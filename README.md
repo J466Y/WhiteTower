@@ -94,7 +94,11 @@ These are the first modules we plan to integrate. None of them is final.
 | **2: Key modules** | LLM gateway and quotas, MCP gateway, skills repository, per-agent harness | One use case in production |
 | **3: Ecosystem** | Shadow AI discovery, compliance, third-party module SDK, public release | First third-party module |
 
-Phases are not dated yet.
+Phases are not dated yet. The implementation roadmap to the MVP, with its milestones and an illustrative calendar, is in [docs/roadmap.md](docs/roadmap.md).
+
+## Design documents
+
+The design package lives in [`docs/`](docs/README.md): the [MVP requirements](docs/requirements/mvp-requirements.md), the [architecture decision records](docs/adr/README.md), the [MVP architecture](docs/architecture/mvp-architecture.md) and the [implementation plans](docs/plans/README.md). All of them are drafts open for review.
 
 ## Out of scope
 
