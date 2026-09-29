@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | Draft |
+| **Status** | Done (see [progress notes](#progress-notes)) |
 | **Size** | M |
 | **Depends on** | none |
 | **Unblocks** | P0-03, P0-04, P1-01, and the schema of every Phase 1 plan |
@@ -140,3 +140,21 @@ Review the model with the maintainers and, if possible, with someone who plays e
 - Model states as PostgreSQL enumerations or check constraints, never as free text.
 - Keep the lifecycle table machine-readable (for example YAML next to the document): P1-04 can generate the transition guards and the documentation from it, so they never diverge.
 - The governance state version must come from one sequence, so every change across all agents has a total order that watch streams can resume from.
+
+## Progress notes
+
+### 2026-09-29: first version, ready for review
+
+| Step | Status | Result |
+| --- | --- | --- |
+| 1. Modeling questions | Done | Q2 and Q3 decided; see [domain model, section 1](../../architecture/domain-model.md#1-modeling-decisions) |
+| 2. Glossary | Done | [Domain model, section 2](../../architecture/domain-model.md#2-glossary) |
+| 3. Entity model | Done | [Domain model, section 3](../../architecture/domain-model.md#3-entities), with the traceability table in section 6 |
+| 4. Lifecycle specification | Done | [lifecycle.md](../../architecture/lifecycle.md) and [agent-lifecycle.yaml](../../architecture/agent-lifecycle.yaml), checked for consistency by script; three tabletop walkthroughs, which added two refinements |
+| 5. Risk tiers and taxonomies | Done | Defaults stored in `settings` |
+| 6. Governance state record | Done | [Domain model, section 4](../../architecture/domain-model.md#4-the-governance-state-record); input for P0-03 |
+| 7. Physical schema | Done | `00001_init.sql`: applies on PostgreSQL 16.15 and 17.11; 28 invariant checks pass on both (three added on 2026-09-29 for the network quarantine bindings and acknowledgements) ([`hack/db/schema_checks.sql`](../../../hack/db/schema_checks.sql)); `sqlc` 1.31.1 generates code from it |
+| 8. Data protection | Done | [Domain model, section 7](../../architecture/domain-model.md#7-personal-data); argument redaction handed to P0-03 |
+| 9. Forward compatibility | Done | [Domain model, section 8](../../architecture/domain-model.md#8-forward-compatibility) |
+| 10. Review and sign-off | Done | Approved by the maintainer (@J466Y) on 2026-09-29. With a single maintainer, one approval stands in for two, as in GOVERNANCE.md |
+

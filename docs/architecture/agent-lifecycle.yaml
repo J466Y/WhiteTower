@@ -1,0 +1,144 @@
+# Agent lifecycle, machine-readable form (normative text: lifecycle.md).
+# Plan P1-04 generates the transition guards, and checks the documentation,
+# from this file. Guard, effect and actor names are defined in lifecycle.md.
+version: 1
+
+states:
+  draft:     { terminal: false, credentials: none,           enforcement_gate: closed }
+  proposed:  { terminal: false, credentials: none,           enforcement_gate: closed }
+  validated: { terminal: false, credentials: non_production, enforcement_gate: open }
+  ready:     { terminal: false, credentials: non_production, enforcement_gate: open }
+  active:    { terminal: false, credentials: all,            enforcement_gate: open }
+  suspended: { terminal: false, credentials: none,           enforcement_gate: closed }
+  retired:   { terminal: true,  credentials: none,           enforcement_gate: closed }
+  rejected:  { terminal: true,  credentials: none,           enforcement_gate: closed }
+
+transitions:
+  - id: T1
+    action: create
+    from: []
+    to: draft
+    actors: [owner]
+    guards: [metadata_complete, use_case_linked]
+    effects: [assign_primary_owner, create_governance_state]
+    audit: whitetower.agent.created.v1
+
+  - id: T2
+    action: submit
+    from: [draft]
+    to: proposed
+    actors: [primary_owner, delegate]
+    guards: [metadata_complete, owner_active]
+    effects: [submit_use_case, notify_advisory]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T3
+    action: withdraw
+    from: [proposed]
+    to: draft
+    actors: [primary_owner, delegate]
+    guards: []
+    effects: [withdraw_use_case]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T4
+    action: request_changes
+    from: [proposed]
+    to: draft
+    actors: [advisory]
+    guards: [not_owner_or_creator, comment_given]
+    effects: [use_case_changes_requested, notify_owner]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T5
+    action: reject
+    from: [proposed]
+    to: rejected
+    actors: [advisory]
+    guards: [not_owner_or_creator, comment_given]
+    effects: [use_case_rejected, notify_owner]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T6
+    action: validate
+    from: [proposed]
+    to: validated
+    actors: [advisory]
+    guards: [not_owner_or_creator, use_case_not_prohibited, owner_active]
+    effects: [use_case_validated, notify_owner]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T7
+    action: mark_ready
+    from: [validated]
+    to: ready
+    actors: [system]
+    guards: [agent_policy_active, harness_declared]
+    effects: [notify_owner]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T8
+    action: unmark_ready
+    from: [ready]
+    to: validated
+    actors: [system]
+    guards: [agent_policy_or_harness_missing]
+    effects: [notify_owner]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T9
+    action: activate
+    from: [ready]
+    to: active
+    actors: [primary_owner, delegate, operator]
+    guards: [owner_active, use_case_validated, agent_policy_active, harness_declared, not_halted]
+    effects: [set_activated_at, schedule_review]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T10
+    action: suspend
+    from: [validated, ready, active]
+    to: suspended
+    actors: [primary_owner, delegate, advisory, operator]
+    guards: [comment_given]
+    reason: manual
+    effects: [remember_previous_state]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T11
+    action: auto_suspend
+    from: [validated, ready, active]
+    to: suspended
+    actors: [system]
+    guards: [owner_inactive_or_review_overdue]
+    reason: [owner_inactive, review_overdue]
+    effects: [remember_previous_state, notify_advisory, notify_operators]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T12
+    action: halt_suspend
+    from: [validated, ready, active]
+    to: suspended
+    actors: [system]
+    guards: [agent_halt_issued]
+    reason: halt
+    effects: [remember_previous_state]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T13
+    action: reinstate
+    from: [suspended]
+    to: previous_state
+    actors: [advisory, operator]
+    guards: [comment_given, owner_active, review_not_overdue, not_halted, previous_state_invariants_hold]
+    effects: [clear_suspension]
+    audit: whitetower.agent.lifecycle_changed.v1
+
+  - id: T14
+    action: retire
+    from: [draft, proposed, validated, ready, active, suspended]
+    to: retired
+    actors: [primary_owner, delegate, advisory, operator]
+    guards: [comment_given]
+    effects: [revoke_credentials, retire_agent_policies, cancel_open_review, set_retired_at]
+    audit: whitetower.agent.lifecycle_changed.v1
