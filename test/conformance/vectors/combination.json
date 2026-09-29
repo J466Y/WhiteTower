@@ -1,0 +1,1123 @@
+{
+  "description": "Combination semantics of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6). Each case is one bundle for agent_id holding the listed policies, one AuthZEN request and the expected response. bundle_version is not compared. valid says whether the policy passes the validator against the profile's Cedar schema, extended with tool_args_extension.",
+  "profile": "v1alpha1",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "tool_args_extension": "type ToolArgs = { recipient_domain?: String };",
+  "cases": [
+    {
+      "id": "C-01",
+      "description": "An agent-specific permit allows",
+      "section": "6.5 (2)",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "read_invoice",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
+      }
+    },
+    {
+      "id": "C-02",
+      "description": "A global permit allows",
+      "section": "6.5 (2)",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000102",
+          "scope": "global",
+          "text": "permit (principal, action == WhiteTower::Action::\"agent.start\", resource);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "agent.start"
+        },
+        "resource": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001"
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000102"
+        ]
+      }
+    },
+    {
+      "id": "C-03",
+      "description": "A global forbid overrides an agent-specific permit",
+      "section": "6.5 (1)",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
+          "scope": "global",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\");",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000202",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource)\nwhen { [WhiteTower::Tool::\"read_invoice\", WhiteTower::Tool::\"send_email\"].contains(resource) };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "send_email",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.forbid",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000101"
+        ]
+      }
+    },
+    {
+      "id": "C-04",
+      "description": "An agent-specific forbid overrides a global permit",
+      "section": "6.5 (1)",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000103",
+          "scope": "global",
+          "text": "permit (principal, action == WhiteTower::Action::\"model.invoke\", resource);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000203",
+          "scope": "agent",
+          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nwhen { resource has provider && resource.provider != \"local\" };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "model.invoke"
+        },
+        "resource": {
+          "type": "model",
+          "id": "gpt-5",
+          "properties": {
+            "provider": "openai"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.forbid",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000203"
+        ]
+      }
+    },
+    {
+      "id": "C-05",
+      "description": "Nothing applies: denied by default",
+      "section": "6.5 (3)",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "delete_database",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.no_permit",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-06",
+      "description": "A permit for another action does not apply",
+      "section": "6.5 (3)",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.result"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "read_invoice",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.no_permit",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-07",
+      "description": "A forbid whose condition does not hold does not apply",
+      "section": "6.5 (2)",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000105",
+          "scope": "global",
+          "text": "forbid (principal, action, resource) when { principal.risk_tier == \"critical\" };",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "read_invoice",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
+      }
+    },
+    {
+      "id": "C-08",
+      "description": "Conditions on the agent's data categories: external model forbidden",
+      "section": "6.2",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000103",
+          "scope": "global",
+          "text": "permit (principal, action == WhiteTower::Action::\"model.invoke\", resource);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000104",
+          "scope": "global",
+          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nwhen { principal.data_categories.contains(\"customer data\") && !(resource has provider && resource.provider == \"local\") };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "model.invoke"
+        },
+        "resource": {
+          "type": "model",
+          "id": "gpt-5",
+          "properties": {
+            "provider": "openai"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.forbid",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000104"
+        ]
+      }
+    },
+    {
+      "id": "C-09",
+      "description": "Conditions on the agent's data categories: local model allowed",
+      "section": "6.2",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000103",
+          "scope": "global",
+          "text": "permit (principal, action == WhiteTower::Action::\"model.invoke\", resource);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000104",
+          "scope": "global",
+          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nwhen { principal.data_categories.contains(\"customer data\") && !(resource has provider && resource.provider == \"local\") };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "model.invoke"
+        },
+        "resource": {
+          "type": "model",
+          "id": "llama-4",
+          "properties": {
+            "provider": "local"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000103"
+        ]
+      }
+    },
+    {
+      "id": "C-10",
+      "description": "Conditions on labels, which are entity tags",
+      "section": "6.2",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000204",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { principal.hasTag(\"team\") && principal.getTag(\"team\") == \"finance\" };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "post_ledger",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000204"
+        ]
+      }
+    },
+    {
+      "id": "C-11",
+      "description": "Conditions on time: inside the permitted hours",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000205",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "post_ledger",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000205"
+        ]
+      }
+    },
+    {
+      "id": "C-12",
+      "description": "Conditions on time: outside the permitted hours",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000205",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "post_ledger",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T20:30:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.no_permit",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-13",
+      "description": "Every permit that applies determines an allow",
+      "section": "6.6",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000206",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource) when { resource.kind == \"function\" };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "read_invoice",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "0192f1c2-7a3b-7c4d-8e5f-000000000206"
+        ]
+      }
+    },
+    {
+      "id": "C-14",
+      "description": "An evaluation error denies, even when a permit applies",
+      "section": "6.5 (4)",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000106",
+          "scope": "global",
+          "text": "// Accesses an optional attribute without checking it first. The validator\n// rejects this policy before approval; enforcement points must still deny if\n// one gets through.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource) when { resource.server == \"untrusted\" };",
+          "valid": false
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "read_invoice",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.evaluation",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000106"
+        ]
+      }
+    },
+    {
+      "id": "C-15",
+      "description": "The environment comes from the credential",
+      "section": "6.2",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000107",
+          "scope": "global",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { principal.environment == \"non_production\" };",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000207",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "non_production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "post_ledger",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.forbid",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000107"
+        ]
+      }
+    },
+    {
+      "id": "C-16",
+      "description": "Tool arguments declared by the deployment: forbidden value",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000108",
+          "scope": "global",
+          "text": "// Needs the deployment extension ToolArgs = { recipient_domain?: String }.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\")\nwhen { context has args && context.args has recipient_domain && context.args.recipient_domain != \"example.org\" };",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000208",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "send_email",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "recipient_domain": "evil.test"
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.forbid",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000108"
+        ]
+      }
+    },
+    {
+      "id": "C-17",
+      "description": "Tool arguments declared by the deployment: permitted value",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000108",
+          "scope": "global",
+          "text": "// Needs the deployment extension ToolArgs = { recipient_domain?: String }.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\")\nwhen { context has args && context.args has recipient_domain && context.args.recipient_domain != \"example.org\" };",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000208",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "send_email",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "recipient_domain": "example.org"
+          }
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000208"
+        ]
+      }
+    },
+    {
+      "id": "C-18",
+      "description": "A request for another agent is refused",
+      "section": "6.5 (4)",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "read_invoice",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.unknown_agent",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-19",
+      "description": "A request that does not match the profile is refused",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000103",
+          "scope": "global",
+          "text": "permit (principal, action == WhiteTower::Action::\"model.invoke\", resource);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "model",
+          "id": "gpt-5",
+          "properties": {
+            "provider": "openai"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-20",
+      "description": "An agent action concerns the requesting agent only",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000102",
+          "scope": "global",
+          "text": "permit (principal, action == WhiteTower::Action::\"agent.start\", resource);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "agent.start"
+        },
+        "resource": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000002"
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    }
+  ]
+}

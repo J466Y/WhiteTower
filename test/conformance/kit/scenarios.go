@@ -1,0 +1,125 @@
+package kit
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"slices"
+	"time"
+
+	modulev1alpha1 "github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1"
+	"github.com/J466Y/WhiteTower/test/conformance/bundle"
+	"github.com/J466Y/WhiteTower/test/conformance/profile"
+)
+
+// Fixture is what a scenario needs: the agent the module serves, a bundle for
+// it, and a request the bundle permits.
+type Fixture struct {
+	Agent     *modulev1alpha1.AgentState
+	Bundle    *bundle.Bundle
+	Ref       bundle.Ref
+	Permitted DecideRequest
+}
+
+// poll is how often scenarios look at the module under test.
+const poll = 20 * time.Millisecond
+
+// StartClosed is scenario S-01, for obligation EP-1: the module allows nothing
+// until it has registered, received a complete state and a lease, and
+// activated a verified bundle; then it allows what the bundle permits, and
+// acknowledges the activation.
+func StartClosed(ctx context.Context, core *Core, driver *Driver, fx Fixture) error {
+	if err := waitFor(ctx, func() bool { return core.Watchers() > 0 }); err != nil {
+		return fmt.Errorf("the module never opened a watch: %w", err)
+	}
+
+	// 1. Connected, but no state yet.
+	if err := expectFor(ctx, driver, fx.Permitted, 200*time.Millisecond, profile.ReasonNoState); err != nil {
+		return fmt.Errorf("before any state: %w", err)
+	}
+
+	// 2. State and a lease, but no bundle.
+	agent := fx.Agent
+	agent.Bundle = nil
+	core.SetAgent(agent)
+	core.Release()
+	if err := eventually(ctx, driver, fx.Permitted, false, profile.ReasonNoBundle); err != nil {
+		return fmt.Errorf("with state but no bundle: %w", err)
+	}
+
+	// 3. A verified bundle: the permitted request is allowed.
+	if err := core.PublishBundle(agent.GetAgentId(), fx.Bundle, fx.Ref); err != nil {
+		return err
+	}
+	if err := eventually(ctx, driver, fx.Permitted, true, profile.ReasonPermit); err != nil {
+		return fmt.Errorf("with a verified bundle: %w", err)
+	}
+
+	// 4. The activation was acknowledged.
+	return waitFor(ctx, func() bool {
+		return slices.ContainsFunc(core.Acks(), func(a *modulev1alpha1.Acknowledgement) bool {
+			b := a.GetBundle()
+			return b != nil && b.GetVersion() == fx.Ref.Version && b.GetManifestSha256() == fx.Ref.ManifestSHA256 &&
+				b.GetOutcome() == modulev1alpha1.BundleOutcome_BUNDLE_OUTCOME_ACTIVATED
+		})
+	})
+}
+
+// expectFor requires the same denial for the whole duration.
+func expectFor(ctx context.Context, driver *Driver, req DecideRequest, d time.Duration, reason string) error {
+	deadline := time.Now().Add(d)
+	for {
+		got, err := driver.Decide(ctx, req)
+		if err != nil {
+			return err
+		}
+		if got.Decision || got.Context.Reason != reason {
+			return fmt.Errorf("got decision %v with reason %s, want a denial with reason %s", got.Decision, got.Context.Reason, reason)
+		}
+		if time.Now().After(deadline) {
+			return nil
+		}
+		if err := sleep(ctx, poll); err != nil {
+			return err
+		}
+	}
+}
+
+// eventually waits for a decision. While it waits, the module must not allow
+// anything the scenario does not expect it to allow.
+func eventually(ctx context.Context, driver *Driver, req DecideRequest, decision bool, reason string) error {
+	for {
+		got, err := driver.Decide(ctx, req)
+		if err != nil {
+			return err
+		}
+		if got.Decision == decision && got.Context.Reason == reason {
+			return nil
+		}
+		if got.Decision && !decision {
+			return fmt.Errorf("allowed (reason %s) while it must deny", got.Context.Reason)
+		}
+		if err := sleep(ctx, poll); err != nil {
+			return fmt.Errorf("last decision %v with reason %s, want %v with reason %s: %w",
+				got.Decision, got.Context.Reason, decision, reason, err)
+		}
+	}
+}
+
+func waitFor(ctx context.Context, cond func() bool) error {
+	for !cond() {
+		if err := sleep(ctx, poll); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return errors.Join(errors.New("timed out"), ctx.Err())
+	case <-time.After(d):
+		return nil
+	}
+}

@@ -1,0 +1,15 @@
+{
+  "description": "A validly signed bundle whose policy does not parse",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "0716e134b5ddbc6b32598a593591d490a3704d48309a3e580c4862128eedb20a",
+    "size_bytes": 4182
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

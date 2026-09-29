@@ -1,0 +1,15 @@
+{
+  "description": "A combining algorithm the contract does not define",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "b0b850dd42bf3706fe0ebb934ab7cc90cd90871e6390421ea28514eadbc3bf3c",
+    "size_bytes": 4340
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "unsupported"
+  }
+}

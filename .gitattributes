@@ -24,3 +24,6 @@ web/src/api/schema.gen.ts linguist-generated=true
 web/pnpm-lock.yaml linguist-generated=true
 hack/tools/go.sum linguist-generated=true
 go.sum linguist-generated=true
+
+# Signed test vectors: their bytes are signed, so they are never converted.
+test/conformance/vectors/bundles/** -text
