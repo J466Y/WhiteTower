@@ -1,0 +1,9 @@
+# oapi-codegen configuration for the Go server interfaces of the public API.
+# Run through `task gen`; paths are relative to the repository root.
+package: gen
+output: internal/api/rest/gen/server.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+  embedded-spec: false

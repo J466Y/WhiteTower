@@ -1,0 +1,10 @@
+# Buf configuration for the module API (ADR-0004).
+version: v2
+modules:
+  - path: api/proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE
