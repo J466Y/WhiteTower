@@ -185,7 +185,7 @@ Initial values of `settings`, all editable by administrators:
 | `lifecycle.review_grace_days` | 14 |
 | `lifecycle.review_reminder_days` | 30, 7 and 1 days before the due date |
 | `lifecycle.review_signoff_risk_tiers` | high, critical |
-| `killswitch.lease_ttl_seconds` | low 60, medium 60, high 30, critical 15 (P0-05 S2 may adjust them) |
+| `killswitch.lease_ttl_seconds` | low 60, medium 60, high 30, critical 15 (confirmed by spike S2) |
 | `killswitch.unconfirmed_after_seconds` | 10 |
 | `audit.retention_months` | 6, the EU AI Act minimum (NFR-10) |
 | `inventory.data_categories` | public data, internal documents, customer data, employee data, personal data, special category data, financial data, health data, source code, credentials |

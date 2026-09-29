@@ -133,13 +133,13 @@ Update section 6 of the requirements (targets set), amend ADR-0005 or ADR-0006 i
 
 ## Progress notes
 
-### 2026-09-29: S1, S4 and S5 done
+### 2026-09-29: S1, S2, S4 and S5 done
 
 | Spike | Status | Result |
 | --- | --- | --- |
 | S1 AGT integration | Done | **No-go on AGT as the foundation of the MVP enforcement point: White Tower builds its own enforcement point in Python, and AGT becomes a Phase 2 interoperability adapter.** Accepted by the maintainer on 2026-09-29 in [ADR-0011](../../adr/0011-own-python-enforcement-point.md); AGT is re-tested live in the pilot (P1-14). Report: [S1-agt.md](../../spikes/S1-agt.md) |
 | S5 Interrupting agents | Done (in the S1 report) | Asynchronous tools and streaming calls stop within milliseconds; blocking tools cannot be interrupted in-process, so the `terminate` halt mode and honest layered acknowledgements are needed |
-| S2 Watch streams and halt propagation | Not started | |
+| S2 Watch streams and halt propagation | Done | With 1,000 enforcement points on two replicas: fleet halts p95 0.63 s, max 0.74 s; leases expire within 10 ms of their TTL; a lost replica's streams move in 0.6 s. Reconnection backoff must be bounded by the lease (module contracts, I-4). NFR-03, NFR-05, NFR-06 and NFR-07 confirmed; default lease TTLs kept. Report: [S2-watch-streams.md](../../spikes/S2-watch-streams.md) |
 | S3 Audit log throughput | Not started | |
 | S4 Policy evaluation latency | Done | In process, 100 policies: `cedar-go` p99 ≤ 0.12 ms, OPA embedded with the contract's Rego wrapper ≤ 1.2 ms, `cedarpy` ≤ 1.02 ms (S1); an AuthZEN decision point on the same host ≤ 0.53 ms. NFR-02 kept as proposed, now backed by measurements; across cluster nodes left to S2. Report: [S4-policy-latency.md](../../spikes/S4-policy-latency.md) |
 

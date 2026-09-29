@@ -1,0 +1,5 @@
+s2.exe
+s2
+results*.json
+!results-1000.json
+run-*.log

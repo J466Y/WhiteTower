@@ -181,3 +181,4 @@ These numbers are evidence for the Phase 1 gate.
 - The gate check must be cheap (a read of an immutable snapshot, 59 ns in S1); it runs on every hook.
 - Treat the core's bundle keys as the trust root; ship them through configuration, never fetch them over an unauthenticated channel.
 - Keep framework-specific code in thin integration modules, so a framework upgrade touches one file.
+- Reconnect as spike S2 validated: backoff with full jitter, capped at a third of the lease TTL and reset once a session receives a renewal (I-4); HTTP/2 pings detect a dead connection before the lease expires.
