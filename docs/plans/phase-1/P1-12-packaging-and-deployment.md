@@ -22,7 +22,7 @@ White Tower can be evaluated on a laptop in fifteen minutes, deployed on Kuberne
 
 ## Deliverables
 
-- Hardened images for the core, the mock module and the demo agent.
+- Hardened images for the core, the mock module and the demo agent (the network quarantine module's image comes from P1-15).
 - `deploy/compose/` profiles `dev` and `eval`, with seed data.
 - `deploy/helm/whitetower/`, with a values schema and tests.
 - The offline bundle build.
@@ -77,8 +77,8 @@ The `eval` profile grows with the project: P1-12.1 ships it with the core, Postg
 
 A build job produces `whitetower-offline-<version>.tar` containing:
 
-- OCI image archives: core, mock module and demo agent;
-- the adapter wheel and the Helm chart;
+- OCI image archives: core, mock module, demo agent and network quarantine module;
+- the enforcement point wheel and the Helm charts (core and network quarantine);
 - SBOMs, cosign bundles for offline signature verification, and checksums;
 - the documentation.
 
@@ -122,7 +122,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 
 ### 10. Compatibility matrix in CI (NFR-15)
 
-The three latest Kubernetes minor versions (kind), PostgreSQL 16 and 17, and amd64 and arm64 image builds.
+The three latest Kubernetes minor versions (kind, with Cilium as the CNI so the network quarantine tests of P1-15 run in the same clusters), PostgreSQL 16 and 17, and amd64 and arm64 image builds.
 
 **Done when:** the matrix is green for the release candidate.
 

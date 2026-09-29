@@ -18,7 +18,7 @@ The core side of the module contracts: modules are registered and approved, thei
 
 **In:** the generated code, authentication and authorization on the machine listener, module registration, instance sessions, the governance state service and watch fan-out, acknowledgements, ingestion wiring, the mock reference module, the conformance kit, load tests.
 
-**Out:** the kill switch domain (P1-08, which writes the governance state through the service built here); bundles (P1-06); the AGT adapter (P1-09).
+**Out:** the kill switch domain (P1-08, which writes the governance state through the service built here); bundles (P1-06); the Python enforcement point (P1-09); the network quarantine module (P1-15).
 
 ## Deliverables
 

@@ -6,8 +6,8 @@
 | **Status** | Draft |
 | **Size** | L |
 | **Depends on** | P1-04, P1-05, P1-07 |
-| **Unblocks** | P1-09, P1-10.5, P1-14 |
-| **Requirements** | KIL-01 to KIL-09, NFR-03 to NFR-05 |
+| **Unblocks** | P1-09, P1-10.5, P1-15 (end-to-end tests), P1-14 |
+| **Requirements** | KIL-01 to KIL-10, NFR-03 to NFR-05 |
 | **Decisions** | ADR-0005, ADR-0010 |
 
 ## Goal
@@ -18,7 +18,7 @@ Anyone with the right role can stop one agent, a selection of agents or the whol
 
 **In:** halt domain and API, fleet and selector halts, propagation tracking, release workflow, lease policy, break-glass integration, drills, fault-injection tests, performance validation, runbooks.
 
-**Out:** the watch transport (P1-07); what the enforcement point does inside the agent (P1-09); the console screens (P1-10.5); a halt path at container or Kubernetes level (Phase 2 harness module).
+**Out:** the watch transport (P1-07); what the enforcement point does inside the agent (P1-09); the network quarantine module (P1-15); the console screens (P1-10.5); stopping workloads (Phase 2 harness module).
 
 ## Deliverables
 
@@ -63,13 +63,13 @@ After commit, notify the other replicas. Token issuance is blocked at once, beca
 
 ### 4. Propagation tracking
 
-- **Expected instances:** those connected, or holding a valid lease, for the targeted agents when the halt is issued, plus any that connect afterwards.
-- **Acknowledgements** report each layer with its timestamp: gate closed, in-flight action interrupted, process terminated.
+- **Expected instances:** those connected, or holding a valid lease, for the targeted agents when the halt is issued, plus any that connect afterwards. They include the network quarantine module of each cluster where a targeted agent has pods (P1-15).
+- **Acknowledgements** report each layer with its timestamp: gate closed, in-flight action interrupted, process terminated, network quarantined (with the number of workloads covered).
 - **Halt status:** propagating, then confirmed (every expected instance acknowledged), partially confirmed, or unconfirmed after a timeout (10 seconds by default), which fires an alert.
-- **Metrics:** `whitetower_halt_propagation_seconds` (issued to acknowledged) and `whitetower_halt_effect_seconds` (issued to in-flight interruption or termination).
+- **Metrics:** `whitetower_halt_propagation_seconds` (issued to acknowledged), `whitetower_halt_effect_seconds` (issued to in-flight interruption or termination) and `whitetower_halt_quarantine_seconds` (issued to network quarantine applied).
 - An instance that keeps sending action events after acknowledging a halt is flagged as suspect (threat model: an enforcement point that lies).
 
-**Done when:** the status and both metrics are correct in tests with mock instances that acknowledge, delay, stay silent and lie.
+**Done when:** the status and the metrics are correct in tests with mock instances that acknowledge, delay, stay silent and lie, including a mock quarantine module.
 
 ### 5. Release workflow
 
@@ -121,7 +121,7 @@ With 500 mock instances, halt one agent and the whole fleet repeatedly. Measure 
 ### 11. Runbooks
 
 - How to halt an agent or the fleet.
-- What to do when a halt stays unconfirmed: kill the process or pod manually, revoke credentials, isolate the network.
+- What to do when a halt stays unconfirmed: check the network quarantine layer (P1-15); otherwise kill the process or pod manually, revoke credentials and isolate the network by hand.
 - How to release, and then how to reinstate.
 
 **Done when:** the runbooks are reviewed by an operator and rehearsed once.
@@ -138,7 +138,7 @@ With 500 mock instances, halt one agent and the whole fleet repeatedly. Measure 
 
 | Risk or question | Mitigation or owner |
 | --- | --- |
-| Enforcement points acknowledge but do not stop | Layered acknowledgements; suspicious activity flagged; token issuance stopped; a halt path outside the agent in Phase 2 |
+| Enforcement points acknowledge but do not stop | Layered acknowledgements; suspicious activity flagged; token issuance stopped; network quarantine on Kubernetes (P1-15); stopping workloads in Phase 2 |
 | Accidental fleet halt | Strong confirmation in the console and CLI (reason plus an explicit confirmation), fast two-person release, and drills that build familiarity |
 | Halt storms (many halts issued in a short time) | Idempotency keys; coalesced state changes in the governance state hub |
 

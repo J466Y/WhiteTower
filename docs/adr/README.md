@@ -25,8 +25,9 @@ Decisions that change the **module contracts** also need an RFC (see `CONTRIBUTI
 | [0008](0008-license-apache-2.md) | Apache-2.0 license and DCO for contributions | Proposed |
 | [0009](0009-human-auth-bff-sessions.md) | Human authentication through a backend-for-frontend with server-side sessions | Proposed |
 | [0010](0010-built-in-agent-token-issuer.md) | Built-in token issuer for agent and module credentials | Proposed |
+| [0011](0011-own-python-enforcement-point.md) | White Tower's own enforcement point for Python agents, instead of Microsoft AGT | Accepted |
 
-All ten are expected to be accepted, amended or rejected at the Phase 0 gate at the latest.
+ADR-0001 to ADR-0010 are expected to be accepted, amended or rejected at the Phase 0 gate at the latest. ADR-0011 was accepted when spike S1 closed.
 
 ## Template
 

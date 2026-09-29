@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft v0.1, open for review |
-| **Date** | 2026-09-28 |
+| **Date** | 2026-09-28; updated 2026-09-29 (spike S1, ADR-0011, network quarantine) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
 
@@ -18,9 +18,9 @@ Changes to this document go through pull requests. Changes to anything that is p
 The MVP is the end of **Phase 1 (Core MVP)** of the charter, and it includes all of **Phase 0 (Foundations)**. It is reached when the Phase 1 gate passes: **a pilot with real agents** in which:
 
 1. Every pilot agent appears in the inventory with an active owner, a validated use case and an approved agent-specific policy.
-2. Pilot agents authenticate with identities issued by White Tower and are governed at runtime by Microsoft AGT, using policies distributed by White Tower.
+2. Pilot agents authenticate with identities issued by White Tower and are governed at runtime by White Tower's enforcement point ([ADR-0011](../adr/0011-own-python-enforcement-point.md)), using policies distributed by White Tower.
 3. Every policy decision and every governance action of the pilot is in the tamper-evident audit log, can be verified with the CLI, and is exported to at least one external system (SIEM or log collector).
-4. The kill switch stops a running pilot agent, per agent and fleet-wide, within the target set in Phase 0, and the stop is confirmed and measured.
+4. The kill switch stops a running pilot agent, per agent and fleet-wide, within the target set in Phase 0, and the stop is confirmed and measured. Agents running on Kubernetes are also isolated at the network level while halted.
 
 The following are **not** part of the MVP (they belong to Phases 2 and 3): LLM gateway and quotas, MCP gateway, skills repository, enforced harness/sandbox, shadow AI discovery, compliance module and the public third-party SDK. The MVP must not block them: the data model and the contracts account for them from v0.1 (see [section 9](#9-out-of-scope-for-the-mvp)).
 
@@ -43,8 +43,8 @@ The following are **not** part of the MVP (they belong to Phases 2 and 3): LLM g
 | Actor | Description |
 | --- | --- |
 | Agent | An in-house or third-party AI agent. It may run with or without White Tower runtime integration (see coverage levels). |
-| Module | A component that provides a capability through the module contract. It runs as one or more module instances. |
-| Enforcement point (EP) | A module instance that applies governance to agents at runtime. In the MVP, this is the Microsoft AGT adapter running alongside the agent. |
+| Module | A component that provides a capability through the module contract. It runs as one or more module instances. In the MVP: the enforcement point, the network quarantine module and the mock module. |
+| Enforcement point (EP) | A module instance that applies governance to agents at runtime. In the MVP, this is White Tower's enforcement point, a Python package loaded in the agent's process ([ADR-0011](../adr/0011-own-python-enforcement-point.md)). |
 | Organization IdP | Source of human identities (OIDC). |
 | SIEM or log collector | Consumer of audit exports. |
 
@@ -59,6 +59,7 @@ The following are **not** part of the MVP (they belong to Phases 2 and 3): LLM g
 | Governance state | What the core tells EPs about an agent: lifecycle state, run state (running or halted), effective bundle reference and lease. |
 | Halt | The action of the kill switch: stop an agent (or the fleet) that is running. |
 | Lease | A time-bounded permission to keep operating that an EP must renew with the core. When it expires, the EP fails closed. |
+| Network quarantine | Isolation of a halted agent's workloads at the network level, applied from outside the agent's process (KIL-10). |
 | Lifecycle state | Where an agent is in the governance process (draft, proposed, validated, ready, active, suspended, retired, rejected). |
 | Run state | Whether an agent is allowed to act right now (running) or stopped by the kill switch (halted). Orthogonal to the lifecycle state. |
 | Checkpoint | A signed statement of the size and root hash of the audit log at a point in time. |
@@ -174,7 +175,7 @@ stateDiagram-v2
 
 | ID | Requirement | Pri | Source |
 | --- | --- | --- | --- |
-| POL-01 | Policies are stored as immutable, versioned documents with a declared language (for example Rego, Cedar or the AGT format) and a scope: global or agent-specific. | M | Scope |
+| POL-01 | Policies are stored as immutable, versioned documents with a declared language (Cedar in the MVP; Rego for engines that run it natively) and a scope: global or agent-specific. | M | Scope |
 | POL-02 | Approval workflow: global policies are approved by the steering committee and agent-specific policies by the advisory committee; the author cannot approve. | M | Governance model |
 | POL-03 | The combination semantics (5.4.1) are part of the contract, and every policy engine adapter must pass the conformance tests for them. | M | Principles |
 | POL-04 | An agent cannot become active without at least one approved agent-specific policy. | M | Governance model |
@@ -215,7 +216,7 @@ The decision records the policy versions and rules that produced it, so the audi
 
 | ID | Requirement | Pri | Source |
 | --- | --- | --- | --- |
-| KIL-01 | Halting an agent stops it while it runs: the current governed action is interrupted and no new action is allowed. Revoking its next token is not enough. | M | Non-functional requirements |
+| KIL-01 | Halting an agent stops it while it runs. **Guaranteed:** from the moment the enforcement point receives the halt, every further governed call and interaction (tool calls, model calls, inputs and outputs) is denied; revoking the next token is not enough. **Best effort:** the action already in flight is interrupted when the framework allows it, and the acknowledgement reports whether it was. Terminating the agent's process is not the default: it happens only when the agent's owner chooses the `terminate` halt mode (decision of 2026-09-29, after spike S1). | M | Non-functional requirements |
 | KIL-02 | Fleet-wide halt of all agents (M), or of a selector such as environment, label or risk tier (S). | M/S | Scope |
 | KIL-03 | Every enforcement point of the target acknowledges the halt. The API and UI show per-instance status and the propagation time, which is also exported as a metric. | M | Non-functional requirements |
 | KIL-04 | Fail-closed backstop: an enforcement point that loses contact with the core for longer than its lease TTL denies every action and halts the agent. | M | Principles |
@@ -224,6 +225,7 @@ The decision records the policy versions and rules that produced it, so the audi
 | KIL-07 | An enforcement point that connects or reconnects for a halted agent receives the halted state before it can allow any action. | M | New |
 | KIL-08 | Break-glass halting works while the IdP is unavailable (see HUM-06). | S | New |
 | KIL-09 | Kill-switch drills: test halts on designated agents, with measured timings. A successful drill within the configured period gives the agent coverage C3. | S | Success criteria |
+| KIL-10 | **Network quarantine on Kubernetes.** While an agent is halted, by an agent, selector or fleet halt, its workloads on Kubernetes are isolated at the network level, whatever the agent's code does: all traffic is denied except what the halt itself needs (reaching the core). Workloads started later for a halted agent are isolated from their start. The isolation is applied within seconds (NFR-23), reported as its own layer in the halt acknowledgement, and lifted when the halt is released. The workload keeps running, so it can be investigated. It requires a CNI that enforces deny rules, such as Cilium, Calico, Antrea or one implementing AdminNetworkPolicy (decision of 2026-09-29). | M | Principles (deny by default), New |
 
 ### 5.7 Modules and contracts (MOD)
 
@@ -234,7 +236,7 @@ The decision records the policy versions and rules that produced it, so the audi
 | MOD-03 | Contracts are versioned (`v1alpha1` in the MVP), versions are negotiated when a module connects, and CI detects breaking changes. Contract changes go through the RFC process. | M | Charter governance |
 | MOD-04 | Governance state is delivered to enforcement points through a watch stream with leases (ADR-0005). | M | Non-functional requirements |
 | MOD-05 | A conformance kit lets module authors check an implementation against the contract, including leases, fail-closed behavior, halts, combination semantics and event schemas. | M | Scope |
-| MOD-06 | A Microsoft AGT adapter provides policy enforcement, runtime control (halt) and decision and action events. AGT is an in-process library with no remote control API, so the adapter is a Python package loaded inside the agent process. It supplies what AGT lacks: remote policy delivery, remote halt and confirmation that the halt took effect. | M | Roadmap (Phase 1) |
+| MOD-06 | White Tower's enforcement point for Python agents provides the governance gate, policy enforcement with Cedar, runtime control (halt) and decision and action events. It is a Python package loaded inside the agent's process, with hooks for the pilot's frameworks (LangGraph 1.x first). It fails closed, records every decision before acting on it, and reports honestly what each halt layer achieved. It replaces the Microsoft AGT adapter of the charter's Phase 1 ([ADR-0011](../adr/0011-own-python-enforcement-point.md)); an AGT interoperability adapter is a Phase 2 candidate. | M | Roadmap (Phase 1), ADR-0011 |
 | MOD-07 | A mock reference module is available for tests and demos. | M | New |
 | MOD-08 | Replacing a module implementation requires no change in the core. The MVP designs for it; Phase 2 demonstrates it with a second policy engine. | M | Success criteria |
 
@@ -283,7 +285,7 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 | NFR-01 | **Fail-closed.** EPs deny every action when the lease has expired, the bundle is missing, invalid or unsigned, the agent state is unknown or the agent is halted. The core API denies on any authorization error. | 100% of fault-injection tests | M | P0-03, P1-08 |
 | NFR-02 | **Decision latency.** The core is never in the synchronous path of an agent action; policy evaluation at the EP adds bounded latency. | p99 ≤ 5 ms in-process; p99 ≤ 20 ms for a remote PDP in the same cluster | M | P0-05 |
 | NFR-03 | **Halt propagation to connected EPs**, from halt issued to acknowledgement. | p95 ≤ 2 s; max ≤ 5 s at MVP scale | M | P0-05, P1-08 |
-| NFR-04 | **Halt effect.** No new governed action can start once the EP has received the halt (within the NFR-03 time). The action in flight is interrupted, or the agent process terminated, and the acknowledgement says which. | In-flight interruption or termination confirmed: p95 ≤ 10 s (AGT's in-process kill callbacks time out after 5 s) | M | P0-05, P1-09 |
+| NFR-04 | **Halt effect.** No new governed action can start once the EP has received the halt (within the NFR-03 time). Interrupting the action in flight is best effort and always reported; the process is terminated only in the `terminate` halt mode. | Gate closed within milliseconds of receipt (spike S1: under 0.02 ms). In-flight asynchronous work interrupted: p95 ≤ 10 s (S1: 1 to 3 ms); blocking work reported as not interrupted unless the halt mode is `terminate` | M | P0-05, P1-09 |
 | NFR-05 | **Lease backstop.** An EP without contact with the core halts within its lease TTL. | Default TTL 60 s; configurable 10 to 300 s, per risk tier | M | P0-05 |
 | NFR-06 | **Availability.** Core highly available with at least two replicas; rolling upgrades complete well within the lease TTL, so they do not stop agents. | 99.9% monthly during the pilot | S | P1-12 |
 | NFR-07 | **Scale.** Capacity the MVP must sustain. | 1,000 agents; 500 concurrent EP connections; 200 audit events/s sustained and 2,000/s bursts for 60 s; 50 concurrent console users | M | P0-05, P1-13 |
@@ -302,6 +304,7 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 | NFR-20 | **Privacy.** Personal data in audit events is minimized, human identifiers can be pseudonymized on export, and retention is configurable (GDPR). | Data inventory reviewed | S | P0-02, P0-04 |
 | NFR-21 | **Security of the project itself.** Published threat model, updated each phase; SECURITY.md with coordinated vulnerability disclosure; private vulnerability reporting enabled. | Published at the Phase 0 gate | M | P0-01, P0-04 |
 | NFR-22 | **Framework mapping.** Features mapped to the OWASP Top 10 for Agentic Applications 2026 (ASI01 to ASI10) and to the EU AI Act obligations on logging (Article 12), human oversight including the ability to halt the system (Article 14(4)(e)), and log retention and monitoring (Articles 19 and 26). | Mapping document | S | P0-04 |
+| NFR-23 | **Network quarantine.** Time from a halt issued to the agent's workloads isolated, on the reference CNI (Cilium), for workloads running when the halt is issued. | p95 ≤ 5 s; max ≤ 10 s | S | P1-15 |
 
 ## 7. Constraints
 
@@ -319,10 +322,11 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 
 | ID | Assumption | Impact if false |
 | --- | --- | --- |
-| ASM-01 | Microsoft AGT remains maintained and exposes the integration points confirmed in the P0-05 spike (charter assumption). **At risk:** as of September 2026, AGT is in Public Preview with frequent breaking changes, and the Agentic AI Foundation declined to host it (June 2026), so the charter's expectation of a move to a foundation has not happened. | The Phase 1 kill switch and policy enforcement need another first enforcement point. P0-05 includes a go/no-go decision and a fallback (a minimal White Tower enforcement point in Python, without AGT); the contracts stay the same. |
+| ASM-01 | The pilot's governed agents are Python agents whose tool and model calls can be hooked, starting with LangGraph 1.x. This replaces the charter's assumption that Microsoft AGT would be the first enforcement point: spike S1 found it immature (Public Preview, frequent breaking changes, no foundation after the Agentic AI Foundation declined it in June 2026), and the MVP no longer depends on it ([ADR-0011](../adr/0011-own-python-enforcement-point.md)). | The enforcement point needs hooks for another framework (P1-09), or an agent is registered at coverage C0 or C1 without runtime enforcement. |
 | ASM-02 | There is an initial team able to build the core (charter assumption). Plan sizes assume one engineer per plan. | Dates move; scope does not. |
-| ASM-03 | A pilot organization provides an OIDC IdP (or accepts the bundled Keycloak), a Kubernetes cluster or a Docker host, two to five real agents that can be instrumented with AGT, named owners and committee members, and a SIEM or log collector. | The Phase 1 gate cannot be passed. Securing the pilot early is on the critical path. |
+| ASM-03 | A pilot organization provides an OIDC IdP (or accepts the bundled Keycloak), a Kubernetes cluster or a Docker host, two to five real agents that can be instrumented with White Tower's enforcement point, named owners and committee members, and a SIEM or log collector. | The Phase 1 gate cannot be passed. Securing the pilot early is on the critical path. |
 | ASM-04 | Hosts are time-synchronized (NTP). | Audit timestamps and token validation become unreliable. |
+| ASM-05 | Kubernetes clusters that run governed agents use a CNI that enforces deny rules (Cilium, Calico, Antrea, or one implementing AdminNetworkPolicy), and agents' pods can be labeled with their White Tower agent ID. | Network quarantine (KIL-10) is not available in that cluster: halts there rely on the in-process gate and on token issuance, and the console shows the quarantine layer as unavailable. It is demonstrated on the reference cluster instead. |
 
 ## 9. Out of scope for the MVP
 
@@ -331,9 +335,10 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 | LLM gateway, token quotas, cost, GPU and local inference | 2 | Capability defined in the contract taxonomy; decision input model covers model calls |
 | MCP and tool gateway | 2 | Decision input model covers tool calls; agent tokens carry an audience |
 | Skills repository with review and signing | 2 | Capability defined in the taxonomy; the audit log and signing keys are reusable |
-| Enforced per-agent harness (sandbox) | 2 | Harness declared per agent during the lifecycle |
+| Enforced per-agent harness (sandbox), including stopping workloads | 2 | Harness declared per agent during the lifecycle; halted agents on Kubernetes are already isolated at the network level (KIL-10) |
 | Per-task delegated credentials (token exchange) | 2 | Token endpoint designed to add the grant (AID-08) |
 | Second policy engine (module replacement demonstrated) | 2 | Contracts validated on paper against more than one engine (P0-03) |
+| Microsoft AGT interoperability adapter | 2 | Contracts mapped onto AGT (P0-03); AGT re-tested live in the pilot (P1-14, ADR-0011) |
 | Shadow AI discovery | 3 | Inventory accepts C0 agents and a `discovered` source flag is reserved |
 | Compliance module and GRC export | 3 | Evidence bundles (AUD-10) and framework mapping (NFR-22) |
 | Public third-party module SDK | 3 | Internal Go SDK and conformance kit built in the MVP |
@@ -344,7 +349,7 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 
 These must exist before feature code starts. They are the Phase 0 plans and the first steps of Phase 1.
 
-1. **Accepted decisions.** ADR-0001 to ADR-0010 accepted or amended by the maintainers.
+1. **Accepted decisions.** ADR-0001 to ADR-0010 accepted or amended by the maintainers. ADR-0011 is already accepted.
 2. **Phase 0 outputs.** Data model v0.1 (P0-02), module contracts v0.1 reviewed through an RFC (P0-03), threat model v0.1 (P0-04), and the NFR targets of section 6 confirmed by measurements (P0-05).
 3. **Project infrastructure.** Repository settings (branch protection, required reviews, private vulnerability reporting, secret scanning), CI, container registry, and the Go module path decision, which depends on whether the project will own a domain (P0-01).
 4. **People.** Maintainers, reviewers for contract RFCs and a security reviewer. A **pilot organization and its agents identified by the Phase 0 gate**, because the Phase 1 gate depends on them (ASM-03).
@@ -355,7 +360,7 @@ These must exist before feature code starts. They are the Phase 0 plans and the 
 | Success criterion | Requirements | Verified in |
 | --- | --- | --- |
 | Every deployed agent appears in the inventory with an assigned owner and policy | INV-01, INV-02, INV-04, POL-04, AID-04 | P1-14 |
-| The kill switch stops a running agent within the target set in Phase 0 | KIL-01 to KIL-07, NFR-03 to NFR-05 | P0-05 (target), P1-08, P1-09, P1-14 |
+| The kill switch stops a running agent within the target set in Phase 0 | KIL-01 to KIL-07, KIL-10, NFR-03 to NFR-05, NFR-23 | P0-05 (target), P1-08, P1-09, P1-15, P1-14 |
 | At least one module is replaced by another vendor's module without changes to the core | MOD-03, MOD-05, MOD-08 | Designed in P0-03, demonstrated in Phase 2 |
 | Audit evidence is consumed from an external SIEM | AUD-03, AUD-04, AUD-06 | P1-02, P1-14 |
 
@@ -364,9 +369,9 @@ These must exist before feature code starts. They are the Phase 0 plans and the 
 | # | Question | Proposal | Decided in |
 | --- | --- | --- | --- |
 | Q1 | What exactly does "if the core does not respond, the action is denied" mean? | Leases with a TTL: EPs decide locally and fail closed when the lease expires (ADR-0005). A synchronous check per action is a Phase 2 option for critical agents. | ADR-0005, Phase 0 gate |
-| Q2 | Is an agent in several environments one record or several? | One logical agent; credentials labeled per environment; running instances reported by EPs. | P0-02 |
-| Q3 | Single-tenant or multi-tenant? | Single organization per deployment. | P0-02 |
+| Q2 | Is an agent in several environments one record or several? | **Decided (P0-02):** one logical agent; credentials labeled per environment; running instances reported by EPs. See the [domain model](../architecture/domain-model.md#1-modeling-decisions). | P0-02 |
+| Q3 | Single-tenant or multi-tenant? | **Decided (P0-02):** single organization per deployment, no tenant column. | P0-02 |
 | Q4 | Default lease TTL and halt targets? | Section 6 values, adjusted with the spike measurements. | P0-05 |
-| Q5 | Which policy languages does the MVP support? | **Cedar as the primary language:** its semantics ("forbid overrides permit", default deny) are exactly POL-03, it is a standard named in the charter, and the official Go implementation lets the core validate and simulate policies. Rego as the second language. AGT supports both; P0-05 must confirm it evaluates them in-process in Python. AGT's own YAML rule format is a fallback only, because it is not a standard. | P0-05, P0-03 |
+| Q5 | Which policy languages does the MVP support? | **Cedar as the primary language:** its semantics ("forbid overrides permit", default deny) are exactly POL-03, it is a standard named in the charter, and the official Go implementation lets the core validate and simulate policies. Rego as the second language. **Spike S1 confirmed:** Cedar runs in-process in Python (`cedarpy`) with exactly these semantics; Rego does not (it needs the `opa` binary or a server). Cedar is primary; Rego stays for engines that run it natively. See [S1](../spikes/S1-agt.md). | P0-05, P0-03 |
 | Q6 | Go module path and domain? | A vanity path if the project gets a domain, to survive a move to a foundation. | P0-01 |
 | Q7 | Who is the pilot organization, and which agents take part? | To be secured before the Phase 0 gate. | Maintainers |

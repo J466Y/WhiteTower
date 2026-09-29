@@ -6,9 +6,9 @@ The design of White Tower, from the charter to the implementation plans. All doc
 
 1. **[Project charter](../Project%20Declaration.pdf)**: why the project exists, its scope, principles and phases.
 2. **[MVP requirements](requirements/mvp-requirements.md)**: what the MVP must do and how well, with requirement IDs, the permission matrix, the lifecycle, and the open questions.
-3. **[Architecture decision records](adr/README.md)**: the ten founding decisions, including Go for the backend, TypeScript and React for the console, and PostgreSQL as the only stateful dependency.
+3. **[Architecture decision records](adr/README.md)**: the founding decisions, including Go for the backend, TypeScript and React for the console, PostgreSQL as the only stateful dependency, and White Tower's own enforcement point for Python agents.
 4. **[MVP architecture](architecture/mvp-architecture.md)**: components, interfaces, key flows (governed action, halt, policy change, audit evidence) and deployment.
-5. **[Implementation plans](plans/README.md)**: nineteen plans from an empty repository to the MVP, with dependencies and the definition of done.
+5. **[Implementation plans](plans/README.md)**: twenty plans from an empty repository to the MVP, with dependencies and the definition of done.
 6. **[Roadmap](roadmap.md)**: sequencing, milestones, staffing, calendar and gate checklists.
 
 ## Where things will go
@@ -23,5 +23,5 @@ The design of White Tower, from the charter to the implementation plans. All doc
 | `security/` | Threat model and framework mapping | P0-04 |
 | `spikes/` | Spike reports | P0-05 |
 | `rfcs/` | Requests for comments on contract changes | P0-01 (template), P0-03 (RFC-0001) |
-| `performance/` | Load and measurement reports | P1-07, P1-08, P1-09, P1-13 |
+| `performance/` | Load and measurement reports | P1-07, P1-08, P1-09, P1-13, P1-15 |
 | `reference/` | Generated configuration and CLI reference | P1-01, P1-11 |

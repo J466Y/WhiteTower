@@ -5,7 +5,7 @@
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
 | **Size** | M |
-| **Depends on** | All feature plans (P1-01 to P1-12) |
+| **Depends on** | All feature plans (P1-01 to P1-12, and P1-15) |
 | **Unblocks** | P1-14 |
 | **Requirements** | NFR-07, NFR-11, NFR-12, NFR-13, NFR-21 |
 | **Decisions** | All |
@@ -25,7 +25,7 @@ The first release, v0.1.0, is secure enough to govern real agents in a pilot: ev
 - Threat model v0.2 (`docs/security/threat-model.md`).
 - The completed ASVS 5.0 level 2 checklist, with evidence.
 - Security test, load test and soak test reports.
-- Release v0.1.0: images, binaries, chart, offline bundle and adapter wheel, all signed.
+- Release v0.1.0: images (core, mock module, demo agent and network quarantine module), binaries, Helm charts, offline bundle and enforcement point wheel, all signed.
 
 ## Steps
 
@@ -100,7 +100,7 @@ The release checklist:
 
 - documentation complete, changelog, known limitations;
 - a dry run of the private vulnerability reporting process;
-- tag, then publish images, binaries, chart, offline bundle and adapter wheel;
+- tag, then publish images, binaries, Helm charts, offline bundle and enforcement point wheel;
 - announcement.
 
 **Done when:** v0.1.0 is published, and its artifacts verify.
