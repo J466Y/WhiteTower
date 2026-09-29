@@ -114,12 +114,12 @@ The project is in its design phase, which is the best time to shape it. The most
 - Proposing adapters for tools you already run.
 - Threat modeling the core.
 
-Changes to module contracts go through an **RFC process**. See `CONTRIBUTING.md` (coming soon).
+Changes to module contracts go through an **RFC process**. See [CONTRIBUTING.md](CONTRIBUTING.md) and [GOVERNANCE.md](GOVERNANCE.md). To build and run the code, follow the [development guide](docs/development.md).
 
 ## Security
 
-Please do not open public issues for security vulnerabilities. See `SECURITY.md` (coming soon) for coordinated disclosure.
+Please do not open public issues for security vulnerabilities. See [SECURITY.md](SECURITY.md) for coordinated disclosure.
 
 ## License
 
-To be decided before the first code release.
+[Apache License 2.0](LICENSE). Contributions are accepted under the Developer Certificate of Origin ([ADR-0008](docs/adr/0008-license-apache-2.md)).

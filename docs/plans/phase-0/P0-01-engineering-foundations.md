@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | Draft |
+| **Status** | In progress (see [progress notes](#progress-notes)) |
 | **Size** | M |
 | **Depends on** | none |
 | **Unblocks** | Every other plan; directly P1-01 and P1-12 |
@@ -147,3 +147,36 @@ A maintainer with administrator rights sets branch protection on `main` (require
 - Go `tool` directives (Go 1.24 and later) remove the need for `tools.go` files and install scripts.
 - Pin third-party GitHub Actions by full commit SHA and let Renovate update the pins.
 - Generated code goes in clearly named directories (`gen/` or `*_gen.go`) so linters and reviewers can skip it.
+
+## Progress notes
+
+### 2026-09-29: first implementation
+
+| Step | Status | Notes |
+| --- | --- | --- |
+| 1. Identifiers | Done | Listed in `CONTRIBUTING.md`. The Go module path is `github.com/J466Y/WhiteTower` until the project has a domain (Q6 stays open). |
+| 2. Community files | Done | `CONTRIBUTING.md`, `GOVERNANCE.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `NOTICE`, RFC template, issue and pull request templates, `CODEOWNERS`; README updated. The code of conduct still needs a private contact address before the first public release. |
+| 3. Skeleton | Done | Server with `/healthz`, `/api/v1/version`, a placeholder module API service and the embedded console; `wtctl version`. |
+| 4. Toolchains and Taskfile | Done | Go toolchain 1.27.1 (oldest supported 1.26); Node.js 22; pnpm 12. |
+| 5. Code generation | Done | OpenAPI (Go server, Go client, TypeScript types) and protobuf (Go, ConnectRPC); `task verify:gen` in CI. |
+| 6. Console skeleton | Done | React 19, Vite 8, TypeScript 5.9, Biome, Vitest, Playwright. The browser test proves the strict CSP holds and no request leaves the deployment. |
+| 7. Continuous integration | Written, not yet run on GitHub | `ci.yml` and `codeql.yml` run on every push and pull request; `scorecard.yml` on `main`; actions pinned by SHA and checked with actionlint. |
+| 8. Dependency hygiene | Done | `renovate.json`; pnpm refuses versions younger than three days; OSV-Scanner and license checks in CI. |
+| 9. Release pipeline | Written, not yet run on GitHub | `.goreleaser.yaml` validated with `goreleaser check`; `release.yml` for tags and manual snapshots (the nightly snapshot waits until releases start); `docs/verify-release.md`. |
+| 10. Development environment | Done | Compose with PostgreSQL, Keycloak (one user per role) and an OpenTelemetry collector, with host ports configurable through a local `.env`. Verified with Docker: services healthy, realm imported with the `groups` claim in tokens, core image built from source and healthy, end-to-end tests green against it, collector receiving OTLP. |
+| 11. Repository settings | Rulesets written, not yet imported | `.github/rulesets/` holds importable rulesets for `main` and release tags; `GOVERNANCE.md` lists the other settings and the working rules. Importing them needs a maintainer with administrator rights. |
+
+**Verified locally on Windows:**
+
+- builds and unit tests (Go 1.27.1 and 1.26.8);
+- golangci-lint, `go vet`, Biome, the TypeScript compiler, `buf lint` and Spectral;
+- `govulncheck`, OSV-Scanner and go-licenses;
+- the binary with the embedded console, checked with curl, the Go end-to-end test and the Playwright browser test.
+
+**Deviations from the plan, and why:**
+
+- **Go tools live in `hack/tools/go.mod`,** a separate module file, instead of `tool` directives in the main `go.mod`. The product's dependency list stays limited to what ships, and tool updates cannot move the versions of runtime dependencies.
+- **`sqlc` and `goose` are not pinned yet.** They arrive with P1-01, which is the first plan with a schema; `sqlc` also needs cgo or a container on Windows, a choice P1-01 must make.
+- **The OpenAPI spec is not embedded in the server** (`embedded-spec: false`). Embedding it pulled `kin-openapi` and five more modules into the binary. P1-01 decides whether to bring it back for request validation.
+- **TypeScript stays on 5.9.** `openapi-typescript` 7 requires TypeScript 5; Renovate is told not to propose 6 or 7.
+- **Images use distroless Debian 13,** because Debian 12 ended regular security support in June 2026.
