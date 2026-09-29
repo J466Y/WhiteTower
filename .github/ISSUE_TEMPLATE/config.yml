@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/J466Y/WhiteTower/security/advisories/new
+    about: Never report vulnerabilities in public issues. Use private reporting instead.
+  - name: Read the design documents
+    url: https://github.com/J466Y/WhiteTower/tree/main/docs
+    about: Requirements, architecture decisions and implementation plans.

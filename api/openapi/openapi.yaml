@@ -1,0 +1,58 @@
+openapi: 3.1.0
+info:
+  title: White Tower public API
+  version: 0.0.0
+  summary: Public REST API of the White Tower governance core.
+  description: |
+    This document is the source of truth of the public API: the Go server
+    interfaces, the Go client and the console's TypeScript types are generated
+    from it with `task gen`.
+
+    Pre-alpha: only placeholder operations exist until the Phase 1 plans add
+    the real ones.
+  contact:
+    name: White Tower maintainers
+    url: https://github.com/J466Y/WhiteTower
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: /api/v1
+tags:
+  - name: meta
+    description: Information about the server itself.
+paths:
+  /version:
+    get:
+      operationId: getVersion
+      summary: Get the version of the running server
+      description: |
+        Returns the release version and Git commit of the running server, and
+        the version of this API. It needs no authentication, so clients can
+        check compatibility before logging in.
+      tags: [meta]
+      security: []
+      responses:
+        "200":
+          description: Version of the running server.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionInfo"
+components:
+  schemas:
+    VersionInfo:
+      type: object
+      additionalProperties: false
+      required: [version, commit, apiVersion]
+      properties:
+        version:
+          type: string
+          description: Release version, or `dev` for local builds.
+        commit:
+          type: string
+          description: Git commit the binary was built from, or `unknown`.
+        apiVersion:
+          type: string
+          description: Version of this API.
+          enum: [v1]

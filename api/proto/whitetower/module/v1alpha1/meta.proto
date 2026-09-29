@@ -1,0 +1,25 @@
+// Placeholder that exercises the code generation pipeline (plan P0-01).
+// The module contracts are defined by RFC-0001 (plan P0-03), which replaces this file.
+
+syntax = "proto3";
+
+package whitetower.module.v1alpha1;
+
+// MetaService describes the server a module is connected to.
+service MetaService {
+  // GetServerInfo returns the version of the server and the contract versions it supports.
+  rpc GetServerInfo(GetServerInfoRequest) returns (GetServerInfoResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// GetServerInfoRequest is empty.
+message GetServerInfoRequest {}
+
+// GetServerInfoResponse describes the server.
+message GetServerInfoResponse {
+  // Release version of the server, or "dev" for local builds.
+  string version = 1;
+  // Module contract versions the server supports, for example "v1alpha1".
+  repeated string contract_versions = 2;
+}

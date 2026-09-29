@@ -1,0 +1,157 @@
+# Development tasks, identical on Windows, macOS and Linux. https://taskfile.dev
+#
+# Without Task installed, run any task through the pinned copy:
+#   go tool -modfile=hack/tools/go.mod task <name>
+version: "3"
+
+vars:
+  # Go tools pinned in hack/tools/go.mod (Task, Buf, protoc plugins, oapi-codegen).
+  GO_TOOL: go tool -modfile=hack/tools/go.mod
+  # Override when pnpm 12 is not on PATH, for example: task build PNPM="npx --yes pnpm@12.6.0"
+  PNPM: pnpm
+  MODULE: github.com/J466Y/WhiteTower
+  VERSION:
+    sh: git describe --tags --always --dirty
+  COMMIT:
+    sh: git rev-parse HEAD
+  LDFLAGS: -s -w -X {{.MODULE}}/internal/version.version={{.VERSION}} -X {{.MODULE}}/internal/version.commit={{.COMMIT}}
+
+tasks:
+  default:
+    desc: List the available tasks
+    silent: true
+    cmds:
+      - "{{.TASK_EXE}} --list"
+
+  setup:
+    desc: Download Go modules, build the pinned tools and install the console's packages
+    cmds:
+      - go mod download
+      - go build -modfile=hack/tools/go.mod tool
+      - "{{.PNPM}} --dir web install --frozen-lockfile"
+
+  gen:
+    desc: Generate code from the contracts in api/ (commit the result)
+    cmds:
+      - task: gen:openapi
+      - task: gen:proto
+
+  gen:openapi:
+    desc: Generate the Go server, the Go client and the console's types from the OpenAPI document
+    cmds:
+      - "{{.GO_TOOL}} oapi-codegen -config api/openapi/server.cfg.yaml api/openapi/openapi.yaml"
+      - "{{.GO_TOOL}} oapi-codegen -config api/openapi/client.cfg.yaml api/openapi/openapi.yaml"
+      - "{{.PNPM}} --dir web run gen"
+
+  gen:proto:
+    desc: Generate the Go code of the module API from the protobuf definitions
+    cmds:
+      - "{{.GO_TOOL}} buf generate"
+
+  verify:gen:
+    desc: Fail if the generated code is not up to date (used by CI)
+    cmds:
+      - task: gen
+      - git diff --exit-code -- internal/api/rest/gen pkg/apiclient pkg/moduleapi web/src/api
+
+  build:
+    desc: Build the console and the binaries into bin/ (the console is embedded in whitetower)
+    cmds:
+      - task: build:web
+      - task: build:go
+
+  build:web:
+    desc: Build the console into internal/webui/dist
+    cmds:
+      - "{{.PNPM}} --dir web run build"
+
+  build:go:
+    desc: Build whitetower (with the console, if built) and wtctl into bin/
+    cmds:
+      - go build -tags embedui -trimpath -ldflags "{{.LDFLAGS}}" -o bin/whitetower{{exeExt}} ./cmd/whitetower
+      - go build -trimpath -ldflags "{{.LDFLAGS}}" -o bin/wtctl{{exeExt}} ./cmd/wtctl
+    preconditions:
+      - sh: test -f internal/webui/dist/index.html
+        msg: "The console is not built: run `task build` (or `task build:web` first)."
+
+  run:
+    desc: Run the core from source on http://127.0.0.1:8080 (placeholder console; use `task dev:web` for the real one)
+    cmds:
+      - go run ./cmd/whitetower {{.CLI_ARGS}}
+
+  test:
+    desc: Run the unit tests of Go and of the console
+    cmds:
+      - go test ./...
+      - "{{.PNPM}} --dir web run test"
+
+  lint:
+    desc: Lint Go, the console and the contracts
+    cmds:
+      - task: lint:go
+      - task: lint:web
+      - task: lint:proto
+
+  lint:go:
+    desc: Run go vet and golangci-lint
+    cmds:
+      - go vet ./...
+      - golangci-lint run
+    preconditions:
+      - sh: golangci-lint version
+        msg: "golangci-lint v2 is not installed: see docs/development.md."
+
+  lint:web:
+    desc: Run Biome and the TypeScript compiler on the console
+    cmds:
+      - "{{.PNPM}} --dir web run lint"
+      - "{{.PNPM}} --dir web run typecheck"
+
+  lint:proto:
+    desc: Lint the protobuf definitions
+    cmds:
+      - "{{.GO_TOOL}} buf lint"
+
+  fmt:
+    desc: Format Go and console code
+    cmds:
+      - go fmt ./...
+      - "{{.PNPM}} --dir web run format"
+
+  vuln:
+    desc: Check the Go code and the pinned tools for known vulnerabilities they can reach
+    cmds:
+      - "{{.GO_TOOL}} govulncheck ./..."
+      - go build -modfile=hack/tools/go.mod -o .task/tools/ tool
+      - for bin in .task/tools/*; do {{.GO_TOOL}} govulncheck -mode=binary "$bin" || exit 1; done
+
+  dev:
+    desc: Start PostgreSQL and Keycloak for development (Docker)
+    cmds:
+      - docker compose -f deploy/compose/dev/compose.yaml up -d --wait postgres keycloak
+
+  dev:web:
+    desc: Run the console with live reload on http://localhost:5173 (proxies the API to `task run`)
+    cmds:
+      - "{{.PNPM}} --dir web run dev"
+
+  dev:down:
+    desc: Stop the development services (keeps their data; add -- -v to delete it)
+    cmds:
+      - docker compose -f deploy/compose/dev/compose.yaml down {{.CLI_ARGS}}
+
+  e2e:
+    desc: Run the end-to-end tests against a running core (WT_E2E_URL, default http://127.0.0.1:8080)
+    cmds:
+      - go test -tags e2e -count=1 ./test/e2e/...
+      - "{{.PNPM}} --dir web run e2e"
+
+  release:snapshot:
+    desc: Build a local snapshot release with GoReleaser (requires goreleaser and syft)
+    cmds:
+      - goreleaser release --snapshot --clean
+
+  clean:
+    desc: Delete build output
+    cmds:
+      - rm -rf bin dist internal/webui/dist

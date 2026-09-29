@@ -1,0 +1,203 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Vet
+        run: |
+          go vet ./...
+          go vet -tags e2e ./test/...
+      - name: Test
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.14.0
+      - name: Known vulnerabilities reachable from the code
+        run: go tool -modfile=hack/tools/go.mod govulncheck ./...
+
+  go-oldest:
+    name: Go 1.26 (oldest supported)
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+      - name: Build and test
+        run: |
+          go build ./...
+          go test ./...
+
+  console:
+    name: Console
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm --dir web install --frozen-lockfile
+      - name: Lint
+        run: pnpm --dir web run lint
+      - name: Type check
+        run: pnpm --dir web run typecheck
+      - name: Test
+        run: pnpm --dir web run test
+      - name: Build
+        run: pnpm --dir web run build
+
+  contracts:
+    name: Contracts and generated code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm --dir web install --frozen-lockfile
+      - name: Generated code is up to date
+        run: go tool -modfile=hack/tools/go.mod task verify:gen
+      - name: Lint the module API (protobuf)
+        run: go tool -modfile=hack/tools/go.mod buf lint
+      - name: Lint the public API (OpenAPI)
+        run: pnpm dlx @stoplight/spectral-cli@6.16.3 lint --fail-severity=warn api/openapi/openapi.yaml
+      - name: No unintended breaking changes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          base="refs/remotes/origin/${BASE_REF}"
+          if git cat-file -e "${base}:api/proto" 2>/dev/null; then
+            go tool -modfile=hack/tools/go.mod buf breaking --against ".git#ref=${base}"
+          else
+            echo "No protobuf baseline on ${BASE_REF}: nothing to compare."
+          fi
+          if git cat-file -e "${base}:api/openapi/openapi.yaml" 2>/dev/null; then
+            git show "${base}:api/openapi/openapi.yaml" > "${RUNNER_TEMP}/openapi-base.yaml"
+            go run github.com/oasdiff/oasdiff@v1.32.1 breaking --fail-on ERR \
+              "${RUNNER_TEMP}/openapi-base.yaml" api/openapi/openapi.yaml
+          else
+            echo "No OpenAPI baseline on ${BASE_REF}: nothing to compare."
+          fi
+
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Start the core (Docker Compose, built from source)
+        run: docker compose -f deploy/compose/dev/compose.yaml --profile core up --detach --build --wait whitetower
+      - name: API smoke test
+        run: go test -tags e2e -count=1 ./test/e2e/...
+      - name: Browser smoke test
+        run: |
+          pnpm --dir web install --frozen-lockfile
+          pnpm --dir web exec playwright install --with-deps chromium
+          pnpm --dir web run e2e
+      - name: Service logs
+        if: failure()
+        run: docker compose -f deploy/compose/dev/compose.yaml --profile core logs
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          retention-days: 7
+
+  supply-chain:
+    name: Supply chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Known vulnerabilities in dependencies (OSV)
+        run: go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.6.0 scan source --lockfile go.mod --lockfile web/pnpm-lock.yaml
+      # The pinned tools (hack/tools/go.mod) are checked by reachability, on the
+      # binaries themselves: a tool fails the job only if it can call vulnerable
+      # code. A module-level scan would also flag golang.org/x/crypto/openpgp
+      # (GO-2026-5932), which has no fix and which no tool imports.
+      - name: Known vulnerabilities reachable from the pinned tools
+        run: |
+          go build -modfile=hack/tools/go.mod -o "${RUNNER_TEMP}/tools/" tool
+          for bin in "${RUNNER_TEMP}"/tools/*; do
+            echo "::group::$(basename "${bin}")"
+            go tool -modfile=hack/tools/go.mod govulncheck -mode=binary "${bin}"
+            echo "::endgroup::"
+          done
+      - name: Go dependency licenses (ADR-0008)
+        run: go run github.com/google/go-licenses/v2@v2.0.1 check ./... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          # License policy of ADR-0008 for everything White Tower ships.
+          deny-licenses: GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, SSPL-1.0, BUSL-1.1

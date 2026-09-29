@@ -1,0 +1,33 @@
+# Build output
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Console build embedded in the core binary (produced by `task build:web`)
+/internal/webui/dist/
+
+# Node.js
+node_modules/
+/web/test-results/
+/web/playwright-report/
+/web/blob-report/
+
+# Task runner state
+.task/
+
+# Secrets and local environment: never commit them
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editors and operating systems
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db

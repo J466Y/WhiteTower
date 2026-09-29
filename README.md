@@ -94,7 +94,11 @@ These are the first modules we plan to integrate. None of them is final.
 | **2: Key modules** | LLM gateway and quotas, MCP gateway, skills repository, per-agent harness | One use case in production |
 | **3: Ecosystem** | Shadow AI discovery, compliance, third-party module SDK, public release | First third-party module |
 
-Phases are not dated yet.
+Phases are not dated yet. The implementation roadmap to the MVP, with its milestones and an illustrative calendar, is in [docs/roadmap.md](docs/roadmap.md).
+
+## Design documents
+
+The design package lives in [`docs/`](docs/README.md): the [MVP requirements](docs/requirements/mvp-requirements.md), the [architecture decision records](docs/adr/README.md), the [MVP architecture](docs/architecture/mvp-architecture.md) and the [implementation plans](docs/plans/README.md). All of them are drafts open for review.
 
 ## Out of scope
 
@@ -110,12 +114,12 @@ The project is in its design phase, which is the best time to shape it. The most
 - Proposing adapters for tools you already run.
 - Threat modeling the core.
 
-Changes to module contracts go through an **RFC process**. See `CONTRIBUTING.md` (coming soon).
+Changes to module contracts go through an **RFC process**. See [CONTRIBUTING.md](CONTRIBUTING.md) and [GOVERNANCE.md](GOVERNANCE.md). To build and run the code, follow the [development guide](docs/development.md).
 
 ## Security
 
-Please do not open public issues for security vulnerabilities. See `SECURITY.md` (coming soon) for coordinated disclosure.
+Please do not open public issues for security vulnerabilities. See [SECURITY.md](SECURITY.md) for coordinated disclosure.
 
 ## License
 
-To be decided before the first code release.
+[Apache License 2.0](LICENSE). Contributions are accepted under the Developer Certificate of Origin ([ADR-0008](docs/adr/0008-license-apache-2.md)).

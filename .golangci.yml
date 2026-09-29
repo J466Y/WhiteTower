@@ -1,0 +1,49 @@
+# golangci-lint v2 configuration. https://golangci-lint.run
+version: "2"
+
+run:
+  # Lint the end-to-end tests too. The embedui tag is left out: it needs the built console.
+  build-tags:
+    - e2e
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - gosec
+    - misspell
+    - nilerr
+    - noctx
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+  settings:
+    misspell:
+      locale: US
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+        - name: var-naming
+  exclusions:
+    # Generated code (files marked "Code generated ... DO NOT EDIT.") is not linted.
+    generated: strict
+    presets:
+      - std-error-handling
+    rules:
+      # Tests may use simpler error handling and fixed test data.
+      - path: _test\.go
+        linters:
+          - gosec
+          - noctx
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/J466Y/WhiteTower

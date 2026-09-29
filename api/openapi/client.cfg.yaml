@@ -1,0 +1,7 @@
+# oapi-codegen configuration for the public Go client of the public API (used by wtctl).
+# Run through `task gen`; paths are relative to the repository root.
+package: apiclient
+output: pkg/apiclient/client.gen.go
+generate:
+  models: true
+  client: true
