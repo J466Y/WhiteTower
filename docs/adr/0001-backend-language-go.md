@@ -31,7 +31,7 @@ Initial library choices, which can change through normal review: standard librar
 - Community. Go is widely known in cloud-native and security circles, and its simplicity makes reviews easier.
 
 **Harder**
-- The AI agent ecosystem is mostly Python and TypeScript. Mitigation: all contracts are language-neutral (OpenAPI, protobuf, CloudEvents, JSON Schema), so modules can be written in any language, and agent-side components (such as an in-process AGT adapter) use the agent's language.
+- The AI agent ecosystem is mostly Python and TypeScript. Mitigation: all contracts are language-neutral (OpenAPI, protobuf, CloudEvents, JSON Schema), so modules can be written in any language, and agent-side components (such as the in-process enforcement point of ADR-0011) use the agent's language.
 - Go's type system is less expressive than Rust's and error handling is verbose. Accepted.
 
 ## Alternatives considered

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | Draft |
+| **Status** | In progress (see [progress notes](#progress-notes)) |
 | **Size** | M (five spikes, time-boxed, can run in parallel) |
 | **Depends on** | none; spike code lives in `hack/spikes/` |
 | **Unblocks** | P0-03 (AGT facts), the Phase 0 gate (NFR targets), P1-02, P1-07, P1-08, P1-09 |
@@ -130,3 +130,18 @@ Update section 6 of the requirements (targets set), amend ADR-0005 or ADR-0006 i
 - Time boxes are hard limits: when one expires, write down what is known and what is not, then stop.
 - Report distributions (p50, p95, p99, max), never averages alone.
 - S1 is the riskiest spike and on the critical path to the contracts: start it on the first day of Phase 0.
+
+## Progress notes
+
+### 2026-09-29: S1 and S5 done
+
+| Spike | Status | Result |
+| --- | --- | --- |
+| S1 AGT integration | Done | **No-go on AGT as the foundation of the MVP enforcement point: White Tower builds its own enforcement point in Python, and AGT becomes a Phase 2 interoperability adapter.** Accepted by the maintainer on 2026-09-29 in [ADR-0011](../../adr/0011-own-python-enforcement-point.md); AGT is re-tested live in the pilot (P1-14). Report: [S1-agt.md](../../spikes/S1-agt.md) |
+| S5 Interrupting agents | Done (in the S1 report) | Asynchronous tools and streaming calls stop within milliseconds; blocking tools cannot be interrupted in-process, so the `terminate` halt mode and honest layered acknowledgements are needed |
+| S2 Watch streams and halt propagation | Not started | |
+| S3 Audit log throughput | Not started | |
+| S4 Policy evaluation latency | Partly done | Python side measured in S1 (Cedar p99 ≤ 1.1 ms with 100 policies parsed once); Go side (cedar-go, embedded OPA) pending |
+
+**Open question Q5 is closed:** Cedar is the primary language, and Rego is not evaluated in-process in Python.
+

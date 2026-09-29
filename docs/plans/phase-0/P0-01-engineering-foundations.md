@@ -70,7 +70,7 @@ Create the layout of ADR-0007: `go.mod` with a `toolchain` line, `cmd/whitetower
 
 ### 5. Code generation pipeline
 
-`task gen` runs every generator: `oapi-codegen` (Go server interfaces in strict mode and a Go client), `openapi-typescript` (console types), `buf generate` (Go, plus TypeScript and Python if the P0-05 spike shows the AGT adapter needs them) and `sqlc`. Generated code is committed. CI regenerates it and fails on any difference.
+`task gen` runs every generator: `oapi-codegen` (Go server interfaces in strict mode and a Go client), `openapi-typescript` (console types), `buf generate` (Go, plus Python for the enforcement point of ADR-0011, and TypeScript if needed) and `sqlc`. Generated code is committed. CI regenerates it and fails on any difference.
 
 **Done when:** changing a placeholder operation in the OpenAPI document and running `task gen` updates Go and TypeScript code, and CI catches a forgotten regeneration.
 

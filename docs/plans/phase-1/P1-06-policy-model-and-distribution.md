@@ -126,7 +126,7 @@ Evaluate a draft version, together with the current global set, against test inp
 | Risk or question | Mitigation or owner |
 | --- | --- |
 | `cedar-go` lacks full schema validation | Parse-only validation plus policy tests; follow `cedar-go` releases |
-| AGT supports only a subset of Cedar or Rego features | Validated in P0-05 S1; documented restrictions enforced by the validator |
+| The core's Cedar validator (cedar-go) and the enforcement point's evaluator (`cedarpy`) disagree on a language feature | Pin matching versions; the validator rejects features the enforcement point cannot evaluate; shared vectors run against both in CI (P1-09) |
 | Global activations cause rebuild storms | Chunked job, and bundle references only change when the content hash changes |
 
 ## Notes for implementers

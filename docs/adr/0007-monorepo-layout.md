@@ -6,7 +6,7 @@
 
 ## Context
 
-During the alpha, contracts, core, adapters, console and deployment files change together: a contract change touches the protobuf definitions, the core, the mock module, the AGT adapter and the conformance kit at once. Separate repositories would turn each of those changes into several coordinated pull requests.
+During the alpha, contracts, core, adapters, console and deployment files change together: a contract change touches the protobuf definitions, the core, the mock module, the enforcement point and the conformance kit at once. Separate repositories would turn each of those changes into several coordinated pull requests.
 
 ## Decision
 
@@ -25,7 +25,8 @@ internal/         core packages, not importable by third parties
 pkg/              public Go packages: module SDK, API client
 modules/
   mock/           reference and test module (Go)
-  agt/            Microsoft AGT adapter (Python: AGT is an in-process library and only its Python SDK is complete)
+  ep-python/      White Tower enforcement point for Python agents (ADR-0011)
+  k8s-quarantine/ Network quarantine controller for Kubernetes (Go, plan P1-15)
 web/              console (React, Vite, pnpm)
 deploy/
   compose/        Docker Compose for development and evaluation

@@ -95,7 +95,7 @@ Every issuance is an audit event. The volume (about 3 per second for 1,000 agent
 
 ### 7. Module identities
 
-Standalone module instances use the same endpoint with their own identity (`spiffe://<trust-domain>/module/<module-id>`) and credentials, created when an operator approves the module (P1-07). An enforcement point embedded in an agent's process, as the AGT adapter is, authenticates **as the agent** and may only serve that agent. Document both cases for P0-03 and P1-07.
+Standalone module instances use the same endpoint with their own identity (`spiffe://<trust-domain>/module/<module-id>`) and credentials, created when an operator approves the module (P1-07). An enforcement point embedded in an agent's process, as the Python enforcement point is (P1-09), authenticates **as the agent** and may only serve that agent. Document both cases for P0-03 and P1-07.
 
 **Done when:** both kinds of identity obtain tokens, and the claims tell them apart.
 

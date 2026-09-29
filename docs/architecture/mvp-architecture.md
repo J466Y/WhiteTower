@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft v0.1, open for review |
-| **Date** | 2026-09-28 |
+| **Date** | 2026-09-28; updated 2026-09-29 (ADR-0011, network quarantine) |
 | **Related** | [Requirements](../requirements/mvp-requirements.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
 
 This document describes how the MVP is built: its components, the interfaces between them, the flows that matter most, and how it is deployed. The reasons behind each choice are in the ADRs; this document only links to them. Normative details (exact schemas, messages and states) are produced by the Phase 0 plans and will replace the sketches marked as such here.
@@ -15,7 +15,7 @@ This document describes how the MVP is built: its components, the interfaces bet
 | Driver | Requirements | Answer |
 | --- | --- | --- |
 | Fail closed without putting the core in the latency path of agent actions | NFR-01, NFR-02 | Decisions at the edge; governance state pushed to enforcement points, which hold leases ([ADR-0005](../adr/0005-edge-enforcement-with-leases.md)) |
-| Stop running agents within seconds, with a bounded worst case | KIL-01 to KIL-07, NFR-03 to NFR-05 | Halts are pushed state changes, acknowledged per instance; lease expiry is the backstop ([ADR-0005](../adr/0005-edge-enforcement-with-leases.md)) |
+| Stop running agents within seconds, with a bounded worst case | KIL-01 to KIL-07, KIL-10, NFR-03 to NFR-05 | Halts are pushed state changes, acknowledged per instance; lease expiry is the backstop ([ADR-0005](../adr/0005-edge-enforcement-with-leases.md)); on Kubernetes, network quarantine does not depend on the agent's process (section 6.2) |
 | Evidence that holds up even against a privileged insider | AUD-01 to AUD-06 | Merkle tree log with signed checkpoints anchored outside ([ADR-0006](../adr/0006-tamper-evident-audit-log.md)) |
 | Governance rules that are enforced, not just documented | AID-04, KIL-06, POL-04 | Token issuance gated by lifecycle and run state in the same transaction ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)) |
 | Self-hosted, air-gapped, few moving parts | CON-02, NFR-14 | One Go binary with the console embedded, plus PostgreSQL ([ADR-0001](../adr/0001-backend-language-go.md), [ADR-0002](../adr/0002-frontend-typescript-react.md), [ADR-0003](../adr/0003-postgresql-only-stateful-dependency.md)) |
@@ -48,8 +48,11 @@ flowchart TB
     SIEM[SIEM or OpenTelemetry collector]
 
     subgraph runtime[Agent runtime]
-        AG[AI agent] --- EP[Enforcement point: Microsoft AGT with the White Tower adapter]
+        AG[AI agent] --- EP[White Tower enforcement point, in the agent's process]
     end
+
+    QM[Network quarantine module, one per Kubernetes cluster]
+    CNI[Cluster network, CNI with deny rules]
 
     TP[Third-party agent without runtime integration, coverage C0]
 
@@ -59,12 +62,14 @@ flowchart TB
     CLI --> API
     API -- login --> IDP
     EP -- token, watch, events --> MAPI
+    QM -- token, watch, acknowledgements --> MAPI
+    QM -- isolates halted agents --> CNI
     core --> PG
     core -- audit export and checkpoints --> SIEM
     OW -. registers .-> TP
 ```
 
-Third-party agents that cannot be integrated at runtime still get an inventory record, an owner, a use case and a policy (coverage C0). Governed agents run next to an enforcement point that talks to the core.
+Third-party agents that cannot be integrated at runtime still get an inventory record, an owner, a use case and a policy (coverage C0). Governed agents run with an enforcement point in their process that talks to the core. On Kubernetes, the network quarantine module isolates halted agents without relying on that process.
 
 ## 3. The core
 
@@ -182,6 +187,7 @@ Separating the human-facing and machine-facing listeners lets operators expose t
 | Emitted by | Examples |
 | --- | --- |
 | Enforcement points | `whitetower.decision.made.v1`, `whitetower.action.executed.v1`, `whitetower.instance.halted.v1`, `whitetower.bundle.activated.v1`, `whitetower.lease.expired.v1` |
+| Network quarantine module | `whitetower.quarantine.applied.v1`, `whitetower.quarantine.lifted.v1` |
 | Core | `whitetower.agent.lifecycle_changed.v1`, `whitetower.policy.version_approved.v1`, `whitetower.halt.issued.v1`, `whitetower.halt.released.v1`, `whitetower.audit.checkpoint.v1` |
 
 Every event carries the W3C trace context (CloudEvents distributed tracing extension), so a decision can be followed from the agent to the audit log.
@@ -227,15 +233,19 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant C2 as Core replica 2
     participant EP as Enforcement points
+    participant QM as Network quarantine module
     O->>C1: POST /api/v1/halts {target, reason}
     C1->>DB: one transaction: halt, agent suspended, state version +1, audit event
     C1->>DB: NOTIFY state change
     DB-->>C2: notification
     C1-)EP: Watch: run state HALTED (streams on replica 1)
     C2-)EP: Watch: run state HALTED (streams on replica 2)
-    EP->>EP: interrupt current action, block new actions
-    EP->>C1: Acknowledge(halt, halted at)
-    C1->>DB: record acknowledgement and propagation time
+    C1-)QM: Watch: run state HALTED
+    EP->>EP: close the gate, interrupt the current action if possible
+    EP->>C1: Acknowledge(halt, layers and times)
+    QM->>QM: apply a deny rule to the agent's pods
+    QM->>C1: Acknowledge(halt, network quarantined at)
+    C1->>DB: record acknowledgements and propagation time
     Note over EP: If the stream is lost, the lease expires after its TTL and the EP halts anyway
 ```
 
@@ -268,48 +278,52 @@ For every agent, the core maintains a governance state record: lifecycle state, 
   - buffer events durably, and fail closed when the buffer is full;
   - reconnect with jittered exponential backoff.
 
-### 6.1 The MVP enforcement point: Microsoft AGT with the White Tower adapter
+### 6.1 The MVP enforcement point: White Tower's package in the agent's process
 
-Microsoft AGT is an in-process library. Policies are evaluated inside the agent's process, and its kill switch is an in-process call that works differently in each language, with no remote API. Only its Python SDK covers every component. The adapter is therefore a **Python package** (`modules/agt/`) loaded in the agent process next to AGT. The P0-05 spike confirms the exact extension points.
+Agent frameworks run tool and model calls inside the agent's process, so that is where an enforcement point sees every action. The MVP's enforcement point is a **Python package**, `whitetower-ep` (`modules/ep-python/`), loaded in the agent's process ([ADR-0011](../adr/0011-own-python-enforcement-point.md)). Spike S1 evaluated Microsoft AGT as its foundation, and found that White Tower had to build the gate, the halt, the Cedar evaluation and the evidence buffer anyway, with weaker guarantees ([S1](../spikes/S1-agt.md)).
 
 ```mermaid
 flowchart LR
     subgraph proc[Agent process]
-        FW[Agent framework] -- intervention points --> AGT[Microsoft AGT]
-        AGT -- gate check, policies, kill callbacks, events --> AD[White Tower adapter]
+        FW[Agent framework] -- tool, model, input and output hooks --> EP[White Tower enforcement point]
+        EP --- CEDAR[Cedar evaluation, cedarpy]
+        EP --- BUF[(Durable evidence buffer)]
     end
-    AD -- token, Watch, GetBundle, Acknowledge, Publish --> CORE[White Tower core]
+    EP -- token, Watch, GetBundle, Acknowledge, Publish --> CORE[White Tower core]
 ```
 
-The adapter plugs into AGT in four places:
-
-1. **Gate.** It is evaluated before AGT's policies and denies everything while there is no current state, the lease has expired, the bundle is missing or invalid, or the agent is halted.
-2. **Policy source.** It loads the verified bundle into AGT's engine and swaps it atomically when a new version arrives.
-3. **Halt.** It triggers AGT's kill for active sessions and holds the termination callbacks of the framework integrations.
-4. **Event sink.** It receives AGT's CloudEvents, maps them to the White Tower catalog and ships them through a durable local buffer.
-
-What White Tower adds to AGT:
-
-| AGT on its own | With White Tower |
+| Part | What it does |
 | --- | --- |
-| Policies loaded from local files or pinned URLs | Approved, versioned bundles signed by the core and pushed to every instance |
-| Kill switch callable only inside the process | Remote halt pushed to every instance, acknowledged and measured |
-| No proof that a kill stopped the process | The acknowledgement reports the gate closing, the in-flight interruption and any process termination |
-| Hash-chained audit, not anchored outside | Events sealed into White Tower's Merkle log, with checkpoints anchored outside |
-| Keeps running if it loses its control plane | Leases: denies everything and halts when contact is lost |
+| Framework hooks | Route every governed call and interaction (tool calls, model calls, inputs and outputs) through the gate and the policies. LangGraph 1.x first; other frameworks as the pilot needs them |
+| Gate | Evaluated before the policies; denies everything while there is no current state, the lease has expired, the bundle is missing or invalid, the agent is halted, or the evidence buffer is full |
+| Policy evaluation | Verifies the signed bundle, parses its Cedar policy set once, and swaps it atomically. Global and agent-specific policies form one set, so Cedar's "forbid overrides permit" gives the combination semantics of POL-03 |
+| Evidence | Writes each decision to a durable local buffer before the action proceeds, then ships the buffer in batches; no governed action without evidence |
+| Halt | Applies the halt layers below and acknowledges each one |
 
-**Halt layers in the adapter.** The first layer is effective milliseconds after the halt arrives. Each further layer covers what the previous one cannot guarantee.
+**Halt layers in the enforcement point.** A halt blocks and denies everything the agent tries afterwards, rather than killing the process: this is the guarantee (requirement KIL-01). The further layers only deal with work already in flight.
 
-1. Close the gate: every evaluation returns deny.
-2. Call AGT's kill for active sessions. This rolls back or hands off in-flight steps and runs the termination callbacks (AGT times them out after 5 seconds).
-3. Terminate the agent process, when the agent's halt mode says so or when interruption is not confirmed within the grace period.
-4. Report in the acknowledgement what happened at each layer.
+1. Close the gate: every governed call and interaction is denied from this moment. Effective within microseconds of receipt (spike S1).
+2. Interrupt the work in flight where the framework allows it, through the framework's own cancellation. Asynchronous work stops within milliseconds; blocking calls cannot be stopped from inside the process (S1).
+3. Terminate the agent process only when the agent's halt mode is `terminate`, chosen by its owner. Otherwise the in-flight action is left to finish, and the gate denies whatever the agent tries next.
+4. Report in the acknowledgement what happened at each layer, including "in-flight action not interrupted".
 
-A halt path that does not depend on the agent's process (container or Kubernetes level) arrives with the harness module in Phase 2.
+**Microsoft AGT and other in-process toolkits.** An interoperability adapter for organizations that already run AGT is a Phase 2 candidate: White Tower as an external backend of AGT's policy evaluator, AGT's events forwarded as supplementary evidence, and halts relayed to AGT's kill switch callbacks. AGT is re-tested live during the pilot (P1-14).
+
+### 6.2 Network quarantine on Kubernetes
+
+The gate lives in the agent's process, so it depends on that process behaving. For agents running on Kubernetes, the **network quarantine module** adds a layer that does not (requirement KIL-10, plan P1-15):
+
+- **What it is.** A small Go controller, deployed once per cluster, with the `runtime-control` capability. Like an enforcement point, it watches the governance state of the agents it covers and acknowledges halts; unlike one, it evaluates no policy.
+- **How it isolates.** Agents' pods carry the label `whitetower.io/agent-id`. When an agent is halted, by an agent, selector or fleet halt, the controller creates a cluster-wide deny rule selecting that label. Pods lose all traffic except what the halt needs: egress to the core's machine listener, so the in-process enforcement point can still acknowledge, deliver its evidence and learn of the release, and the node's health probes, so the pod is not restarted.
+- **No race with new pods.** The rule selects on the agent's label, not on individual pods, so a pod started later for a halted agent is isolated from its start.
+- **Reporting.** The controller acknowledges the halt with the layer `network_quarantined` and the number of pods covered. Releasing the halt removes the rule. The controller never lifts a quarantine without fresh state from the core, even after a restart or a lost connection.
+- **Keeps the evidence.** The workload keeps running, isolated, so it can be investigated. Stopping workloads arrives with the harness module in Phase 2.
+- **Requires a CNI that enforces deny rules** above ordinary network policies: Cilium (the reference, tested in CI), Calico, Antrea, or a CNI implementing AdminNetworkPolicy. Standard Kubernetes network policies can only add permissions, so they cannot quarantine.
+- **Limits.** Pods without the agent label are not covered; the console shows the pods found per agent. On some CNIs, connections opened before the rule may survive until they close; the gate still denies whatever the agent does through them.
 
 ## 7. Data model overview
 
-Sketch of the main entities; the full model is produced by plan P0-02.
+Sketch of the main entities. The full model is in the [domain model](domain-model.md), and the lifecycle in [lifecycle](lifecycle.md) (plan P0-02).
 
 ```mermaid
 erDiagram
@@ -343,7 +357,7 @@ Identifiers are UUIDv7. Governance records are never deleted; they are retired. 
 | `postgres` | Database |
 | `keycloak` | Development IdP with one test user per role (never used in production) |
 | `mock-module` | Reference enforcement point for tests and demos |
-| `demo-agent` | A sample agent governed through AGT |
+| `demo-agent` | A sample agent governed by White Tower's enforcement point |
 | `otel-collector` (optional) | Receives the audit export to show the SIEM path |
 
 The goal is a working demo within fifteen minutes of cloning the repository (OPS-01).
@@ -355,6 +369,7 @@ The goal is a working demo within fifteen minutes of cloning the repository (OPS
 - Signing keys (tokens, bundles, checkpoints) as three separate Secrets mounted as files.
 - Network policies: the console listener reachable from the corporate network, the machine listener from agent networks, the operations listener from the cluster only.
 - Database migrations run by the core at startup under an advisory lock.
+- The network quarantine module: a separate chart, one `Deployment` per cluster with two replicas and leader election, allowed to manage only its deny rules and to read pods; plus the deny rule template for the cluster's CNI.
 
 ### 8.3 Air-gapped installation
 
@@ -391,27 +406,64 @@ An offline bundle contains the images as OCI archives, the Helm chart, SBOMs, si
 | CLI | Go with `cobra` | ADR-0001 |
 | Telemetry | OpenTelemetry, Prometheus | ADR-0004 |
 | Build and release | Taskfile, GoReleaser, distroless images, Syft SBOMs, cosign signatures | ADR-0007, plan P0-01 |
+| Enforcement point | Python package on `cedarpy`, with framework hooks | ADR-0011, plan P1-09 |
+| Network quarantine | Go controller with `client-go`; CNI deny rules, Cilium as the reference | Plan P1-15 |
 | Deployment | Docker Compose, Helm | Plan P1-12 |
 
-## 11. Prepared for later phases
+## 11. Build or integrate
+
+White Tower invents no new security mechanism. Its value is the coordinating layer that no open-source project provides: one inventory, one governance model and one place to stop agents, across tools that already exist. The rule is to integrate existing tools and standards, and to build only the coordination, or what no integrable component can guarantee.
+
+| White Tower integrates | For |
+| --- | --- |
+| The organization's IdP (OIDC; SAML through a broker such as Keycloak) | Human identities and roles |
+| PostgreSQL | All state |
+| Cedar and OPA engines | Policy evaluation |
+| OpenTelemetry collectors and the organization's SIEM | Telemetry and evidence export |
+| Sigstore, SPDX and CycloneDX tooling | Signed, verifiable releases |
+| Kubernetes, container runtimes and CNIs (Cilium, Calico, Antrea) | Running and isolating workloads; the CNI enforces the network quarantine |
+| LLM and MCP gateways (Phase 2) | Choke points for model and tool calls |
+| Agent frameworks, through their own hooks | Enforcement inside the agent |
+
+| White Tower builds: the coordinating layer | Why no existing tool covers it |
+| --- | --- |
+| Inventory, ownership and lifecycle | Commercial platforms only govern their own ecosystem; nothing open covers all agents |
+| Policy model: two levels, approvals, signed bundles | Engines evaluate policies; none manages who approves them and where they apply |
+| Governance state distribution with fail-closed leases | Each tool has its own control loop; none gives one enforcement model across them |
+| Halt orchestration with layered confirmation | Toolkits stop agents inside their own process; none stops and confirms across layers |
+| Evidence across every tool, verifiable by third parties | Each tool keeps its own logs; none anchors them together |
+| Module contracts and the conformance kit | The standards exist; the contract that binds them does not |
+
+| White Tower builds, because nothing integrable gives the guarantee | Recorded in |
+| --- | --- |
+| A narrow OAuth token issuer for machines | [ADR-0010](../adr/0010-built-in-agent-token-issuer.md): issuance must see halts and lifecycle states atomically |
+| The tamper-evident audit log, on a standard transparency-log library | [ADR-0006](../adr/0006-tamper-evident-audit-log.md): evidence must stay verifiable against a privileged insider without another stateful component |
+| A small enforcement point in Python | [ADR-0011](../adr/0011-own-python-enforcement-point.md), after [spike S1](../spikes/S1-agt.md): the existing toolkit offers no gate, no loss-free evidence and no honest halt confirmation |
+
+Anything added to the "builds" tables needs an ADR explaining why integration was not enough.
+
+## 12. Prepared for later phases
 
 | Later capability | Hook in the MVP |
 | --- | --- |
 | MCP and LLM gateways (Phase 2) | They become enforcement points using the same watch contract, and call a decision point through AuthZEN; agent tokens are already audience-bound |
-| Second policy engine (Phase 2) | Combination semantics and test vectors are part of the contract, not of AGT |
-| Harness module (Phase 2) | A second, independent halt path at the container or Kubernetes level, which does not rely on the agent's enforcement point |
+| Second policy engine (Phase 2) | Combination semantics and test vectors are part of the contract, not of any engine |
+| Harness module (Phase 2) | Stopping or restarting workloads (scale to zero, container kill), on top of the MVP's network quarantine; both act outside the agent's process |
+| Microsoft AGT and other toolkits (Phase 2) | Interoperability adapters that plug into the same contracts ([ADR-0011](../adr/0011-own-python-enforcement-point.md)) |
 | Strict mode for critical agents (Phase 2) | Synchronous decision per action, as an option of the watch contract |
 | Message broker (if needed) | Events and notifications sit behind interfaces |
 | External identity sources | SPIRE, Kubernetes workload identity and external issuers plug into the token endpoint |
 | Discovery (Phase 3) | Inventory accepts agents with a `discovered` source |
 
-## 12. Architecture risks
+## 13. Architecture risks
 
 | Risk | Mitigation |
 | --- | --- |
-| Microsoft AGT is immature for a first adapter: Public Preview, frequent breaking changes, extension points that differ per language, and no foundation (the Agentic AI Foundation declined it in June 2026) | Spike with a go/no-go decision (P0-05); exact version pinned; thin adapter; contracts validated against several engines; mock module keeps the core testable without AGT; fallback to a minimal White Tower enforcement point in Python |
+| White Tower's own enforcement point runs inside other people's agents and must follow each framework's releases ([ADR-0011](../adr/0011-own-python-enforcement-point.md)) | Small scope on a proven evaluator (`cedarpy`); conformance kit; weekly CI against the frameworks' latest releases; network quarantine as an independent layer on Kubernetes |
+| The contracts end up shaped like White Tower's own enforcement point | P0-03 maps them onto AGT, OPA, Cedar and an AuthZEN engine before the RFC |
 | A candidate engine changes hands (Galileo Agent Control, named in the charter, was acquired by Cisco in 2026) | Engine-neutral contracts and standard policy languages (Cedar, Rego), as the charter's risk table foresaw |
-| A compromised enforcement point fakes acknowledgements | Halts also stop token issuance; the console flags instances that keep sending events after a halt; the Phase 2 harness module adds an independent stop |
+| A compromised enforcement point fakes acknowledgements | Halts also stop token issuance; the console flags instances that keep sending events after a halt; on Kubernetes, network quarantine isolates the agent regardless (KIL-10); the Phase 2 harness module adds another independent stop |
+| Network quarantine depends on the cluster's CNI | Cilium as the reference, tested in CI; templates for Calico, Antrea and AdminNetworkPolicy; the console shows the layer as unavailable where the CNI cannot deny |
 | The sealer limits audit throughput | Measured in P0-05 against NFR-07 and NFR-09; batching; hash chain as fallback |
 | Fail-closed turns core outages into fleet outages | High availability, TTL tuned per risk tier, alerting on lease health; documented as an accepted trade-off (ADR-0005) |
 | Contracts change often during the alpha | `v1alpha1` label, RFC process, breaking-change checks in CI |

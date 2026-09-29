@@ -21,10 +21,10 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | ID | Plan | Size | Depends on | Main requirements | Status |
 | --- | --- | --- | --- | --- | --- |
 | [P0-01](phase-0/P0-01-engineering-foundations.md) | Engineering foundations | M | none | NFR-13, NFR-18, NFR-21, CON-01 | In progress |
-| [P0-02](phase-0/P0-02-domain-and-data-model.md) | Domain and data model v0.1 | M | none | INV, AID-01, POL-01, AUD-01, NFR-19, NFR-20 | Draft |
+| [P0-02](phase-0/P0-02-domain-and-data-model.md) | Domain and data model v0.1 | M | none | INV, AID-01, POL-01, AUD-01, NFR-19, NFR-20 | Done |
 | [P0-03](phase-0/P0-03-module-contracts.md) | Module contracts v0.1 | L | P0-02, P0-05 (S1) | MOD-01 to MOD-05, MOD-08, POL-03, POL-05, POL-06 | Draft |
 | [P0-04](phase-0/P0-04-threat-model.md) | Threat model v0.1 | M | P0-02, P0-03 (drafts) | NFR-21, NFR-22 | Draft |
-| [P0-05](phase-0/P0-05-spikes-and-nfr-targets.md) | Technical spikes and NFR targets | M | none (uses `hack/spikes/`) | NFR-02 to NFR-09 | Draft |
+| [P0-05](phase-0/P0-05-spikes-and-nfr-targets.md) | Technical spikes and NFR targets | M | none (uses `hack/spikes/`) | NFR-02 to NFR-09 | In progress |
 
 ### Phase 1: Core MVP (gate G1, "Pilot with real agents")
 
@@ -38,12 +38,13 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | [P1-06](phase-1/P1-06-policy-model-and-distribution.md) | Policy model and distribution | L | P0-03, P1-04 | POL-01 to POL-10 | Draft |
 | [P1-07](phase-1/P1-07-module-registry-and-api.md) | Module registry and module API | L | P0-03, P1-01, P1-05 | MOD-01 to MOD-05, MOD-07 | Draft |
 | [P1-08](phase-1/P1-08-kill-switch.md) | Kill switch | L | P1-04, P1-05, P1-07 | KIL-01 to KIL-09 | Draft |
-| [P1-09](phase-1/P1-09-agt-adapter.md) | Microsoft AGT adapter | L | P0-05 (S1), P1-06, P1-07, P1-08 | MOD-06 | Draft |
+| [P1-09](phase-1/P1-09-python-enforcement-point.md) | White Tower enforcement point (Python) | L | P0-05 (S1), P1-06, P1-07, P1-08 | MOD-06 | Draft |
 | [P1-10](phase-1/P1-10-web-console.md) | Web console | XL, split into 7 subplans | P1-10.0 needs only the requirements; P1-10.1 needs P1-03; then each backend plan | UI-01 to UI-09 | Draft |
 | [P1-11](phase-1/P1-11-cli.md) | CLI (`wtctl`) | M | P1-03 | API-04 | Draft |
 | [P1-12](phase-1/P1-12-packaging-and-deployment.md) | Packaging and deployment | XL, split into 2 parts | P1-01 (part 1); P1-07, P1-08 (part 2) | OPS-01 to OPS-07, NFR-14, NFR-15 | Draft |
 | [P1-13](phase-1/P1-13-security-hardening-and-release.md) | Security hardening and release v0.1.0 | M | all feature plans | NFR-11, NFR-12, NFR-13 | Draft |
 | [P1-14](phase-1/P1-14-pilot-and-gate.md) | Pilot and Phase 1 gate | M, plus pilot calendar | P1-13 | Charter success criteria | Draft |
+| [P1-15](phase-1/P1-15-network-quarantine.md) | Kubernetes network quarantine module | M | P0-03, P1-05, P1-07; P1-08 for the end-to-end tests | KIL-10, NFR-23 | Draft |
 
 ## Dependencies
 
@@ -65,12 +66,13 @@ flowchart LR
         P106[P1-06 Policies]
         P107[P1-07 Module API]
         P108[P1-08 Kill switch]
-        P109[P1-09 AGT adapter]
+        P109[P1-09 Enforcement point]
         P110[P1-10 Console]
         P111[P1-11 CLI]
         P112[P1-12 Deployment]
         P113[P1-13 Hardening]
         P114[P1-14 Pilot]
+        P115[P1-15 Network quarantine]
     end
     P002 --> P003
     P005 --> P003
@@ -98,9 +100,12 @@ flowchart LR
     P110 --> P113
     P112 --> P113
     P113 --> P114
+    P107 --> P115
+    P115 --> P112
+    P115 --> P113
 ```
 
-**Critical path** (with the baseline team of the [roadmap](../roadmap.md)): P0-01 and P0-02 → P1-01 → P1-03 → P1-04 → P1-05 → P1-08 → P1-09 → P1-13 → P1-14. The contracts branch (P0-03 → P1-07) runs in parallel with about two weeks of slack. The console, CLI and deployment plans run in parallel and must keep pace, not lead.
+**Critical path** (with the baseline team of the [roadmap](../roadmap.md)): since the network quarantine joined the MVP, the platform track sets the end date: P0-01 → P1-01 → P1-02 → P1-07 → P1-11 → P1-15 → P1-12.2 → P1-13 → P1-14. The core domain track (P1-03 → P1-04 → P1-05 → P1-08 → P1-09) finishes one week earlier; with a fifth person taking P1-15, it becomes the critical path again. The contracts branch (P0-03 → P1-07) runs in parallel with slack. The console plans run in parallel and must keep pace, not lead.
 
 ## Definition of done (every plan)
 
@@ -124,7 +129,7 @@ Every Must requirement is covered by at least one plan:
 | Agent identity and credentials (AID) | P1-05, P1-07 |
 | Policies (POL) | P0-03, P1-06, P1-09 |
 | Audit and evidence (AUD) | P0-02, P1-02, P1-11 |
-| Kill switch (KIL) | P0-03, P1-08, P1-09, P1-10 |
+| Kill switch (KIL) | P0-03, P1-08, P1-09, P1-10, P1-15 |
 | Modules and contracts (MOD) | P0-03, P1-07, P1-09 |
 | User interface (UI) | P1-10 |
 | API and CLI (API) | P1-01, P1-11, and every feature plan for its endpoints |

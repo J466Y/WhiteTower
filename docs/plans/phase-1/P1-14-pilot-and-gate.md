@@ -35,9 +35,9 @@ Prove, with real agents, real people and a real SIEM, that White Tower does what
 Agree with a partner organization (ASM-03) on:
 
 - scope, schedule and a support channel;
-- **two to five real agents**: at least one in-house Python agent instrumented with AGT (aiming for coverage C3), and at least one third-party SaaS agent registered at C0;
+- **two to five real agents**: at least one in-house Python agent instrumented with White Tower's enforcement point (aiming for coverage C3), and at least one third-party SaaS agent registered at C0;
 - named owners and committee members;
-- the IdP, the SIEM and the environment (Kubernetes, or a Docker host);
+- the IdP, the SIEM and the environment: Kubernetes, preferably with a CNI that enforces deny rules so network quarantine can be shown (ASM-05), or a Docker host;
 - a data handling agreement and the success metrics.
 
 **Done when:** signed before the Phase 0 gate. Without it, the Phase 1 gate is at risk (critical path).
@@ -74,7 +74,8 @@ Define how each is measured, which data is collected, and a weekly check-in.
 
 ### 5. Instrument agents
 
-- Install `whitetower-agt` in the governed agents, with credentials created through the CLI or Kubernetes workload identity.
+- Install `whitetower-ep` in the governed agents, with credentials created through the CLI or Kubernetes workload identity.
+- On Kubernetes, label the agents' pods with their agent ID and install the network quarantine module (P1-15).
 - Iterate policies in a non-production environment first.
 - Verify coverage C2.
 
@@ -91,25 +92,36 @@ Watch the dashboards, reviews and drift; collect user experience feedback; fix b
 - A halt drill on each governed agent.
 - A fleet halt drill in an agreed window.
 - A partition drill (block traffic between the enforcement points and the core) to verify fail-closed behavior.
+- On Kubernetes, check in each halt drill that the agent's pods were quarantined, and how long it took (NFR-23).
 
 Measure each against the targets, and reach coverage C3.
 
 **Done when:** the drill report shows the targets met, or explains the gaps.
 
-### 8. Evidence
+### 8. Microsoft AGT, re-tested live
+
+ADR-0011 replaced AGT with White Tower's own enforcement point for the MVP, and asked for AGT to be checked again with a real agent. If the partner runs AGT, or agrees to try it:
+
+- run one pilot agent with AGT's latest release, next to or instead of White Tower's enforcement point, in a non-production environment;
+- repeat the spike S1 probes live: White Tower as AGT's policy backend, halts relayed to AGT's kill switch, event delivery under load;
+- record what changed since spike S1.
+
+**Done when:** the result is in the gate report, as input to the Phase 2 priorities (the AGT interoperability adapter).
+
+### 9. Evidence
 
 - Auditors run `wtctl audit verify`, and a consistency check against a checkpoint stored in the SIEM.
 - Export the evidence bundle for the pilot period (Could).
 
 **Done when:** the evidence is attached to the gate report.
 
-### 9. Gate review (G1)
+### 10. Gate review (G1)
 
 Write a report with evidence for each charter success criterion and each Must requirement (demonstrated or not), the NFR measurements against their targets, incidents, feedback and known limitations. The maintainers and the pilot sponsor decide go or no-go for Phase 2, and set its priorities (for example, MCP gateway or LLM gateway first).
 
 **Done when:** the gate decision is recorded, and the roadmap is updated for Phase 2.
 
-### 10. Retrospective and publication
+### 11. Retrospective and publication
 
 Hold a project retrospective. With the partner's consent, publish a write-up or case study, and update the README's status section.
 
@@ -120,16 +132,17 @@ Hold a project retrospective. With the partner's consent, publish a write-up or 
 The gate report, approved by the maintainers and the pilot sponsor, shows the four MVP criteria of requirements section 1 met:
 
 1. every pilot agent in the inventory with an active owner, a validated use case and an approved agent-specific policy;
-2. governed agents authenticated by White Tower and governed at runtime through AGT with White Tower policies;
+2. governed agents authenticated by White Tower and governed at runtime by White Tower's enforcement point with White Tower policies;
 3. evidence in the tamper-evident log, verified with the CLI and exported to the partner's SIEM;
-4. halts of one agent and of the fleet confirmed and measured within the Phase 0 targets.
+4. halts of one agent and of the fleet confirmed and measured within the Phase 0 targets and, for agents on Kubernetes, their pods quarantined at the network level (in the pilot if its cluster supports it, otherwise on the reference cluster).
 
 ## Risks and open questions
 
 | Risk or question | Mitigation or owner |
 | --- | --- |
 | No pilot partner in time | Start step 1 during Phase 0; the maintainers' own organizations as a fallback |
-| Real agents use frameworks the adapter does not support | Choose pilot agents together with the P0-05 S1 framework choice; add a helper in P1-09 if needed |
+| Real agents use frameworks the enforcement point does not support | Choose pilot agents with LangGraph 1.x where possible; add hooks in P1-09 if needed |
+| The pilot's cluster cannot enforce deny rules, or the pilot runs on Docker | Show network quarantine on the reference cluster, and record the limit in the gate report |
 | Committee members lack time | Short training, the personal inbox and reminders; realistic review intervals |
 
 ## Notes for implementers

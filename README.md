@@ -78,7 +78,7 @@ These are the first modules we plan to integrate. None of them is final.
 | --- | --- |
 | Policy engine and runtime governance | [Microsoft Agent Governance Toolkit](https://opensource.microsoft.com/blog/2026/04/02/introducing-the-agent-governance-toolkit-open-source-runtime-security-for-ai-agents/), [Galileo Agent Control](https://galileo.ai/blog/announcing-agent-control), OPA |
 | Identity | SPIFFE/SPIRE, Keycloak |
-| Kill switch | Microsoft AGT (Agent Runtime) |
+| Kill switch | Built in this project: an in-process enforcement point and network quarantine on Kubernetes ([ADR-0011](docs/adr/0011-own-python-enforcement-point.md)); Microsoft AGT as a later integration |
 | Sandbox / harness | gVisor, Firecracker, containers with seccomp |
 | LLM gateway, quotas, cost | LiteLLM |
 | MCP and tool gateway | Obot, open MCP gateways |
@@ -90,7 +90,7 @@ These are the first modules we plan to integrate. None of them is final.
 | Phase | Focus | Exit gate |
 | --- | --- | --- |
 | **0: Foundations** | Module contracts, data model, threat model | Contracts v0.1 reviewed |
-| **1: Core MVP** | Inventory and identity, audit and basic UI, kill switch via AGT | Pilot with real agents |
+| **1: Core MVP** | Inventory and identity, audit and basic UI, kill switch through White Tower's enforcement point and network quarantine | Pilot with real agents |
 | **2: Key modules** | LLM gateway and quotas, MCP gateway, skills repository, per-agent harness | One use case in production |
 | **3: Ecosystem** | Shadow AI discovery, compliance, third-party module SDK, public release | First third-party module |
 
