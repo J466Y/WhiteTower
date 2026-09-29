@@ -147,3 +147,4 @@ With 500 mock instances, halt one agent and the whole fleet repeatedly. Measure 
 - Never make halting depend on anything slower than one database transaction: no synchronous calls to modules, and no approval.
 - Keep the halt path free of optional dependencies (SMTP, webhooks): notifications happen after commit and may fail without affecting the halt.
 - The halt, the suspension and the state version bump must be in one transaction; test it with a failure injected between them.
+- Spike S2 measured this path with 1,000 enforcement points: a fleet halt was delivered with p99 ≤ 310 ms and acknowledged with p95 0.63 s. Most of the difference is 1,000 acknowledgements written in a burst: write them in batches ([report](../../spikes/S2-watch-streams.md)).

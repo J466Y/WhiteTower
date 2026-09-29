@@ -5,6 +5,17 @@
   "schedule": ["before 6am on monday"],
   "minimumReleaseAge": "3 days",
   "postUpdateOptions": ["gomodTidy"],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**",
+    "**/examples/**",
+    "**/__tests__/**",
+    "**/test/**",
+    "**/tests/**",
+    "**/__fixtures__/**",
+    "hack/spikes/**"
+  ],
   "packageRules": [
     {
       "description": "One pull request for GitHub Actions (pinned by commit SHA)",

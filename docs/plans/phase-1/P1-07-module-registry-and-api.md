@@ -152,3 +152,9 @@ Publish the results.
 - `connect-go` server streams map to plain `http.Handler`s, so TLS and middleware stay shared with the rest of the machine listener.
 - Send the snapshot and later changes through one ordered channel per stream, to avoid races between them.
 - Enforcement points start closed. The contract (and the kit) makes the "no action before state" rule testable (KIL-07).
+- From spike S2, which ran this design with 1,000 enforcement points ([report](../../spikes/S2-watch-streams.md)):
+  - serialize every governance state change with a transaction-level advisory lock, so versions commit in order; otherwise a replica reading "every change after V" can skip one that commits late;
+  - register a stream before reading its snapshot, then skip changes the snapshot already holds;
+  - catch up on every notification and also every few seconds, so a lost notification delays a change but never loses it;
+  - send renewals only once a stream's queue is drained (CORE-6), and drop streams that cannot keep up (CORE-7);
+  - streams stay where they reconnected after a replica returns; ending them at token expiry (CORE-1) rebalances them over time.

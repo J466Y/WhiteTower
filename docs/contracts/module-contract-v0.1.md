@@ -151,7 +151,7 @@ JSON examples of every method are in appendix A.
 
 ### 4.7 Retries and backoff
 
-- **I-4.** Instances MUST retry with exponential backoff and full jitter, with waits of at most 30 seconds. The first wait SHOULD be a random duration up to 0.5 seconds, each later cap doubling; the cap SHOULD reset once a stream has stayed up for 60 seconds.
+- **I-4.** Instances MUST retry with exponential backoff and full jitter. The backoff's cap MUST NOT exceed 30 seconds, nor a third of the shortest lease TTL the instance holds, so that once the core returns every instance is back within one renewal interval. The backoff MUST return to its first step once a session has received a lease renewal. The first wait SHOULD be a random duration up to 0.5 seconds, each later cap doubling. (Spike S2: with a 30-second cap, a five-second outage of the whole core left 6 to 8% of 1,000 enforcement points failed closed; with this rule, none.)
 - Retrying is always safe: acknowledgements carry an `acknowledgement_id` chosen by the instance, and events are de-duplicated on their source and ID.
 
 ### 4.8 Limits
@@ -556,7 +556,7 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | S-09 The bundle vectors are rejected with the right reasons, and the previous bundle stays active | EP-7 | Designed |
 | S-10 Events validate against the catalog, with a gapless `wtseq`, and survive a restart | EP-8 | Designed |
 | S-11 A full evidence buffer closes the gate | EP-8 | Designed |
-| S-12 Reconnection uses jittered backoff and resumes from the last version | EP-9, I-4 | Designed |
+| S-12 Reconnection uses jittered backoff bounded by the lease, resets after a renewal, and resumes from the last version | EP-9, I-4 | Designed |
 | S-13 Unknown fields and values never open anything | EP-10 | Designed |
 | S-14 A runtime-control module never lifts a layer without a current state | RC-2, RC-3 | Designed |
 | S-15 A runtime-control module acknowledges per agent, with the workloads covered | RC-4 | Designed |
