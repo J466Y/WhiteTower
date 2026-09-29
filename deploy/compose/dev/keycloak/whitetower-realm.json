@@ -1,0 +1,157 @@
+{
+  "realm": "whitetower",
+  "displayName": "White Tower (development)",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "groups": [
+    { "name": "wt-steering" },
+    { "name": "wt-advisory" },
+    { "name": "wt-owners" },
+    { "name": "wt-users" },
+    { "name": "wt-operators" },
+    { "name": "wt-auditors" },
+    { "name": "wt-admins" }
+  ],
+  "clients": [
+    {
+      "clientId": "whitetower-console",
+      "name": "White Tower console (backend-for-frontend)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "whitetower-console-dev-only",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:8080/auth/callback",
+        "http://127.0.0.1:8080/auth/callback",
+        "http://localhost:5173/auth/callback"
+      ],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8080/*##http://127.0.0.1:8080/*##http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "wtctl",
+      "name": "White Tower CLI",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://127.0.0.1/*", "http://localhost/*"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "steering",
+      "email": "steering@example.test",
+      "firstName": "Sam",
+      "lastName": "Steering",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
+      "groups": ["/wt-steering"]
+    },
+    {
+      "username": "advisory",
+      "email": "advisory@example.test",
+      "firstName": "Alex",
+      "lastName": "Advisory",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
+      "groups": ["/wt-advisory"]
+    },
+    {
+      "username": "owner",
+      "email": "owner@example.test",
+      "firstName": "Olivia",
+      "lastName": "Owner",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
+      "groups": ["/wt-owners"]
+    },
+    {
+      "username": "user",
+      "email": "user@example.test",
+      "firstName": "Uma",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
+      "groups": ["/wt-users"]
+    },
+    {
+      "username": "operator",
+      "email": "operator@example.test",
+      "firstName": "Omar",
+      "lastName": "Operator",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
+      "groups": ["/wt-operators"]
+    },
+    {
+      "username": "auditor",
+      "email": "auditor@example.test",
+      "firstName": "Ana",
+      "lastName": "Auditor",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
+      "groups": ["/wt-auditors"]
+    },
+    {
+      "username": "admin",
+      "email": "admin@example.test",
+      "firstName": "Adrian",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
+      "groups": ["/wt-admins"]
+    }
+  ]
+}
