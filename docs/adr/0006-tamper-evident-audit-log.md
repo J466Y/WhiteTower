@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-09-28
-- **Related:** AUD-01 to AUD-10, NFR-08 to NFR-10; ADR-0003
+- **Related:** AUD-01 to AUD-10, NFR-07 to NFR-10; ADR-0003; [spike S3](../spikes/S3-audit-throughput.md)
 
 ## Context
 
@@ -13,7 +13,7 @@ A table in a database is not immutable: whoever administers the database can cha
 ## Decision
 
 1. **Storage.** Events live in an append-only `audit_events` table in PostgreSQL. The runtime database role can only INSERT into it, and triggers reject UPDATE and DELETE. Tables are partitioned by month.
-2. **Sealing.** A single background job (the sealer, one leader across replicas) assigns each new event a position in the log and appends it to a **Merkle tree with RFC 6962 hashing**. The leaf is the SHA-256 of the event's canonical JSON (RFC 8785). Intermediate tree hashes are stored in their own table. The reference implementation is `golang.org/x/mod/sumdb/tlog`, the code behind the Go checksum database; the `transparency-dev` libraries are the fallback.
+2. **Sealing.** A single background job (the sealer, one leader across replicas) assigns each new event a position in the log and appends it to a **Merkle tree with RFC 6962 hashing**. The leaf is the SHA-256 of the event's canonical JSON (RFC 8785). Intermediate tree hashes are stored in their own table. The reference implementation is `golang.org/x/mod/sumdb/tlog`, the code behind the Go checksum database; the `transparency-dev` libraries are the fallback. Ingestion adds each event to a **queue of unsealed events** in the event's own transaction, and the sealer takes events off it in batches, so an event whose transaction commits late is sealed later, never skipped.
 3. **Checkpoints.** At least every 60 seconds (or every N events), the sealer signs a **checkpoint** (tree size and root hash) in the C2SP `tlog-checkpoint` signed-note format, with an Ed25519 key reserved for this purpose.
 4. **Anchoring outside White Tower.** Checkpoints travel with the audit export stream (OTLP, JSON Lines) and can be stored by the SIEM, a WORM bucket or any other witness. A later consistency proof between an external checkpoint and the current tree shows that history has not been rewritten, even by a database administrator.
 5. **Verification.** `wtctl audit verify` recomputes the tree from the events and checks the checkpoint signatures; `wtctl audit prove` produces and checks inclusion proofs for single events and consistency proofs between two checkpoints.
@@ -29,13 +29,14 @@ A table in a database is not immutable: whoever administers the database can cha
 - The whole mechanism lives inside PostgreSQL (ADR-0003).
 
 **Harder**
-- The sealer serializes appends to the tree. Throughput must be measured in the P0-05 spike against NFR-07 and NFR-09.
+- The sealer serializes appends to the tree. Spike S3 measured it on a laptop: at 2,000 events per second it was busy 18% of the time, with a p99 sealing delay of 341 ms, and it kept up at 10,000 per second.
+- Storage: about 2.2 KB per retained event in PostgreSQL, of which about 370 bytes of tree data outlive retention (spike S3).
 - Protection against a privileged insider depends on checkpoints actually being stored outside. The deployment guide makes it an explicit step.
 - If the checkpoint signing key leaks, forged checkpoints become possible. The key is separate from the database, rotatable, and its public half is published.
 
 ## Alternatives considered
 
-- **A plain hash chain.** Simpler, but proofs are linear and there is no efficient consistency proof between two checkpoints. Kept as the fallback if the spike finds the Merkle tree too costly.
+- **A plain hash chain.** Simpler, but proofs are linear and there is no efficient consistency proof between two checkpoints. It was kept as the fallback in case the Merkle tree proved too costly; spike S3 found it costs about the same to compute and two stored hashes per event, so the fallback is no longer needed.
 - **immudb.** A tamper-evident database, but another stateful dependency (ADR-0003).
 - **Trillian or Tessera.** Production-grade transparency logs, but heavier to operate and without a PostgreSQL backend fitting this design. Worth revisiting if the log must scale far beyond the MVP.
 - **WORM storage only** (S3 Object Lock). Prevents deletion but proves little about ordering or completeness; kept as an optional archive (AUD-08).

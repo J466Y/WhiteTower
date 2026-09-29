@@ -1,0 +1,6 @@
+s3.exe
+s3
+s3-linux
+results*.json
+!results-1m.json
+run-*.log
