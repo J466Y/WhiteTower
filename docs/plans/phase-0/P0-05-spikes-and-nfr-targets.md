@@ -133,7 +133,7 @@ Update section 6 of the requirements (targets set), amend ADR-0005 or ADR-0006 i
 
 ## Progress notes
 
-### 2026-09-29: S1 and S5 done
+### 2026-09-29: S1, S4 and S5 done
 
 | Spike | Status | Result |
 | --- | --- | --- |
@@ -141,7 +141,7 @@ Update section 6 of the requirements (targets set), amend ADR-0005 or ADR-0006 i
 | S5 Interrupting agents | Done (in the S1 report) | Asynchronous tools and streaming calls stop within milliseconds; blocking tools cannot be interrupted in-process, so the `terminate` halt mode and honest layered acknowledgements are needed |
 | S2 Watch streams and halt propagation | Not started | |
 | S3 Audit log throughput | Not started | |
-| S4 Policy evaluation latency | Partly done | Python side measured in S1 (Cedar p99 ≤ 1.1 ms with 100 policies parsed once); Go side (cedar-go, embedded OPA) pending |
+| S4 Policy evaluation latency | Done | In process, 100 policies: `cedar-go` p99 ≤ 0.12 ms, OPA embedded with the contract's Rego wrapper ≤ 1.2 ms, `cedarpy` ≤ 1.02 ms (S1); an AuthZEN decision point on the same host ≤ 0.53 ms. NFR-02 kept as proposed, now backed by measurements; across cluster nodes left to S2. Report: [S4-policy-latency.md](../../spikes/S4-policy-latency.md) |
 
 **Open question Q5 is closed:** Cedar is the primary language, and Rego is not evaluated in-process in Python.
 
