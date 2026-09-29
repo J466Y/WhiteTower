@@ -87,7 +87,7 @@ Workflows, each with path filters so a change only runs what it affects:
 - **Go:** golangci-lint, tests with the race detector and coverage.
 - **Console:** Biome, type check, Vitest, build.
 - **Code generation:** drift check (step 5).
-- **Contracts:** `buf lint` and `buf breaking` against `main`; Spectral and `oasdiff` for OpenAPI; JSON Schema validation of manifest and event examples.
+- **Contracts:** `buf lint`, and `buf breaking` against the latest `contracts/v*` tag (P0-03 changed it from `main`, following its versioning policy); Spectral and `oasdiff` for OpenAPI; JSON Schema validation of manifest and event examples (`test/contracts`, added in P0-03).
 - **Security:** `govulncheck`, OSV-Scanner on the pnpm lockfile, CodeQL for Go and TypeScript, dependency review on pull requests, license checks (`go-licenses` and a pnpm license checker, following ADR-0008), secret scanning.
 - **End to end:** Docker Compose smoke test.
 

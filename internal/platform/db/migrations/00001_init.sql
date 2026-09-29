@@ -513,7 +513,10 @@ CREATE TABLE whitetower.governance_state (
   agent_halt_ids    uuid[] NOT NULL DEFAULT '{}',
   bundle_id         uuid REFERENCES whitetower.policy_bundles (id),
   lease_ttl_seconds integer NOT NULL CHECK (lease_ttl_seconds BETWEEN 10 AND 300),
-  labels            jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(labels) = 'object'),
+  halt_mode         text NOT NULL DEFAULT 'interrupt' CHECK (halt_mode IN ('block', 'interrupt', 'terminate')),
+  -- What policies may use about the agent: slug, kind, risk tier, data categories,
+  -- labels and the owner's principal ID (module contracts, section 6.2).
+  attributes        jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(attributes) = 'object'),
   state_version     bigint NOT NULL,
   updated_at        timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT governance_state_halts CHECK ((run_state = 'halted') = (cardinality(agent_halt_ids) > 0))

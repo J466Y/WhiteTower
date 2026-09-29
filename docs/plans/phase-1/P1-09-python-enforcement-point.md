@@ -102,7 +102,7 @@ On release, the gate reopens only if the lease and the bundle are valid. A termi
 
 ### 6. Evidence and durable buffer
 
-- Write each decision, and each governed action's outcome, to a local SQLite file in WAL mode **before** the action proceeds. Events follow the catalog of P0-03 (`decision.made`, `action.executed`, `action.blocked`), with the White Tower agent ID as subject, `wtseq` and the trace context, and with arguments redacted or hashed as the catalog requires.
+- Write each decision, and each governed action's outcome, to a local SQLite file in WAL mode **before** the action proceeds. Events follow the catalog of the module contracts (`decision.made` for every decision, allowed or denied, and `action.executed` for the outcome of allowed calls), with the White Tower agent ID as subject, `wtseq` and the trace context, and with arguments recorded as the contracts' privacy rules require (names, or an HMAC, never values).
 - Size the buffer for NFR-08 (24 hours at 10 events per second) and cap it. Publish in batches, with retries and respect for backpressure.
 - When the buffer is full, close the gate: no action without evidence.
 
