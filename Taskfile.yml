@@ -119,9 +119,11 @@ tasks:
       - "{{.PNPM}} --dir web run format"
 
   vuln:
-    desc: Check Go dependencies for known vulnerabilities that the code can reach
+    desc: Check the Go code and the pinned tools for known vulnerabilities they can reach
     cmds:
       - "{{.GO_TOOL}} govulncheck ./..."
+      - go build -modfile=hack/tools/go.mod -o .task/tools/ tool
+      - for bin in .task/tools/*; do {{.GO_TOOL}} govulncheck -mode=binary "$bin" || exit 1; done
 
   dev:
     desc: Start PostgreSQL and Keycloak for development (Docker)

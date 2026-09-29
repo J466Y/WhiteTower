@@ -176,6 +176,18 @@ jobs:
           go-version-file: go.mod
       - name: Known vulnerabilities in dependencies (OSV)
         run: go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.6.0 scan source --lockfile go.mod --lockfile web/pnpm-lock.yaml
+      # The pinned tools (hack/tools/go.mod) are checked by reachability, on the
+      # binaries themselves: a tool fails the job only if it can call vulnerable
+      # code. A module-level scan would also flag golang.org/x/crypto/openpgp
+      # (GO-2026-5932), which has no fix and which no tool imports.
+      - name: Known vulnerabilities reachable from the pinned tools
+        run: |
+          go build -modfile=hack/tools/go.mod -o "${RUNNER_TEMP}/tools/" tool
+          for bin in "${RUNNER_TEMP}"/tools/*; do
+            echo "::group::$(basename "${bin}")"
+            go tool -modfile=hack/tools/go.mod govulncheck -mode=binary "${bin}"
+            echo "::endgroup::"
+          done
       - name: Go dependency licenses (ADR-0008)
         run: go run github.com/google/go-licenses/v2@v2.0.1 check ./... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0
 
