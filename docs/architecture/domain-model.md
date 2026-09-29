@@ -124,7 +124,7 @@ The full list of columns and constraints is in the schema file. The sections bel
 | `module_agent_bindings` | Which agents a standalone module may serve: named agents, or all agents, as the network quarantine module of a cluster is (KIL-10) | One active binding per module and agent, and at most one active binding to all agents per module (DB) |
 | `module_instances` | Connected, disconnected and lost instances, with lease TTL and contract version | An instance authenticated as an agent names that agent (DB); lease TTL between 10 and 300 seconds (DB) |
 | `instance_agents` | Per instance and agent: active bundle version, last observed state version | Drives drift detection (P1-06) and halt tracking (P1-08) |
-| `governance_state` | One record per agent: lifecycle state, run state, agent-level halts, bundle, lease TTL, labels, state version | `halted` if and only if at least one halt covers the agent (DB); lease TTL bounds (DB) |
+| `governance_state` | One record per agent: lifecycle state, run state, agent-level halts, bundle, lease TTL, halt mode, policy attributes, state version | `halted` if and only if at least one halt covers the agent (DB); lease TTL bounds (DB); halt mode values (DB) |
 | `fleet_state` | The single fleet-wide record | Exactly one row (DB); `halted` if and only if a fleet halt is active (DB) |
 
 A fleet halt changes one row (`fleet_state`), not one row per agent. Selector halts are folded into each matching agent's `agent_halt_ids` when issued, and into agents registered later.
@@ -159,17 +159,18 @@ A fleet halt changes one row (`fleet_state`), not one row per agent. Selector ha
 
 ## 4. The governance state record
 
-What the core publishes to enforcement points for each agent (ADR-0005); the wire format is defined by the module contracts (P0-03).
+What the core publishes to enforcement points for each agent (ADR-0005). Its wire form is `AgentState` in the [module contracts](../contracts/module-contract-v0.1.md#51-the-state), which confirmed this record in P0-03 and added the halt mode and the policy attributes.
 
 | Field | Source |
 | --- | --- |
 | Agent ID | `governance_state.agent_id` |
 | Lifecycle state, which decides whether the gate may open ([lifecycle](lifecycle.md), section 1) | `governance_state.lifecycle_state` |
 | Effective run state | `halted` if `agent_halt_ids` is not empty or the fleet is halted |
-| Halt IDs and reasons | `agent_halt_ids`, `fleet_state.halt_ids` |
+| Halt IDs, scopes and issue times; reasons stay in the core | `agent_halt_ids`, `fleet_state.halt_ids` → `halts` |
 | Bundle reference: version, SHA-256, signature | `governance_state.bundle_id` → `policy_bundles` |
 | Lease TTL | `governance_state.lease_ttl_seconds`, from the risk tier (setting `killswitch.lease_ttl_seconds`) |
-| Labels needed locally (environment, risk tier) | `governance_state.labels` |
+| Halt mode chosen by the owner | `governance_state.halt_mode`, copied from `agents.halt_mode` |
+| Attributes for policies: slug, kind, risk tier, data categories, labels, owner ID. The environment is not here: it comes from each enforcement point's credential | `governance_state.attributes` |
 | State version | `governance_state.state_version`, from the global sequence `governance_state_version_seq` |
 
 Every change takes a new number from the global sequence in the transaction that makes it. Watch streams resume from the last version an instance saw, and fall back to a snapshot when the gap is too large.

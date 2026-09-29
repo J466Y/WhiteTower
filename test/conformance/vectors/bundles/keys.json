@@ -1,0 +1,23 @@
+{
+  "description": "Published Ed25519 keys that sign the bundle vectors. Their seeds are public: never trust these keys outside tests.",
+  "trusted": [
+    {
+      "kid": "h88MKF4Xti9x8DiokiJuKLOps-ms1fWOUL8eZUM5ZHQ",
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "alg": "EdDSA",
+      "x": "Yj27ObdpnwuMip4egYfDCHVbmtRAyUG8fXAio8Vkx8Q",
+      "test_only_seed": "XUFVXJ7TH1tgQn1smWHoGjJMhf3iL5kBaennl-SSpYY"
+    }
+  ],
+  "untrusted": [
+    {
+      "kid": "U4aA_uzkDKQskPyQMN-Jo7tb82tJMjzwVIANNFycLZw",
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "alg": "EdDSA",
+      "x": "FV-4p9g8TsMt81YcmAzfjeyTIXIxPTfPrCtjqTqnKDM",
+      "test_only_seed": "ux_Hvp1N9P4MA2ynmkeaqtuwSBmX42T3BSkl-3vChRQ"
+    }
+  ]
+}

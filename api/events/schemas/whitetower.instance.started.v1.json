@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Instance started",
+  "description": "A module instance started and registered (section 4).",
+  "type": "object",
+  "required": [
+    "module",
+    "module_version",
+    "contract_version",
+    "instance_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "module": {
+      "$ref": "common.schema.json#/$defs/slug"
+    },
+    "module_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "contract_version": {
+      "enum": [
+        "v1alpha1"
+      ]
+    },
+    "instance_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 64
+      }
+    }
+  }
+}

@@ -1,0 +1,89 @@
+// Module contracts v0.1 (RFC-0001): signed policy bundles.
+// Normative text: docs/contracts/module-contract-v0.1.md, section 7.
+
+syntax = "proto3";
+
+package whitetower.module.v1alpha1;
+
+// PolicyService serves the signed policy bundles that governance state refers
+// to, and the keys that verify them.
+service PolicyService {
+  // GetBundle returns one version of an agent's bundle.
+  rpc GetBundle(GetBundleRequest) returns (GetBundleResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetBundleKeys returns the public keys the core signs bundles with,
+  // including the next key during a rotation.
+  rpc GetBundleKeys(GetBundleKeysRequest) returns (GetBundleKeysResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// GetBundleRequest names a bundle.
+message GetBundleRequest {
+  // The agent.
+  string agent_id = 1;
+  // The bundle version, from the agent's BundleRef.
+  uint64 version = 2;
+}
+
+// GetBundleResponse carries the bundle.
+message GetBundleResponse {
+  // The bundle.
+  Bundle bundle = 1;
+}
+
+// Bundle is a signed, versioned effective policy set.
+message Bundle {
+  // The manifest, exactly as signed: the RFC 8785 canonical JSON of the bundle
+  // manifest. Verify the signature over these bytes before parsing them, and
+  // never re-serialize them.
+  bytes manifest = 1;
+  // JWS compact serialization with a detached payload (RFC 7515, appendix F)
+  // over the manifest bytes.
+  string signature = 2;
+  // The files the manifest lists, and nothing else.
+  repeated BundleFile files = 3;
+}
+
+// BundleFile is one file of a bundle.
+message BundleFile {
+  // Relative path, as listed in the manifest.
+  string path = 1;
+  // The file's content.
+  bytes content = 2;
+}
+
+// GetBundleKeysRequest is empty.
+message GetBundleKeysRequest {}
+
+// GetBundleKeysResponse lists the bundle signing keys.
+message GetBundleKeysResponse {
+  // Current, next and recently retired keys.
+  repeated BundleKey keys = 1;
+}
+
+// BundleKeyStatus is the status of a bundle signing key.
+enum BundleKeyStatus {
+  // Unknown. Not trusted.
+  BUNDLE_KEY_STATUS_UNSPECIFIED = 0;
+  // Signs new bundles.
+  BUNDLE_KEY_STATUS_ACTIVE = 1;
+  // Will sign bundles after the next rotation; trust it in advance.
+  BUNDLE_KEY_STATUS_NEXT = 2;
+  // Signed bundles before the last rotation; still valid for them.
+  BUNDLE_KEY_STATUS_RETIRED = 3;
+}
+
+// BundleKey is a public key that verifies bundle signatures.
+message BundleKey {
+  // The key ID used in the JWS header ("kid").
+  string key_id = 1;
+  // The JWS algorithm, "EdDSA" (Ed25519 keys) in v1alpha1.
+  string algorithm = 2;
+  // The raw 32-byte Ed25519 public key.
+  bytes public_key = 3;
+  // The key's status.
+  BundleKeyStatus status = 4;
+}

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decision made",
+  "description": "One decision of an enforcement point (sections 6 and 8).",
+  "type": "object",
+  "required": [
+    "decision",
+    "reason",
+    "action",
+    "resource",
+    "environment",
+    "policies",
+    "state_version",
+    "evaluation_us"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "enum": [
+        "allow",
+        "deny"
+      ]
+    },
+    "reason": {
+      "$ref": "common.schema.json#/$defs/decisionReason"
+    },
+    "action": {
+      "$ref": "common.schema.json#/$defs/action"
+    },
+    "resource": {
+      "$ref": "common.schema.json#/$defs/resource"
+    },
+    "environment": {
+      "enum": [
+        "production",
+        "non_production"
+      ]
+    },
+    "policies": {
+      "description": "White Tower policy IDs that determined the decision.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "common.schema.json#/$defs/uuid"
+      }
+    },
+    "bundle_version": {
+      "$ref": "common.schema.json#/$defs/version"
+    },
+    "state_version": {
+      "$ref": "common.schema.json#/$defs/stateVersion"
+    },
+    "evaluation_us": {
+      "description": "Time spent deciding, gate included, in microseconds.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "task_id": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "arguments": {
+      "description": "What the enforcement point records about the call's arguments (section 8.3). Never their values.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "names": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "hmac_sha256": {
+          "description": "HMAC-SHA-256 of the canonical arguments with a key held by the deployment.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "allow"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "bundle_version"
+        ],
+        "properties": {
+          "reason": {
+            "const": "policy.permit"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "reason": {
+            "not": {
+              "const": "policy.permit"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

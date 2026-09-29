@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | Draft |
+| **Status** | In progress: everything but the RFC review is done (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts) |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate |
@@ -100,7 +100,7 @@ Enforcement points fetch bundles through `GetBundle`. Engines that load policies
 ### 7. Event catalog (subplan candidate)
 
 - **CloudEvents envelope rules:** `source` URI scheme for instances; unique `id` per source; `time`; `subject` set to the White Tower agent ID; `dataschema`; extensions `wtseq` (per-source sequence) and W3C trace context.
-- **Types emitted by EPs:** `decision.made`, `action.executed`, `action.blocked`, `instance.started`, `instance.halted`, `bundle.activated`, `lease.expired`. **Types emitted by runtime-control modules:** `quarantine.applied`, `quarantine.lifted`. **Types emitted by the core:** lifecycle, policy, halt and checkpoint events.
+- **Types emitted by EPs:** `decision.made`, `action.executed`, `instance.started`, `instance.halted`, `bundle.activated`, `bundle.rejected`, `lease.expired`. **Types emitted by runtime-control modules:** `quarantine.applied`, `quarantine.lifted`. **Types emitted by the core:** lifecycle, policy, halt and checkpoint events.
 - **Delivery:** at-least-once, de-duplicated on source and ID, ordered per source by `wtseq`.
 - **Mapping from AGT,** for the Phase 2 adapter: AGT emits CloudEvents 1.0 (types `ai.agentmesh.*` and `ai.agentos.*`). Document how they map, keeping the original type in an extension attribute.
 
@@ -171,3 +171,23 @@ Write the RFC and circulate it to the maintainers and at least one external revi
 - Keep v0.1 small: four services and about ten event types.
 - Write every obligation as a numbered MUST with a scenario in the kit; an obligation nobody tests will be broken.
 - Reference implementations of signed notes and JWS exist in Go (`golang.org/x/mod/sumdb/note`, `go-jose`); use them in the test vectors to avoid homemade formats.
+
+## Progress notes
+
+### 2026-09-29: contracts v0.1 drafted, ready for the RFC review
+
+The normative specification is [module-contract-v0.1.md](../../contracts/module-contract-v0.1.md), proposed in [RFC-0001](../../rfcs/0001-module-contracts-v0.1.md).
+
+| Step | Status | Result |
+| --- | --- | --- |
+| 1. Capability taxonomy | Done | Four capabilities specified (`enforcement-point`, `policy-engine`, `runtime-control`, `event-source`), eight reserved; the charter's eight module types all placed |
+| 2. Manifest schema | Done | Schema, three valid examples and seven invalid ones, checked in CI by `test/contracts` |
+| 3. Module API | Done | Four services plus server information; `buf lint` clean; normative text and a JSON example for every method (appendix A) |
+| 4. Governance state and leases | Done | Obligations EP-1 to EP-12, RC-1 to RC-6, I-1 to I-6, MAN-1 to MAN-4 and CORE-1 to CORE-9; every module obligation has a scenario. The P0-02 record gained the halt mode and the policy attributes (schema checks still pass on PostgreSQL 16 and 17) |
+| 5. Decision profile | Done | Cedar schema; AuthZEN request and response schemas; 20 combination and 13 fail-closed vectors, passing on `cedar-go` 1.8.0 and on `cedarpy` 4.12.1; Rego wrapper checked with OPA 1.21. One deliberate difference from Cedar: an evaluation error always denies |
+| 6. Bundle format | Done | One JSON manifest (RFC 8785) with a detached JWS (EdDSA); 15 signed vectors, including tampered, unsigned, forged and older bundles, verified in Go and in Python |
+| 7. Event catalog | Done | 15 types, each with a schema and an example, validated in CI; privacy rules for arguments, prompts and outputs |
+| 8. Conformance kit design | Done | Kit design, driver protocol and 16 scenarios; the skeleton runs S-01 end to end against a Go stub over HTTP/2 with TLS |
+| 9. Real engines | Done | [engine-mappings.md](../../contracts/engine-mappings.md): AGT, OPA, Cedar, Cerbos and Topaz; no blocking gap |
+| 10. Versioning policy | Done | Section 10 of the specification; CI now compares the protobuf files with the latest `contracts/v*` tag |
+| 11. RFC-0001 | In progress | Draft written. Next: open the review for at least two weeks with an external reviewer, resolve the comments, accept, and tag `contracts/v0.1.0` |

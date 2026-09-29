@@ -172,23 +172,29 @@ Separating the human-facing and machine-facing listeners lets operators expose t
 | `/api/v1/modules` | Register a manifest, approve, list instances and health |
 | `/api/v1/principals`, `/api/v1/role-bindings`, `/api/v1/settings` | Administration |
 
-### 4.3 Module API (sketch; defined in `api/proto`, package `whitetower.module.v1alpha1`)
+### 4.3 Module API
+
+Defined in `api/proto`, package `whitetower.module.v1alpha1`, and specified in the [module contracts](../contracts/module-contract-v0.1.md#4-module-api).
 
 | Service and method | Direction | Purpose |
 | --- | --- | --- |
-| `RegistryService.RegisterInstance` | Module → core | Announce an instance: module, version, supported contract versions, agents served |
-| `GovernanceService.Watch` | Core → module (server stream) | Snapshot, then changes: agent state, run state, bundle reference, fleet state, lease renewals |
-| `GovernanceService.Acknowledge` | Module → core | Confirm a halt, a bundle activation or an observed state |
-| `PolicyService.GetBundle` | Module → core | Download a signed policy bundle by reference |
+| `RegistryService.RegisterInstance` | Module → core | Announce an instance: module, manifest hash, version, supported contract versions, agents served |
+| `RegistryService.Heartbeat`, `DeregisterInstance` | Module → core | Report health and the agents served; leave cleanly |
+| `GovernanceService.Watch` | Core → module (server stream) | Snapshot, then changes: agent state, halts, bundle reference, fleet state, lease renewals |
+| `GovernanceService.Acknowledge` | Module → core | Report halt layers, bundle activations and the state version applied |
+| `PolicyService.GetBundle`, `GetBundleKeys` | Module → core | Download a signed policy bundle by reference; list the bundle signing keys |
 | `EventService.Publish` | Module → core | Send a batch of CloudEvents: decisions, actions, instance events |
+| `MetaService.GetServerInfo` | Module → core | The core's version and supported contract versions |
 
-### 4.4 Events (sketch; catalog in `api/events`)
+### 4.4 Events
 
-| Emitted by | Examples |
+The catalog is in `api/events`, specified in the [module contracts](../contracts/module-contract-v0.1.md#8-events).
+
+| Emitted by | Types |
 | --- | --- |
-| Enforcement points | `whitetower.decision.made.v1`, `whitetower.action.executed.v1`, `whitetower.instance.halted.v1`, `whitetower.bundle.activated.v1`, `whitetower.lease.expired.v1` |
+| Enforcement points | `whitetower.decision.made.v1`, `whitetower.action.executed.v1`, `whitetower.instance.started.v1`, `whitetower.instance.halted.v1`, `whitetower.bundle.activated.v1`, `whitetower.bundle.rejected.v1`, `whitetower.lease.expired.v1` |
 | Network quarantine module | `whitetower.quarantine.applied.v1`, `whitetower.quarantine.lifted.v1` |
-| Core | `whitetower.agent.lifecycle_changed.v1`, `whitetower.policy.version_approved.v1`, `whitetower.halt.issued.v1`, `whitetower.halt.released.v1`, `whitetower.audit.checkpoint.v1` |
+| Core | `whitetower.agent.created.v1`, `whitetower.agent.lifecycle_changed.v1`, `whitetower.policy.version_approved.v1`, `whitetower.halt.issued.v1`, `whitetower.halt.released.v1`, `whitetower.audit.checkpoint.v1`, and one type for every other state change (AUD-01) |
 
 Every event carries the W3C trace context (CloudEvents distributed tracing extension), so a decision can be followed from the agent to the audit log.
 
@@ -267,15 +273,15 @@ In the same transaction, token issuance for the agent stops. A fleet halt works 
 
 ## 6. Governance state and leases
 
-For every agent, the core maintains a governance state record: lifecycle state, run state, the effective bundle reference (version, hash and signature), the lease TTL and a version number taken from a global sequence. The fleet state (halted or not, and the selector of a fleet halt) is one more record.
+For every agent, the core maintains a governance state record: lifecycle state, halts, the effective bundle reference (version, manifest hash and size), the lease TTL, the halt mode, the attributes policies may use, and a version number taken from a global sequence. The fleet state, with its active fleet halts, is one more record.
 
-- **Watch protocol (sketch).** An EP opens `Watch` with the agents it serves and the last version it has seen. The core replies with a snapshot if the EP is new or too far behind, then streams changes in version order. Lease renewals are sent every third of the TTL.
+- **Watch protocol.** An EP opens `Watch` with the last version it applied. The core replies with a snapshot if the EP is new or too far behind, then streams changes in version order. Lease renewals come at a third of the TTL, and at least every 30 seconds, only when the stream is current. The [module contracts](../contracts/module-contract-v0.1.md#5-governance-state-leases-and-halts) specify it.
 - **Lease expiry is computed by the EP** from its own monotonic clock at the moment it receives a renewal, so it does not depend on clocks being synchronized between hosts.
-- **Obligations of an EP** (normative text in the contracts, P0-03):
-  - allow nothing until it has a current state and a verified bundle;
-  - deny everything and halt the agent when the lease expires or the run state is halted;
-  - acknowledge halts and bundle activations;
-  - buffer events durably, and fail closed when the buffer is full;
+- **Obligations of an EP**, numbered EP-1 to EP-12 in the [contracts](../contracts/module-contract-v0.1.md#57-obligations-of-enforcement-points):
+  - allow nothing until it has a current state, a lease and a verified bundle;
+  - deny everything and halt the agent when the lease expires or the agent is halted;
+  - acknowledge halts, layer by layer, and bundle activations;
+  - record every decision durably before the action proceeds, and fail closed when the buffer is full;
   - reconnect with jittered exponential backoff.
 
 ### 6.1 The MVP enforcement point: White Tower's package in the agent's process

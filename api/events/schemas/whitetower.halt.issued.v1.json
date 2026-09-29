@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Halt issued",
+  "description": "A halt (KIL-01, KIL-02). The reason is recorded here, never sent to enforcement points.",
+  "type": "object",
+  "required": [
+    "halt_id",
+    "scope",
+    "reason",
+    "drill",
+    "issuer",
+    "state_version"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "halt_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "scope": {
+      "$ref": "common.schema.json#/$defs/haltScope"
+    },
+    "agent_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "selector": {
+      "$ref": "common.schema.json#/$defs/selector"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "drill": {
+      "type": "boolean"
+    },
+    "issuer": {
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "state_version": {
+      "$ref": "common.schema.json#/$defs/stateVersion"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "agent"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "agent_id"
+        ],
+        "not": {
+          "required": [
+            "selector"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "selector"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "selector"
+        ],
+        "not": {
+          "required": [
+            "agent_id"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "fleet"
+          }
+        }
+      },
+      "then": {
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "agent_id"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "selector"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

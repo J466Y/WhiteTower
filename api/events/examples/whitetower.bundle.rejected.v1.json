@@ -1,0 +1,16 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000006",
+  "source": "/agents/0192f1c2-7a3b-7c4d-8e5f-000000000001/ep/b7e2c1d4",
+  "type": "whitetower.bundle.rejected.v1",
+  "time": "2026-09-29T10:15:02.118Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "datacontenttype": "application/json",
+  "wtseq": "1041",
+  "data": {
+    "version": 43,
+    "manifest_sha256": "0b5c1a6e2f07d8c9e4b3a2f1d0c9b8a7e6f5d4c3b2a1908f7e6d5c4b3a291807",
+    "reason": "file_hash",
+    "detail": "policies/global/0192f1c2-7a3b-7c4d-8e5f-000000000101.cedar"
+  }
+}

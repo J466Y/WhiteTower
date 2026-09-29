@@ -1,0 +1,15 @@
+{
+  "description": "The manifest was changed after signing, and governance state refers to the changed one",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 43,
+    "manifest_sha256": "f2f4f4d95d8326421e659ca2585f018474c73417e6f7edf4d6cabc13e3bf459e",
+    "size_bytes": 4344
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "signature"
+  }
+}

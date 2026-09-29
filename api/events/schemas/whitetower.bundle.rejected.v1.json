@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bundle rejected",
+  "description": "A bundle failed verification (section 7.4).",
+  "type": "object",
+  "required": [
+    "version",
+    "manifest_sha256",
+    "reason"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "$ref": "common.schema.json#/$defs/version"
+    },
+    "manifest_sha256": {
+      "$ref": "common.schema.json#/$defs/sha256"
+    },
+    "reason": {
+      "$ref": "common.schema.json#/$defs/bundleRejection"
+    },
+    "detail": {
+      "type": "string",
+      "maxLength": 500
+    }
+  }
+}

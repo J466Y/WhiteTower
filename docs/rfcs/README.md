@@ -4,4 +4,4 @@ An RFC proposes a change to the module contracts (`api/proto`, `api/events`, `ap
 
 | RFC | Title | Status |
 | --- | --- | --- |
-| 0001 | Module contracts v0.1 | Not started (plan [P0-03](../plans/phase-0/P0-03-module-contracts.md)) |
+| [0001](0001-module-contracts-v0.1.md) | Module contracts v0.1 | Draft, review not open yet (plan [P0-03](../plans/phase-0/P0-03-module-contracts.md)) |

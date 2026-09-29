@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "White Tower decision request",
+  "description": "An OpenID AuthZEN Authorization API 1.0 evaluation request, restricted by the White Tower decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6).",
+  "type": "object",
+  "required": ["subject", "action", "resource", "context"],
+  "additionalProperties": false,
+  "properties": {
+    "subject": {
+      "description": "The agent making the request.",
+      "type": "object",
+      "required": ["type", "id", "properties"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "agent" },
+        "id": { "$ref": "#/$defs/uuid" },
+        "properties": {
+          "type": "object",
+          "required": ["slug", "kind", "risk_tier", "environment", "data_categories", "owner", "labels"],
+          "additionalProperties": false,
+          "properties": {
+            "slug": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$" },
+            "kind": { "enum": ["in_house", "third_party"] },
+            "risk_tier": { "enum": ["low", "medium", "high", "critical"] },
+            "environment": {
+              "description": "The environment of the credential the enforcement point runs with.",
+              "enum": ["production", "non_production"]
+            },
+            "data_categories": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "owner": { "$ref": "#/$defs/uuid" },
+            "labels": {
+              "type": "object",
+              "propertyNames": { "pattern": "^[a-z0-9]([a-z0-9._/-]{0,61}[a-z0-9])?$" },
+              "additionalProperties": { "type": "string", "maxLength": 256 }
+            }
+          }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "enum": [
+            "agent.start",
+            "input.receive",
+            "model.invoke",
+            "model.result",
+            "tool.invoke",
+            "tool.result",
+            "output.emit",
+            "agent.stop"
+          ]
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["agent", "tool", "model", "mcp_server", "dataset", "skill", "url"] },
+        "id": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "properties": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "tool" } } },
+          "then": {
+            "required": ["properties"],
+            "properties": {
+              "properties": {
+                "type": "object",
+                "required": ["kind"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "enum": ["function", "mcp", "http", "other"] },
+                  "server": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "model" } } },
+          "then": {
+            "properties": {
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": { "provider": { "type": "string", "minLength": 1 } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["agent", "mcp_server", "dataset", "skill", "url"] } } },
+          "then": { "properties": { "properties": { "type": "object", "maxProperties": 0 } } }
+        }
+      ]
+    },
+    "context": {
+      "type": "object",
+      "required": ["time"],
+      "additionalProperties": false,
+      "properties": {
+        "time": { "$ref": "#/$defs/timestamp" },
+        "task_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "trace_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "on_behalf_of": { "description": "Reserved for per-task delegated credentials (Phase 2).", "type": "string" },
+        "args": {
+          "description": "Tool arguments declared by the deployment's extension of ToolArgs. Tool actions only.",
+          "type": "object"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "properties": { "name": { "enum": ["agent.start", "input.receive", "output.emit", "agent.stop"] } } } } },
+      "then": { "properties": { "resource": { "properties": { "type": { "const": "agent" } } } } }
+    },
+    {
+      "if": { "properties": { "action": { "properties": { "name": { "enum": ["model.invoke", "model.result"] } } } } },
+      "then": { "properties": { "resource": { "properties": { "type": { "const": "model" } } } } }
+    },
+    {
+      "if": { "properties": { "action": { "properties": { "name": { "enum": ["tool.invoke", "tool.result"] } } } } },
+      "then": { "properties": { "resource": { "properties": { "type": { "const": "tool" } } } } },
+      "else": { "properties": { "context": { "not": { "required": ["args"] } } } }
+    }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "timestamp": {
+      "description": "RFC 3339, UTC, with milliseconds (NFR-19).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    }
+  }
+}

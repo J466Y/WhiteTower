@@ -1,0 +1,12 @@
+# Invalid: contract version v1 does not exist yet.
+apiVersion: whitetower/v1alpha1
+kind: ModuleManifest
+metadata: {name: source, version: 0.1.0, vendor: Example, license: Apache-2.0}
+spec:
+  contractVersions: [v1]
+  identity: module
+  agents: bound
+  capabilities:
+    - {name: event-source}
+  events: {emits: [whitetower.instance.started.v1], consumes: []}
+  permissions: [events.publish]

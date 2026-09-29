@@ -1,0 +1,12 @@
+# Invalid: mcp-gateway is reserved and cannot be declared in v1alpha1.
+apiVersion: whitetower/v1alpha1
+kind: ModuleManifest
+metadata: {name: gateway, version: 0.1.0, vendor: Example, license: Apache-2.0}
+spec:
+  contractVersions: [v1alpha1]
+  identity: module
+  agents: bound
+  capabilities:
+    - {name: mcp-gateway}
+  events: {emits: [], consumes: []}
+  permissions: [governance.watch]

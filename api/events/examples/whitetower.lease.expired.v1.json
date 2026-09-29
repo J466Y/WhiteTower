@@ -1,0 +1,14 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000007",
+  "source": "/agents/0192f1c2-7a3b-7c4d-8e5f-000000000001/ep/b7e2c1d4",
+  "type": "whitetower.lease.expired.v1",
+  "time": "2026-09-29T10:15:02.118Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "datacontenttype": "application/json",
+  "wtseq": "1060",
+  "data": {
+    "lease_ttl_ms": 30000,
+    "effect": "gate_closed"
+  }
+}

@@ -1,0 +1,12 @@
+# Invalid: a runtime-control module must acknowledge the halts it acts on.
+apiVersion: whitetower/v1alpha1
+kind: ModuleManifest
+metadata: {name: quarantine, version: 0.1.0, vendor: Example, license: Apache-2.0}
+spec:
+  contractVersions: [v1alpha1]
+  identity: module
+  agents: all
+  capabilities:
+    - {name: runtime-control, haltLayers: [network_quarantined], platforms: [kubernetes]}
+  events: {emits: [whitetower.quarantine.applied.v1], consumes: []}
+  permissions: [governance.watch]

@@ -1,0 +1,12 @@
+# Invalid: an instance that runs inside an agent's process serves that agent only.
+apiVersion: whitetower/v1alpha1
+kind: ModuleManifest
+metadata: {name: bad-ep, version: 0.1.0, vendor: Example, license: Apache-2.0}
+spec:
+  contractVersions: [v1alpha1]
+  identity: agent
+  agents: bound
+  capabilities:
+    - {name: enforcement-point, interventionPoints: [tool.invoke, model.invoke], haltModes: [block], haltLayers: [gate_closed]}
+  events: {emits: [whitetower.decision.made.v1], consumes: []}
+  permissions: [governance.watch, governance.acknowledge, policy.bundles.read, events.publish]

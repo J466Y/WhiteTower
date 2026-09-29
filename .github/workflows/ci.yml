@@ -107,17 +107,22 @@ jobs:
         run: go tool -modfile=hack/tools/go.mod buf lint
       - name: Lint the public API (OpenAPI)
         run: pnpm dlx @stoplight/spectral-cli@6.16.3 lint --fail-severity=warn api/openapi/openapi.yaml
-      - name: No unintended breaking changes
+      # Module contracts: a published contract version never changes incompatibly, so
+      # compare with the latest contracts tag (docs/contracts/module-contract-v0.1.md, section 10).
+      - name: Module API has no breaking change since the last contracts release
+        run: |
+          tag="$(git tag --list 'contracts/v*' --sort=-v:refname | head -n 1)"
+          if [ -n "${tag}" ]; then
+            go tool -modfile=hack/tools/go.mod buf breaking --against ".git#tag=${tag}"
+          else
+            echo "No contracts tag yet: v1alpha1 is a draft under RFC-0001, nothing to compare."
+          fi
+      - name: Public API has no unintended breaking change
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
           base="refs/remotes/origin/${BASE_REF}"
-          if git cat-file -e "${base}:api/proto" 2>/dev/null; then
-            go tool -modfile=hack/tools/go.mod buf breaking --against ".git#ref=${base}"
-          else
-            echo "No protobuf baseline on ${BASE_REF}: nothing to compare."
-          fi
           if git cat-file -e "${base}:api/openapi/openapi.yaml" 2>/dev/null; then
             git show "${base}:api/openapi/openapi.yaml" > "${RUNNER_TEMP}/openapi-base.yaml"
             go run github.com/oasdiff/oasdiff@v1.32.1 breaking --fail-on ERR \

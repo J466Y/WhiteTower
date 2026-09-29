@@ -1,0 +1,80 @@
+// Cedar schema of the White Tower decision profile, contract v1alpha1 (RFC-0001).
+// Normative text: docs/contracts/module-contract-v0.1.md, section 6.
+//
+// Policies are validated against this schema before approval (POL-07). A
+// deployment may extend ToolArgs with the arguments of its own tools; nothing
+// else may change.
+namespace WhiteTower {
+  // The agent that makes the request. Its inventory labels are entity tags:
+  //   principal.hasTag("team") && principal.getTag("team") == "finance"
+  entity Agent {
+    // The agent's human-readable identifier.
+    slug: String,
+    // "in_house" or "third_party".
+    kind: String,
+    // "low", "medium", "high" or "critical".
+    risk_tier: String,
+    // "production" or "non_production": the environment of the credential the
+    // enforcement point runs with, not a property of the agent.
+    environment: String,
+    // Data categories the agent accesses, from the organization's taxonomy.
+    data_categories: Set<String>,
+    // Pseudonymous principal ID of the primary owner.
+    owner: String
+  } tags String;
+
+  // A tool the agent calls. Its ID is the tool's name as the agent sees it.
+  entity Tool {
+    // "function", "mcp", "http" or "other".
+    kind: String,
+    // For MCP tools, the ID of the MCP server that provides the tool.
+    server?: String
+  };
+
+  // A model the agent calls. Its ID is the model's name, for example "gpt-5".
+  entity Model {
+    // The provider, for example "openai" or "local".
+    provider?: String
+  };
+
+  // Reserved for later actions of the profile.
+  entity McpServer;
+  entity Dataset;
+  entity Skill;
+  entity Url;
+
+  // Arguments of tool calls. Empty in the base profile: a deployment declares
+  // the arguments its policies need, and enforcement points fill only those.
+  type ToolArgs = {};
+
+  // Context of every request.
+  type Context = {
+    // When the request was made (enforcement point clock, UTC).
+    time: datetime,
+    // The task or run the request belongs to.
+    task_id?: String,
+    // The W3C trace ID of the request.
+    trace_id?: String,
+    // Reserved for per-task delegated credentials (AID-08, Phase 2).
+    on_behalf_of?: String
+  };
+
+  // Context of tool calls: the common context plus the tool's arguments.
+  type ToolContext = {
+    time: datetime,
+    task_id?: String,
+    trace_id?: String,
+    on_behalf_of?: String,
+    args?: ToolArgs
+  };
+
+  // The eight intervention points of the profile.
+  action "agent.start" appliesTo { principal: Agent, resource: Agent, context: Context };
+  action "input.receive" appliesTo { principal: Agent, resource: Agent, context: Context };
+  action "model.invoke" appliesTo { principal: Agent, resource: Model, context: Context };
+  action "model.result" appliesTo { principal: Agent, resource: Model, context: Context };
+  action "tool.invoke" appliesTo { principal: Agent, resource: Tool, context: ToolContext };
+  action "tool.result" appliesTo { principal: Agent, resource: Tool, context: ToolContext };
+  action "output.emit" appliesTo { principal: Agent, resource: Agent, context: Context };
+  action "agent.stop" appliesTo { principal: Agent, resource: Agent, context: Context };
+}

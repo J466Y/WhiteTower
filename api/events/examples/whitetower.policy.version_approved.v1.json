@@ -1,0 +1,22 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000012",
+  "source": "/core",
+  "type": "whitetower.policy.version_approved.v1",
+  "time": "2026-09-29T10:15:02.118Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "datacontenttype": "application/json",
+  "data": {
+    "policy_id": "0192f1c2-7a3b-7c4d-8e5f-000000000202",
+    "policy_name": "invoice-triage-tools",
+    "version": 1,
+    "scope": "agent",
+    "language": "cedar",
+    "content_sha256": "48e99b7b72513a2b2f521b4a24688dfbded3cc0fcf2124936879e39ccf341692",
+    "approver": {
+      "type": "human",
+      "id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a2"
+    },
+    "approver_role": "advisory"
+  }
+}

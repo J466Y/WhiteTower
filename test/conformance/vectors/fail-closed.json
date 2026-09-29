@@ -1,0 +1,299 @@
+{
+  "description": "Gate of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 5.4). Each case gives the enforcement point's state for the agent; the request is the same, and the active bundle, when there is one, permits it. When several conditions hold, the reason is the first one in the order of section 5.4.",
+  "profile": "v1alpha1",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "policies": [
+    {
+      "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+      "scope": "agent",
+      "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+      "valid": true
+    }
+  ],
+  "request": {
+    "subject": {
+      "type": "agent",
+      "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+      "properties": {
+        "slug": "invoice-triage",
+        "kind": "in_house",
+        "risk_tier": "high",
+        "environment": "production",
+        "data_categories": [
+          "customer data",
+          "financial data"
+        ],
+        "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+        "labels": {
+          "team": "finance"
+        }
+      }
+    },
+    "action": {
+      "name": "tool.invoke"
+    },
+    "resource": {
+      "type": "tool",
+      "id": "read_invoice",
+      "properties": {
+        "kind": "function"
+      }
+    },
+    "context": {
+      "time": "2026-09-29T10:00:00.000Z"
+    }
+  },
+  "cases": [
+    {
+      "id": "F-01",
+      "description": "No state received yet",
+      "obligation": "EP-1",
+      "state": {
+        "state_received": false,
+        "lease_valid": false,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "unspecified",
+        "bundle_active": false,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.no_state",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-02",
+      "description": "The lease expired",
+      "obligation": "EP-3",
+      "state": {
+        "state_received": true,
+        "lease_valid": false,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "active",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.lease_expired",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-03",
+      "description": "The agent is halted",
+      "obligation": "EP-4",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": true,
+        "fleet_halted": false,
+        "lifecycle_state": "active",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.halted",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-04",
+      "description": "The fleet is halted, the agent's own state is running",
+      "obligation": "EP-4",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": true,
+        "lifecycle_state": "active",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.fleet_halted",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-05",
+      "description": "Halted with an expired lease: the lease is reported first",
+      "obligation": "EP-2",
+      "state": {
+        "state_received": true,
+        "lease_valid": false,
+        "agent_halted": true,
+        "fleet_halted": false,
+        "lifecycle_state": "active",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.lease_expired",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-06",
+      "description": "The agent is suspended",
+      "obligation": "EP-6",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "suspended",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.lifecycle",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-07",
+      "description": "The agent is still a draft",
+      "obligation": "EP-6",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "draft",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.lifecycle",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-08",
+      "description": "The agent is retired",
+      "obligation": "EP-6",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "retired",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.lifecycle",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-09",
+      "description": "A lifecycle state the enforcement point does not know",
+      "obligation": "EP-6",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "unknown",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.lifecycle",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-10",
+      "description": "A validated agent in non-production: the gate is open",
+      "obligation": "EP-6",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "validated",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
+      }
+    },
+    {
+      "id": "F-11",
+      "description": "No bundle is active",
+      "obligation": "EP-7",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "active",
+        "bundle_active": false,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.no_bundle",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-12",
+      "description": "The evidence buffer is full",
+      "obligation": "EP-8",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "active",
+        "bundle_active": true,
+        "evidence_buffer_full": true
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.evidence_full",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-13",
+      "description": "Everything in order: the policies decide",
+      "obligation": "EP-2",
+      "state": {
+        "state_received": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "active",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
+      }
+    }
+  ]
+}

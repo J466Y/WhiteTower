@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quarantine lifted",
+  "description": "The agent is no longer halted, and its quarantine rule was removed.",
+  "type": "object",
+  "required": [
+    "workloads",
+    "rule",
+    "cluster"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workloads": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rule": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253
+    },
+    "cluster": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  }
+}

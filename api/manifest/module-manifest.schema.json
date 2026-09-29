@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "White Tower module manifest",
+  "description": "What a module is, what it does and what it needs, apiVersion whitetower/v1alpha1 (docs/contracts/module-contract-v0.1.md, section 3). Written in YAML or JSON.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "const": "whitetower/v1alpha1" },
+    "kind": { "const": "ModuleManifest" },
+    "metadata": {
+      "type": "object",
+      "required": ["name", "version", "vendor", "license"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "The module's slug, unique in a deployment.",
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+        },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "version": {
+          "description": "The module's version, SemVer 2.0.",
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+        },
+        "vendor": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "license": { "description": "An SPDX license expression.", "type": "string", "minLength": 1, "maxLength": 200 },
+        "homepage": { "type": "string", "pattern": "^https://" },
+        "description": { "type": "string", "maxLength": 2000 }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["contractVersions", "identity", "agents", "capabilities", "events", "permissions"],
+      "additionalProperties": false,
+      "properties": {
+        "contractVersions": {
+          "description": "Module contract versions the module implements.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["v1alpha1"] }
+        },
+        "identity": {
+          "description": "agent: instances run inside an agent's process and authenticate as that agent. module: instances authenticate with the module's own identity.",
+          "enum": ["agent", "module"]
+        },
+        "agents": {
+          "description": "Which agents instances serve. self: the agent they run in. bound: the agents an operator binds to the module. all: every agent, through one binding to all agents.",
+          "enum": ["self", "bound", "all"]
+        },
+        "capabilities": {
+          "description": "At least one capability of the taxonomy (section 2). Reserved capabilities cannot be declared in v1alpha1: mcp-gateway, llm-gateway, skills-repository, harness, observability, compliance, discovery, identity-source.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/enforcementPoint" },
+              { "$ref": "#/$defs/policyEngine" },
+              { "$ref": "#/$defs/runtimeControl" },
+              { "$ref": "#/$defs/eventSource" }
+            ]
+          }
+        },
+        "events": {
+          "type": "object",
+          "required": ["emits", "consumes"],
+          "additionalProperties": false,
+          "properties": {
+            "emits": {
+              "description": "Event types instances may publish. The core rejects any other type.",
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/eventType" }
+            },
+            "consumes": {
+              "description": "Event types the module consumes. Always empty in v1alpha1.",
+              "type": "array",
+              "maxItems": 0
+            }
+          }
+        },
+        "permissions": {
+          "description": "What instances may do through the module API (section 3.3).",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["governance.watch", "governance.acknowledge", "policy.bundles.read", "events.publish"] }
+        },
+        "endpoints": {
+          "description": "Endpoints the core or other modules may call. None are required in v1alpha1.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "protocol"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "pattern": "^[a-z0-9-]{1,63}$" },
+              "protocol": { "enum": ["authzen-1.0"] },
+              "path": { "type": "string", "pattern": "^/" }
+            }
+          }
+        },
+        "configSchema": {
+          "description": "A JSON Schema (draft 2020-12) of the module's own configuration.",
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "description": "An instance that runs inside an agent serves that agent only.",
+          "if": { "properties": { "identity": { "const": "agent" } } },
+          "then": { "properties": { "agents": { "const": "self" } } },
+          "else": { "properties": { "agents": { "enum": ["bound", "all"] } } }
+        },
+        {
+          "description": "An enforcement point watches, acknowledges, reads bundles and publishes its decisions.",
+          "if": { "properties": { "capabilities": { "contains": { "properties": { "name": { "const": "enforcement-point" } } } } } },
+          "then": {
+            "properties": {
+              "permissions": {
+                "allOf": [
+                  { "contains": { "const": "governance.watch" } },
+                  { "contains": { "const": "governance.acknowledge" } },
+                  { "contains": { "const": "policy.bundles.read" } },
+                  { "contains": { "const": "events.publish" } }
+                ]
+              },
+              "events": { "properties": { "emits": { "contains": { "const": "whitetower.decision.made.v1" } } } }
+            }
+          }
+        },
+        {
+          "description": "A runtime-control module watches and acknowledges.",
+          "if": { "properties": { "capabilities": { "contains": { "properties": { "name": { "const": "runtime-control" } } } } } },
+          "then": {
+            "properties": {
+              "permissions": {
+                "allOf": [
+                  { "contains": { "const": "governance.watch" } },
+                  { "contains": { "const": "governance.acknowledge" } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "description": "An event source publishes.",
+          "if": { "properties": { "capabilities": { "contains": { "properties": { "name": { "const": "event-source" } } } } } },
+          "then": { "properties": { "permissions": { "contains": { "const": "events.publish" } } } }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "eventType": { "type": "string", "pattern": "^whitetower\\.[a-z_]+\\.[a-z_]+\\.v[1-9][0-9]*$" },
+    "action": {
+      "enum": ["agent.start", "input.receive", "model.invoke", "model.result", "tool.invoke", "tool.result", "output.emit", "agent.stop"]
+    },
+    "enforcementPoint": {
+      "type": "object",
+      "required": ["name", "interventionPoints", "haltModes", "haltLayers"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "const": "enforcement-point" },
+        "interventionPoints": {
+          "description": "Actions of the decision profile the enforcement point evaluates. tool.invoke and model.invoke are required.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/action" },
+          "allOf": [{ "contains": { "const": "tool.invoke" } }, { "contains": { "const": "model.invoke" } }]
+        },
+        "haltModes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["block", "interrupt", "terminate"] },
+          "contains": { "const": "block" }
+        },
+        "haltLayers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["gate_closed", "in_flight_interrupted", "process_terminated"] },
+          "contains": { "const": "gate_closed" }
+        },
+        "frameworks": {
+          "description": "Agent frameworks the enforcement point hooks, with supported versions. Informational.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "versions"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "versions": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "policyEngine": {
+      "type": "object",
+      "required": ["name", "languages", "combiningAlgorithms", "embedded"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "const": "policy-engine" },
+        "languages": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["cedar", "rego"] } },
+        "combiningAlgorithms": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["wt-deny-overrides-v1"] } },
+        "embedded": {
+          "description": "true when the engine runs inside an enforcement point of the same module; false when it is a decision point other modules call through AuthZEN.",
+          "type": "boolean"
+        }
+      }
+    },
+    "runtimeControl": {
+      "type": "object",
+      "required": ["name", "haltLayers", "platforms"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "const": "runtime-control" },
+        "haltLayers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["network_quarantined"] }
+        },
+        "platforms": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["kubernetes"] } }
+      }
+    },
+    "eventSource": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": { "name": { "const": "event-source" } }
+    }
+  }
+}

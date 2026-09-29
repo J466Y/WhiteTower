@@ -1,0 +1,123 @@
+// Module contracts v0.1 (RFC-0001): instance registration.
+// Normative text: docs/contracts/module-contract-v0.1.md, section 4.
+
+syntax = "proto3";
+
+package whitetower.module.v1alpha1;
+
+import "google/protobuf/duration.proto";
+
+// RegistryService lets a module instance announce itself, report its health and
+// leave cleanly. Every other method of the module API needs a registered
+// instance.
+service RegistryService {
+  // RegisterInstance announces an instance and negotiates the contract version.
+  // Registering again with the same module and instance key updates the
+  // existing instance and returns the same instance ID.
+  rpc RegisterInstance(RegisterInstanceRequest) returns (RegisterInstanceResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // Heartbeat reports the instance's health and, when it changed, the set of
+  // agents it serves.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // DeregisterInstance tells the core that the instance is stopping on purpose,
+  // so it is shown as disconnected rather than lost.
+  rpc DeregisterInstance(DeregisterInstanceRequest) returns (DeregisterInstanceResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// RegisterInstanceRequest describes the instance.
+message RegisterInstanceRequest {
+  // Slug of the module, as registered and approved by an operator.
+  string module = 1;
+  // Lowercase hexadecimal SHA-256 of the RFC 8785 canonical JSON of the manifest
+  // the instance runs. It must match the approved manifest.
+  string manifest_sha256 = 2;
+  // Version of the module, as in its manifest.
+  string module_version = 3;
+  // Key chosen by the instance, unique within the module and stable for its
+  // deployment slot (for example a pod name). Registering again with the same
+  // key updates the existing instance.
+  string instance_key = 4;
+  // Contract versions the instance supports, for example "v1alpha1".
+  repeated string contract_versions = 5;
+  // Agents the instance serves. An enforcement point embedded in an agent's
+  // process lists exactly that agent.
+  repeated string agent_ids = 6;
+  // Descriptive information, shown in the console.
+  InstanceInfo info = 7;
+}
+
+// InstanceInfo is descriptive information about an instance. It is never used
+// for authorization.
+message InstanceInfo {
+  // Host or pod name.
+  string host = 1;
+  // Versions of the main components, for example {"python": "3.13.1", "langgraph": "1.2.0"}.
+  map<string, string> components = 2;
+}
+
+// RegisterInstanceResponse confirms the registration.
+message RegisterInstanceResponse {
+  // Identifier the core assigned to the instance (UUIDv7). Every later call
+  // carries it.
+  string instance_id = 1;
+  // The contract version selected for this instance.
+  string contract_version = 2;
+  // How often the instance must call Heartbeat.
+  google.protobuf.Duration heartbeat_interval = 3;
+}
+
+// Health is the health an instance reports about itself.
+enum Health {
+  // Not reported. Treated as unhealthy.
+  HEALTH_UNSPECIFIED = 0;
+  // Working normally.
+  HEALTH_HEALTHY = 1;
+  // Working, with a problem an operator should look at, for example events
+  // rejected by the core.
+  HEALTH_DEGRADED = 2;
+  // Not working; its gate is closed or its layer cannot be applied.
+  HEALTH_UNHEALTHY = 3;
+}
+
+// HeartbeatRequest reports the instance's health.
+message HeartbeatRequest {
+  // Identifier returned by RegisterInstance.
+  string instance_id = 1;
+  // Current health.
+  Health health = 2;
+  // Short explanation of the health, for operators.
+  string detail = 3;
+  // The complete set of agents the instance serves now. Present only when the
+  // set changed since the last report.
+  ServedAgents served_agents = 4;
+}
+
+// ServedAgents is a complete set of agent IDs.
+message ServedAgents {
+  // Agent IDs.
+  repeated string agent_ids = 1;
+}
+
+// HeartbeatResponse may change the heartbeat interval.
+message HeartbeatResponse {
+  // How often the instance must call Heartbeat from now on.
+  google.protobuf.Duration heartbeat_interval = 1;
+}
+
+// DeregisterInstanceRequest names the instance that is stopping.
+message DeregisterInstanceRequest {
+  // Identifier returned by RegisterInstance.
+  string instance_id = 1;
+  // Why the instance is stopping, for operators.
+  string reason = 2;
+}
+
+// DeregisterInstanceResponse is empty.
+message DeregisterInstanceResponse {}

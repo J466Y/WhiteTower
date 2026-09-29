@@ -1,0 +1,15 @@
+{
+  "description": "A valid bundle older than the active one",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 40,
+    "manifest_sha256": "71a420fd700b59d51fde3129126112723759732b06a202fd8d34892904b4123e",
+    "size_bytes": 4344
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "older_version"
+  }
+}

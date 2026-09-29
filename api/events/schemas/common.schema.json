@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Definitions shared by the event schemas",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "stateVersion": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "action": {
+      "enum": [
+        "agent.start",
+        "input.receive",
+        "model.invoke",
+        "model.result",
+        "tool.invoke",
+        "tool.result",
+        "output.emit",
+        "agent.stop"
+      ]
+    },
+    "resource": {
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "agent",
+            "tool",
+            "model",
+            "mcp_server",
+            "dataset",
+            "skill",
+            "url"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "decisionReason": {
+      "enum": [
+        "policy.permit",
+        "policy.forbid",
+        "policy.no_permit",
+        "gate.no_state",
+        "gate.lease_expired",
+        "gate.halted",
+        "gate.fleet_halted",
+        "gate.lifecycle",
+        "gate.no_bundle",
+        "gate.evidence_full",
+        "error.evaluation",
+        "error.timeout",
+        "error.unknown_agent",
+        "error.invalid_request"
+      ]
+    },
+    "bundleRejection": {
+      "enum": [
+        "oversized",
+        "unknown_key",
+        "signature",
+        "manifest_mismatch",
+        "invalid_manifest",
+        "unsupported",
+        "missing_file",
+        "file_hash",
+        "extra_file",
+        "older_version",
+        "parse_error"
+      ]
+    },
+    "lifecycleState": {
+      "enum": [
+        "draft",
+        "proposed",
+        "validated",
+        "ready",
+        "active",
+        "suspended",
+        "retired",
+        "rejected"
+      ]
+    },
+    "haltScope": {
+      "enum": [
+        "agent",
+        "selector",
+        "fleet"
+      ]
+    },
+    "haltLayerReport": {
+      "type": "object",
+      "required": [
+        "layer",
+        "outcome",
+        "after_ms"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "layer": {
+          "enum": [
+            "gate_closed",
+            "in_flight_interrupted",
+            "process_terminated",
+            "network_quarantined"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "done",
+            "not_done",
+            "not_applicable",
+            "failed"
+          ]
+        },
+        "after_ms": {
+          "description": "Time from receiving the halt to the outcome (monotonic clock).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "actor": {
+      "description": "Who did it, by pseudonymous principal ID. Never a name or an email address.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "human",
+            "service_account",
+            "breakglass",
+            "system"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        }
+      },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "system"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "id"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "id"
+        ]
+      }
+    },
+    "selector": {
+      "description": "The agents a selector halt covers: every condition must hold.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "enum": [
+            "production",
+            "non_production"
+          ]
+        },
+        "risk_tiers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          }
+        },
+        "labels": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

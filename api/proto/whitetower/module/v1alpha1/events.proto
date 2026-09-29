@@ -1,0 +1,52 @@
+// Module contracts v0.1 (RFC-0001): evidence from module instances.
+// Normative text: docs/contracts/module-contract-v0.1.md, section 8.
+
+syntax = "proto3";
+
+package whitetower.module.v1alpha1;
+
+// EventService receives the events module instances emit, for the audit log.
+service EventService {
+  // Publish delivers a batch of events. Delivery is at least once: the core
+  // de-duplicates on the event's source and ID, so a batch can be retried
+  // as is.
+  rpc Publish(PublishRequest) returns (PublishResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// PublishRequest carries a batch of events.
+message PublishRequest {
+  // Identifier returned by RegisterInstance.
+  string instance_id = 1;
+  // At most 500 events, each a CloudEvent 1.0 in JSON structured mode (UTF-8),
+  // of at most 64 KiB, in the order they were recorded.
+  repeated bytes events = 2;
+}
+
+// PublishResponse reports what happened to each event.
+message PublishResponse {
+  // One result per event, in the order of the request.
+  repeated EventResult results = 1;
+}
+
+// EventStatus says what the core did with an event.
+enum EventStatus {
+  // Unknown. Keep the event and retry.
+  EVENT_STATUS_UNSPECIFIED = 0;
+  // Stored for the audit log. The instance may drop it from its buffer.
+  EVENT_STATUS_ACCEPTED = 1;
+  // Already stored earlier. The instance may drop it from its buffer.
+  EVENT_STATUS_DUPLICATE = 2;
+  // Can never be accepted, for example an undeclared type or an invalid
+  // schema. The instance must not retry it (contract, section 8.4).
+  EVENT_STATUS_REJECTED = 3;
+}
+
+// EventResult is the outcome for one event.
+message EventResult {
+  // What the core did.
+  EventStatus status = 1;
+  // For a rejection, why.
+  string reason = 2;
+}

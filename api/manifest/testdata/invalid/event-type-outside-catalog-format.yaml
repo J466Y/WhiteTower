@@ -1,0 +1,12 @@
+# Invalid: event types follow whitetower.<area>.<event>.v<N>.
+apiVersion: whitetower/v1alpha1
+kind: ModuleManifest
+metadata: {name: source, version: 0.1.0, vendor: Example, license: Apache-2.0}
+spec:
+  contractVersions: [v1alpha1]
+  identity: module
+  agents: bound
+  capabilities:
+    - {name: event-source}
+  events: {emits: [decision.made], consumes: []}
+  permissions: [events.publish]
