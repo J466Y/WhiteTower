@@ -292,6 +292,7 @@ Later capabilities attach without redesigning the MVP schema. Their tables are n
 | --- | --- |
 | `sqlc` configuration and type overrides; checks turned into Go integration tests | P1-01 |
 | Retention of audit partitions, leaves and de-duplication keys | P1-02 |
+| The queue of unsealed events validated by [spike S3](../spikes/S3-audit-throughput.md) (`audit_unsealed`) | P1-02 |
 | Lifecycle guards generated from `agent-lifecycle.yaml` | P1-04 |
 | Bundle content size and storage by hash | P1-06 |
 | Redaction of personal data in event arguments | P0-03 (event catalog) |

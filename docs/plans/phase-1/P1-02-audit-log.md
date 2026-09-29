@@ -50,6 +50,7 @@ The tamper-evident audit log: every core change recorded in the same transaction
 - Indexes for the queries of step 6.
 - Privileges from P0-02: the runtime role can only INSERT into audit tables, and triggers reject UPDATE and DELETE.
 - Since events are never updated, sealing state lives in a separate leaves table (`audit_leaves`: tree index, event ID, leaf hash).
+- A **queue of unsealed events** (`audit_unsealed`: event ID and ingestion time, indexed on both). Ingestion fills it in the event's own transaction, and the sealer empties it. The runtime role may SELECT, INSERT and DELETE on it, but not UPDATE. Spike S3 validated this design; the migration does not have the table yet.
 
 **Done when:** tests prove the runtime role cannot modify or delete events, and partitions exist three months ahead.
 
@@ -57,12 +58,12 @@ The tamper-evident audit log: every core change recorded in the same transaction
 
 A leader-elected job:
 
-1. Selects committed events that have no leaf yet, in ingestion order.
+1. Takes up to 5,000 events off the queue of unsealed events (`DELETE … RETURNING`), and orders them by ingestion time, then ID. Only committed events are in the queue, so an event whose transaction commits late is sealed in a later batch, never skipped. No row locks are needed: only one sealer runs, and if a second one ever did, the primary key on the leaf index would reject its batch.
 2. Assigns tree indexes itself. An event committed late just gets a later index, so there are no gaps.
-3. Computes RFC 6962 leaf hashes over the canonical bytes, and stores the intermediate hashes with `golang.org/x/mod/sumdb/tlog` (`StoredHashes`).
-4. Commits one batch per transaction.
+3. Computes RFC 6962 leaf hashes over the canonical bytes, and stores the intermediate hashes with `golang.org/x/mod/sumdb/tlog` (`StoredHashesForRecordHash`). It keeps the right edge of the tree in memory, at most one hash per level, which is all an append reads.
+4. Commits one batch per transaction, in rounds every 200 ms that drain the queue. The sealing delay is then about one round ([spike S3](../../spikes/S3-audit-throughput.md)).
 
-It must be crash-safe: after a restart it resumes from the last committed index, without duplicates or gaps. Sealing lag is exported as a metric.
+It must be crash-safe: after a restart, or after any failed batch, it reloads the tree size and the right edge from the database and resumes from the last committed index, without duplicates or gaps. Sealing lag, and the time to claim a batch from the queue, are exported as metrics.
 
 **Done when:** killing the sealer in the middle of a batch and restarting it leaves a consistent tree (test), and sealing lag stays within NFR-09 under load.
 
@@ -82,8 +83,8 @@ The logic behind `EventService.Publish`:
 - **Authorization:** an instance may only publish the event types declared in its manifest, for the agents it serves.
 - **Validation:** the envelope, and `data` against its schema.
 - **De-duplication:** on source and ID; duplicates are reported as accepted.
-- **Gap detection:** per source, using `wtseq`; a gap produces a `whitetower.audit.gap_detected.v1` event.
-- **Atomicity:** each batch is inserted in one transaction, with a result per event.
+- **Gap detection:** per source, using `wtseq`; a gap produces a `whitetower.audit.gap_detected.v1` event. Each batch updates its sources' sequence rows in the order of the source, so batches that share sources cannot deadlock (spike S3 hit this deadlock at 10,000 events per second).
+- **Atomicity:** each batch is inserted in one transaction, with a result per event. The events and their entries in the queue of unsealed events go in one statement.
 - **Backpressure:** when sealing lag or database latency passes a threshold, the core answers "resource exhausted" with a retry hint, and enforcement points keep buffering (NFR-08). Rate limits apply per instance.
 
 **Done when:** duplicate, out-of-order and gapped batches produce the expected results (tests), and backpressure never loses an acknowledged event.
@@ -105,7 +106,8 @@ Permissions follow the matrix: auditors, steering, advisory and operators see ev
 - recomputing leaves and the tree from events, reporting the first discrepancy;
 - verifying checkpoint signatures;
 - checking an inclusion proof;
-- checking a consistency proof between an external checkpoint and the current tree.
+- checking a consistency proof between an external checkpoint and the current tree;
+- reading the log in chunks of about 10,000 leaves, which PostgreSQL joins to their events by index. One query over the whole log makes it hash-join and sort everything on disk (spike S3).
 
 It works online (through the API) and offline (against an export). `wtctl audit verify`, `prove` and `consistency` (P1-11) are thin wrappers around it.
 
@@ -125,6 +127,7 @@ It works online (through the API) and offline (against an export). `wtctl audit 
 
 - Retention is configured per event class. Six months is the default minimum (NFR-10); going lower requires an explicit override and logs a warning.
 - A job drops whole partitions older than the retention period and keeps the tree hashes and checkpoints, so what remains still verifies. The drop itself is an audited event.
+- Storage, measured in spike S3 with events of about 700 bytes: about 2.2 KB per retained event, of which the leaf and its tree hashes (about 370 bytes) stay after the drop. This step decides whether that tree data is kept whole or compacted to the few hashes that stand for a dropped range, which costs the consistency proofs of the checkpoints inside it.
 - Optionally, partitions are archived to S3 Object Lock-compatible storage (MinIO in air-gapped sites) before dropping (Could).
 
 **Done when:** after dropping a partition, verification reports the pruned range and still validates everything else.
@@ -151,7 +154,8 @@ It works online (through the API) and offline (against an export). `wtctl audit 
 
 | Risk or question | Mitigation or owner |
 | --- | --- |
-| Sealer throughput | Measured in P0-05 S3; batching; hash chain fallback (ADR-0006) |
+| Sealer throughput | Measured in spike S3: at 2,000 events per second the sealer was busy 18% of the time, and it kept up at 10,000 per second. Batching as in step 3 |
+| Audit storage grows with the average event rate: about 2.2 KB per retained event (spike S3) | Sizing guidance in P1-12; retention per event class; compaction of dropped months' tree data (step 9) |
 | Audit volume from token issuance and decisions grows faster than expected | Per-class retention; measure in the pilot; aggregation of low-value events is a Phase 2 option |
 | The checkpoint event is sealed in the next batch, so the tree always contains the checkpoints up to the previous one | Documented in the specification; verification handles it |
 
@@ -160,3 +164,4 @@ It works online (through the API) and offline (against an export). `wtctl audit 
 - `golang.org/x/mod/sumdb/tlog` and `golang.org/x/mod/sumdb/note` provide tree hashing, proofs and signed notes; `transparency-dev/formats` has checkpoint parsing if needed.
 - Never compute hashes over JSONB round-trips: keep the canonical bytes.
 - Keep the audit tables out of the ORM-style convenience layer: only the writer and the sealer touch them.
+- The spike code in [`hack/spikes/s3`](../../../hack/spikes/s3/README.md) has working versions of the ingestion, sealing and verification queries.
