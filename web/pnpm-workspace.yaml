@@ -1,0 +1,7 @@
+# pnpm settings. pnpm 11 and later read them only from this file; the console
+# is the only package, so there is no `packages` list.
+
+# Supply-chain protection: never resolve a version published less than three
+# days ago (pnpm's default is one day), so compromised releases are usually
+# caught and removed before they reach this project.
+minimumReleaseAge: 4320
