@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "White Tower event",
+  "description": "A CloudEvent 1.0 in JSON format, with White Tower's rules (docs/contracts/module-contract-v0.1.md, section 8.2). The data is validated by the schema of the event's type (catalog.json).",
+  "type": "object",
+  "required": [
+    "specversion",
+    "id",
+    "source",
+    "type",
+    "time",
+    "datacontenttype",
+    "data"
+  ],
+  "propertyNames": {
+    "pattern": "^[a-z0-9]{1,20}$"
+  },
+  "properties": {
+    "specversion": {
+      "const": "1.0"
+    },
+    "id": {
+      "description": "Unique within the source; UUIDv7 recommended.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "source": {
+      "description": "The evidence stream: /core, /agents/<agent-id>/ep/<stream-id> or /modules/<module>/<stream-id>.",
+      "type": "string",
+      "pattern": "^(/core|/agents/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ep/[a-z0-9-]{1,64}|/modules/[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?/[a-z0-9-]{1,64})$"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^whitetower\\.[a-z_]+\\.[a-z_]+\\.v[1-9][0-9]*$"
+    },
+    "time": {
+      "$ref": "schemas/common.schema.json#/$defs/timestamp"
+    },
+    "subject": {
+      "description": "The White Tower agent ID the event is about.",
+      "$ref": "schemas/common.schema.json#/$defs/uuid"
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "dataschema": {
+      "type": "string",
+      "pattern": "^https://"
+    },
+    "data": {
+      "type": "object"
+    },
+    "wtseq": {
+      "description": "Sequence number within the source, as a decimal string: 1, 2, 3 and so on, without gaps.",
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$"
+    },
+    "traceparent": {
+      "type": "string",
+      "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+    },
+    "tracestate": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "wtorigtype": {
+      "description": "The original type of an event translated by an adapter.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  },
+  "additionalProperties": {
+    "type": [
+      "string",
+      "integer",
+      "boolean"
+    ]
+  },
+  "if": {
+    "properties": {
+      "source": {
+        "pattern": "^/(agents|modules)/"
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "wtseq"
+    ]
+  },
+  "else": {
+    "not": {
+      "required": [
+        "wtseq"
+      ]
+    }
+  }
+}

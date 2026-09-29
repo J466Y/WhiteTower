@@ -1,0 +1,21 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000011",
+  "source": "/core",
+  "type": "whitetower.agent.lifecycle_changed.v1",
+  "time": "2026-09-29T10:15:02.118Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "datacontenttype": "application/json",
+  "data": {
+    "transition": "T6",
+    "action": "validate",
+    "from": "proposed",
+    "to": "validated",
+    "comment_given": true,
+    "actor": {
+      "type": "human",
+      "id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a2"
+    },
+    "state_version": 815
+  }
+}

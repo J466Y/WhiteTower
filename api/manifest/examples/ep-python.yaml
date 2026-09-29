@@ -1,0 +1,88 @@
+# White Tower's enforcement point for Python agents (plan P1-09, ADR-0011).
+apiVersion: whitetower/v1alpha1
+kind: ModuleManifest
+metadata:
+  name: ep-python
+  displayName: White Tower enforcement point for Python
+  version: 0.1.0
+  vendor: White Tower project
+  license: Apache-2.0
+  homepage: https://github.com/J466Y/WhiteTower
+  description: >-
+    Loaded in the agent's process. Gates every governed call, evaluates Cedar
+    policies from signed bundles, halts in layers, and records every decision
+    before the action proceeds.
+spec:
+  contractVersions: [v1alpha1]
+  identity: agent
+  agents: self
+  capabilities:
+    - name: enforcement-point
+      interventionPoints:
+        [agent.start, input.receive, model.invoke, model.result, tool.invoke, tool.result, output.emit, agent.stop]
+      haltModes: [block, interrupt, terminate]
+      haltLayers: [gate_closed, in_flight_interrupted, process_terminated]
+      frameworks:
+        - name: langgraph
+          versions: ">=1.0,<2.0"
+    - name: policy-engine
+      languages: [cedar]
+      combiningAlgorithms: [wt-deny-overrides-v1]
+      embedded: true
+  events:
+    emits:
+      - whitetower.decision.made.v1
+      - whitetower.action.executed.v1
+      - whitetower.instance.started.v1
+      - whitetower.instance.halted.v1
+      - whitetower.bundle.activated.v1
+      - whitetower.bundle.rejected.v1
+      - whitetower.lease.expired.v1
+    consumes: []
+  permissions: [governance.watch, governance.acknowledge, policy.bundles.read, events.publish]
+  configSchema:
+    type: object
+    required: [coreUrl, agentId, credentials, bundleKeys, bufferPath]
+    additionalProperties: false
+    properties:
+      coreUrl:
+        description: Base URL of the core's machine listener.
+        type: string
+        pattern: "^https://"
+      agentId:
+        type: string
+      credentials:
+        description: How the enforcement point authenticates as the agent.
+        oneOf:
+          - type: object
+            required: [privateKeyFile, keyId]
+            additionalProperties: false
+            properties:
+              privateKeyFile: {type: string}
+              keyId: {type: string}
+          - type: object
+            required: [workloadIdentityTokenFile]
+            additionalProperties: false
+            properties:
+              workloadIdentityTokenFile: {type: string}
+      bundleKeys:
+        description: File with the bundle signing keys the enforcement point trusts, its trust root.
+        type: string
+      bufferPath:
+        description: Location of the durable evidence buffer.
+        type: string
+      bufferMaxBytes:
+        type: integer
+        minimum: 1048576
+      terminateGracePeriodSeconds:
+        type: integer
+        minimum: 0
+        default: 10
+      evidence:
+        type: object
+        additionalProperties: false
+        properties:
+          arguments:
+            description: What decision events record about tool arguments (contract, section 8.3).
+            enum: [none, names, hashed]
+            default: names

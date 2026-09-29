@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent lifecycle changed",
+  "description": "One transition of the lifecycle (docs/architecture/lifecycle.md, section 3).",
+  "type": "object",
+  "required": [
+    "transition",
+    "action",
+    "from",
+    "to",
+    "actor",
+    "state_version"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "transition": {
+      "type": "string",
+      "pattern": "^T([2-9]|1[0-4])$"
+    },
+    "action": {
+      "enum": [
+        "submit",
+        "withdraw",
+        "request_changes",
+        "reject",
+        "validate",
+        "mark_ready",
+        "unmark_ready",
+        "activate",
+        "suspend",
+        "auto_suspend",
+        "halt_suspend",
+        "reinstate",
+        "retire"
+      ]
+    },
+    "from": {
+      "$ref": "common.schema.json#/$defs/lifecycleState"
+    },
+    "to": {
+      "$ref": "common.schema.json#/$defs/lifecycleState"
+    },
+    "suspension_reason": {
+      "enum": [
+        "manual",
+        "owner_inactive",
+        "review_overdue",
+        "halt"
+      ]
+    },
+    "comment_given": {
+      "type": "boolean"
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "state_version": {
+      "$ref": "common.schema.json#/$defs/stateVersion"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "to": {
+            "const": "suspended"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "suspension_reason"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "suspension_reason"
+          ]
+        }
+      }
+    }
+  ]
+}

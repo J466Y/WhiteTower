@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Audit checkpoint",
+  "description": "A signed checkpoint of the audit log, in the C2SP tlog-checkpoint signed-note format.",
+  "type": "object",
+  "required": [
+    "tree_size",
+    "root_hash",
+    "key_id",
+    "note"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "tree_size": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "root_hash": {
+      "description": "Base64 (standard, padded) of the 32-byte Merkle root.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{43}=$"
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "note": {
+      "description": "The complete signed note.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    }
+  }
+}

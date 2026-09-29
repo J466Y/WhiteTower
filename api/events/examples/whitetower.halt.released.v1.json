@@ -1,0 +1,23 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000014",
+  "source": "/core",
+  "type": "whitetower.halt.released.v1",
+  "time": "2026-09-29T10:15:02.118Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "datacontenttype": "application/json",
+  "data": {
+    "halt_id": "0192f1c3-0d4e-7a10-9b2c-000000000040",
+    "scope": "agent",
+    "requested_by": {
+      "type": "human",
+      "id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1"
+    },
+    "approved_by": {
+      "type": "human",
+      "id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a2"
+    },
+    "reason": "Investigation closed: the recipient was a test mailbox",
+    "state_version": 951
+  }
+}

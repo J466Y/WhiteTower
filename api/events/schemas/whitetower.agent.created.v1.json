@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent created",
+  "description": "Transition T1 of the lifecycle (docs/architecture/lifecycle.md).",
+  "type": "object",
+  "required": [
+    "slug",
+    "kind",
+    "risk_tier",
+    "use_case_id",
+    "primary_owner",
+    "actor",
+    "state_version"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "slug": {
+      "$ref": "common.schema.json#/$defs/slug"
+    },
+    "kind": {
+      "enum": [
+        "in_house",
+        "third_party"
+      ]
+    },
+    "risk_tier": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "use_case_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "primary_owner": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "state_version": {
+      "$ref": "common.schema.json#/$defs/stateVersion"
+    }
+  }
+}

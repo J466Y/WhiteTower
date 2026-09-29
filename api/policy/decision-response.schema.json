@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "White Tower decision response",
+  "description": "An OpenID AuthZEN Authorization API 1.0 evaluation response, restricted by the White Tower decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6).",
+  "type": "object",
+  "required": ["decision", "context"],
+  "additionalProperties": false,
+  "properties": {
+    "decision": { "type": "boolean" },
+    "context": {
+      "type": "object",
+      "required": ["reason", "policies"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "description": "Why the decision was taken (section 6.6).",
+          "enum": [
+            "policy.permit",
+            "policy.forbid",
+            "policy.no_permit",
+            "gate.no_state",
+            "gate.lease_expired",
+            "gate.halted",
+            "gate.fleet_halted",
+            "gate.lifecycle",
+            "gate.no_bundle",
+            "gate.evidence_full",
+            "error.evaluation",
+            "error.timeout",
+            "error.unknown_agent",
+            "error.invalid_request"
+          ]
+        },
+        "policies": {
+          "description": "IDs of the White Tower policies that determined the decision: the permits for an allow, the forbids for a denial by policy, the policies that failed for an evaluation error. Empty otherwise.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "bundle_version": {
+          "description": "The bundle the decision was evaluated with. Absent when no bundle was used.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "obligations": {
+          "description": "Reserved. Always empty in v1alpha1: decisions are booleans.",
+          "type": "array",
+          "maxItems": 0
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "decision": { "const": true } } },
+      "then": { "properties": { "context": { "properties": { "reason": { "const": "policy.permit" } }, "required": ["bundle_version"] } } },
+      "else": { "properties": { "context": { "properties": { "reason": { "not": { "const": "policy.permit" } } } } } }
+    }
+  ]
+}

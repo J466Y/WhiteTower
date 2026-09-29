@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Policy version approved",
+  "description": "An approval by the steering committee (global policies) or the advisory committee (agent-specific policies).",
+  "type": "object",
+  "required": [
+    "policy_id",
+    "policy_name",
+    "version",
+    "scope",
+    "language",
+    "content_sha256",
+    "approver",
+    "approver_role"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "policy_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "policy_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "version": {
+      "$ref": "common.schema.json#/$defs/version"
+    },
+    "scope": {
+      "enum": [
+        "global",
+        "agent"
+      ]
+    },
+    "language": {
+      "enum": [
+        "cedar",
+        "rego"
+      ]
+    },
+    "content_sha256": {
+      "$ref": "common.schema.json#/$defs/sha256"
+    },
+    "approver": {
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "approver_role": {
+      "enum": [
+        "steering",
+        "advisory"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "global"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "approver_role": {
+            "const": "steering"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "approver_role": {
+            "const": "advisory"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -6,7 +6,10 @@ This directory is the source of truth for every interface of White Tower. Code i
 | --- | --- | --- |
 | [`openapi/`](openapi/) | Public REST API, used by the console, the CLI and the organization's tools | OpenAPI 3.1 |
 | [`proto/`](proto/) | Module API, used by enforcement points and modules | Protocol Buffers, served with ConnectRPC |
-| [`events/`](events/) | Event catalog | CloudEvents 1.0 with JSON Schema |
-| [`manifest/`](manifest/) | Module manifest | JSON Schema |
+| [`events/`](events/README.md) | Event catalog | CloudEvents 1.0 with JSON Schema |
+| [`manifest/`](manifest/README.md) | Module manifest | JSON Schema |
+| [`policy/`](policy/README.md) | Decision profile and policy bundles | Cedar schema, JSON Schema, Rego |
 
-Changes to `proto/`, `events/` and `manifest/` go through the RFC process described in [CONTRIBUTING.md](../CONTRIBUTING.md). The module contracts themselves are defined by RFC-0001 (plan [P0-03](../docs/plans/phase-0/P0-03-module-contracts.md)); until then, these directories only hold placeholders that exercise the code generation pipeline.
+The module contracts (`proto/`, `events/`, `manifest/` and `policy/`) are specified in [module-contract-v0.1.md](../docs/contracts/module-contract-v0.1.md) and proposed in [RFC-0001](../docs/rfcs/0001-module-contracts-v0.1.md). Changes to them go through the RFC process described in [CONTRIBUTING.md](../CONTRIBUTING.md). The public REST API is still a placeholder that exercises the code generation pipeline; the Phase 1 plans define it.
+
+`go test ./test/contracts ./test/conformance` checks every schema, example and test vector in these directories.

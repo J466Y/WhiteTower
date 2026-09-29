@@ -1,0 +1,14 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000015",
+  "source": "/core",
+  "type": "whitetower.audit.checkpoint.v1",
+  "time": "2026-09-29T10:15:02.118Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "tree_size": 104857,
+    "root_hash": "6c0SuA1Uu2Bbq3K1C8kfqy0t1i/0aVb6hSlW4Vj3E+M=",
+    "key_id": "whitetower-audit-2026-09",
+    "note": "whitetower.example/audit\n104857\n6c0SuA1Uu2Bbq3K1C8kfqy0t1i/0aVb6hSlW4Vj3E+M=\n\n— whitetower-audit-2026-09 Az3grlgtzPICa5OS8npVmf1Myq/5IZniMp+ZJurmRDeOoRDe4URYN7u5/Zhcyv2q1gGzGku9nTo+zyWE+xeMcTOAYQ8=\n"
+  }
+}

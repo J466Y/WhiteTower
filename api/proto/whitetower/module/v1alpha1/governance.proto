@@ -1,0 +1,321 @@
+// Module contracts v0.1 (RFC-0001): governance state, leases and acknowledgements.
+// Normative text: docs/contracts/module-contract-v0.1.md, sections 5 and 6.
+
+syntax = "proto3";
+
+package whitetower.module.v1alpha1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// GovernanceService delivers the governance state of agents to module instances
+// and receives what they did with it (ADR-0005).
+service GovernanceService {
+  // Watch streams the governance state of every agent in the instance's scope:
+  // a snapshot, then changes in version order, with lease renewals in between.
+  // The stream never ends on its own except when the token that opened it
+  // expires or the server shuts down; clients reconnect and resume.
+  rpc Watch(WatchRequest) returns (stream WatchResponse);
+
+  // Acknowledge reports what the instance did with the state it received:
+  // halt layers, bundle activations and the state version applied.
+  rpc Acknowledge(AcknowledgeRequest) returns (AcknowledgeResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// WatchRequest opens or resumes a watch.
+message WatchRequest {
+  // Identifier returned by RegisterInstance.
+  string instance_id = 1;
+  // The last state version the instance applied, or 0 for a snapshot. The
+  // server may answer with a snapshot even when this is not 0.
+  uint64 since_version = 2;
+}
+
+// WatchResponse is one message of the stream.
+message WatchResponse {
+  // The state version the client has reached once it applies this message.
+  // For snapshot parts, the version of the whole snapshot.
+  uint64 version = 1;
+
+  // What the message carries.
+  oneof message {
+    // Part of a snapshot. A snapshot replaces the client's whole state, and
+    // takes effect only when its last part arrives.
+    SnapshotPart snapshot_part = 2;
+    // A change after the snapshot, in version order.
+    StateChange change = 3;
+    // Renews the lease of every agent in scope.
+    LeaseRenewal lease_renewal = 4;
+  }
+}
+
+// SnapshotPart is part of a complete state.
+message SnapshotPart {
+  // True for the first part of a snapshot. The client starts collecting a new
+  // snapshot and keeps its current state until the last part arrives.
+  bool first = 1;
+  // True for the last part. The client then replaces its state atomically.
+  bool last = 2;
+  // The fleet state. Present in the first part.
+  FleetState fleet = 3;
+  // Agents in the instance's scope.
+  repeated AgentState agents = 4;
+}
+
+// StateChange carries the new state of what changed.
+message StateChange {
+  // The complete new state of each agent that changed, or that entered the
+  // instance's scope.
+  repeated AgentState agents = 1;
+  // The new fleet state, when it changed.
+  FleetState fleet = 2;
+  // Agents that left the instance's scope. The instance must deny everything
+  // for them from now on.
+  repeated string removed_agent_ids = 3;
+}
+
+// LeaseRenewal renews the lease of every agent in scope. Each lease then lasts
+// that agent's lease_ttl, measured on the client's monotonic clock from the
+// moment it received this message.
+message LeaseRenewal {
+  // Server time when the renewal was sent. Informational: leases never depend
+  // on clocks being synchronized.
+  google.protobuf.Timestamp server_time = 1;
+}
+
+// AgentState is what the core publishes about one agent.
+message AgentState {
+  // The agent's identifier (UUIDv7).
+  string agent_id = 1;
+  // The state version of this agent's last change.
+  uint64 version = 2;
+  // The agent's human-readable identifier, for logs.
+  string slug = 3;
+  // Where the agent is in the governance process. It decides whether the gate
+  // may open.
+  LifecycleState lifecycle_state = 4;
+  // Agent and selector halts that cover the agent. The agent is halted when
+  // this list is not empty or when the fleet is halted.
+  repeated Halt halts = 5;
+  // The agent's effective policy bundle. Absent while it has none.
+  BundleRef bundle = 6;
+  // How long the lease lasts after each renewal.
+  google.protobuf.Duration lease_ttl = 7;
+  // What the agent's owner chose to happen to work in flight when it is halted.
+  HaltMode halt_mode = 8;
+  // What policies may use about the agent (decision profile).
+  AgentAttributes attributes = 9;
+}
+
+// FleetState is the state that applies to every agent.
+message FleetState {
+  // The state version of the fleet state's last change.
+  uint64 version = 1;
+  // Active fleet halts. Every agent is halted while this list is not empty.
+  repeated Halt halts = 2;
+}
+
+// LifecycleState is the agent's lifecycle state (docs/architecture/lifecycle.md).
+// The gate may open only in the validated, ready and active states; any other
+// value, including values unknown to the client, keeps it closed.
+enum LifecycleState {
+  // Unknown. Keeps the gate closed.
+  LIFECYCLE_STATE_UNSPECIFIED = 0;
+  // The owner is preparing the proposal.
+  LIFECYCLE_STATE_DRAFT = 1;
+  // Waiting for the advisory committee.
+  LIFECYCLE_STATE_PROPOSED = 2;
+  // Use case validated; non-production use only.
+  LIFECYCLE_STATE_VALIDATED = 3;
+  // Ready to be activated; non-production use only.
+  LIFECYCLE_STATE_READY = 4;
+  // In production.
+  LIFECYCLE_STATE_ACTIVE = 5;
+  // Temporarily barred.
+  LIFECYCLE_STATE_SUSPENDED = 6;
+  // Permanently out of service.
+  LIFECYCLE_STATE_RETIRED = 7;
+  // The proposal was rejected.
+  LIFECYCLE_STATE_REJECTED = 8;
+}
+
+// HaltScope says what a halt targets.
+enum HaltScope {
+  // Unknown. Still a halt.
+  HALT_SCOPE_UNSPECIFIED = 0;
+  // One agent.
+  HALT_SCOPE_AGENT = 1;
+  // The agents matching a selector.
+  HALT_SCOPE_SELECTOR = 2;
+  // Every agent.
+  HALT_SCOPE_FLEET = 3;
+}
+
+// Halt identifies an active halt. Reasons are not sent to instances; operators
+// see them in the console.
+message Halt {
+  // The halt's identifier (UUIDv7).
+  string halt_id = 1;
+  // What the halt targets.
+  HaltScope scope = 2;
+  // When the halt was issued (server time).
+  google.protobuf.Timestamp issued_at = 3;
+  // True for a kill switch drill (KIL-09), which instances handle as a real halt.
+  bool drill = 4;
+}
+
+// HaltMode says how far an enforcement point goes with work already in flight.
+// Every mode closes the gate at once.
+enum HaltMode {
+  // Unknown. Treated as HALT_MODE_INTERRUPT.
+  HALT_MODE_UNSPECIFIED = 0;
+  // Close the gate only; work in flight finishes.
+  HALT_MODE_BLOCK = 1;
+  // Close the gate and interrupt work in flight where the framework allows it.
+  HALT_MODE_INTERRUPT = 2;
+  // Close the gate, interrupt, then end the agent's process after a grace period.
+  HALT_MODE_TERMINATE = 3;
+}
+
+// BundleRef identifies the agent's effective policy bundle.
+message BundleRef {
+  // Bundle version, monotonic per agent.
+  uint64 version = 1;
+  // Lowercase hexadecimal SHA-256 of the bundle's manifest bytes.
+  string manifest_sha256 = 2;
+  // Total size of the manifest and the files, in bytes.
+  uint64 size_bytes = 3;
+}
+
+// AgentAttributes are the facts about an agent that policies may use. They map
+// to the attributes and tags of the Cedar principal (decision profile).
+message AgentAttributes {
+  // "in_house" or "third_party".
+  string kind = 1;
+  // "low", "medium", "high" or "critical".
+  string risk_tier = 2;
+  // Data categories the agent accesses, from the organization's taxonomy.
+  repeated string data_categories = 3;
+  // Free-form labels set in the inventory.
+  map<string, string> labels = 4;
+  // Pseudonymous principal ID of the agent's primary owner. Never a name or an
+  // email address.
+  string owner_id = 5;
+}
+
+// AcknowledgeRequest carries one or more acknowledgements.
+message AcknowledgeRequest {
+  // Identifier returned by RegisterInstance.
+  string instance_id = 1;
+  // At most 100 acknowledgements.
+  repeated Acknowledgement acknowledgements = 2;
+}
+
+// Acknowledgement reports one thing the instance did.
+message Acknowledgement {
+  // Identifier chosen by the instance (UUID). A retry reuses it, so the core
+  // records each acknowledgement once.
+  string acknowledgement_id = 1;
+  // The agent it concerns.
+  string agent_id = 2;
+
+  // What is acknowledged.
+  oneof kind {
+    // What a halt achieved, layer by layer.
+    HaltAcknowledgement halt = 3;
+    // A bundle activated or rejected.
+    BundleAcknowledgement bundle = 4;
+    // The state version applied.
+    StateAcknowledgement state = 5;
+  }
+}
+
+// HaltAcknowledgement reports halt layers. An instance may acknowledge a halt
+// several times as layers complete, for example the gate at once and the
+// interruption after its grace period.
+message HaltAcknowledgement {
+  // The halt, including a fleet halt.
+  string halt_id = 1;
+  // One report per layer the instance handles.
+  repeated HaltLayerReport layers = 2;
+}
+
+// HaltLayer is one layer of a halt (architecture, sections 6.1 and 6.2).
+enum HaltLayer {
+  // Unknown.
+  HALT_LAYER_UNSPECIFIED = 0;
+  // Every further governed call and interaction is denied (KIL-01).
+  HALT_LAYER_GATE_CLOSED = 1;
+  // The work in flight was interrupted.
+  HALT_LAYER_IN_FLIGHT_INTERRUPTED = 2;
+  // The agent's process ended.
+  HALT_LAYER_PROCESS_TERMINATED = 3;
+  // The agent's workloads were isolated at the network level (KIL-10).
+  HALT_LAYER_NETWORK_QUARANTINED = 4;
+}
+
+// LayerOutcome says what happened at one layer.
+enum LayerOutcome {
+  // Unknown. Never counts as done.
+  LAYER_OUTCOME_UNSPECIFIED = 0;
+  // The layer is in place.
+  LAYER_OUTCOME_DONE = 1;
+  // Attempted but not achieved, for example blocking work that is still running.
+  LAYER_OUTCOME_NOT_DONE = 2;
+  // Nothing to do: nothing was in flight, the halt mode excludes the layer, or
+  // the agent has no workloads here.
+  LAYER_OUTCOME_NOT_APPLICABLE = 3;
+  // The attempt failed with an error.
+  LAYER_OUTCOME_FAILED = 4;
+}
+
+// HaltLayerReport is the outcome of one layer.
+message HaltLayerReport {
+  // The layer.
+  HaltLayer layer = 1;
+  // What happened.
+  LayerOutcome outcome = 2;
+  // Time from receiving the halt to this outcome, measured on the instance's
+  // monotonic clock.
+  google.protobuf.Duration after_receipt = 3;
+  // The instance's wall-clock time of the outcome. Informational.
+  google.protobuf.Timestamp observed_at = 4;
+  // Short explanation, for example "blocking tool still running".
+  string detail = 5;
+  // For HALT_LAYER_NETWORK_QUARANTINED: the number of workloads isolated.
+  uint32 workloads = 6;
+}
+
+// BundleOutcome says what the instance did with a bundle.
+enum BundleOutcome {
+  // Unknown.
+  BUNDLE_OUTCOME_UNSPECIFIED = 0;
+  // Verified and active.
+  BUNDLE_OUTCOME_ACTIVATED = 1;
+  // Refused; the previous bundle, if any, stays active.
+  BUNDLE_OUTCOME_REJECTED = 2;
+}
+
+// BundleAcknowledgement reports a bundle activation or rejection.
+message BundleAcknowledgement {
+  // Bundle version.
+  uint64 version = 1;
+  // Lowercase hexadecimal SHA-256 of the manifest bytes the instance received.
+  string manifest_sha256 = 2;
+  // What the instance did.
+  BundleOutcome outcome = 3;
+  // For a rejection, a reason code of the contract (section 7.5).
+  string reason = 4;
+}
+
+// StateAcknowledgement reports the state version applied, so the console can
+// show instances that lag behind.
+message StateAcknowledgement {
+  // The last state version applied.
+  uint64 version = 1;
+}
+
+// AcknowledgeResponse is empty: the acknowledgements were recorded.
+message AcknowledgeResponse {}

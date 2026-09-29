@@ -1,0 +1,159 @@
+{
+  "description": "The event catalog of module contracts v0.1 (docs/contracts/module-contract-v0.1.md, section 8). emitters: the capabilities (or the core) that may emit the type. subject: whether the envelope's subject is required, optional or absent.",
+  "contract_version": "v1alpha1",
+  "types": [
+    {
+      "type": "whitetower.decision.made.v1",
+      "summary": "An enforcement point decided on a governed call or interaction, allowed or denied.",
+      "emitters": [
+        "enforcement-point"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.decision.made.v1.json",
+      "example": "examples/whitetower.decision.made.v1.json"
+    },
+    {
+      "type": "whitetower.action.executed.v1",
+      "summary": "A governed call that was allowed has finished.",
+      "emitters": [
+        "enforcement-point"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.action.executed.v1.json",
+      "example": "examples/whitetower.action.executed.v1.json"
+    },
+    {
+      "type": "whitetower.instance.started.v1",
+      "summary": "A module instance started and registered.",
+      "emitters": [
+        "enforcement-point",
+        "runtime-control",
+        "event-source"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.instance.started.v1.json",
+      "example": "examples/whitetower.instance.started.v1.json"
+    },
+    {
+      "type": "whitetower.instance.halted.v1",
+      "summary": "An enforcement point applied a halt, layer by layer.",
+      "emitters": [
+        "enforcement-point"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.instance.halted.v1.json",
+      "example": "examples/whitetower.instance.halted.v1.json"
+    },
+    {
+      "type": "whitetower.bundle.activated.v1",
+      "summary": "An enforcement point verified and activated a policy bundle.",
+      "emitters": [
+        "enforcement-point"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.bundle.activated.v1.json",
+      "example": "examples/whitetower.bundle.activated.v1.json"
+    },
+    {
+      "type": "whitetower.bundle.rejected.v1",
+      "summary": "An enforcement point refused a policy bundle and kept the previous one, if any.",
+      "emitters": [
+        "enforcement-point"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.bundle.rejected.v1.json",
+      "example": "examples/whitetower.bundle.rejected.v1.json"
+    },
+    {
+      "type": "whitetower.lease.expired.v1",
+      "summary": "An instance lost contact with the core for longer than its lease.",
+      "emitters": [
+        "enforcement-point",
+        "runtime-control"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.lease.expired.v1.json",
+      "example": "examples/whitetower.lease.expired.v1.json"
+    },
+    {
+      "type": "whitetower.quarantine.applied.v1",
+      "summary": "A runtime-control module isolated a halted agent's workloads at the network level.",
+      "emitters": [
+        "runtime-control"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.quarantine.applied.v1.json",
+      "example": "examples/whitetower.quarantine.applied.v1.json"
+    },
+    {
+      "type": "whitetower.quarantine.lifted.v1",
+      "summary": "A runtime-control module removed a network quarantine after the halt was released.",
+      "emitters": [
+        "runtime-control"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.quarantine.lifted.v1.json",
+      "example": "examples/whitetower.quarantine.lifted.v1.json"
+    },
+    {
+      "type": "whitetower.agent.created.v1",
+      "summary": "An agent was proposed (lifecycle transition T1).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.agent.created.v1.json",
+      "example": "examples/whitetower.agent.created.v1.json"
+    },
+    {
+      "type": "whitetower.agent.lifecycle_changed.v1",
+      "summary": "An agent changed lifecycle state (transitions T2 to T14).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.agent.lifecycle_changed.v1.json",
+      "example": "examples/whitetower.agent.lifecycle_changed.v1.json"
+    },
+    {
+      "type": "whitetower.policy.version_approved.v1",
+      "summary": "A committee approved a policy version. The subject is the agent for agent-specific policies.",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.policy.version_approved.v1.json",
+      "example": "examples/whitetower.policy.version_approved.v1.json"
+    },
+    {
+      "type": "whitetower.halt.issued.v1",
+      "summary": "Someone halted an agent, a selection of agents or the fleet. The subject is the agent for agent halts.",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.halt.issued.v1.json",
+      "example": "examples/whitetower.halt.issued.v1.json"
+    },
+    {
+      "type": "whitetower.halt.released.v1",
+      "summary": "A halt was released by two people, or automatically for a drill.",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.halt.released.v1.json",
+      "example": "examples/whitetower.halt.released.v1.json"
+    },
+    {
+      "type": "whitetower.audit.checkpoint.v1",
+      "summary": "The audit log signed a checkpoint (ADR-0006).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "none",
+      "schema": "schemas/whitetower.audit.checkpoint.v1.json",
+      "example": "examples/whitetower.audit.checkpoint.v1.json"
+    }
+  ]
+}
