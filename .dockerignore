@@ -1,0 +1,13 @@
+.git
+.task
+bin
+dist
+**/node_modules
+internal/webui/dist
+web/test-results
+web/playwright-report
+web/blob-report
+*.pem
+*.key
+.env
+.env.*

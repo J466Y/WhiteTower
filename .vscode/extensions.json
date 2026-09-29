@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "golang.go",
+    "biomejs.biome",
+    "bufbuild.vscode-buf",
+    "redhat.vscode-yaml",
+    "task.vscode-task",
+    "ms-playwright.playwright",
+    "editorconfig.editorconfig"
+  ]
+}
