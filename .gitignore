@@ -31,3 +31,7 @@ node_modules/
 !.vscode/extensions.json
 .DS_Store
 Thumbs.db
+
+# Python virtual environments (spikes, adapters)
+.venv/
+__pycache__/
