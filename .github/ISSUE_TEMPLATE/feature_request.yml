@@ -1,0 +1,31 @@
+name: Feature request
+description: Propose a capability or an improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Changes to the module contracts need an RFC: open this issue to discuss the idea first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to achieve, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How you would like it to work.
+    validations:
+      required: true
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Related requirements or plans
+      description: Requirement IDs or plan steps this relates to, if you know them (see docs/).
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

@@ -1,0 +1,9 @@
+# Reviewers by area. See GOVERNANCE.md: contract changes (api/proto, api/events,
+# api/manifest) need two maintainer approvals and an accepted RFC.
+*                 @J466Y
+/api/             @J466Y
+/docs/adr/        @J466Y
+/docs/rfcs/       @J466Y
+/.github/         @J466Y
+/GOVERNANCE.md    @J466Y
+/SECURITY.md      @J466Y
