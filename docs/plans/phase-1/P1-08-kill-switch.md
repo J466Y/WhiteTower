@@ -133,7 +133,7 @@ With 500 mock instances, halt one agent and the whole fleet repeatedly. Measure 
 - A release needs two distinct authorized people, and leaves an agent-halted agent suspended.
 - A fleet halt covers agents registered after it was issued.
 - Every step is audited, and the runbooks are reviewed.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-08-kill-switch) pass: ST-40 to ST-45.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-08-kill-switch) pass: ST-40 to ST-45.
 
 ## Risks and open questions
 

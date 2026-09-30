@@ -12,24 +12,36 @@ import (
 )
 
 func TestVersion(t *testing.T) {
-	srv := httptest.NewServer(server.NewHandler())
+	srv := httptest.NewTLSServer(server.ConsoleHandler())
 	t.Cleanup(srv.Close)
 
 	tests := []struct {
-		name    string
-		args    []string
-		want    []string
-		wantErr string
+		name       string
+		args       []string
+		want       []string
+		wantStderr string
+		wantErr    string
 	}{
 		{name: "client only", args: []string{"version"}, want: []string{"client: dev"}},
-		{name: "with server", args: []string{"version", "--server", srv.URL}, want: []string{"client: dev", "server: dev", "API v1"}},
-		{name: "invalid server URL", args: []string{"version", "--server", "localhost:8080"}, wantErr: "invalid --server"},
+		{
+			name:    "untrusted server certificate",
+			args:    []string{"version", "--server", srv.URL},
+			wantErr: "certificate",
+		},
+		{
+			name:       "development server",
+			args:       []string{"version", "--insecure-skip-tls-verify", "--server", srv.URL},
+			want:       []string{"client: dev", "server: dev", "API v1"},
+			wantStderr: "not verifying",
+		},
+		{name: "invalid server URL", args: []string{"version", "--server", "localhost:8443"}, wantErr: "invalid --server"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var out bytes.Buffer
+			var out, errOut bytes.Buffer
 			cmd := cli.NewRootCommand()
 			cmd.SetOut(&out)
+			cmd.SetErr(&errOut)
 			cmd.SetArgs(tt.args)
 			err := cmd.ExecuteContext(context.Background())
 			if tt.wantErr != "" {
@@ -45,6 +57,9 @@ func TestVersion(t *testing.T) {
 				if !strings.Contains(out.String(), want) {
 					t.Errorf("output %q does not contain %q", out.String(), want)
 				}
+			}
+			if !strings.Contains(errOut.String(), tt.wantStderr) {
+				t.Errorf("stderr %q does not contain %q", errOut.String(), tt.wantStderr)
 			}
 		})
 	}

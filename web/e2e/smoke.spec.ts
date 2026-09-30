@@ -4,7 +4,7 @@ test("the console loads from the core and nothing leaves the deployment", async 
   page,
   baseURL,
 }) => {
-  const origin = new URL(baseURL ?? "http://127.0.0.1:8080").origin;
+  const origin = new URL(baseURL ?? "https://127.0.0.1:8443").origin;
   const external: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());

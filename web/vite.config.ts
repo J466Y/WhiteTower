@@ -3,7 +3,9 @@ import { defineConfig } from "vitest/config";
 
 // The core serves the console from its binary: the build goes to
 // internal/webui/dist, which `go build -tags embedui` embeds.
-const core = "http://127.0.0.1:8080";
+// During development the core serves a self-signed certificate (`task run`),
+// so the proxy does not verify it.
+const core = { target: "https://127.0.0.1:8443", secure: false };
 
 export default defineConfig({
   plugins: [react()],
@@ -18,7 +20,6 @@ export default defineConfig({
     proxy: {
       "/api": core,
       "/auth": core,
-      "/healthz": core,
     },
   },
   test: {

@@ -166,7 +166,7 @@ These numbers are evidence for the Phase 1 gate.
 - The end-to-end demonstration runs with two frameworks: decisions in the audit log, halts effective within NFR-03 and NFR-04, and fail-closed within the TTL during a partition.
 - Decision overhead within NFR-02 (in-process p99 ≤ 5 ms, gate included).
 - The weekly job against the latest releases of `cedarpy` and the supported frameworks is running.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-09-python-enforcement-point) pass: ST-46 to ST-53.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-09-python-enforcement-point) pass: ST-46 to ST-53.
 
 ## Risks and open questions
 

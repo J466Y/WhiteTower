@@ -6,6 +6,11 @@ ARG TARGETPLATFORM
 COPY $TARGETPLATFORM/whitetower /usr/local/bin/whitetower
 
 USER nonroot:nonroot
-ENV WT_ADDR=:8080
-EXPOSE 8080
+# The three listeners on every interface; certificates come from the
+# configuration (docs/reference/configuration.md).
+ENV WT_LISTENERS_CONSOLE_ADDRESS=:8443 \
+    WT_LISTENERS_MACHINE_ADDRESS=:9443 \
+    WT_LISTENERS_OPERATIONS_ADDRESS=:9090
+EXPOSE 8443 9443 9090
 ENTRYPOINT ["/usr/local/bin/whitetower"]
+CMD ["serve"]

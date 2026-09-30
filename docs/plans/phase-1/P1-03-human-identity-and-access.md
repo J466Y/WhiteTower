@@ -134,7 +134,7 @@ Tests from the [P0-04 catalog](../../security/security-tests.md#p1-03-human-iden
 - The permission tests cover every role and permission pair, including separation of duties.
 - The security tests of step 12 pass.
 - Deactivating a principal revokes their sessions immediately.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-03-human-identity-and-access) pass: ST-13 to ST-22.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-03-human-identity-and-access) pass: ST-13 to ST-22.
 
 ## Risks and open questions
 

@@ -136,7 +136,7 @@ Describe how token exchange (RFC 8693) will issue per-task tokens that carry the
 - All negative tests pass, and fuzzing runs in CI.
 - JWKS rotation causes no verification failure for clients that refresh.
 - At MVP load (1,000 agents refreshing every 4 minutes), the token endpoint answers with p95 ≤ 100 ms.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-05-agent-identity-and-credentials) pass: ST-25 to ST-30.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-05-agent-identity-and-credentials) pass: ST-25 to ST-30.
 
 ## Risks and open questions
 

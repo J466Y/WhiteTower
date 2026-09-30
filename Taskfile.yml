@@ -75,9 +75,11 @@ tasks:
         msg: "The console is not built: run `task build` (or `task build:web` first)."
 
   run:
-    desc: Run the core from source on http://127.0.0.1:8080 (placeholder console; use `task dev:web` for the real one)
+    desc: Run the core from source on https://127.0.0.1:8443, with a self-signed development certificate (placeholder console; use `task dev:web` for the real one)
+    env:
+      WT_DEV_SELF_SIGNED_TLS: "true"
     cmds:
-      - go run ./cmd/whitetower {{.CLI_ARGS}}
+      - go run ./cmd/whitetower serve {{.CLI_ARGS}}
 
   test:
     desc: Run the unit tests of Go and of the console
@@ -141,7 +143,7 @@ tasks:
       - docker compose -f deploy/compose/dev/compose.yaml down {{.CLI_ARGS}}
 
   e2e:
-    desc: Run the end-to-end tests against a running core (WT_E2E_URL, default http://127.0.0.1:8080)
+    desc: Run the end-to-end tests against a running core (WT_E2E_URL, default https://127.0.0.1:8443; WT_E2E_OPERATIONS_URL, default http://127.0.0.1:9090)
     cmds:
       - go test -tags e2e -count=1 ./test/e2e/...
       - "{{.PNPM}} --dir web run e2e"

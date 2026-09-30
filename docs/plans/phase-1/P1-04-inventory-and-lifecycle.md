@@ -134,7 +134,7 @@ A YAML format for agents (with references to use cases and owners by email), a d
 - Automatic suspension happens within one job interval after an owner is deactivated or a review lapses past its grace period.
 - A third-party agent can be registered at coverage C0 and appears in the inventory.
 - The OpenAPI document is updated, the generated clients compile, and the console side has agreed to the API.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-04-inventory-and-lifecycle) pass: ST-23 and ST-24.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-04-inventory-and-lifecycle) pass: ST-23 and ST-24.
 
 ## Risks and open questions
 

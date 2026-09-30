@@ -151,7 +151,7 @@ A consistency check that runs on a schedule, against the latest checkpoint the S
 - Every manipulation in the tamper suite is detected; a rewrite of history is detected with an exported checkpoint.
 - Exports reach an OpenTelemetry collector and a JSON Lines file with no gaps across restarts.
 - After a retention drop, the remaining log still verifies.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-02-audit-log) pass: ST-06 to ST-12.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-02-audit-log) pass: ST-06 to ST-12.
 
 ## Risks and open questions
 
