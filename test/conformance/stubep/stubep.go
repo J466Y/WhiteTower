@@ -34,7 +34,14 @@ type Config struct {
 	// How it reaches the core.
 	CoreURL    string
 	HTTPClient connect.HTTPClient
+	// How old a lease renewal may be, on the stub's clock, and still renew
+	// the lease. Zero means DefaultRenewalTolerance.
+	RenewalTolerance time.Duration
 }
+
+// DefaultRenewalTolerance is the contract's default for how old a lease
+// renewal may be (section 5.3).
+const DefaultRenewalTolerance = 5 * time.Second
 
 // EP is the stub enforcement point.
 type EP struct {
@@ -126,7 +133,7 @@ func (e *EP) session(ctx context.Context) error {
 		case *modulev1alpha1.WatchResponse_Change:
 			e.applyChange(m.Change, msg.GetVersion())
 		case *modulev1alpha1.WatchResponse_LeaseRenewal:
-			e.renewLease()
+			e.renewLease(m.LeaseRenewal)
 		}
 		e.syncBundle(ctx)
 	}
@@ -166,8 +173,17 @@ func (e *EP) applyChange(c *modulev1alpha1.StateChange, version uint64) {
 	}
 }
 
-// renewLease starts a new lease on the monotonic clock (obligation EP-3).
-func (e *EP) renewLease() {
+// renewLease starts a new lease on the monotonic clock (obligation EP-3). A
+// renewal without the core's time, or older than the tolerance on the stub's
+// clock, renews nothing (section 5.3).
+func (e *EP) renewLease(r *modulev1alpha1.LeaseRenewal) {
+	tolerance := e.cfg.RenewalTolerance
+	if tolerance == 0 {
+		tolerance = DefaultRenewalTolerance
+	}
+	if r.GetServerTime() == nil || time.Since(r.GetServerTime().AsTime()) > tolerance {
+		return
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.stateReceived && e.agent != nil {

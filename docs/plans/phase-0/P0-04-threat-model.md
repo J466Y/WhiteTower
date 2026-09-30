@@ -157,9 +157,9 @@ Review with a security reviewer and the maintainers, then publish. Update the mo
 
 | Step | Status | Result |
 | --- | --- | --- |
-| 1 to 6 | Done | [Threat model](../../security/threat-model.md): 14 assets, 10 threat actors, 9 trust boundaries, 73 threats, 9 attack trees. Eight design changes: seven applied to the requirements, ADR-0010, the contracts, the architecture and the Phase 1 plans; DC-2 is scheduled in the contracts. 14 accepted risks, with their rationale |
+| 1 to 6 | Done | [Threat model](../../security/threat-model.md): 14 assets, 10 threat actors, 9 trust boundaries, 73 threats, 9 attack trees. Eight design changes, all applied to the requirements, ADR-0010, the contracts, the architecture and the Phase 1 plans; DC-2 changed the contracts before their review (see P0-03). 14 accepted risks, with their rationale |
 | 7 | Done | [Framework mapping](../../security/framework-mapping.md), with the dates of the Digital Omnibus on AI checked against the text of the Official Journal |
 | 8 | Done | [Security test catalog](../../security/security-tests.md): 74 tests, each owned by a Phase 1 plan whose acceptance criteria reference them |
 | 9 | Waiting | Review by an independent security reviewer. The upkeep rules were already in `GOVERNANCE.md` |
 
-**What remains:** the independent review (an acceptance criterion), and DC-2 in the contracts, before the review of RFC-0001 opens (P0-03).
+**What remains:** the independent review (an acceptance criterion).

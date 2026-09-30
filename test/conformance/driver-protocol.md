@@ -17,6 +17,8 @@ The kit starts the harness with these environment variables:
 
 Credentials for the fake token endpoint are added with it, in plan P1-07.
 
+The module runs with its default settings. Scenario S-17 assumes that its tolerance for the age of lease renewals is under a minute; the contract's default is 5 seconds (section 5.3).
+
 ## Endpoints
 
 All bodies are JSON.

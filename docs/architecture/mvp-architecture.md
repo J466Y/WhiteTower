@@ -276,7 +276,7 @@ In the same transaction, token issuance for the agent stops, except for the modu
 For every agent, the core maintains a governance state record: lifecycle state, halts, the effective bundle reference (version, manifest hash and size), the lease TTL, the halt mode, the attributes policies may use, and a version number taken from a global sequence. The fleet state, with its active fleet halts, is one more record.
 
 - **Watch protocol.** An EP opens `Watch` with the last version it applied. The core replies with a snapshot if the EP is new or too far behind, then streams changes in version order. Lease renewals come at a third of the TTL, and at least every 30 seconds, only when the stream is current. The [module contracts](../contracts/module-contract-v0.1.md#5-governance-state-leases-and-halts) specify it.
-- **Lease expiry is computed by the EP** from its own monotonic clock at the moment it receives a renewal, so it does not depend on clocks being synchronized between hosts.
+- **Lease expiry is computed by the EP** from its own monotonic clock at the moment it receives a renewal. Only a fresh renewal counts: one the core stamped more than a few seconds earlier, by the EP's clock, renews nothing, so a stream held back on its way lets leases run out instead of delaying halts ([threat model](../security/threat-model.md), DC-2). That check needs synchronized clocks, as token expiry does; the length of the lease does not.
 - **Obligations of an EP**, numbered EP-1 to EP-12 in the [contracts](../contracts/module-contract-v0.1.md#57-obligations-of-enforcement-points):
   - allow nothing until it has a current state, a lease and a verified bundle;
   - deny everything and halt the agent when the lease expires or the agent is halted;
@@ -392,7 +392,7 @@ An offline bundle contains the images as OCI archives, the Helm chart, SBOMs, si
 | Observability | Prometheus metrics prefixed `whitetower_`; OpenTelemetry traces, exported only if configured; JSON logs with request and trace IDs |
 | Configuration | One YAML file plus `WT_`-prefixed environment variables; secrets always from files |
 | High availability | Stateless replicas; jobs elected through advisory locks; watch streams served by any replica and fed through `LISTEN/NOTIFY` |
-| Time | UTC everywhere; the server stamps ingestion time; leases use monotonic clocks |
+| Time | UTC everywhere; the server stamps ingestion time; leases use monotonic clocks, and only fresh renewals count, so hosts are NTP-synchronized (ASM-04) |
 | Errors | RFC 9457 problem details on the REST API; ConnectRPC error codes on the module API |
 | Localization | Console only (English and Spanish at MVP); the API returns stable error codes with English messages |
 

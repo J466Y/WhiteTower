@@ -40,7 +40,7 @@ Identifiers: assumptions `A-`, threats `T-`, attack trees `AT-`, design changes 
 | ID | Assumption | Threats if it fails |
 | --- | --- | --- |
 | A-1 | The organization's IdP authenticates people correctly, and the organization controls who is in each group | T-14, T-15 |
-| A-2 | Hosts are time-synchronized (ASM-04) | T-20, T-32 once DC-2 lands |
+| A-2 | Hosts are time-synchronized (ASM-04) | T-20, T-32 |
 | A-3 | The Kubernetes control plane and the nodes that run the core are not compromised; cluster administrators are trusted in the MVP | T-60 |
 | A-4 | Operators distribute the core's TLS trust anchors and the bundle keys to modules through a channel they control | T-29, T-33 |
 | A-5 | Audit checkpoints are exported to at least one system outside the reach of White Tower's database administrators ([ADR-0006](../adr/0006-tamper-evident-audit-log.md)) | T-51, T-52 |
@@ -236,7 +236,7 @@ Each table covers the flows of one boundary. The rating is likelihood / impact �
 | T-29 | T | A forged or tampered bundle reaches an enforcement point | L / H → M | Signed with the bundle key; keys from the enforcement point's configuration (A-4); bound to the manifest hash in the state; checks V1 to V7 ([contracts section 7](../contracts/module-contract-v0.1.md#7-policy-bundles)) | Low |
 | T-30 | T | An older bundle is replayed | L / H → M | Versions only grow (V6); the state names the version and its hash (V3) | Low |
 | T-31 | T | A stale replica, or a replayed stream, undoes a halt | L / H → M | CORE-5 and CORE-6; versions committed in order under an advisory lock ([spike S2](../spikes/S2-watch-streams.md)) | Low |
-| **T-32** | T, D | A delayed stream. Something on the path (a proxy, a load balancer, a sidecar) buffers the `Watch` stream and releases it late. Renewals keep arriving at their usual pace, so leases never expire, while halts arrive as late as the attacker wants | L / H → M | Unacknowledged halts raise alerts (P1-08); **DC-2**: renewals carry the core's time, and one older than a tolerance on the instance's clock renews nothing | Low, once DC-2 lands |
+| **T-32** | T, D | A delayed stream. Something on the path (a proxy, a load balancer, a sidecar) buffers the `Watch` stream and releases it late. Renewals keep arriving at their usual pace, so leases never expire, while halts arrive as late as the attacker wants | L / H → M | Unacknowledged halts raise alerts (P1-08); **DC-2**: renewals carry the core's time, and one older than a tolerance on the instance's clock renews nothing | Low |
 | T-33 | S | A server impersonating the core keeps an enforcement point open or feeds it state | L / H → M | TLS with trust anchors from configuration (I-1, A-4); bundles still need the configured keys | Low |
 | T-34 | R, T | A compromised enforcement point acknowledges layers it did not apply | M / H → H | Layers reported separately, never overstated ([contracts 5.5](../contracts/module-contract-v0.1.md#55-halts)); network quarantine acknowledges independently on Kubernetes (KIL-10); halts stop tokens for other audiences; **DC-6**: the console flags allow decisions and executed actions after the gate was acknowledged closed | R-01 |
 | T-35 | R | An enforcement point withholds events, or reports decisions that differ from what happened | M / M → M | Sequence numbers per source make gaps visible (AUD-02); from ingestion on, evidence is tamper-evident | R-03 |
@@ -400,7 +400,7 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 - Fill the enforcement points' buffers through backpressure (T-36): per-instance backpressure.
 - Issue a fleet halt as an insider or break-glass holder (T-71): R-12.
 - Deactivate owners in bulk through SCIM (T-18): reversible, audited.
-- Once DC-2 lands, skew a host's clock so fresh renewals look stale: needs control of the host's time (A-2); the enforcement point reports the stale renewals.
+- Skew a host's clock so that fresh renewals look stale (DC-2): needs control of the host's time (A-2); the enforcement point reports the stale renewals.
 
 ### AT-8: compromise the supply chain
 
@@ -421,12 +421,12 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 
 ## 7. Design changes
 
-The analysis found eight gaps in the design. Each change is applied in the documents listed, or scheduled where it needs code.
+The analysis found eight gaps in the design. Each change is applied in the documents listed.
 
 | ID | Threats | Change | Where | Status |
 | --- | --- | --- | --- | --- |
 | DC-1 | T-25 | The enforcement point of a halted or suspended agent keeps getting tokens for the module API, and only for it: it can still acknowledge, deliver its evidence and learn of a release, while every other audience stays closed. Retired agents get none; P1-05 decides whether a retired agent gets a short delivery-only period | AID-04, KIL-06, [ADR-0010](../adr/0010-built-in-agent-token-issuer.md), CORE-8 and contracts section 11, architecture section 5.3, P1-05 step 5, P1-08 step 2 | Applied |
-| DC-2 | T-32 | Lease renewals carry the core's time. An instance ignores a renewal older than a tolerance on its own clock (5 seconds by default, configurable), so a delayed stream lets leases expire instead of delaying halts. This relies on A-2, which tokens already need | Contracts section 5.3 and the `LeaseRenewal` message, with a conformance scenario | Scheduled: the contract change lands before the review of RFC-0001 opens (P0-03); listed in contracts section 12 |
+| DC-2 | T-32 | Lease renewals carry the core's time. An instance ignores a renewal older than a tolerance on its own clock (5 seconds by default, configurable), so a delayed stream lets leases expire instead of delaying halts. This relies on A-2, which tokens already need | Contracts sections 4.8, 5.2 (CORE-6), 5.3 and 11; the `LeaseRenewal` message; conformance scenario S-17; KIL-04 and ASM-04 | Applied |
 | DC-3 | T-54 | Migrations run in their own step, `whitetower migrate` (an init container on Kubernetes, a one-off service in Compose), with the migration role. The serving process holds only the runtime role's credentials | OPS-07, architecture section 8.2, P1-01 step 4, P1-12 step 3 | Applied |
 | DC-4 | T-16 | Nobody grants a role to themselves. Grants of steering, advisory or operator notify the steering committee's inbox | HUM-04, P1-03 step 4 | Applied |
 | DC-5 | T-45 | Pods carrying an agent label may not use the host's network, which deny rules cannot reach | P1-15 step 6 | Applied |

@@ -707,13 +707,15 @@ func (x *StateChange) GetRemovedAgentIds() []string {
 	return nil
 }
 
-// LeaseRenewal renews the lease of every agent in scope. Each lease then lasts
-// that agent's lease_ttl, measured on the client's monotonic clock from the
-// moment it received this message.
+// LeaseRenewal renews the lease of every agent in scope, if it is fresh. Each
+// lease then lasts that agent's lease_ttl, measured on the client's monotonic
+// clock from the moment it received this message.
 type LeaseRenewal struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Server time when the renewal was sent. Informational: leases never depend
-	// on clocks being synchronized.
+	// The core's clock when it sent the renewal. Required. A client ignores a
+	// renewal without it, or older than its tolerance (5 seconds by default) on
+	// the client's own clock, so a stream held back on its way lets leases run
+	// out instead of delaying halts (contract, section 5.3).
 	ServerTime    *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=server_time,json=serverTime,proto3" json:"server_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

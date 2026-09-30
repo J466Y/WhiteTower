@@ -25,7 +25,7 @@ The normative text is [module-contract-v0.1.md](../contracts/module-contract-v0.
 4. **Decisions shaped as AuthZEN evaluations**, with eight actions matching the intervention points agents have, a gate checked before policies, and the combining algorithm `wt-deny-overrides-v1`. **Cedar is the primary language**; Rego is supported through a standard wrapper. Any evaluation error denies, which is stricter than Cedar.
 5. **Signed bundles**: an RFC 8785 canonical manifest, a detached JWS with Ed25519, and seven ordered verification steps with rejection reasons. No rollback.
 6. **Evidence as CloudEvents 1.0**, with a per-source sequence (`wtseq`) to detect gaps, at-least-once delivery, and data minimization: no argument values, prompts or outputs.
-7. **Conformance first**: 48 language-neutral vectors that pass on `cedar-go` and on `cedarpy`, a kit that plays the core over the network, and a catalog of 16 scenarios tied to numbered obligations.
+7. **Conformance first**: 48 language-neutral vectors that pass on `cedar-go` and on `cedarpy`, a kit that plays the core over the network, and a catalog of 17 scenarios tied to numbered obligations.
 
 The contracts were mapped onto Microsoft AGT, OPA, Cedar and engines with native AuthZEN; no gap is blocking ([engine-mappings.md](../contracts/engine-mappings.md)).
 
@@ -56,7 +56,7 @@ The [threat model](../security/threat-model.md) (plan P0-04) analyzes these boun
 
 ## Unresolved questions
 
-Listed in section 12 of the specification: learning rotated bundle keys from the core, how deployments manage tool arguments visible to policies, stable URLs and label prefixes (which depend on the project's domain), when decision points become mandatory, and Rego naming. The [threat model](../security/threat-model.md) settled DNS during network quarantine, and asks for one change before the review opens: lease renewals that carry the core's time, so that a delayed stream cannot delay halts (DC-2).
+Listed in section 12 of the specification: learning rotated bundle keys from the core, how deployments manage tool arguments visible to policies, stable URLs and label prefixes (which depend on the project's domain), when decision points become mandatory, and Rego naming. The [threat model](../security/threat-model.md) settled DNS during network quarantine, and added one rule before the review: a lease renewal counts only if it is fresh, so that a stream held back on its way cannot delay halts (section 5.3, DC-2).
 
 ## Implementation plan
 

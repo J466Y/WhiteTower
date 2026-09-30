@@ -191,3 +191,14 @@ The normative specification is [module-contract-v0.1.md](../../contracts/module-
 | 9. Real engines | Done | [engine-mappings.md](../../contracts/engine-mappings.md): AGT, OPA, Cedar, Cerbos and Topaz; no blocking gap |
 | 10. Versioning policy | Done | Section 10 of the specification; CI now compares the protobuf files with the latest `contracts/v*` tag |
 | 11. RFC-0001 | In progress | Draft written. Next: open the review for at least two weeks with an external reviewer, resolve the comments, accept, and tag `contracts/v0.1.0` |
+
+### 2026-09-30: changes before the review opens
+
+The draft changed after the spikes and the [threat model](../../security/threat-model.md). The review of RFC-0001 covers these changes like the rest:
+
+| Change | Source | Where |
+| --- | --- | --- |
+| Reconnection backoff bounded by the lease, and reset after a renewal | Spike S2 | I-4, scenario S-12 |
+| The enforcement point of a halted or suspended agent still gets tokens for the module API | Threat model, DC-1 | CORE-8, section 11 |
+| A lease renewal counts only if it is fresh: it carries the core's time, and an instance ignores one older than its tolerance, 5 seconds by default | Threat model, DC-2 | Sections 4.8, 5.2, 5.3 and 11; `LeaseRenewal.server_time`; scenario S-17, which runs end to end against the stub |
+| No DNS during network quarantine | Threat model, DC-7 | Section 12 |
