@@ -112,6 +112,7 @@ Build through GoReleaser (P0-01): signed binaries for Linux, macOS and Windows o
 - End-to-end tests cover the main flows using a personal access token in CI; interactive login is tested manually on the three operating systems.
 - `wtctl audit verify` detects the P1-02 tamper suite.
 - Halting through the CLI works while the console is down, and with a break-glass session while the IdP is down.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-11-cli) pass: ST-57 to ST-59.
 
 ## Risks and open questions
 

@@ -12,7 +12,7 @@
 
 ## Goal
 
-Every agent and module instance proves who it is with an asymmetric key, and receives short-lived tokens that White Tower issues only when governance allows it. The token endpoint becomes an enforcement point in its own right: the moment an agent is halted or suspended, it gets no new token.
+Every agent and module instance proves who it is with an asymmetric key, and receives short-lived tokens that White Tower issues only when governance allows it. The token endpoint becomes an enforcement point in its own right: the moment an agent is halted or suspended, it gets no new token, except for the module API, which its enforcement point still needs (DC-1 of the [threat model](../../security/threat-model.md)).
 
 ## Scope
 
@@ -77,9 +77,11 @@ The gate runs in the same transaction as issuance, or on a consistent read. It d
 - a non-production credential is used by an agent that is not `validated`, `ready` or `active`;
 - the credential is revoked or expired.
 
+**One exception keeps the halt path whole:** a token for the module API is still issued to a suspended or halted agent, whose enforcement point needs it to acknowledge the halt, deliver its evidence and learn of the release (AID-04; [threat model](../../security/threat-model.md), DC-1). It is refused for a retired agent, and for a revoked or expired credential. Decide here whether a retired agent's enforcement point gets a short period to deliver its remaining evidence.
+
 The caller gets a generic OAuth error; the detailed reason goes to the audit log.
 
-**Done when:** halting an agent makes its next token request fail within the same second (test).
+**Done when:** halting an agent makes its next token request for any audience but the module API fail within the same second, while its enforcement point still gets module API tokens (tests).
 
 ### 6. Access tokens
 
@@ -134,6 +136,7 @@ Describe how token exchange (RFC 8693) will issue per-task tokens that carry the
 - All negative tests pass, and fuzzing runs in CI.
 - JWKS rotation causes no verification failure for clients that refresh.
 - At MVP load (1,000 agents refreshing every 4 minutes), the token endpoint answers with p95 ≤ 100 ms.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-05-agent-identity-and-credentials) pass: ST-25 to ST-30.
 
 ## Risks and open questions
 

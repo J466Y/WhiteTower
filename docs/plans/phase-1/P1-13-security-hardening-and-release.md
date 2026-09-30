@@ -43,7 +43,7 @@ Walk the checklist for the console and the API, fix gaps in the owning plans, an
 
 ### 3. Security testing
 
-- The full security test catalog of P0-04.
+- The full [security test catalog](../../security/security-tests.md) of P0-04.
 - Dynamic scans in CI against the Compose stack: OWASP ZAP baseline, plus an API scan driven by the OpenAPI document.
 - The complete permission matrix tests.
 - Longer fuzzing campaigns on the assertion, CloudEvents, manifest and bundle parsers.

@@ -120,6 +120,7 @@ Evaluate a draft version, together with the current global set, against test inp
 - Activating a global version rebuilds 1,000 bundles in under 60 seconds.
 - Validation rejects Cedar and Rego syntax errors with positions.
 - No path lets an author approve their own version (tests).
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-06-policy-model-and-distribution) pass: ST-31 to ST-33.
 
 ## Risks and open questions
 

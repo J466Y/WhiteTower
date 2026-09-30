@@ -273,7 +273,7 @@ When no halt covers the agent any more, the gate reopens only if every other con
 
 Besides CORE-1 to CORE-7:
 
-- **CORE-8.** A halt is committed, and the stream updated, without waiting for any module. Token issuance for the halted agents stops in the same transaction ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)).
+- **CORE-8.** A halt is committed, and the stream updated, without waiting for any module. Token issuance for the halted agents stops in the same transaction, except for tokens for the module API, which their enforcement points still need to acknowledge the halt, deliver their evidence and learn of the release ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)).
 - **CORE-9.** Governance state carries no personal data other than the owner's pseudonymous principal ID.
 
 ## 6. Decision profile
@@ -583,8 +583,8 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 
 | Threat | What the contracts do |
 | --- | --- |
-| A compromised enforcement point lies in its acknowledgements or evidence | Layers are reported separately and never overstate (section 5.5); halts also stop token issuance (CORE-8); network quarantine acts outside the agent's process (RC-1); the console flags instances that keep emitting actions after a halt (P1-08) |
-| Stolen agent credentials | The thief can act only as that agent: its scope is one agent, its state carries no personal data (CORE-9), and its halts still stop token issuance |
+| A compromised enforcement point lies in its acknowledgements or evidence | Layers are reported separately and never overstate (section 5.5); halts also stop token issuance for every audience but the module API (CORE-8); network quarantine acts outside the agent's process (RC-1); the console flags instances that keep emitting actions after a halt (P1-08) |
+| Stolen agent credentials | The thief can act only as that agent: its scope is one agent, its state carries no personal data (CORE-9), its halts stop token issuance for every audience but the module API, and revoking the credential stops that too |
 | A forged or tampered bundle | Signed with a key from the enforcement point's configuration (section 7.3), bound to the state's hash, verified step by step (section 7.4) |
 | Replaying an older bundle | Versions only grow, and the state names the one to use (V3, V6) |
 | Impersonating the core | TLS with trust anchors from configuration (I-1) |
@@ -594,7 +594,7 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | Personal data leaking into evidence | Minimization rules of section 8.3 |
 | Unknown values opening the gate | EP-10 |
 
-The threat model (plan P0-04) analyzes these boundaries in depth.
+The [threat model](../security/threat-model.md) (plan P0-04) analyzes these boundaries in depth.
 
 ## 12. Open questions for the review
 
@@ -602,7 +602,8 @@ The threat model (plan P0-04) analyzes these boundaries in depth.
 | --- | --- |
 | Should enforcement points learn rotated bundle keys from the core? | Not in `v1alpha1`: keys come from configuration. A key rollover statement signed by the current key could come in `v1beta1` |
 | Which tool arguments may policies see? | Only those a deployment declares in `ToolArgs`; how deployments manage that extension is settled in P1-06 |
-| Do quarantined pods keep cluster DNS? | Decided with the threat model (P0-04) and P1-15 |
+| Do quarantined pods keep cluster DNS? | Decided by the [threat model](../security/threat-model.md) (DC-7): no, by default. The enforcement point reconnects to the core's last resolved addresses; where the CNI has DNS-aware rules, an option may allow the core's name only |
+| How does a lease resist a delayed stream? | Decided by the [threat model](../security/threat-model.md) (T-32, DC-2): `LeaseRenewal` carries the core's time, and an instance ignores a renewal older than a tolerance on its own clock (5 seconds by default), so a stream held back on its way lets leases expire instead of delaying halts. To specify in section 5.3, with a conformance scenario, before the review of RFC-0001 opens |
 | Stable URLs for `dataschema`, and the Kubernetes label prefix | Depend on the project's domain (open question Q6) |
 | When do decision points become mandatory for gateways? | With the Phase 2 gateways, in `v1beta1` |
 | Rego package naming and a Rego engine | Phase 2, with the second policy engine |

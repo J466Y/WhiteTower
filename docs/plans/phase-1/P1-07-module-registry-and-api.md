@@ -138,6 +138,7 @@ Publish the results.
 - With 500 concurrent streams on two replicas, state changes are delivered with p95 ≤ 1 second (part of NFR-03's budget).
 - During a rolling restart of one replica, every enforcement point reconnects within 30 seconds without losing a change, and no lease expires with the default TTL.
 - Instances and their state are visible through the API.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-07-module-registry-and-api) pass: ST-34 to ST-39.
 
 ## Risks and open questions
 

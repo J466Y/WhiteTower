@@ -136,6 +136,8 @@ The gate report, approved by the maintainers and the pilot sponsor, shows the fo
 3. evidence in the tamper-evident log, verified with the CLI and exported to the partner's SIEM;
 4. halts of one agent and of the fleet confirmed and measured within the Phase 0 targets and, for agents on Kubernetes, their pods quarantined at the network level (in the pilot if its cluster supports it, otherwise on the reference cluster).
 
+The gate report also records the exercise this plan owns in the [security test catalog](../../security/security-tests.md#p1-14-pilot-and-gate), ST-74.
+
 ## Risks and open questions
 
 | Risk or question | Mitigation or owner |

@@ -121,9 +121,11 @@ Every transition:
 | draft, proposed | Refused | Not built | Published (gate closed) |
 | validated, ready | Non-production credentials only | Built from the active global and agent-specific versions; with no agent-specific policy yet, only global policies apply, under default deny | Published (gate open) |
 | active | All credentials | Built | Published (gate open) |
-| suspended | Refused, credentials kept for reinstatement | Kept, not rebuilt | Published (gate closed) |
+| suspended | Refused, except module API tokens for its enforcement point; credentials kept for reinstatement | Kept, not rebuilt | Published (gate closed) |
 | retired | Refused, credentials revoked | Not built | Published (gate closed) so connected instances stop |
 | rejected | Refused | Not built | Published (gate closed) |
+
+A halted agent, whatever its lifecycle state, gets tokens only for the module API, which its enforcement point needs to acknowledge the halt, deliver its evidence and learn of the release (AID-04, KIL-06; DC-1 of the [threat model](../security/threat-model.md)).
 
 ## 10. Tabletop walkthroughs
 
@@ -146,7 +148,7 @@ The table above was walked through with three scenarios. The people are the test
 
 **An emergency halt, then back to service.**
 
-1. Omar halts `invoice-triage`, reason "suspected exfiltration" (P1-08). In one transaction: run state `halted`, lifecycle `suspended` with reason `halt` (T12), token issuance refused. Enforcement points close their gates and acknowledge.
+1. Omar halts `invoice-triage`, reason "suspected exfiltration" (P1-08). In one transaction: run state `halted`, lifecycle `suspended` with reason `halt` (T12), tokens refused except for the enforcement points' channel to the core. Enforcement points close their gates and acknowledge.
 2. After the investigation, Olivia requests the release and Alex approves it. The run state returns to `running`; the agent stays `suspended`.
 3. Alex reinstates it (T13) once the fix is in place. It returns to `active`.
 

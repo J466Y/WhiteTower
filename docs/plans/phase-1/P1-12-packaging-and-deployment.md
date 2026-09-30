@@ -60,7 +60,7 @@ The `eval` profile grows with the project: P1-12.1 ships it with the core, Postg
 - **Security:** the restricted Pod Security Standard.
 - **Configuration and secrets:** ConfigMap, and Secrets for the three signing keys and the database credentials, with support for existing Secrets. An optional ServiceMonitor.
 - **Values schema:** in JSON Schema, with its documentation.
-- **Migrations:** run by the core at startup under an advisory lock, so no Helm hooks are needed.
+- **Migrations:** `whitetower migrate` in an init container, under an advisory lock, with the migration role's credentials mounted there only; the server container gets the runtime role's ([threat model](../../security/threat-model.md), DC-3). No Helm hooks are needed.
 - **Tests:** `helm test`, chart-testing (`ct`) and `kubeconform` in CI.
 
 **Done when:** `helm install` on kind passes the smoke and end-to-end tests.
@@ -117,6 +117,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 - IdP guides: Keycloak, Entra ID, Okta.
 - SIEM export guides: OpenTelemetry collector configurations for Splunk, Elastic and Microsoft Sentinel.
 - Key rotation, scaling and troubleshooting.
+- A security configuration guide for what the [threat model](../../security/threat-model.md) assumes: MFA at the IdP; checkpoints exported to the SIEM, with a scheduled consistency check against its latest one that alerts on failure (DC-8); the database's own audit log sent to the SIEM; production resources that accept White Tower tokens requiring `wt_env=production` (R-14).
 - The halting runbooks of P1-08.
 
 **Done when:** an operator from the pilot organization reviews the documentation.
@@ -133,6 +134,7 @@ The three latest Kubernetes minor versions (kind, with Cilium as the CNI so the 
 - The air-gapped installation succeeds with egress blocked.
 - A rolling upgrade with 500 mock instances causes no lease expiry and loses no state.
 - The restore drill passes, with the audit log verifiable afterwards.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-12-packaging-and-deployment) pass: ST-60 to ST-64.
 
 ## Risks and open questions
 

@@ -58,7 +58,7 @@ On login, create or update the principal (issuer, subject, name, email, groups, 
 
 - **Roles:** steering, advisory, owner, user, operator, auditor, admin.
 - **Mapping:** configurable from an IdP claim (the claim name is configurable, for example `groups` or `roles`) to roles.
-- **Local bindings:** administrators can add role bindings inside White Tower; every binding change is audited.
+- **Local bindings:** administrators can add role bindings inside White Tower; every binding change is audited. Nobody can grant a role to themselves (HUM-04), and a grant of steering, advisory or operator notifies the steering committee's inbox ([threat model](../../security/threat-model.md), DC-4).
 - **Effective roles** are computed at login and kept in the session; changing a binding revokes the affected sessions so they refresh.
 - `/api/v1/me` returns the principal, roles, permission IDs (used by the console to adapt itself) and the CSRF token.
 
@@ -119,7 +119,7 @@ Extend the Keycloak realm from P0-01 so it has one user per role, a user with se
 
 ### 12. Security tests
 
-Tests from the P0-04 catalog for this plan:
+Tests from the [P0-04 catalog](../../security/security-tests.md#p1-03-human-identity-and-access) for this plan, ST-13 to ST-22:
 
 - CSRF, session fixation, cookie flags, open redirects;
 - ID token replay (nonce), algorithm confusion in ID token validation;
@@ -134,6 +134,7 @@ Tests from the P0-04 catalog for this plan:
 - The permission tests cover every role and permission pair, including separation of duties.
 - The security tests of step 12 pass.
 - Deactivating a principal revokes their sessions immediately.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-03-human-identity-and-access) pass: ST-13 to ST-22.
 
 ## Risks and open questions
 

@@ -23,7 +23,7 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | [P0-01](phase-0/P0-01-engineering-foundations.md) | Engineering foundations | M | none | NFR-13, NFR-18, NFR-21, CON-01 | In progress |
 | [P0-02](phase-0/P0-02-domain-and-data-model.md) | Domain and data model v0.1 | M | none | INV, AID-01, POL-01, AUD-01, NFR-19, NFR-20 | Done |
 | [P0-03](phase-0/P0-03-module-contracts.md) | Module contracts v0.1 | L | P0-02, P0-05 (S1) | MOD-01 to MOD-05, MOD-08, POL-03, POL-05, POL-06 | In progress (RFC review) |
-| [P0-04](phase-0/P0-04-threat-model.md) | Threat model v0.1 | M | P0-02, P0-03 (drafts) | NFR-21, NFR-22 | Draft |
+| [P0-04](phase-0/P0-04-threat-model.md) | Threat model v0.1 | M | P0-02, P0-03 (drafts) | NFR-21, NFR-22 | In progress (review) |
 | [P0-05](phase-0/P0-05-spikes-and-nfr-targets.md) | Technical spikes and NFR targets | M | none (uses `hack/spikes/`) | NFR-02 to NFR-09 | In progress |
 
 ### Phase 1: Core MVP (gate G1, "Pilot with real agents")

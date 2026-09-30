@@ -11,6 +11,7 @@ The design of White Tower, from the charter to the implementation plans. All doc
 5. **[Module contracts](contracts/README.md)**: what a module must implement to plug into White Tower, and what the core guarantees in return.
 6. **[Implementation plans](plans/README.md)**: twenty plans from an empty repository to the MVP, with dependencies and the definition of done.
 7. **[Roadmap](roadmap.md)**: sequencing, milestones, staffing, calendar and gate checklists.
+8. **[Security design](security/README.md)**: the threat model, the security tests each plan must pass, and the mapping to the OWASP Top 10 for Agentic Applications and the EU AI Act.
 
 ## Where things will go
 

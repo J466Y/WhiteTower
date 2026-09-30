@@ -43,7 +43,7 @@ The contracts cross the main trust boundaries of the system: between the core an
 - bundles are signed with keys from each enforcement point's configuration, and never roll back;
 - evidence is ordered, gap-detected and minimized.
 
-Plan P0-04 builds the full threat model on these boundaries.
+The [threat model](../security/threat-model.md) (plan P0-04) analyzes these boundaries in depth.
 
 ## Alternatives
 
@@ -56,7 +56,7 @@ Plan P0-04 builds the full threat model on these boundaries.
 
 ## Unresolved questions
 
-Listed in section 12 of the specification: learning rotated bundle keys from the core, how deployments manage tool arguments visible to policies, DNS during network quarantine, stable URLs and label prefixes (which depend on the project's domain), when decision points become mandatory, and Rego naming.
+Listed in section 12 of the specification: learning rotated bundle keys from the core, how deployments manage tool arguments visible to policies, stable URLs and label prefixes (which depend on the project's domain), when decision points become mandatory, and Rego naming. The [threat model](../security/threat-model.md) settled DNS during network quarantine, and asks for one change before the review opens: lease renewals that carry the core's time, so that a delayed stream cannot delay halts (DC-2).
 
 ## Implementation plan
 
