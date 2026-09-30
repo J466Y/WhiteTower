@@ -111,6 +111,7 @@ Each subplan gets its own file in `phase-1/P1-10-web-console/` when work starts.
 - The English and Spanish translations are complete.
 - No request leaves the deployment (asserted in Playwright).
 - The console works at 1280 pixels wide and is usable at 768.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-10-web-console) pass: ST-54 to ST-56.
 
 ## Risks and open questions
 

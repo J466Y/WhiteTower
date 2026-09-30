@@ -16,7 +16,7 @@ The central governance rule is that an agent that is halted, suspended, retired 
 
 - **The core includes a minimal OAuth 2.0 authorization server for machine identities.** It supports only the client credentials grant with `private_key_jwt` client authentication (RFC 7523). Agents and module instances register public keys; White Tower never holds their private keys.
 - **Access tokens** are JWTs following RFC 9068, signed with ES256 (the most widely supported algorithm for verifiers), valid for 5 minutes by default and 15 at most. They carry the SPIFFE-format subject (`spiffe://<trust-domain>/agent/<agent-id>`), the audience requested through a resource indicator (RFC 8707) and White Tower claims: agent ID, owner, environment and risk tier.
-- **Issuance checks governance state in the same database transaction** (AID-04): no token for halted, suspended or retired agents; production tokens only for active agents.
+- **Issuance checks governance state in the same database transaction** (AID-04): no token for halted, suspended or retired agents; production tokens only for active agents. The one exception is the module API: the enforcement point of a halted or suspended agent still gets tokens for it, and only for it, so it can acknowledge the halt, deliver its evidence and learn of the release ([threat model](../security/threat-model.md), DC-1). That channel cannot free the agent: the state it carries keeps the gate closed.
 - **Discovery.** JWKS at `/.well-known/jwks.json` and RFC 8414 metadata at `/.well-known/oauth-authorization-server`. Signing keys rotate with overlap.
 - **Extension points**, designed now and built later:
   - Kubernetes workload identity federation, accepting projected service account tokens as client assertions (AID-07, Should in the MVP).
@@ -27,7 +27,7 @@ The central governance rule is that an agent that is halted, suspended, retired 
 ## Consequences
 
 **Easier**
-- The governance gate is atomic: once the kill switch commits, no new token is issued.
+- The governance gate is atomic: once the kill switch commits, no new token is issued for any audience but the module API.
 - No extra component for pilots and air-gapped installs.
 - Standard OAuth: gateways, MCP servers and tools can verify tokens with any JWT library and the published JWKS. Audience-bound tokens fit the MCP authorization rules the Phase 2 gateway will follow.
 

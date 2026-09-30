@@ -62,7 +62,7 @@ Each rule denies all ingress and egress, with two exceptions:
 | Antrea | `ClusterNetworkPolicy` in the `emergency` tier | An `Allow` rule for the core, then `Drop` |
 | AdminNetworkPolicy | Priority 0 (an alpha Kubernetes API; best effort) | An `Allow` rule for the core, then `Deny` |
 
-Decide, with the threat model (P0-04), whether cluster DNS is allowed during a quarantine: the enforcement point needs name resolution to reconnect, but DNS can carry data out.
+**No DNS during a quarantine** ([threat model](../../security/threat-model.md), DC-7): DNS can carry data out, and the halt path does not need it, because the enforcement point reconnects to the core's last resolved addresses (P1-09). On a CNI with DNS-aware rules, such as Cilium, an option allows lookups of the core's name only.
 
 **Done when:** each template isolates a test pod except for the core and node probes, on a cluster running that CNI.
 
@@ -87,10 +87,10 @@ Decide, with the threat model (P0-04), whether cluster DNS is allowed during a q
 ### 6. Protecting the quarantine
 
 - **RBAC:** the controller may manage only its rule kind and read pods; it has no access to workloads or Secrets.
-- **Admission policies** (`ValidatingAdmissionPolicy`, shipped with the chart and enabled by default): only the controller's service account may change or delete the quarantine rules, and nobody may change the `whitetower.io/agent-id` label of a running pod.
+- **Admission policies** (`ValidatingAdmissionPolicy`, shipped with the chart and enabled by default): only the controller's service account may change or delete the quarantine rules, nobody may change the `whitetower.io/agent-id` label of a running pod, and no pod carrying that label may use the host's network, which deny rules cannot reach (DC-5).
 - **Documentation:** agents' service accounts must not be able to patch pods or network rules.
 
-**Done when:** tests show that a user with broad namespace rights cannot remove a quarantine or relabel a quarantined pod.
+**Done when:** tests show that a user with broad namespace rights cannot remove a quarantine, relabel a quarantined pod, or run a labeled pod on the host's network.
 
 ### 7. Image and Helm chart
 
@@ -130,6 +130,7 @@ Measure the time from halt issued to effective isolation (p50, p95, p99, max) ag
 - A controller restart or a lost connection to the core never lifts a quarantine (test).
 - The controller cannot touch workloads, and users cannot remove a quarantine or relabel a quarantined pod (tests).
 - The templates for Calico, Antrea and AdminNetworkPolicy pass their weekly job, or their limits are documented.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-15-network-quarantine) pass: ST-69 to ST-73.
 
 ## Risks and open questions
 
@@ -138,7 +139,7 @@ Measure the time from halt issued to effective isolation (p50, p95, p99, max) ag
 | Connections opened before the quarantine survive it on some CNIs | Measured in step 8; the in-process gate still denies governed calls; residual risk recorded in the threat model; if needed, the enforcement point closes its connections on halt |
 | The cluster's CNI does not enforce deny rules (ASM-05) | Detected at installation; the console shows the layer as unavailable; documented in the runbook |
 | Pods run without the agent label | Pods found per agent shown in the console; optional admission policy requiring the label in namespaces marked for agents |
-| Quarantine blocks what the enforcement point needs | Exception for the core by design; DNS decided with the threat model (step 3) |
+| Quarantine blocks what the enforcement point needs | Exception for the core by design; no DNS, so the enforcement point reuses the core's resolved addresses (step 3) |
 | A lost connection to the core leaves new halts without network enforcement | Alert on disconnection; the in-process gate and token issuance still apply; optional quarantine on lease expiry |
 | AdminNetworkPolicy is still an alpha API | Cilium is the reference; the AdminNetworkPolicy template is best effort |
 

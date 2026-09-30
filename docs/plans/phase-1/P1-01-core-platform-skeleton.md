@@ -57,12 +57,12 @@ Three listeners, as in the architecture document: console and API (`:8443`), mac
 ### 4. Database layer
 
 - A `pgx` connection pool and `sqlc` generation wired into `task gen`.
-- `goose` migrations embedded in the binary and applied at startup under an advisory lock, so only one replica migrates. The server refuses to start if the database schema is newer than the binary.
-- Two connection strings: migration role and runtime role (ADR-0003).
+- `goose` migrations embedded in the binary and applied by `whitetower migrate` under an advisory lock, so only one replica migrates. It runs before the server: an init container on Kubernetes, a one-off service in Compose. The server waits until the schema is the one its binary expects, and refuses to start if the schema is newer.
+- Two connection strings: the migration role's, used only by `whitetower migrate`, and the runtime role's, the only one the server holds ([threat model](../../security/threat-model.md), DC-3).
 - A transaction helper, `platform.InTx(ctx, func(tx) error)`, with hooks for audit events (filled by P1-02) and for "after commit" notifications (used by the governance state).
 - Apply `00001_init.sql` from P0-02.
 
-**Done when:** two replicas start against an empty database, one migrates and the other waits, and both become ready.
+**Done when:** two replicas start against an empty database, one migrates while the other waits, and both become ready; the server process holds no migration credentials.
 
 ### 5. REST API scaffolding
 
@@ -118,10 +118,11 @@ Document and enforce with a lint rule (for example `depguard`):
 
 ## Acceptance criteria
 
-- The server starts from its configuration, migrates, and serves health, metrics, the OpenAPI document and the console on the right listeners with TLS. The end-to-end smoke test is green.
+- `whitetower migrate` prepares the database, then the server starts from its configuration and serves health, metrics, the OpenAPI document and the console on the right listeners with TLS. The end-to-end smoke test is green.
 - With two replicas on one database, each job runs on exactly one replica, and notifications reach the other replica (tests).
 - Graceful shutdown completes within the configured deadline with open streams (test).
 - With default settings, the server makes no outbound connection (unit test here; full egress test in P1-12).
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-01-core-platform-skeleton) pass: ST-01 to ST-05.
 
 ## Risks and open questions
 

@@ -111,6 +111,8 @@ Permissions follow the matrix: auditors, steering, advisory and operators see ev
 
 It works online (through the API) and offline (against an export). `wtctl audit verify`, `prove` and `consistency` (P1-11) are thin wrappers around it.
 
+A consistency check that runs on a schedule, against the latest checkpoint the SIEM holds, catches a log rolled back by a database administrator, and alerts when it fails ([threat model](../../security/threat-model.md), DC-8). P1-12 documents how to run it.
+
 **Done when:** the tamper suite of step 10 is detected by the library.
 
 ### 8. Export
@@ -149,6 +151,7 @@ It works online (through the API) and offline (against an export). `wtctl audit 
 - Every manipulation in the tamper suite is detected; a rewrite of history is detected with an exported checkpoint.
 - Exports reach an OpenTelemetry collector and a JSON Lines file with no gaps across restarts.
 - After a retention drop, the remaining log still verifies.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-02-audit-log) pass: ST-06 to ST-12.
 
 ## Risks and open questions
 

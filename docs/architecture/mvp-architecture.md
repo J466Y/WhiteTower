@@ -3,8 +3,8 @@
 | | |
 | --- | --- |
 | **Status** | Draft v0.1, open for review |
-| **Date** | 2026-09-28; updated 2026-09-29 (ADR-0011, network quarantine) |
-| **Related** | [Requirements](../requirements/mvp-requirements.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
+| **Date** | 2026-09-28; updated 2026-09-29 (ADR-0011, network quarantine) and 2026-09-30 (threat model) |
+| **Related** | [Requirements](../requirements/mvp-requirements.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md), [Threat model](../security/threat-model.md) |
 
 This document describes how the MVP is built: its components, the interfaces between them, the flows that matter most, and how it is deployed. The reasons behind each choice are in the ADRs; this document only links to them. Normative details (exact schemas, messages and states) are produced by the Phase 0 plans and will replace the sketches marked as such here.
 
@@ -255,7 +255,7 @@ sequenceDiagram
     Note over EP: If the stream is lost, the lease expires after its TTL and the EP halts anyway
 ```
 
-In the same transaction, token issuance for the agent stops. A fleet halt works the same way through a fleet-wide state, which also covers agents registered afterwards and leaves individual lifecycle states unchanged. Releasing a halt needs a request and an approval by two different people.
+In the same transaction, token issuance for the agent stops, except for the module API tokens its enforcement point needs to acknowledge, deliver its evidence and learn of the release (DC-1 of the [threat model](../security/threat-model.md)). A fleet halt works the same way through a fleet-wide state, which also covers agents registered afterwards and leaves individual lifecycle states unchanged. Releasing a halt needs a request and an approval by two different people.
 
 ### 5.4 Publishing a policy change
 
@@ -374,7 +374,7 @@ The goal is a working demo within fifteen minutes of cloning the repository (OPS
 - External PostgreSQL; CloudNativePG documented as the reference operator.
 - Signing keys (tokens, bundles, checkpoints) as three separate Secrets mounted as files.
 - Network policies: the console listener reachable from the corporate network, the machine listener from agent networks, the operations listener from the cluster only.
-- Database migrations run by the core at startup under an advisory lock.
+- Database migrations run by `whitetower migrate` in an init container, with the migration role's credentials, under an advisory lock; the serving container holds only the runtime role's (threat model, DC-3).
 - The network quarantine module: a separate chart, one `Deployment` per cluster with two replicas and leader election, allowed to manage only its deny rules and to read pods; plus the deny rule template for the cluster's CNI.
 
 ### 8.3 Air-gapped installation
@@ -468,8 +468,8 @@ Anything added to the "builds" tables needs an ADR explaining why integration wa
 | White Tower's own enforcement point runs inside other people's agents and must follow each framework's releases ([ADR-0011](../adr/0011-own-python-enforcement-point.md)) | Small scope on a proven evaluator (`cedarpy`); conformance kit; weekly CI against the frameworks' latest releases; network quarantine as an independent layer on Kubernetes |
 | The contracts end up shaped like White Tower's own enforcement point | P0-03 maps them onto AGT, OPA, Cedar and an AuthZEN engine before the RFC |
 | A candidate engine changes hands (Galileo Agent Control, named in the charter, was acquired by Cisco in 2026) | Engine-neutral contracts and standard policy languages (Cedar, Rego), as the charter's risk table foresaw |
-| A compromised enforcement point fakes acknowledgements | Halts also stop token issuance; the console flags instances that keep sending events after a halt; on Kubernetes, network quarantine isolates the agent regardless (KIL-10); the Phase 2 harness module adds another independent stop |
+| A compromised enforcement point fakes acknowledgements | Halts also stop token issuance for every audience but the module API; the console flags instances that keep acting after a halt; on Kubernetes, network quarantine isolates the agent regardless (KIL-10); the Phase 2 harness module adds another independent stop |
 | Network quarantine depends on the cluster's CNI | Cilium as the reference, tested in CI; templates for Calico, Antrea and AdminNetworkPolicy; the console shows the layer as unavailable where the CNI cannot deny |
-| The sealer limits audit throughput | Measured in P0-05 against NFR-07 and NFR-09; batching; hash chain as fallback |
+| The sealer limits audit throughput | Spike S3: at 2,000 events per second the sealer was busy 18% of the time, with a p99 sealing delay of 341 ms, and it kept up at 10,000 per second ([S3](../spikes/S3-audit-throughput.md)) |
 | Fail-closed turns core outages into fleet outages | High availability, TTL tuned per risk tier, alerting on lease health; documented as an accepted trade-off (ADR-0005) |
 | Contracts change often during the alpha | `v1alpha1` label, RFC process, breaking-change checks in CI |

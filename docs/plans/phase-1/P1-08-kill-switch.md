@@ -49,9 +49,9 @@ In one transaction:
 - for an agent halt, move the agent to `suspended` with the halt as reason (KIL-06);
 - write the audit event and bump the governance state version.
 
-After commit, notify the other replicas. Token issuance is blocked at once, because the gate of P1-05 reads the run state.
+After commit, notify the other replicas. Token issuance is blocked at once for every audience but the module API, because the gate of P1-05 reads the run state; the enforcement point keeps its channel to the core ([threat model](../../security/threat-model.md), DC-1).
 
-**Done when:** after a successful response, the halt is visible on every replica and the agent's next token request fails (test).
+**Done when:** after a successful response, the halt is visible on every replica and the agent's next token request for any audience but the module API fails (test).
 
 ### 3. Fleet and selector halts
 
@@ -67,7 +67,7 @@ After commit, notify the other replicas. Token issuance is blocked at once, beca
 - **Acknowledgements** report each layer with its timestamp: gate closed, in-flight action interrupted, process terminated, network quarantined (with the number of workloads covered).
 - **Halt status:** propagating, then confirmed (every expected instance acknowledged), partially confirmed, or unconfirmed after a timeout (10 seconds by default), which fires an alert.
 - **Metrics:** `whitetower_halt_propagation_seconds` (issued to acknowledged), `whitetower_halt_effect_seconds` (issued to in-flight interruption or termination) and `whitetower_halt_quarantine_seconds` (issued to network quarantine applied).
-- An instance that keeps sending action events after acknowledging a halt is flagged as suspect (threat model: an enforcement point that lies).
+- An instance is flagged as suspect when it reports an allow decision or an executed action whose time is after its acknowledged gate closing ([threat model](../../security/threat-model.md), DC-6). Denials, and evidence buffered before the halt and delivered afterwards, are expected.
 
 **Done when:** the status and the metrics are correct in tests with mock instances that acknowledge, delay, stay silent and lie, including a mock quarantine module.
 
@@ -133,12 +133,13 @@ With 500 mock instances, halt one agent and the whole fleet repeatedly. Measure 
 - A release needs two distinct authorized people, and leaves an agent-halted agent suspended.
 - A fleet halt covers agents registered after it was issued.
 - Every step is audited, and the runbooks are reviewed.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-08-kill-switch) pass: ST-40 to ST-45.
 
 ## Risks and open questions
 
 | Risk or question | Mitigation or owner |
 | --- | --- |
-| Enforcement points acknowledge but do not stop | Layered acknowledgements; suspicious activity flagged; token issuance stopped; network quarantine on Kubernetes (P1-15); stopping workloads in Phase 2 |
+| Enforcement points acknowledge but do not stop | Layered acknowledgements; suspicious activity flagged; token issuance stopped for every audience but the module API; network quarantine on Kubernetes (P1-15); stopping workloads in Phase 2 |
 | Accidental fleet halt | Strong confirmation in the console and CLI (reason plus an explicit confirmation), fast two-person release, and drills that build familiarity |
 | Halt storms (many halts issued in a short time) | Idempotency keys; coalesced state changes in the governance state hub |
 

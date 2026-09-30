@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft v0.1, open for review |
-| **Date** | 2026-09-28; updated 2026-09-29 (spike S1, ADR-0011, network quarantine) |
+| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine) and 2026-09-30 ([threat model](../security/threat-model.md)) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
 
@@ -124,7 +124,7 @@ stateDiagram-v2
 | HUM-01 | Humans authenticate only through the organization's IdP using OIDC (authorization code with PKCE). White Tower stores no human passwords. | M | Non-functional requirements |
 | HUM-02 | Roles are derived from IdP group claims through a configurable mapping; the platform administrator can also grant role bindings inside White Tower. | M | Non-functional requirements |
 | HUM-03 | Authorization is deny-by-default on every API operation and follows the permission matrix (5.2.1). | M | Principles |
-| HUM-04 | Separation of duties: nobody approves their own proposal, use case or policy version, and releasing a halt needs a second person. | M | New |
+| HUM-04 | Separation of duties: nobody approves their own proposal, use case or policy version, nobody grants a role to themselves, and releasing a halt needs a second person. | M | New |
 | HUM-05 | Principal status is kept current: administrators can deactivate principals (M), and the system accepts deprovisioning from the IdP through SCIM 2.0 Users (S). | M/S | Governance model |
 | HUM-06 | Break-glass: a sealed emergency credential allows halting agents and the fleet while the IdP is unavailable. Every use raises a critical audit event. | S | New |
 | HUM-07 | Service accounts and personal access tokens for automation, with scopes and expiry. | S | New |
@@ -164,8 +164,8 @@ stateDiagram-v2
 | AID-01 | Every agent has a unique, stable identifier and a SPIFFE-format identity (`spiffe://<trust-domain>/agent/<agent-id>`). | M | Scope, standards |
 | AID-02 | Agents authenticate with asymmetric credentials (`private_key_jwt`, RFC 7523). White Tower never holds an agent's private key. | M | New |
 | AID-03 | White Tower issues short-lived access tokens (JWT, RFC 9068; 5 minutes by default, 15 at most) through an OAuth 2.0 token endpoint, and publishes its signing keys (JWKS) and metadata (RFC 8414). | M | Scope |
-| AID-04 | Token issuance is gated by governance state: never for halted, suspended or retired agents; production credentials only for `active` agents; non-production credentials from `validated` onward. | M | Principles |
-| AID-05 | Credentials can be rotated and revoked; halting or retiring an agent blocks new tokens immediately. | M | Scope |
+| AID-04 | Token issuance is gated by governance state: never for halted, suspended or retired agents; production credentials only for `active` agents; non-production credentials from `validated` onward. One exception keeps the halt path whole: the enforcement point of a halted or suspended agent still gets tokens for the module API, and for nothing else, so it can acknowledge halts, deliver its evidence and learn of releases (threat model, DC-1). | M | Principles |
+| AID-05 | Credentials can be rotated and revoked; halting or retiring an agent blocks new tokens immediately, except the module API tokens a halted agent's enforcement point keeps (AID-04). | M | Scope |
 | AID-06 | Module instances authenticate with the same mechanism and their own identities (`spiffe://<trust-domain>/module/<module-id>`). | M | New |
 | AID-07 | Kubernetes workload identity federation: projected service account tokens from registered clusters are accepted instead of static keys. | S | New |
 | AID-08 | Per-task delegated tokens through OAuth 2.0 Token Exchange (RFC 8693), carrying the on-behalf-of user and a narrowed scope. Must in Phase 2, when the gateways consume them. | C | Scope |
@@ -221,7 +221,7 @@ The decision records the policy versions and rules that produced it, so the audi
 | KIL-03 | Every enforcement point of the target acknowledges the halt. The API and UI show per-instance status and the propagation time, which is also exported as a metric. | M | Non-functional requirements |
 | KIL-04 | Fail-closed backstop: an enforcement point that loses contact with the core for longer than its lease TTL denies every action and halts the agent. | M | Principles |
 | KIL-05 | Halting is available from the UI, the API and the CLI, requires a reason and takes effect without approval. Releasing a halt requires two different authorized people. | M | Governance model |
-| KIL-06 | Halting an agent blocks its token issuance and moves it to `suspended` with the halt as reason. A fleet or selector halt blocks token issuance for every matching agent but leaves lifecycle states unchanged, so releasing it restores operation without reinstating agents one by one. | M | New |
+| KIL-06 | Halting an agent blocks its token issuance, except for the module API (AID-04), and moves it to `suspended` with the halt as reason. A fleet or selector halt blocks token issuance, with the same exception, for every matching agent but leaves lifecycle states unchanged, so releasing it restores operation without reinstating agents one by one. | M | New |
 | KIL-07 | An enforcement point that connects or reconnects for a halted agent receives the halted state before it can allow any action. | M | New |
 | KIL-08 | Break-glass halting works while the IdP is unavailable (see HUM-06). | S | New |
 | KIL-09 | Kill-switch drills: test halts on designated agents, with measured timings. A successful drill within the configured period gives the agent coverage C3. | S | Success criteria |
@@ -274,7 +274,7 @@ The decision records the policy versions and rules that produced it, so the audi
 | OPS-04 | Configuration through a file and environment variables; secrets read from files or Kubernetes Secrets; a documented configuration reference. | M | New |
 | OPS-05 | Self-observability: Prometheus metrics, optional OTLP export of traces and logs, structured JSON logs, liveness and readiness endpoints. | M | Principles (OpenTelemetry) |
 | OPS-06 | Backup and restore procedure for PostgreSQL and signing keys, documented and tested at least once. | S | New |
-| OPS-07 | Database migrations run automatically and are forward-only; the upgrade procedure is documented. | M | New |
+| OPS-07 | Database migrations run automatically, in their own step with their own credentials, so the serving process never holds the right to change the schema (threat model, DC-3); they are forward-only, and the upgrade procedure is documented. | M | New |
 
 ## 6. Non-functional requirements
 

@@ -51,6 +51,7 @@ Spike S1 tested Microsoft AGT as the foundation of this plan and recommended aga
 - Token acquisition with `private_key_jwt`, sharing test vectors with the Go helper of P1-05, and a token cache that refreshes early. The enforcement point authenticates as the agent it serves (P1-05).
 - The watch loop runs in a dedicated thread, so it serves both synchronous and asynchronous agents. The lease timer uses the monotonic clock, and reconnection uses jittered backoff.
 - `RegisterInstance`, `Acknowledge`, `GetBundle` and `Publish`.
+- The core's resolved addresses are kept, and reused when name resolution fails, still checking the certificate against the configured name: a quarantined pod has no DNS ([threat model](../../security/threat-model.md), DC-7). Lease renewals follow the freshness rule that DC-2 adds to the contracts.
 
 **Done when:** the client connects to a real core, survives core restarts and passes the lease scenarios of the kit.
 
@@ -111,7 +112,7 @@ On release, the gate reopens only if the lease and the bundle are valid. A termi
 ### 7. Configuration and identity
 
 - Configuration: agent ID, core URL, credentials (a key file, or Kubernetes workload identity through P1-05), the bundle trust root and the buffer location, from a file or environment variables.
-- Invalid or incomplete configuration keeps the gate closed and says why; it never falls back to allowing.
+- Invalid or incomplete configuration keeps the gate closed and says why; it never falls back to allowing. A private key file that other users can read is invalid configuration.
 - The owner's personal data never reaches the agent's process: the enforcement point knows the owner only by pseudonymous principal ID.
 
 **Done when:** each misconfiguration is covered by a test that shows the gate staying closed.
@@ -165,6 +166,7 @@ These numbers are evidence for the Phase 1 gate.
 - The end-to-end demonstration runs with two frameworks: decisions in the audit log, halts effective within NFR-03 and NFR-04, and fail-closed within the TTL during a partition.
 - Decision overhead within NFR-02 (in-process p99 ≤ 5 ms, gate included).
 - The weekly job against the latest releases of `cedarpy` and the supported frameworks is running.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-09-python-enforcement-point) pass: ST-46 to ST-53.
 
 ## Risks and open questions
 
