@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress (review; see [progress notes](#progress-notes)) |
+| **Status** | Done (see [progress notes](#progress-notes)) |
 | **Size** | M |
 | **Depends on** | P0-02 and P0-03 (drafts are enough to start) |
 | **Unblocks** | P1-13; security requirements for every Phase 1 plan |
@@ -160,6 +160,6 @@ Review with a security reviewer and the maintainers, then publish. Update the mo
 | 1 to 6 | Done | [Threat model](../../security/threat-model.md): 14 assets, 10 threat actors, 9 trust boundaries, 73 threats, 9 attack trees. Eight design changes, all applied to the requirements, ADR-0010, the contracts, the architecture and the Phase 1 plans; DC-2 changed the contracts before their review (see P0-03). 14 accepted risks, with their rationale |
 | 7 | Done | [Framework mapping](../../security/framework-mapping.md), with the dates of the Digital Omnibus on AI checked against the text of the Official Journal |
 | 8 | Done | [Security test catalog](../../security/security-tests.md): 74 tests, each owned by a Phase 1 plan whose acceptance criteria reference them |
-| 9 | Waiting | Review by an independent security reviewer. The upkeep rules were already in `GOVERNANCE.md` |
+| 9 | Done | Reviewed and accepted on 2026-09-30 by the maintainer, who did not write it. The upkeep rules were already in `GOVERNANCE.md`. An external security review is still planned before the pilot (P1-13 step 8) |
 
-**What remains:** the independent review (an acceptance criterion).
+**Nothing remains.** The model is kept current as `GOVERNANCE.md` says, and P1-13 publishes version 0.2 against the implementation.

@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Draft v0.1, with [threat model v0.1](threat-model.md) |
+| **Status** | Version 0.1, with [threat model v0.1](threat-model.md) |
 | **Date** | 2026-09-30 |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 8 |
 

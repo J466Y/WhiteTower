@@ -185,6 +185,7 @@ A maintainer with administrator rights sets branch protection on `main` (require
 
 | Step | Status | Notes |
 | --- | --- | --- |
+| 1. Identifiers | Done | Q6 is closed: the module path stays `github.com/J466Y/WhiteTower` until the project has its own domain |
 | 7. Continuous integration | Done | CI and CodeQL run on every pull request since the first ones were merged |
 | 9. Release pipeline | Deferred to the MVP | The maintainer decided that no release is published before the MVP; the pipeline is exercised at the first release (P1-13) |
 | 11. Repository settings | Done | The maintainer imported the rulesets and enabled the settings of `GOVERNANCE.md` |

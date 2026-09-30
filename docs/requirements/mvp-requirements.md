@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Draft v0.1, open for review |
+| **Status** | Version 0.2, for the Phase 0 gate (2026-09-30): targets set from measurements, open questions Q1 to Q6 closed |
 | **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine) and 2026-09-30 ([threat model](../security/threat-model.md)) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
@@ -373,5 +373,5 @@ These must exist before feature code starts. They are the Phase 0 plans and the 
 | Q3 | Single-tenant or multi-tenant? | **Decided (P0-02):** single organization per deployment, no tenant column. | P0-02 |
 | Q4 | Default lease TTL and halt targets? | **Decided (P0-05):** the section 6 values stand. Spike S2 measured them with 1,000 enforcement points: fleet halts p95 0.63 s and max 0.74 s, and leases expire within 10 ms of their TTL. The default TTLs stay 60, 60, 30 and 15 s for the low, medium, high and critical risk tiers. See [S2](../spikes/S2-watch-streams.md). | P0-05 |
 | Q5 | Which policy languages does the MVP support? | **Cedar as the primary language:** its semantics ("forbid overrides permit", default deny) are exactly POL-03, it is a standard named in the charter, and the official Go implementation lets the core validate and simulate policies. Rego as the second language. **Spike S1 confirmed:** Cedar runs in-process in Python (`cedarpy`) with exactly these semantics; Rego does not (it needs the `opa` binary or a server). Cedar is primary; Rego stays for engines that run it natively. See [S1](../spikes/S1-agt.md). | P0-05, P0-03 |
-| Q6 | Go module path and domain? | A vanity path if the project gets a domain, to survive a move to a foundation. | P0-01 |
+| Q6 | Go module path and domain? | **Decided (maintainer, 2026-09-30):** the module path stays `github.com/J466Y/WhiteTower`. A vanity path is reconsidered only if the project gets its own domain, for example when it moves to a foundation. | P0-01 |
 | Q7 | Who is the pilot organization, and which agents take part? | To be secured before the Phase 0 gate. | Maintainers |
