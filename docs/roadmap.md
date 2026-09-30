@@ -22,7 +22,7 @@ This roadmap puts the implementation plans in order: who does what, when, and wh
   With the year-end break and a 15 to 20% contingency, plan for **June to July 2027**.
 - **Critical path.** Since network quarantine joined the MVP (one week more), it runs through the platform track: core skeleton → audit log → module API → CLI → network quarantine → high availability and air-gap → hardening → pilot. The core domain track (human identity → inventory → agent identity → kill switch → enforcement point) is one week shorter (section 6).
 - **Two things to start now,** because they can delay everything: signing the pilot partner (before the Phase 0 gate) and the remaining spikes (S2 to S4). The Microsoft AGT spike is done: no-go, and White Tower builds its own enforcement point ([ADR-0011](adr/0011-own-python-enforcement-point.md)).
-- **Progress (2026-09-30).** P0-02 and P0-05 are done, and P0-01 is done but for testing the development environment on macOS and Linux. P0-04 is done too, and P0-03 waits for the external review of RFC-0001. The ten founding ADRs are accepted, and the Phase 1 team is confirmed. The dates are re-baselined at G0 (section 11).
+- **Progress (2026-09-30).** P0-02 and P0-05 are done, and P0-01 is done but for testing the development environment on macOS and Linux. P0-04 is done too, and P0-03 waits for the external review of RFC-0001. The ten founding ADRs are accepted, the Phase 1 team is confirmed, and the pilot environment is ready. The dates are re-baselined at G0 (section 11).
 
 ## 2. Assumptions
 
@@ -198,7 +198,7 @@ Track A (P1-01 → P1-03 → P1-04 → P1-05 → P1-08, then the halt integratio
 - [x] Threat model v0.1 reviewed by the security reviewer (P0-04): reviewed and accepted by the maintainer (2026-09-30); an external review is planned before the pilot (P1-13).
 - [x] Go or no-go on AGT recorded: no-go, White Tower builds its own enforcement point (P0-05 S1, ADR-0011).
 - [ ] CI, release pipeline and development environment working on the three operating systems (P0-01). CI runs on every pull request; the release pipeline is deferred to the MVP (maintainer, 2026-09-30); the development environment still has to be tested on macOS and Linux.
-- [ ] Pilot partner signed (P1-14 step 1), which also closes Q7.
+- [x] Pilot partner signed (P1-14 step 1), which also closes Q7: the maintainer has the pilot environment ready (2026-09-30); its details are settled in P1-14.
 - [x] Phase 1 team confirmed (2026-09-30). Only then do the dates of this roadmap become commitments.
 
 ### G1: "Pilot with real agents" (end of Phase 1, the MVP)
