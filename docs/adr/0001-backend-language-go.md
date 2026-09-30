@@ -1,6 +1,6 @@
 # ADR-0001: Go for the backend
 
-- **Status:** Proposed
+- **Status:** Accepted, by the maintainer on 2026-09-30
 - **Date:** 2026-09-28
 - **Related:** CON-06, NFR-02, NFR-03, NFR-13, NFR-14; ADR-0003, ADR-0004
 

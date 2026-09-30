@@ -15,19 +15,19 @@ Decisions that change the **module contracts** also need an RFC (see `CONTRIBUTI
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| [0001](0001-backend-language-go.md) | Go for the backend | Proposed |
-| [0002](0002-frontend-typescript-react.md) | TypeScript and React single-page app for the frontend | Proposed |
-| [0003](0003-postgresql-only-stateful-dependency.md) | PostgreSQL as the only stateful dependency of the MVP | Proposed |
-| [0004](0004-api-and-contract-formats.md) | API and contract formats | Proposed |
-| [0005](0005-edge-enforcement-with-leases.md) | Decisions at the edge, governance state pushed with fail-closed leases | Proposed |
-| [0006](0006-tamper-evident-audit-log.md) | Tamper-evident audit log with a Merkle tree and signed checkpoints | Proposed |
-| [0007](0007-monorepo-layout.md) | Monorepo layout | Proposed |
-| [0008](0008-license-apache-2.md) | Apache-2.0 license and DCO for contributions | Proposed |
-| [0009](0009-human-auth-bff-sessions.md) | Human authentication through a backend-for-frontend with server-side sessions | Proposed |
-| [0010](0010-built-in-agent-token-issuer.md) | Built-in token issuer for agent and module credentials | Proposed |
+| [0001](0001-backend-language-go.md) | Go for the backend | Accepted |
+| [0002](0002-frontend-typescript-react.md) | TypeScript and React single-page app for the frontend | Accepted |
+| [0003](0003-postgresql-only-stateful-dependency.md) | PostgreSQL as the only stateful dependency of the MVP | Accepted |
+| [0004](0004-api-and-contract-formats.md) | API and contract formats | Accepted |
+| [0005](0005-edge-enforcement-with-leases.md) | Decisions at the edge, governance state pushed with fail-closed leases | Accepted |
+| [0006](0006-tamper-evident-audit-log.md) | Tamper-evident audit log with a Merkle tree and signed checkpoints | Accepted |
+| [0007](0007-monorepo-layout.md) | Monorepo layout | Accepted |
+| [0008](0008-license-apache-2.md) | Apache-2.0 license and DCO for contributions | Accepted |
+| [0009](0009-human-auth-bff-sessions.md) | Human authentication through a backend-for-frontend with server-side sessions | Accepted |
+| [0010](0010-built-in-agent-token-issuer.md) | Built-in token issuer for agent and module credentials | Accepted |
 | [0011](0011-own-python-enforcement-point.md) | White Tower's own enforcement point for Python agents, instead of Microsoft AGT | Accepted |
 
-ADR-0001 to ADR-0010 are expected to be accepted, amended or rejected at the Phase 0 gate at the latest. ADR-0011 was accepted when spike S1 closed.
+The maintainer accepted ADR-0001 to ADR-0010 on 2026-09-30, for the Phase 0 gate; ADR-0011 was accepted when spike S1 closed. What implementation, tests and measurements teach from here on comes as new ADRs that amend or supersede these.
 
 ## Template
 

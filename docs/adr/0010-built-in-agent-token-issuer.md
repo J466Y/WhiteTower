@@ -1,6 +1,6 @@
 # ADR-0010: Built-in token issuer for agent and module credentials
 
-- **Status:** Proposed
+- **Status:** Accepted, by the maintainer on 2026-09-30
 - **Date:** 2026-09-28
 - **Related:** AID-01 to AID-09, KIL-06; ADR-0004, ADR-0005; plan P1-05
 

@@ -1,6 +1,6 @@
 # ADR-0008: Apache-2.0 license and DCO for contributions
 
-- **Status:** Proposed
+- **Status:** Accepted, by the maintainer on 2026-09-30
 - **Date:** 2026-09-28
 - **Related:** CON-01; plan P0-01
 

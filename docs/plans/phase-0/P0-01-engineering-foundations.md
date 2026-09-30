@@ -180,3 +180,14 @@ A maintainer with administrator rights sets branch protection on `main` (require
 - **The OpenAPI spec is not embedded in the server** (`embedded-spec: false`). Embedding it pulled `kin-openapi` and five more modules into the binary. P1-01 decides whether to bring it back for request validation.
 - **TypeScript stays on 5.9.** `openapi-typescript` 7 requires TypeScript 5; Renovate is told not to propose 6 or 7.
 - **Images use distroless Debian 13,** because Debian 12 ended regular security support in June 2026.
+
+### 2026-09-30: before the Phase 0 gate
+
+| Step | Status | Notes |
+| --- | --- | --- |
+| 1. Identifiers | Done | Q6 is closed: the module path stays `github.com/J466Y/WhiteTower` until the project has its own domain |
+| 7. Continuous integration | Done | CI and CodeQL run on every pull request since the first ones were merged |
+| 9. Release pipeline | Deferred to the MVP | The maintainer decided that no release is published before the MVP; the pipeline is exercised at the first release (P1-13) |
+| 11. Repository settings | Done | The maintainer imported the rulesets and enabled the settings of `GOVERNANCE.md` |
+
+**What remains:** testing the development environment on macOS and Linux; it is verified on Windows only. The code of conduct's private contact address is still needed before the first public release.

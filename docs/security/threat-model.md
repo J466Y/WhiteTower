@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Draft v0.1, awaiting review by an independent security reviewer |
+| **Status** | Version 0.1, reviewed and accepted by the maintainer on 2026-09-30 |
 | **Date** | 2026-09-30 |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md) |
 | **Models** | The MVP as designed: [architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [module contracts v0.1](../contracts/module-contract-v0.1.md), [domain model](../architecture/domain-model.md) |
@@ -461,7 +461,7 @@ The abuse cases above become tests in the [security test catalog](security-tests
 
 ## 10. Review and upkeep
 
-- **Review.** This version needs a review by a security reviewer who did not write it (acceptance criterion of P0-04). Candidates, in order: the community (OpenSSF, OWASP chapters), then a reviewer from the pilot organization. The review is recorded in P0-04's progress notes.
+- **Review.** The maintainer, who did not write it, reviewed and accepted this version on 2026-09-30. An external security review is still planned before the pilot, with the release review of P1-13.
 - **Upkeep.** As [GOVERNANCE.md](../../GOVERNANCE.md) sets out, the threat model is reviewed at every phase gate, whenever a trust boundary changes, and in the security section of every RFC. Plan P1-13 publishes version 0.2, checked against the implementation.
 
 | Version | Date | Change |

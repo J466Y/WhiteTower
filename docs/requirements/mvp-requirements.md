@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Draft v0.1, open for review |
+| **Status** | Version 0.2, for the Phase 0 gate (2026-09-30): targets set from measurements, open questions Q1 to Q6 closed |
 | **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine) and 2026-09-30 ([threat model](../security/threat-model.md)) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
@@ -278,9 +278,9 @@ The decision records the policy versions and rules that produced it, so the audi
 
 ## 6. Non-functional requirements
 
-The charter leaves the decision latency and kill switch targets "to be set in phase 0". The values below are **proposed starting targets**; plan P0-05 measures them and this table is updated at the Phase 0 gate.
+The charter leaves the decision latency and kill switch targets "to be set in phase 0". Plan P0-05 measured them with five spikes, and the maintainer confirmed the targets below on 2026-09-30, each with the measurement that backs it. NFR-01, NFR-08, NFR-11 and NFR-23 are verified by the Phase 1 plans in the last column.
 
-| ID | Requirement | Proposed target | Pri | Set or verified by |
+| ID | Requirement | Target | Pri | Set or verified by |
 | --- | --- | --- | --- | --- |
 | NFR-01 | **Fail-closed.** EPs deny every action when the lease has expired, the bundle is missing, invalid or unsigned, the agent state is unknown or the agent is halted. The core API denies on any authorization error. | 100% of fault-injection tests | M | P0-03, P1-08 |
 | NFR-02 | **Decision latency.** The core is never in the synchronous path of an agent action; policy evaluation at the EP adds bounded latency. | p99 ≤ 5 ms in-process; p99 ≤ 20 ms for a remote PDP in the same cluster. Measured in spikes S1 and S4, with 100 policies: in-process p99 ≤ 0.12 ms in Go (`cedar-go`), ≤ 1.02 ms in Python (`cedarpy`), ≤ 1.2 ms with OPA embedded; ≤ 0.53 ms through an AuthZEN decision point on the same host. The durable evidence write before each action is measured in P1-09 | M | P0-05 |
@@ -368,10 +368,10 @@ These must exist before feature code starts. They are the Phase 0 plans and the 
 
 | # | Question | Proposal | Decided in |
 | --- | --- | --- | --- |
-| Q1 | What exactly does "if the core does not respond, the action is denied" mean? | Leases with a TTL: EPs decide locally and fail closed when the lease expires (ADR-0005). A synchronous check per action is a Phase 2 option for critical agents. | ADR-0005, Phase 0 gate |
+| Q1 | What exactly does "if the core does not respond, the action is denied" mean? | **Decided (ADR-0005, accepted on 2026-09-30):** leases with a TTL. Enforcement points decide locally, and fail closed when the lease expires or renewals stop arriving fresh. A synchronous check per action is a Phase 2 option for critical agents. | ADR-0005 |
 | Q2 | Is an agent in several environments one record or several? | **Decided (P0-02):** one logical agent; credentials labeled per environment; running instances reported by EPs. See the [domain model](../architecture/domain-model.md#1-modeling-decisions). | P0-02 |
 | Q3 | Single-tenant or multi-tenant? | **Decided (P0-02):** single organization per deployment, no tenant column. | P0-02 |
 | Q4 | Default lease TTL and halt targets? | **Decided (P0-05):** the section 6 values stand. Spike S2 measured them with 1,000 enforcement points: fleet halts p95 0.63 s and max 0.74 s, and leases expire within 10 ms of their TTL. The default TTLs stay 60, 60, 30 and 15 s for the low, medium, high and critical risk tiers. See [S2](../spikes/S2-watch-streams.md). | P0-05 |
 | Q5 | Which policy languages does the MVP support? | **Cedar as the primary language:** its semantics ("forbid overrides permit", default deny) are exactly POL-03, it is a standard named in the charter, and the official Go implementation lets the core validate and simulate policies. Rego as the second language. **Spike S1 confirmed:** Cedar runs in-process in Python (`cedarpy`) with exactly these semantics; Rego does not (it needs the `opa` binary or a server). Cedar is primary; Rego stays for engines that run it natively. See [S1](../spikes/S1-agt.md). | P0-05, P0-03 |
-| Q6 | Go module path and domain? | A vanity path if the project gets a domain, to survive a move to a foundation. | P0-01 |
-| Q7 | Who is the pilot organization, and which agents take part? | To be secured before the Phase 0 gate. | Maintainers |
+| Q6 | Go module path and domain? | **Decided (maintainer, 2026-09-30):** the module path stays `github.com/J466Y/WhiteTower`. A vanity path is reconsidered only if the project gets its own domain, for example when it moves to a foundation. | P0-01 |
+| Q7 | Who is the pilot organization, and which agents take part? | **Decided (maintainer, 2026-09-30):** the maintainer has the pilot environment ready: a virtual machine in a monitored network segment, or the data center. Which agents take part, and how sites, subnets and the identification of agents fit in, is settled in P1-14, once the console exists. | Maintainers, P1-14 |

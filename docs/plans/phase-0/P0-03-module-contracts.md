@@ -202,3 +202,7 @@ The draft changed after the spikes and the [threat model](../../security/threat-
 | The enforcement point of a halted or suspended agent still gets tokens for the module API | Threat model, DC-1 | CORE-8, section 11 |
 | A lease renewal counts only if it is fresh: it carries the core's time, and an instance ignores one older than its tolerance, 5 seconds by default | Threat model, DC-2 | Sections 4.8, 5.2, 5.3 and 11; `LeaseRenewal.server_time`; scenario S-17, which runs end to end against the stub |
 | No DNS during network quarantine | Threat model, DC-7 | Section 12 |
+
+### 2026-09-30: approved by the maintainer
+
+The maintainer reviewed the specification and approved RFC-0001, and agreed to settle each open question of section 12 when the work that needs it starts. While the project has a single maintainer, acceptance also needs an external reviewer, after a review of at least two weeks from the day the RFC is announced ([GOVERNANCE.md](../../../GOVERNANCE.md)). Then the RFC is accepted and `contracts/v0.1.0` is tagged. Only P1-07 needs the accepted contracts; the other Phase 1 plans can start before.

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress (see [progress notes](#progress-notes)) |
+| **Status** | Done (see [progress notes](#progress-notes)) |
 | **Size** | M (five spikes, time-boxed, can run in parallel) |
 | **Depends on** | none; spike code lives in `hack/spikes/` |
 | **Unblocks** | P0-03 (AGT facts), the Phase 0 gate (NFR targets), P1-02, P1-07, P1-08, P1-09 |
@@ -147,5 +147,23 @@ Update section 6 of the requirements (targets set), amend ADR-0005 or ADR-0006 i
 
 **Open question Q4 is closed:** spike S2 confirmed the halt targets and the default lease TTLs of the requirements.
 
-**Step 6 is done except for the presentation at the Phase 0 gate.** The requirements carry the measured targets. ADR-0006 records the S3 results, and ADR-0011 the AGT decision.
+**Step 6 is done.** The requirements carry the measured targets. ADR-0006 records the S3 results, and ADR-0011 the AGT decision.
 
+### 2026-09-30: results for the Phase 0 gate
+
+Every target P0-05 had to set is backed by a measurement, and none had to be relaxed. The maintainer confirmed them on 2026-09-30.
+
+| Requirement | Target | Measured in Phase 0 | Spike |
+| --- | --- | --- | --- |
+| NFR-02 Decision latency | p99 ≤ 5 ms in process; ≤ 20 ms for a decision point in the cluster | 100 policies, p99: 0.12 ms with `cedar-go`, 1.02 ms with `cedarpy`, 1.2 ms with OPA embedded; 0.53 ms through an AuthZEN decision point on the same host | S1, S4 |
+| NFR-03 Halt propagation | p95 ≤ 2 s, max ≤ 5 s | 1,000 enforcement points on two replicas: fleet halts p95 0.63 s, max 0.74 s; agent halts max 19 ms | S2 |
+| NFR-04 Halt effect | Gate closed within milliseconds; work in flight interrupted, p95 ≤ 10 s | Gate closed in under 0.02 ms; asynchronous work interrupted in 1 to 3 ms; blocking calls cannot be interrupted in process, hence the `terminate` halt mode | S1, S5 |
+| NFR-05 Lease backstop | TTL 60 s by default; 60, 60, 30 and 15 s by risk tier | Leases expire within 10 ms of their TTL | S2 |
+| NFR-06 Availability | Rolling upgrades do not stop agents | A lost replica's enforcement points move to the other one in 0.6 s, with no lease expiry | S2 |
+| NFR-07 Scale | 500 enforcement points; 200 audit events/s sustained, 2,000/s for 60 s | 1,000 streams on two replicas; 200/s and 2,000/s ingested and sealed with none lost, and kept up at 10,000/s | S2, S3 |
+| NFR-09 Audit sealing | Sealed within 5 s; a checkpoint every 60 s | p99 201 ms at 200/s and 341 ms at 2,000/s; a checkpoint takes 2 ms | S3 |
+| NFR-10 Audit retention | At least six months | Dropping a month takes under 0.2 s, and the rest of the log still verifies; about 2.2 KB per retained event | S3 |
+
+**What the spikes changed:** White Tower builds its own enforcement point (ADR-0011, S1); reconnection backoff is bounded by the lease (I-4, S2); the audit log keeps its Merkle tree, with a queue of unsealed events and verification in chunks (ADR-0006, P1-02, S3).
+
+**Measured later, in Phase 1:** NFR-01 (fault injection, P1-08), NFR-08 (audit durability, P1-02 and P1-09), NFR-11 (API latency, P1-13) and NFR-23 (network quarantine, P1-15).

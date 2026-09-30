@@ -1,6 +1,6 @@
 # ADR-0005: Decisions at the edge, governance state pushed with fail-closed leases
 
-- **Status:** Proposed
+- **Status:** Accepted, by the maintainer on 2026-09-30
 - **Date:** 2026-09-28
 - **Related:** NFR-01 to NFR-05, KIL-01 to KIL-07, MOD-04, POL-05; ADR-0003, ADR-0004. Answers open question Q1 of the requirements.
 
