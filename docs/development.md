@@ -24,14 +24,16 @@ git clone https://github.com/J466Y/WhiteTower.git
 cd WhiteTower
 task setup    # Go modules, pinned tools, console packages
 task build    # console, then bin/whitetower and bin/wtctl
-./bin/whitetower
+WT_DEV_SELF_SIGNED_TLS=true ./bin/whitetower serve
 ```
 
-On Windows, run `.\bin\whitetower.exe`. Open <http://127.0.0.1:8080>: the console shows the server's version. Check it from the CLI too:
+On Windows, set the variable first: `$env:WT_DEV_SELF_SIGNED_TLS = "true"`, then run `.\bin\whitetower.exe serve`. The core then serves a self-signed certificate made at startup, which is for development only. Open <https://127.0.0.1:8443> and accept the browser's warning: the console shows the server's version. Check it from the CLI too:
 
 ```sh
-./bin/wtctl version --server http://127.0.0.1:8080
+./bin/wtctl version --insecure-skip-tls-verify --server https://127.0.0.1:8443
 ```
+
+The core has three listeners: the console and public API on `127.0.0.1:8443`, the module API on `127.0.0.1:9443`, and health checks on `http://127.0.0.1:9090/healthz`. Its settings are in the [configuration reference](reference/configuration.md); `whitetower config print` shows the effective values.
 
 ## Everyday tasks
 
@@ -43,7 +45,7 @@ On Windows, run `.\bin\whitetower.exe`. Open <http://127.0.0.1:8080>: the consol
 | `task lint` | Runs `go vet`, golangci-lint, Biome, the TypeScript compiler and `buf lint` |
 | `task fmt` | Formats Go and console code |
 | `task vuln` | Checks Go dependencies for reachable known vulnerabilities |
-| `task run` | Runs the core from source, with a placeholder console |
+| `task run` | Runs the core from source with a development certificate, and a placeholder console |
 | `task dev` | Starts PostgreSQL and Keycloak in Docker |
 | `task dev:web` | Runs the console with live reload |
 | `task dev:down` | Stops the development services |
@@ -56,11 +58,11 @@ On Windows, run `.\bin\whitetower.exe`. Open <http://127.0.0.1:8080>: the consol
 Use two terminals:
 
 ```sh
-task run       # core on http://127.0.0.1:8080
+task run       # core on https://127.0.0.1:8443
 task dev:web   # console on http://localhost:5173, with live reload
 ```
 
-Vite forwards `/api`, `/auth` and `/healthz` to the core. The console's API types come from the OpenAPI document: after changing `api/openapi/openapi.yaml`, run `task gen`.
+Vite forwards `/api` and `/auth` to the core, accepting its development certificate. The console's API types come from the OpenAPI document: after changing `api/openapi/openapi.yaml`, run `task gen`.
 
 ## Development services
 
@@ -86,7 +88,7 @@ Commit the generated code with the contract change. Never edit it by hand: CI re
 ## Tests
 
 - **Unit tests:** `task test`.
-- **End-to-end tests:** start a core that serves the built console (`task build` then `./bin/whitetower`, or the Compose `core` profile), then run `task e2e`. The browser test needs Chromium, installed once with `pnpm --dir web exec playwright install chromium`. Set `WT_E2E_URL` to test another deployment.
+- **End-to-end tests:** start a core that serves the built console (`task build` then `./bin/whitetower serve` with a development certificate, or the Compose `core` profile), then run `task e2e`. The browser test needs Chromium, installed once with `pnpm --dir web exec playwright install chromium`. Set `WT_E2E_URL` and `WT_E2E_OPERATIONS_URL` to test another deployment.
 - **Race detector:** `go test -race ./...` needs cgo (a C compiler). CI runs it on Linux.
 
 ## Repository layout

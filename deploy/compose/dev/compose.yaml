@@ -6,7 +6,8 @@
 #   docker compose --profile otel up -d          also an OpenTelemetry collector
 #
 # Host ports can be changed in a local, uncommitted .env file next to this one
-# (WT_POSTGRES_PORT, WT_KEYCLOAK_PORT, WT_CORE_PORT, WT_OTLP_GRPC_PORT, WT_OTLP_HTTP_PORT).
+# (WT_POSTGRES_PORT, WT_KEYCLOAK_PORT, WT_CONSOLE_PORT, WT_MACHINE_PORT,
+# WT_OPERATIONS_PORT, WT_OTLP_GRPC_PORT, WT_OTLP_HTTP_PORT).
 name: whitetower-dev
 
 services:
@@ -57,15 +58,18 @@ services:
       context: ../../..
       dockerfile: deploy/docker/Dockerfile
     environment:
-      WT_ADDR: ":8080"
+      # A self-signed certificate made at startup: for development only.
+      WT_DEV_SELF_SIGNED_TLS: "true"
     ports:
-      - "127.0.0.1:${WT_CORE_PORT:-8080}:8080"
+      - "127.0.0.1:${WT_CONSOLE_PORT:-8443}:8443"
+      - "127.0.0.1:${WT_MACHINE_PORT:-9443}:9443"
+      - "127.0.0.1:${WT_OPERATIONS_PORT:-9090}:9090"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
       # Distroless images have no shell: the binary checks itself.
-      test: ["CMD", "/usr/local/bin/whitetower", "-healthcheck"]
+      test: ["CMD", "/usr/local/bin/whitetower", "healthcheck"]
       interval: 5s
       timeout: 3s
       retries: 12

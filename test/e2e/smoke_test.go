@@ -1,12 +1,15 @@
 //go:build e2e
 
 // Package e2e holds end-to-end tests that run against a live deployment.
-// Run them with `task e2e`; WT_E2E_URL selects the deployment
-// (default http://127.0.0.1:8080).
+// Run them with `task e2e`. WT_E2E_URL selects the console listener
+// (default https://127.0.0.1:8443) and WT_E2E_OPERATIONS_URL the operations
+// listener (default http://127.0.0.1:9090). The deployment may serve a
+// self-signed development certificate: these tests do not verify it.
 package e2e
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
 	"net/http"
 	"os"
@@ -16,12 +19,19 @@ import (
 )
 
 func TestSmoke(t *testing.T) {
-	base := strings.TrimRight(os.Getenv("WT_E2E_URL"), "/")
-	if base == "" {
-		base = "http://127.0.0.1:8080"
+	base := envOr("WT_E2E_URL", "https://127.0.0.1:8443")
+	operations := envOr("WT_E2E_OPERATIONS_URL", "http://127.0.0.1:9090")
+	client := &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
-	waitUntilHealthy(t, client, base+"/healthz", 60*time.Second)
+	waitUntilHealthy(t, client, operations+"/healthz", 60*time.Second)
+
+	t.Run("readiness", func(t *testing.T) {
+		if status, _, body := get(t, client, operations+"/readyz"); status != http.StatusOK {
+			t.Fatalf("got %d %q", status, body)
+		}
+	})
 
 	t.Run("public API", func(t *testing.T) {
 		status, _, body := get(t, client, base+"/api/v1/version")
@@ -38,7 +48,17 @@ func TestSmoke(t *testing.T) {
 		if csp := header.Get("Content-Security-Policy"); !strings.Contains(csp, "default-src 'self'") {
 			t.Fatalf("missing strict Content-Security-Policy, got %q", csp)
 		}
+		if hsts := header.Get("Strict-Transport-Security"); !strings.HasPrefix(hsts, "max-age=") {
+			t.Fatalf("missing Strict-Transport-Security, got %q", hsts)
+		}
 	})
+}
+
+func envOr(name, fallback string) string {
+	if v := strings.TrimRight(os.Getenv(name), "/"); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func waitUntilHealthy(t *testing.T, client *http.Client, url string, timeout time.Duration) {

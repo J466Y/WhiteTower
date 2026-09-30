@@ -6,7 +6,7 @@ Local services for development and evaluation, started with `task dev` (see [doc
 | --- | --- | --- |
 | PostgreSQL | `127.0.0.1:5432`, database `whitetower` | `whitetower` / `whitetower-dev-only` |
 | Keycloak | `http://127.0.0.1:8180`, realm `whitetower` | Administration console: `admin` / `admin-dev-only` |
-| Core (profile `core`) | `http://127.0.0.1:8080` | none yet |
+| Core (profile `core`) | Console and API `https://127.0.0.1:8443`; module API `https://127.0.0.1:9443`; health and metrics `http://127.0.0.1:9090` | none yet. The certificate is self-signed, made at startup |
 | OpenTelemetry collector (profile `otel`) | OTLP gRPC `127.0.0.1:4317`, HTTP `127.0.0.1:4318` | none |
 
 ## Ports already in use
@@ -17,7 +17,9 @@ Each host port can be changed without editing the Compose file: create a `.env` 
 # deploy/compose/dev/.env
 WT_POSTGRES_PORT=15432
 WT_KEYCLOAK_PORT=8180
-WT_CORE_PORT=8080
+WT_CONSOLE_PORT=8443
+WT_MACHINE_PORT=9443
+WT_OPERATIONS_PORT=9090
 WT_OTLP_GRPC_PORT=4317
 WT_OTLP_HTTP_PORT=4318
 ```

@@ -135,7 +135,7 @@ The three latest Kubernetes minor versions (kind, with Cilium as the CNI so the 
 - The air-gapped installation succeeds with egress blocked.
 - A rolling upgrade with 500 mock instances causes no lease expiry and loses no state.
 - The restore drill passes, with the audit log verifiable afterwards.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-12-packaging-and-deployment) pass: ST-60 to ST-64.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-12-packaging-and-deployment) pass: ST-60 to ST-64.
 
 ## Risks and open questions
 

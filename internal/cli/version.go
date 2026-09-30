@@ -2,10 +2,8 @@ package cli
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -13,7 +11,7 @@ import (
 	"github.com/J466Y/WhiteTower/pkg/apiclient"
 )
 
-func newVersionCommand() *cobra.Command {
+func newVersionCommand(opts *options) *cobra.Command {
 	var server string
 	cmd := &cobra.Command{
 		Use:   "version",
@@ -30,11 +28,11 @@ func newVersionCommand() *cobra.Command {
 
 			base, err := url.Parse(server)
 			if err != nil || (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" {
-				return fmt.Errorf("invalid --server %q: want a URL such as http://localhost:8080", server)
+				return fmt.Errorf("invalid --server %q: want a URL such as https://localhost:8443", server)
 			}
 			client, err := apiclient.NewClientWithResponses(
 				strings.TrimRight(server, "/")+"/api/v1",
-				apiclient.WithHTTPClient(&http.Client{Timeout: 10 * time.Second}),
+				apiclient.WithHTTPClient(opts.httpClient(cmd)),
 			)
 			if err != nil {
 				return err
@@ -51,6 +49,6 @@ func newVersionCommand() *cobra.Command {
 			return err
 		},
 	}
-	cmd.Flags().StringVar(&server, "server", "", "URL of a White Tower server, for example http://localhost:8080")
+	cmd.Flags().StringVar(&server, "server", "", "URL of a White Tower server, for example https://localhost:8443")
 	return cmd
 }

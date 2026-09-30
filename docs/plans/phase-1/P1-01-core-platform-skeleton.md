@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | Draft |
+| **Status** | In progress (see [progress notes](#progress-notes)) |
 | **Size** | M |
 | **Depends on** | P0-01, P0-02 |
 | **Unblocks** | Every Phase 1 backend plan; P1-12 |
@@ -31,7 +31,7 @@ The `whitetower` server with all the cross-cutting plumbing in place: configurat
 
 ### 1. Configuration
 
-One YAML file plus environment overrides prefixed `WT_`, loaded into a typed structure with defaults and validation. Secrets are always read from files (`*_file` keys), never from plain values. `whitetower config print --redacted` shows the effective configuration. The reference documentation is generated from the structure's field comments.
+One YAML file plus environment overrides prefixed `WT_`, loaded into a typed structure with defaults and validation. Secrets are always read from files (`*_file` keys), never from plain values. `whitetower config print` shows the effective configuration, which holds no secret. The reference documentation is generated from the structure's field comments.
 
 **Done when:** an invalid configuration stops startup with a message naming the field, and the reference is generated in CI.
 
@@ -122,7 +122,7 @@ Document and enforce with a lint rule (for example `depguard`):
 - With two replicas on one database, each job runs on exactly one replica, and notifications reach the other replica (tests).
 - Graceful shutdown completes within the configured deadline with open streams (test).
 - With default settings, the server makes no outbound connection (unit test here; full egress test in P1-12).
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#P1-01-core-platform-skeleton) pass: ST-01 to ST-05.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-01-core-platform-skeleton) pass: ST-01 to ST-05.
 
 ## Risks and open questions
 
@@ -136,3 +136,27 @@ Document and enforce with a lint rule (for example `depguard`):
 - Go's `net/http` pattern routing (Go 1.22 and later) is enough; no router library is needed.
 - Keep `context.Context` as the first parameter everywhere; carry the principal and request ID in it through typed keys.
 - `LISTEN/NOTIFY` needs a dedicated connection outside the pool; it does not work through PgBouncer in transaction mode (documented in P1-12).
+
+## Progress notes
+
+The plan lands in seven pull requests:
+
+| Pull request | Steps | Status |
+| --- | --- | --- |
+| 1. Configuration, commands and listeners | 1, 2 | Done |
+| 2. Observability and health | 3 | Not started |
+| 3. Database layer and `whitetower migrate` | 4, and the PostgreSQL fixture of step 10 | Not started |
+| 4. REST API scaffolding and the console | 5, 9 | Not started |
+| 5. Module API scaffolding | 6 | Not started |
+| 6. Background jobs and notifications across replicas | 7, 8 | Not started |
+| 7. Test harness, internal rules and security tests | 10, 11, ST-01 to ST-05 | Not started |
+
+### 2026-09-30: configuration, commands and listeners
+
+- `internal/platform/config`: defaults, then a YAML file that refuses unknown keys, then `WT_` variables; every error names its setting. The [configuration reference](../../reference/configuration.md) is generated from the field comments, and a test fails when it is out of date.
+- `whitetower serve`, `config print`, `healthcheck` and `version`, on cobra. The container images run `serve`, listening on every interface.
+- Three listeners: console and API on 8443 and the module API on 9443, both HTTPS with HTTP/1.1 and HTTP/2; operations on 9090, plain HTTP, with `/healthz` and `/readyz`. They bind to the loopback interface by default.
+- `internal/platform/servertls`: certificates reloaded when their files change, the last good one kept when a new one does not load; TLS 1.2 at least. `dev.self_signed_tls` generates a certificate at startup and logs a warning.
+- Shutdown: the drain signal ends long-lived streams, `/readyz` answers 503, and what is still open at the deadline (8 s by default, always under 10 s) is closed.
+- `wtctl --insecure-skip-tls-verify`, for development servers; it warns when used.
+- Tests: TLS versions, certificate reload, a drain with open streams, the deadline, and the module API over gRPC and Connect. The Compose stack, the end-to-end tests and the browser test use HTTPS.
