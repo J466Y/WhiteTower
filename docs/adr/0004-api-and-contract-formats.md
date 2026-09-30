@@ -1,6 +1,6 @@
 # ADR-0004: API and contract formats
 
-- **Status:** Proposed
+- **Status:** Accepted, by the maintainer on 2026-09-30
 - **Date:** 2026-09-28
 - **Related:** API-01 to API-03, MOD-01 to MOD-05, POL-06, AID-03, CON-03; ADR-0001, ADR-0005
 

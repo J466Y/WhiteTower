@@ -1,6 +1,6 @@
 # ADR-0002: TypeScript and React single-page app for the frontend
 
-- **Status:** Proposed
+- **Status:** Accepted, by the maintainer on 2026-09-30
 - **Date:** 2026-09-28
 - **Related:** CON-06, UI-01 to UI-09, NFR-12, NFR-14, NFR-17; ADR-0004, ADR-0009
 

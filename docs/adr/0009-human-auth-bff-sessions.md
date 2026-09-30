@@ -1,6 +1,6 @@
 # ADR-0009: Human authentication through a backend-for-frontend with server-side sessions
 
-- **Status:** Proposed
+- **Status:** Accepted, by the maintainer on 2026-09-30
 - **Date:** 2026-09-28
 - **Related:** HUM-01 to HUM-07, NFR-12; ADR-0002; plan P1-03
 

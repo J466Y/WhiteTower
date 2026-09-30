@@ -1,6 +1,6 @@
 # ADR-0007: Monorepo layout
 
-- **Status:** Proposed
+- **Status:** Accepted, by the maintainer on 2026-09-30
 - **Date:** 2026-09-28
 - **Related:** ADR-0001, ADR-0002, ADR-0004; plan P0-01
 

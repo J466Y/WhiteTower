@@ -1,6 +1,6 @@
 # ADR-0006: Tamper-evident audit log with a Merkle tree and signed checkpoints
 
-- **Status:** Proposed
+- **Status:** Accepted, by the maintainer on 2026-09-30
 - **Date:** 2026-09-28
 - **Related:** AUD-01 to AUD-10, NFR-07 to NFR-10; ADR-0003; [spike S3](../spikes/S3-audit-throughput.md)
 

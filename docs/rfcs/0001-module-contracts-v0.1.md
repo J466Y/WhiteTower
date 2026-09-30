@@ -2,9 +2,9 @@
 
 | | |
 | --- | --- |
-| **Status** | Draft |
+| **Status** | In review: approved by the maintainer on 2026-09-30; acceptance needs an external review too ([GOVERNANCE.md](../../GOVERNANCE.md)) |
 | **Authors** | @J466Y |
-| **Review period** | Not open yet: at least two weeks from the day it opens, with at least one external reviewer |
+| **Review period** | At least two weeks from the day it is announced, with at least one external reviewer |
 | **Related** | Plan [P0-03](../plans/phase-0/P0-03-module-contracts.md); MOD-01 to MOD-05, MOD-08, POL-03, POL-05, POL-06, KIL-03, KIL-04, KIL-07, KIL-10, AUD-02; [ADR-0004](../adr/0004-api-and-contract-formats.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md), [ADR-0011](../adr/0011-own-python-enforcement-point.md) |
 
 ## Summary

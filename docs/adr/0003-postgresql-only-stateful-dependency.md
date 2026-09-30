@@ -1,6 +1,6 @@
 # ADR-0003: PostgreSQL as the only stateful dependency of the MVP
 
-- **Status:** Proposed
+- **Status:** Accepted for the MVP, by the maintainer on 2026-09-30. The database may be revisited once the MVP runs; a change would come as a new ADR.
 - **Date:** 2026-09-28
 - **Related:** CON-07, AUD-01, NFR-06, NFR-14, OPS-07; ADR-0005, ADR-0006
 
