@@ -118,6 +118,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 - SIEM export guides: OpenTelemetry collector configurations for Splunk, Elastic and Microsoft Sentinel.
 - Key rotation, scaling and troubleshooting.
 - A security configuration guide for what the [threat model](../../security/threat-model.md) assumes: MFA at the IdP; checkpoints exported to the SIEM, with a scheduled consistency check against its latest one that alerts on failure (DC-8); the database's own audit log sent to the SIEM; production resources that accept White Tower tokens requiring `wt_env=production` (R-14).
+- Time synchronization: every host that runs the core, a module or an agent keeps its clock within a few seconds of the others. An enforcement point whose clock is more than 5 seconds off ignores lease renewals and fails closed (contracts section 5.3).
 - The halting runbooks of P1-08.
 
 **Done when:** an operator from the pilot organization reviews the documentation.

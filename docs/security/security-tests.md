@@ -101,7 +101,7 @@ Each test turns an abuse case of the threat model into a check that fails if the
 | --- | --- | --- | --- |
 | ST-46 | The fail-closed vectors, and the unknown values of EP-10, all keep the gate closed | T-42 | unit |
 | ST-47 | The bundle vectors pass: every rejection of V1 to V7 for its reason | T-29, T-30 | unit |
-| ST-48 | A delayed stream: renewals older than the tolerance renew nothing, and the gate closes when the lease runs out | T-32, DC-2 | integration |
+| ST-48 | A delayed stream: renewals older than the tolerance renew nothing, and the gate closes when the lease runs out (conformance scenario S-17) | T-32, DC-2 | integration |
 | ST-49 | A server whose certificate does not chain to the configured trust anchors is refused (I-1) | T-33 | integration |
 | ST-50 | Decision events never carry argument values, prompts, outputs or error messages | T-44 | unit |
 | ST-51 | With DNS blocked, the enforcement point reconnects to the core's last resolved addresses | T-46, DC-7 | integration |

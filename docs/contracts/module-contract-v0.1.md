@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md). Contract version `v1alpha1` |
-| **Date** | 2026-09-29 |
+| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |
 | **Conformance** | [`test/conformance/`](../../test/conformance/README.md) |
@@ -167,6 +167,7 @@ JSON examples of every method are in appendix A.
 | Heartbeat interval | Set by the core, 30 seconds by default |
 | Lease TTL | 10 to 300 seconds, per agent |
 | Lease renewal interval | A third of the shortest TTL in scope, and at most 30 seconds |
+| Age of a lease renewal when it arrives | At most 5 seconds by default, on the instance's clock; an instance may configure another tolerance |
 
 ### 4.9 Instances
 
@@ -200,12 +201,13 @@ This section is the wire form of ADR-0005: the core publishes each agent's gover
 - **CORE-5.** When `since_version` is 0, or when the core cannot send every change since it, the core MUST start with a snapshot. It MAY send a snapshot at any time, and MUST NOT send a snapshot or a change older than `since_version`.
 - A **snapshot** is one or more `SnapshotPart` messages with the same version: the first has `first` set and carries the fleet state, the last has `last` set. Agents missing from a snapshot are out of scope.
 - **Changes** follow in strictly increasing version order. Each carries the complete new state of every agent that changed or entered the scope, the new fleet state when it changed, and the agents that left the scope.
-- **CORE-6.** The core MUST send a `LeaseRenewal` right after each complete snapshot, then at least at the renewal interval of section 4.8, and only when it has sent every change it knows of. A renewal therefore always means "your state is current".
+- **CORE-6.** The core MUST send a `LeaseRenewal` right after each complete snapshot, then at least at the renewal interval of section 4.8, and only when it has sent every change it knows of. A renewal therefore always means "your state is current". Every renewal carries `server_time`, the core's clock when it sends it (section 5.3).
 - **CORE-7.** The core MUST end a stream it cannot keep up to date, for example a client too slow to read, rather than let it fall behind. The client's lease then expires if it cannot reconnect.
 
 ### 5.3 Leases
 
 - A renewal renews the lease of every agent in scope. Each lease then lasts that agent's `lease_ttl`, measured on the client's **monotonic clock** from the moment it received the renewal.
+- **Only a fresh renewal counts.** An instance ignores a renewal without `server_time`, or whose `server_time` is older than a tolerance on its own clock: 5 seconds by default (section 4.8). Such a renewal renews nothing, and while an instance receives only those, it SHOULD report `HEALTH_DEGRADED` in its heartbeats. Something on the path that holds the stream back can then delay it by the tolerance at most: beyond that, leases run out and the gate closes, instead of halts arriving late ([threat model](../security/threat-model.md), T-32). The check relies on synchronized clocks (ASM-04), as token expiry does; the lease itself is still measured on the monotonic clock.
 - There is no lease before the first renewal of a session. An agent that enters the scope through a change gets its lease from the next renewal; the core SHOULD send one right after such a change.
 - **When a lease expires, the agent is treated as halted**: the enforcement point denies everything and applies the agent's halt mode (KIL-04), and emits `whitetower.lease.expired.v1`. It opens again when it has a current state and a new lease.
 
@@ -249,7 +251,7 @@ When no halt covers the agent any more, the gate reopens only if every other con
 
 - **EP-1. Start closed.** Allow nothing until the instance has registered, applied a complete snapshot, received a lease renewal and activated a verified bundle for the agent.
 - **EP-2. Decide locally, gate first.** For every governed call and interaction, check the gate (section 5.4), then evaluate the agent's bundle with the profile and the combining algorithm of section 6. Never call the core synchronously to decide.
-- **EP-3. Leases.** Keep one lease per agent on a monotonic clock; when it expires, deny everything and apply the halt mode (section 5.3).
+- **EP-3. Leases.** Keep one lease per agent on a monotonic clock, renewed only by fresh renewals; when it expires, deny everything and apply the halt mode (section 5.3).
 - **EP-4. Halts.** When the agent or the fleet is halted, close the gate at once, apply the halt mode, and acknowledge each layer honestly (section 5.5).
 - **EP-5. Releases.** Reopen only when no halt covers the agent and every other gate condition holds (section 5.6).
 - **EP-6. Lifecycle.** Open the gate only in the `validated`, `ready` and `active` states.
@@ -561,6 +563,7 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | S-14 A runtime-control module never lifts a layer without a current state | RC-2, RC-3 | Designed |
 | S-15 A runtime-control module acknowledges per agent, with the workloads covered | RC-4 | Designed |
 | S-16 Registration refuses an unknown contract version | CORE-3, I-3 | Designed |
+| S-17 Stale renewals, a minute old or without the core's time, renew nothing: the lease runs out within its TTL, and a fresh renewal renews it again | EP-3, section 5.3 | Implemented |
 
 ## 10. Versioning and compatibility
 
@@ -589,6 +592,7 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | Replaying an older bundle | Versions only grow, and the state names the one to use (V3, V6) |
 | Impersonating the core | TLS with trust anchors from configuration (I-1) |
 | Cutting enforcement points off the core | They fail closed when their lease expires (section 5.3): an attacker can stop agents, never free them. This trade-off is accepted in ADR-0005 |
+| Holding the stream back, so that renewals keep leases alive while halts arrive late | Renewals carry the core's time, and an instance ignores one older than its tolerance (section 5.3): past the tolerance, leases run out |
 | A stale replica undoing a halt | The core never sends state older than the client's (CORE-5), and renewals mean "current" (CORE-6) |
 | Flooding the audit log | Rate limits, the limits of section 4.8, and publication restricted to declared types and owned sources (section 4.3) |
 | Personal data leaking into evidence | Minimization rules of section 8.3 |
@@ -603,7 +607,6 @@ The [threat model](../security/threat-model.md) (plan P0-04) analyzes these boun
 | Should enforcement points learn rotated bundle keys from the core? | Not in `v1alpha1`: keys come from configuration. A key rollover statement signed by the current key could come in `v1beta1` |
 | Which tool arguments may policies see? | Only those a deployment declares in `ToolArgs`; how deployments manage that extension is settled in P1-06 |
 | Do quarantined pods keep cluster DNS? | Decided by the [threat model](../security/threat-model.md) (DC-7): no, by default. The enforcement point reconnects to the core's last resolved addresses; where the CNI has DNS-aware rules, an option may allow the core's name only |
-| How does a lease resist a delayed stream? | Decided by the [threat model](../security/threat-model.md) (T-32, DC-2): `LeaseRenewal` carries the core's time, and an instance ignores a renewal older than a tolerance on its own clock (5 seconds by default), so a stream held back on its way lets leases expire instead of delaying halts. To specify in section 5.3, with a conformance scenario, before the review of RFC-0001 opens |
 | Stable URLs for `dataschema`, and the Kubernetes label prefix | Depend on the project's domain (open question Q6) |
 | When do decision points become mandatory for gateways? | With the Phase 2 gateways, in `v1beta1` |
 | Rego package naming and a Rego engine | Phase 2, with the second policy engine |

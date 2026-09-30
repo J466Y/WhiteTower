@@ -125,9 +125,19 @@ func (c *Core) Release() {
 
 // RenewLeases renews the lease of every agent on every open watch.
 func (c *Core) RenewLeases() {
+	c.RenewLeasesAt(timestamppb.Now())
+}
+
+// RenewLeasesAt sends a renewal carrying the given server time, or none when
+// it is nil. A scenario uses it to play a stream held back on its way, whose
+// renewals arrive late.
+func (c *Core) RenewLeasesAt(serverTime *timestamppb.Timestamp) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.broadcast(c.renewalLocked())
+	c.broadcast(&modulev1alpha1.WatchResponse{
+		Version: c.version,
+		Message: &modulev1alpha1.WatchResponse_LeaseRenewal{LeaseRenewal: &modulev1alpha1.LeaseRenewal{ServerTime: serverTime}},
+	})
 }
 
 // Watchers returns the number of open watch streams.
