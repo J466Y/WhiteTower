@@ -3,9 +3,11 @@ package server
 import (
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/J466Y/WhiteTower/internal/api/moduleapi"
 	"github.com/J466Y/WhiteTower/internal/api/rest"
+	"github.com/J466Y/WhiteTower/internal/platform/health"
 	"github.com/J466Y/WhiteTower/internal/webui"
 )
 
@@ -39,22 +41,29 @@ func MachineHandler() http.Handler {
 	})
 }
 
-// OperationsHandler serves the operations listener: /healthz answers while
-// the process runs; /readyz stops answering "ok" once the server drains, so
-// load balancers send new connections elsewhere.
-func OperationsHandler(drain *Drain) http.Handler {
+// OperationsHandler serves the operations listener. /healthz answers while
+// the process runs. /readyz answers "ok" while every readiness check passes
+// and the server is not draining, so that load balancers send traffic
+// elsewhere otherwise. /metrics serves the Prometheus metrics.
+func OperationsHandler(drain *Drain, ready *health.Readiness, metrics http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		plain(w, http.StatusOK, "ok\n")
 	})
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-drain.Draining():
 			plain(w, http.StatusServiceUnavailable, "draining\n")
+			return
 		default:
-			plain(w, http.StatusOK, "ok\n")
 		}
+		if failing := ready.Failing(r.Context()); len(failing) > 0 {
+			plain(w, http.StatusServiceUnavailable, "not ready: "+strings.Join(failing, ", ")+"\n")
+			return
+		}
+		plain(w, http.StatusOK, "ok\n")
 	})
+	mux.Handle("GET /metrics", metrics)
 	return mux
 }
 

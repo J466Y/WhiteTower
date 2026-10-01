@@ -17,9 +17,13 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/J466Y/WhiteTower/internal/platform/config"
+	"github.com/J466Y/WhiteTower/internal/platform/health"
+	"github.com/J466Y/WhiteTower/internal/platform/metrics"
 	"github.com/J466Y/WhiteTower/internal/server"
+	"github.com/J466Y/WhiteTower/internal/version"
 	"github.com/J466Y/WhiteTower/internal/webui"
 	modulev1alpha1 "github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1"
 	"github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1/modulev1alpha1connect"
@@ -100,14 +104,25 @@ func TestConsoleHandler(t *testing.T) {
 
 func TestOperationsHandler(t *testing.T) {
 	drain := server.NewDrain()
-	srv := httptest.NewServer(server.OperationsHandler(drain))
+	ready := health.NewReadiness(slog.New(slog.DiscardHandler))
+	registry := metrics.NewRegistry(version.Get())
+	srv := httptest.NewServer(server.OperationsHandler(drain, ready, metrics.Handler(registry)))
 	t.Cleanup(srv.Close)
 
 	if got := get(t, http.DefaultClient, srv.URL+"/healthz"); got.status != http.StatusOK || got.body != "ok\n" {
 		t.Fatalf("healthz: got %d %q", got.status, got.body)
 	}
-	if got := get(t, http.DefaultClient, srv.URL+"/readyz"); got.status != http.StatusOK {
-		t.Fatalf("readyz before the drain: got %d", got.status)
+	if got := get(t, http.DefaultClient, srv.URL+"/readyz"); got.status != http.StatusOK || got.body != "ok\n" {
+		t.Fatalf("readyz with every check passing: got %d %q", got.status, got.body)
+	}
+	if got := get(t, http.DefaultClient, srv.URL+"/metrics"); got.status != http.StatusOK || !strings.Contains(got.body, "whitetower_build_info{") {
+		t.Fatalf("metrics: got %d %q", got.status, got.body)
+	}
+
+	ready.Add("database", func(context.Context) error { return errors.New("connection refused to 10.0.0.5") })
+	got := get(t, http.DefaultClient, srv.URL+"/readyz")
+	if got.status != http.StatusServiceUnavailable || got.body != "not ready: database\n" {
+		t.Fatalf("readyz with a failing check: got %d %q, want 503 naming the check only", got.status, got.body)
 	}
 }
 
@@ -178,11 +193,16 @@ func insecureClient(h2 bool) *http.Client {
 	return &http.Client{Transport: tr, Timeout: 10 * time.Second}
 }
 
+// defaultHandlers are the handlers of the server binary, instrumented as it
+// instruments them.
 func defaultHandlers(drain *server.Drain) server.Handlers {
+	discard := slog.New(slog.DiscardHandler)
+	registry := metrics.NewRegistry(version.Get())
+	observer := server.NewObserver(discard, metrics.NewHTTP(registry), noop.NewTracerProvider())
 	return server.Handlers{
-		Console:    server.ConsoleHandler(),
-		Machine:    server.MachineHandler(),
-		Operations: server.OperationsHandler(drain),
+		Console:    observer.Wrap("console", server.ConsoleHandler()),
+		Machine:    observer.Wrap("machine", server.MachineHandler()),
+		Operations: server.OperationsHandler(drain, health.NewReadiness(discard), metrics.Handler(registry)),
 	}
 }
 
@@ -311,7 +331,7 @@ func TestShutdownDrainsOpenStreams(t *testing.T) {
 	cfg.Shutdown.Timeout = 5 * time.Second
 	drain := server.NewDrain()
 	h := defaultHandlers(drain)
-	h.Machine = streaming(drain, true)
+	h.Machine = discardObserver().Wrap("machine", streaming(drain, true))
 	r := start(t, cfg, h, drain)
 
 	body := openStream(t, r.machine+"/watch")
@@ -335,7 +355,7 @@ func TestShutdownClosesStreamsAtTheDeadline(t *testing.T) {
 	cfg.Shutdown.Timeout = time.Second
 	drain := server.NewDrain()
 	h := defaultHandlers(drain)
-	h.Machine = streaming(drain, false)
+	h.Machine = discardObserver().Wrap("machine", streaming(drain, false))
 	r := start(t, cfg, h, drain)
 
 	body := openStream(t, r.machine+"/watch")

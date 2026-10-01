@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -16,8 +15,13 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel"
 
 	"github.com/J466Y/WhiteTower/internal/platform/config"
+	"github.com/J466Y/WhiteTower/internal/platform/health"
+	"github.com/J466Y/WhiteTower/internal/platform/logging"
+	"github.com/J466Y/WhiteTower/internal/platform/metrics"
+	"github.com/J466Y/WhiteTower/internal/platform/tracing"
 	"github.com/J466Y/WhiteTower/internal/server"
 	"github.com/J466Y/WhiteTower/internal/version"
 	"github.com/J466Y/WhiteTower/internal/webui"
@@ -90,28 +94,58 @@ func newServeCommand(load func() (config.Config, error), stdout io.Writer) *cobr
 			if err != nil {
 				return err
 			}
-			logger := newLogger(stdout, cfg.Log.Level)
-			v := version.Get()
-			logger.Info("starting whitetower", "version", v.Version, "commit", v.Commit, "console_embedded", webui.Embedded)
-			if cfg.Dev.SelfSignedTLS {
-				logger.Warn("DEVELOPMENT MODE: the HTTPS listeners serve a self-signed certificate made at startup. Never use this setting in production.")
-			}
-
-			drain := server.NewDrain()
-			srv, err := server.New(cfg, server.Handlers{
-				Console:    server.ConsoleHandler(),
-				Machine:    server.MachineHandler(),
-				Operations: server.OperationsHandler(drain),
-			}, drain, logger)
-			if err != nil {
-				return err
-			}
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			return srv.Run(ctx)
+			return serve(ctx, cfg, stdout)
 		},
 	}
 }
+
+// serve runs the server until ctx ends. Every dependency is made here and
+// handed to what uses it.
+func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
+	logger := logging.New(stdout, cfg.Log.Level)
+	v := version.Get()
+	logger.Info("starting whitetower", "version", v.Version, "commit", v.Commit, "console_embedded", webui.Embedded)
+	if cfg.Dev.SelfSignedTLS {
+		logger.Warn("DEVELOPMENT MODE: the HTTPS listeners serve a self-signed certificate made at startup. Never use this setting in production.")
+	}
+
+	// OpenTelemetry reports its own errors through a global handler.
+	otel.SetErrorHandler(tracing.ErrorHandler(logger))
+	traces, err := tracing.New(cfg.Tracing, v)
+	if err != nil {
+		return err
+	}
+	if cfg.Tracing.OTLP.Endpoint != "" {
+		logger.Info("exporting traces", "endpoint", cfg.Tracing.OTLP.Endpoint, "sample_ratio", cfg.Tracing.SampleRatio)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), traceFlushTimeout)
+		defer cancel()
+		if err := traces.Shutdown(ctx); err != nil {
+			logger.Warn("sending the last spans", "error", err.Error())
+		}
+	}()
+
+	registry := metrics.NewRegistry(v)
+	observer := server.NewObserver(logger, metrics.NewHTTP(registry), traces.TracerProvider())
+	drain := server.NewDrain()
+	ready := health.NewReadiness(logger)
+	srv, err := server.New(cfg, server.Handlers{
+		Console:    observer.Wrap("console", server.ConsoleHandler()),
+		Machine:    observer.Wrap("machine", server.MachineHandler()),
+		Operations: server.OperationsHandler(drain, ready, metrics.Handler(registry)),
+	}, drain, logger)
+	if err != nil {
+		return err
+	}
+	return srv.Run(ctx)
+}
+
+// traceFlushTimeout bounds how long the last spans may take to leave after
+// the listeners have stopped.
+const traceFlushTimeout = 5 * time.Second
 
 func newConfigCommand(load func() (config.Config, error)) *cobra.Command {
 	cmd := &cobra.Command{
@@ -178,12 +212,6 @@ func newHealthcheckCommand(load func() (config.Config, error)) *cobra.Command {
 			return nil
 		},
 	}
-}
-
-func newLogger(w io.Writer, level string) *slog.Logger {
-	var l slog.Level
-	_ = l.UnmarshalText([]byte(level)) // validated with the configuration
-	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: l}))
 }
 
 // lookup returns the value of a variable in environ.

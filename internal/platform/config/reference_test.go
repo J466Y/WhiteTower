@@ -125,6 +125,8 @@ func typeName(t reflect.Type) string {
 		return "boolean"
 	case t.Kind() == reflect.Int || t.Kind() == reflect.Int64:
 		return "integer"
+	case t.Kind() == reflect.Float64:
+		return "number"
 	default:
 		return "string"
 	}

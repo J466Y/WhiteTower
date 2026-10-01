@@ -140,6 +140,12 @@ func setFromString(v reflect.Value, s string) error {
 			return fmt.Errorf("%q: want an integer", s)
 		}
 		v.SetInt(n)
+	case reflect.Float64:
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return fmt.Errorf("%q: want a number", s)
+		}
+		v.SetFloat(f)
 	default:
 		return fmt.Errorf("settings of type %s cannot be set from the environment", v.Type())
 	}
@@ -180,6 +186,9 @@ func node(v reflect.Value) *yaml.Node {
 		scalar.Tag, scalar.Value = "!!bool", strconv.FormatBool(v.Bool())
 	case v.Kind() == reflect.Int || v.Kind() == reflect.Int64:
 		scalar.Tag, scalar.Value = "!!int", strconv.FormatInt(v.Int(), 10)
+	case v.Kind() == reflect.Float64:
+		// Untagged, so that 1 prints as 1 rather than !!float 1.
+		scalar.Value = strconv.FormatFloat(v.Float(), 'g', -1, 64)
 	default:
 		scalar.Tag, scalar.Value = "!!str", v.String()
 	}

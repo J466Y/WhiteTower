@@ -62,6 +62,23 @@ Logging.
 | --- | --- | --- | --- | --- |
 | `log.level` | `WT_LOG_LEVEL` | string | `info` | The lowest level logged: debug, info, warn or error. |
 
+## `tracing`
+
+OpenTelemetry tracing.
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `tracing.sample_ratio` | `WT_TRACING_SAMPLE_RATIO` | number | `1` | With an OTLP endpoint, the fraction of new traces that are recorded and exported, from 0 to 1. A request that arrives with a W3C trace context follows its caller's decision. |
+
+### `tracing.otlp`
+
+Where spans are exported.
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `tracing.otlp.endpoint` | `WT_TRACING_OTLP_ENDPOINT` | string | none | Base URL of the receiver, such as https://otel-collector:4318; spans are sent to its /v1/traces path as protobuf. Empty: no span is exported, and tracing makes no connection. |
+| `tracing.otlp.ca_file` | `WT_TRACING_OTLP_CA_FILE` | string | none | PEM file with the certificate authorities that sign the receiver's certificate, for an https endpoint. Empty: the system's. |
+
 ## `dev`
 
 Settings for development only.
