@@ -119,10 +119,12 @@ func (o *Observer) log(ctx context.Context, listener string, r *http.Request, ro
 	if status >= http.StatusInternalServerError {
 		level = slog.LevelError
 	}
+	safePath := strings.ReplaceAll(r.URL.Path, "\n", "")
+	safePath = strings.ReplaceAll(safePath, "\r", "")
 	o.logger.LogAttrs(ctx, level, "request",
 		slog.String("listener", listener),
 		slog.String("method", r.Method),
-		slog.String("path", r.URL.Path),
+		slog.String("path", safePath),
 		slog.String("route", route),
 		slog.Int("status", status),
 		slog.Int64("bytes", bytes),
