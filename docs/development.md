@@ -135,3 +135,4 @@ The reasoning behind the layout is in [ADR-0007](adr/0007-monorepo-layout.md).
 | `ERR_PNPM_... Command "...\pnpm.cjs" not found` | An old standalone pnpm failed to switch to pnpm 12. Install pnpm 12 with npm, or pass `PNPM="npx --yes pnpm@12.6.0"` to Task. |
 | `corepack` fails with a signature or key error | The corepack bundled with Node.js 22.12 has outdated signing keys. Install pnpm with npm instead. |
 | `The console is not built` when running `task build:go` | Run `task build`, which builds the console first. |
+| `bind: An attempt was made to access a socket in a way forbidden by its access permissions` | Windows reserves port ranges for Hyper-V, and they can change after a restart: `netsh interface ipv4 show excludedportrange protocol=tcp` lists them. Choose a port outside them: `WT_CONSOLE_PORT` and the like in `deploy/compose/dev/.env` for Compose, or `WT_LISTENERS_CONSOLE_ADDRESS` for the binary. |
