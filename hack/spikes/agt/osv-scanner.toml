@@ -1,0 +1,29 @@
+# Read by OSV-Scanner, and by the OpenSSF Scorecard check built on it, for
+# requirements.txt and the packages it resolves to. The pins are the versions
+# spike S1 ran with, and the probes are never built into White Tower artifacts.
+#
+# No fixed version installs with agent-governance-toolkit 5.0.0, the latest
+# release: it requires cryptography<50 and, through its LangGraph extra,
+# langgraph<1.0, which requires langgraph-checkpoint<4 and langgraph-sdk<0.3.
+# None of the advisories is reachable from the probes. Review them when the
+# probes or the pins change.
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-83"
+reason = "langgraph, fixed in 1.0.10. Needs write access to a persistent checkpoint store; the probes compile their graphs without a checkpointer."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2573"
+reason = "langgraph-checkpoint, fixed in 4.1.1. Needs write access to a persistent checkpoint store; the probes compile their graphs without a checkpointer."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2574"
+reason = "langgraph-checkpoint, fixed in 4.0.0. Needs a node cache (a cache backend and a CachePolicy); the probes enable none."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2575"
+reason = "langgraph-sdk, fixed in 0.3.15. Only RemoteGraph uses the SDK; the probes do not."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-3552"
+reason = "cryptography, fixed in 50.0.0. Affects PKCS#7 EnvelopedData decryption (pkcs7_decrypt_*) only, which nothing in the environment calls."

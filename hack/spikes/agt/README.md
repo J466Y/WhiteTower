@@ -15,3 +15,5 @@ python -m venv .venv
 ```
 
 Add `-W ignore::DeprecationWarning` to hide AGT's deprecation warnings.
+
+Some pinned versions have known vulnerabilities that the probes do not reach; [osv-scanner.toml](osv-scanner.toml) lists them and the reasons. Install them only in the spike's own virtual environment.
