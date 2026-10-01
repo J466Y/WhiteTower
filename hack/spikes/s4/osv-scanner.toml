@@ -1,0 +1,6 @@
+# Read by OSV-Scanner, and by the OpenSSF Scorecard check built on it, for this
+# spike's go.mod. The spike is never built into White Tower artifacts.
+
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = "golang.org/x/crypto/openpgp is deprecated and will not be fixed, so every x/crypto version matches. The spike imports golang.org/x/crypto/pbkdf2 only (go list -deps -test ./...)."
