@@ -144,7 +144,7 @@ The plan lands in seven pull requests:
 | Pull request | Steps | Status |
 | --- | --- | --- |
 | 1. Configuration, commands and listeners | 1, 2 | Done |
-| 2. Observability and health | 3 | Not started |
+| 2. Observability and health | 3 | Done |
 | 3. Database layer and `whitetower migrate` | 4, and the PostgreSQL fixture of step 10 | Not started |
 | 4. REST API scaffolding and the console | 5, 9 | Not started |
 | 5. Module API scaffolding | 6 | Not started |
@@ -160,3 +160,18 @@ The plan lands in seven pull requests:
 - Shutdown: the drain signal ends long-lived streams, `/readyz` answers 503, and what is still open at the deadline (8 s by default, always under 10 s) is closed.
 - `wtctl --insecure-skip-tls-verify`, for development servers; it warns when used.
 - Tests: TLS versions, certificate reload, a drain with open streams, the deadline, and the module API over gRPC and Connect. The Compose stack, the end-to-end tests and the browser test use HTTPS.
+
+### 2026-10-01: observability and health
+
+- `internal/platform/logging`: JSON lines on standard output, with UTC timestamps in milliseconds (NFR-19). Records made with a request's context carry `request_id`, `trace_id`, `span_id` and `principal_id`; authentication (P1-03) names the principal with `logging.SetPrincipal`. `logging.Secret` shows `[REDACTED]` through slog, fmt, encoding/json and YAML, even from an unexported field, and `logging.Header` redacts the headers that carry credentials.
+- Request IDs are UUIDv7, made by the server and returned in `X-Request-Id`; clients cannot choose them.
+- What a client or a remote party chooses is sanitized once, where it enters, with `logging.Sanitize`, before it reaches the logs, the traces or a terminal. That covers the method, the path, header values, a receiver's status line and the server's answer in `wtctl`. Everything but printable characters is escaped as in a Go string literal, and values are cut at 1 KiB. The access log records the path as the client sent it, percent-encoded.
+- Every request on the console and machine listeners gets a server span that continues the caller's W3C trace context, a count and a duration in the metrics, and an access log record. The record leaves out the query string, which can hold credentials. The rest of the step 5 middleware comes with PR 4.
+- `internal/platform/metrics`: a registry of its own, served at `/metrics` on the operations listener. It holds `whitetower_build_info`, the `whitetower_http_*` request metrics by listener, method and route, and the standard `go_` and `process_` metrics. The route is the pattern that matched, and unknown methods count as `_OTHER`, so clients cannot add series.
+- `internal/platform/tracing`: without `tracing.otlp.endpoint`, spans only give the logs their IDs. Nothing is recorded or sent, and the standard `OTEL_*` variables change nothing. With an endpoint, spans go to an OTLP/HTTP receiver as gzipped protobuf, sampled parent-based at `tracing.sample_ratio`, with retries on 429, 502, 503 and 504, no redirects, TLS 1.2 or later and an optional CA file. A small client of our own sends them: the official HTTP exporter would link gRPC, grpc-gateway and genproto, about 8 MB, without using them. The binary grows by 2 MB instead.
+- `internal/platform/health`: `/readyz` runs the registered checks at once, each within one second, and answers 503 with the names of those that fail. A check is logged when it starts or stops failing. PR 3 registers the database and the schema, P1-05 the signing keys.
+- Tests:
+  - a request is followed by its IDs through the response, the access log and the exported span, in the server binary's own wiring;
+  - the defaults make no outbound connection, with the `OTEL_*` variables pointing at a fake collector (acceptance criteria);
+  - gRPC, Connect and the stream tests run through the instrumentation.
+- **Open:** OTLP export of logs (OPS-05) waits for the OpenTelemetry Go logs SDK and its OTLP exporter to reach 1.0. They are at 0.22 today, with 1.0 at the release candidate stage. Until then, the platform collects the JSON logs from standard output, for example with the collector's `filelog` receiver.

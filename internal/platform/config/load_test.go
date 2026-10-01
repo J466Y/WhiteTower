@@ -99,6 +99,12 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 		{"log level", []string{"WT_LOG_LEVEL=verbose"}, "log.level"},
 		{"duration syntax", []string{"WT_SHUTDOWN_TIMEOUT=8"}, "WT_SHUTDOWN_TIMEOUT"},
 		{"boolean syntax", []string{"WT_DEV_SELF_SIGNED_TLS=maybe"}, "WT_DEV_SELF_SIGNED_TLS"},
+		{"number syntax", []string{"WT_TRACING_SAMPLE_RATIO=half"}, "WT_TRACING_SAMPLE_RATIO"},
+		{"sample ratio", []string{"WT_TRACING_SAMPLE_RATIO=1.5"}, "tracing.sample_ratio"},
+		{"OTLP over gRPC", []string{"WT_TRACING_OTLP_ENDPOINT=grpc://collector:4317"}, "tracing.otlp.endpoint"},
+		{"OTLP without host", []string{"WT_TRACING_OTLP_ENDPOINT=https:///v1"}, "tracing.otlp.endpoint"},
+		{"OTLP with a query", []string{"WT_TRACING_OTLP_ENDPOINT=https://collector:4318/?tenant=a"}, "tracing.otlp.endpoint"},
+		{"CA file without https", []string{"WT_TRACING_OTLP_ENDPOINT=http://collector:4318", "WT_TRACING_OTLP_CA_FILE=/ca.pem"}, "tracing.otlp.ca_file"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -110,16 +116,46 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 	}
 }
 
+// A credential in the endpoint must not reach the error, which is printed and
+// may be logged.
+func TestEndpointErrorsDoNotRepeatTheURL(t *testing.T) {
+	for _, endpoint := range []string{
+		"https://user:canary-5e3f@collector:4318",
+		"https://collector:4318/?api_key=canary-5e3f",
+		"https://collector:4318/%zzcanary-5e3f",
+	} {
+		_, err := Load("", []string{"WT_DEV_SELF_SIGNED_TLS=true", "WT_TRACING_OTLP_ENDPOINT=" + endpoint})
+		if err == nil || !strings.Contains(err.Error(), "tracing.otlp.endpoint") {
+			t.Fatalf("%s: error %v, want it to name tracing.otlp.endpoint", endpoint, err)
+		}
+		if strings.Contains(err.Error(), "canary-5e3f") {
+			t.Fatalf("the error repeats the endpoint: %v", err)
+		}
+	}
+}
+
 func TestYAMLRoundTrip(t *testing.T) {
-	cfg := Defaults()
-	cfg.Listeners.Console.CertFile = "/etc/whitetower/console.crt"
-	cfg.Dev.SelfSignedTLS = true
-	data, err := cfg.YAML()
+	data, err := Defaults().YAML()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "timeout: 8s") {
-		t.Errorf("durations must print as text:\n%s", data)
+	if !strings.Contains(string(data), "sample_ratio: 1\n") {
+		t.Errorf("a whole number must print plainly:\n%s", data)
+	}
+
+	cfg := Defaults()
+	cfg.Listeners.Console.CertFile = "/etc/whitetower/console.crt"
+	cfg.Tracing.SampleRatio = 0.25
+	cfg.Tracing.OTLP.Endpoint = "https://otel-collector:4318"
+	cfg.Dev.SelfSignedTLS = true
+	data, err = cfg.YAML()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"timeout: 8s", "sample_ratio: 0.25"} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("missing %q:\n%s", want, data)
+		}
 	}
 	var back Config
 	if err := decodeYAML(data, &back); err != nil {
@@ -153,6 +189,8 @@ func zeroText(v reflect.Value) string {
 		return "false"
 	case v.Kind() == reflect.Int || v.Kind() == reflect.Int64:
 		return "0"
+	case v.Kind() == reflect.Float64:
+		return "0.5"
 	default:
 		return "text"
 	}

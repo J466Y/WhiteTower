@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/version"
 	"github.com/J466Y/WhiteTower/pkg/apiclient"
 )
@@ -41,11 +42,14 @@ func newVersionCommand(opts *options) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("contacting the server: %w", err)
 			}
+			// What the server sends reaches the terminal sanitized, so that a
+			// hostile server cannot send it control sequences.
 			if resp.JSON200 == nil {
-				return fmt.Errorf("unexpected response from the server: %s", resp.Status())
+				return fmt.Errorf("unexpected response from the server: %s", logging.Sanitize(resp.Status()))
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "server: %s (commit %s, API %s)\n",
-				resp.JSON200.Version, resp.JSON200.Commit, resp.JSON200.ApiVersion)
+				logging.Sanitize(resp.JSON200.Version), logging.Sanitize(resp.JSON200.Commit),
+				logging.Sanitize(string(resp.JSON200.ApiVersion)))
 			return err
 		},
 	}

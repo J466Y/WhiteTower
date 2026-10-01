@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/J466Y/WhiteTower/internal/platform/health"
 	"github.com/J466Y/WhiteTower/internal/server"
 )
 
@@ -63,7 +65,8 @@ func TestInvalidConfigurationStopsWithTheSettingNamed(t *testing.T) {
 }
 
 func TestHealthcheck(t *testing.T) {
-	healthy := httptest.NewServer(server.OperationsHandler(server.NewDrain()))
+	ready := health.NewReadiness(slog.New(slog.DiscardHandler))
+	healthy := httptest.NewServer(server.OperationsHandler(server.NewDrain(), ready, http.NotFoundHandler()))
 	t.Cleanup(healthy.Close)
 	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)

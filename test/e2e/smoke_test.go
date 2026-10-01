@@ -34,9 +34,27 @@ func TestSmoke(t *testing.T) {
 	})
 
 	t.Run("public API", func(t *testing.T) {
-		status, _, body := get(t, client, base+"/api/v1/version")
+		status, header, body := get(t, client, base+"/api/v1/version")
 		if status != http.StatusOK || !strings.Contains(body, `"apiVersion":"v1"`) {
 			t.Fatalf("got %d %q", status, body)
+		}
+		if header.Get("X-Request-Id") == "" {
+			t.Fatal("missing X-Request-Id")
+		}
+	})
+
+	t.Run("metrics", func(t *testing.T) {
+		status, _, body := get(t, client, operations+"/metrics")
+		if status != http.StatusOK {
+			t.Fatalf("got %d", status)
+		}
+		for _, want := range []string{
+			"whitetower_build_info{",
+			`whitetower_http_requests_total{code="200",listener="console",method="GET",route="/api/v1/version"}`,
+		} {
+			if !strings.Contains(body, want) {
+				t.Errorf("missing %s", want)
+			}
 		}
 	})
 

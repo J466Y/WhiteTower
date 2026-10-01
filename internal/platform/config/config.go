@@ -13,7 +13,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -27,6 +29,8 @@ type Config struct {
 	Shutdown Shutdown `yaml:"shutdown"`
 	// Logging.
 	Log Log `yaml:"log"`
+	// OpenTelemetry tracing.
+	Tracing Tracing `yaml:"tracing"`
 	// Settings for development only.
 	Dev Dev `yaml:"dev"`
 }
@@ -77,6 +81,24 @@ type Log struct {
 	Level string `yaml:"level"`
 }
 
+// Tracing holds the OpenTelemetry tracing settings. Every request gets a span,
+// whose trace ID reaches the logs; spans leave the server only when an OTLP
+// endpoint is set.
+type Tracing struct {
+	// With an OTLP endpoint, the fraction of new traces that are recorded and exported, from 0 to 1. A request that arrives with a W3C trace context follows its caller's decision.
+	SampleRatio float64 `yaml:"sample_ratio"`
+	// Where spans are exported.
+	OTLP OTLP `yaml:"otlp"`
+}
+
+// OTLP is an OTLP/HTTP receiver, such as an OpenTelemetry collector.
+type OTLP struct {
+	// Base URL of the receiver, such as https://otel-collector:4318; spans are sent to its /v1/traces path as protobuf. Empty: no span is exported, and tracing makes no connection.
+	Endpoint string `yaml:"endpoint"`
+	// PEM file with the certificate authorities that sign the receiver's certificate, for an https endpoint. Empty: the system's.
+	CAFile string `yaml:"ca_file"`
+}
+
 // Dev holds settings for development only.
 type Dev struct {
 	// Serve a self-signed certificate generated at startup on the HTTPS listeners, instead of the certificate files. For development only: the server logs a warning.
@@ -100,6 +122,7 @@ func Defaults() Config {
 		TLS:      TLS{MinVersion: "1.2"},
 		Shutdown: Shutdown{Timeout: 8 * time.Second},
 		Log:      Log{Level: "info"},
+		Tracing:  Tracing{SampleRatio: 1},
 	}
 }
 
@@ -151,7 +174,37 @@ func (c Config) Validate() error {
 	default:
 		add("log.level", "%q: want debug, info, warn or error", c.Log.Level)
 	}
+	if r := c.Tracing.SampleRatio; !(r >= 0 && r <= 1) {
+		add("tracing.sample_ratio", "%v: want a number from 0 to 1", r)
+	}
+	if e := c.Tracing.OTLP.Endpoint; e != "" {
+		if err := checkEndpoint(e); err != nil {
+			add("tracing.otlp.endpoint", "%v", err)
+		}
+	}
+	if c.Tracing.OTLP.CAFile != "" && !strings.HasPrefix(c.Tracing.OTLP.Endpoint, "https://") {
+		add("tracing.otlp.ca_file", "set it only with an https endpoint")
+	}
 	return errors.Join(errs...)
+}
+
+// checkEndpoint accepts the base URL of an OTLP/HTTP receiver. Its errors
+// never repeat the URL, which could hold a credential.
+func checkEndpoint(s string) error {
+	u, err := url.Parse(s)
+	switch {
+	case err != nil:
+		return errors.New("not a valid URL")
+	case u.User != nil:
+		return errors.New("the URL holds credentials, which do not belong in the configuration")
+	case u.Scheme != "http" && u.Scheme != "https":
+		return errors.New("want an http or https URL")
+	case u.Host == "":
+		return errors.New("the URL has no host")
+	case u.RawQuery != "" || u.Fragment != "":
+		return errors.New("want a base URL, without a query or a fragment")
+	}
+	return nil
 }
 
 // Version returns the minimum TLS version as a crypto/tls constant.

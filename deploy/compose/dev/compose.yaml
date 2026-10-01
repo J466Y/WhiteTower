@@ -7,7 +7,8 @@
 #
 # Host ports can be changed in a local, uncommitted .env file next to this one
 # (WT_POSTGRES_PORT, WT_KEYCLOAK_PORT, WT_CONSOLE_PORT, WT_MACHINE_PORT,
-# WT_OPERATIONS_PORT, WT_OTLP_GRPC_PORT, WT_OTLP_HTTP_PORT).
+# WT_OPERATIONS_PORT, WT_OTLP_GRPC_PORT, WT_OTLP_HTTP_PORT), and so can
+# WT_TRACING_OTLP_ENDPOINT, which sends the core's traces to a collector.
 name: whitetower-dev
 
 services:
@@ -60,6 +61,9 @@ services:
     environment:
       # A self-signed certificate made at startup: for development only.
       WT_DEV_SELF_SIGNED_TLS: "true"
+      # Empty: no trace leaves the core. http://otel-collector:4318 sends them
+      # to the collector of the otel profile.
+      WT_TRACING_OTLP_ENDPOINT: ${WT_TRACING_OTLP_ENDPOINT:-}
     ports:
       - "127.0.0.1:${WT_CONSOLE_PORT:-8443}:8443"
       - "127.0.0.1:${WT_MACHINE_PORT:-9443}:9443"

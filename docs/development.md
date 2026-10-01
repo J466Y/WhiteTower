@@ -33,7 +33,7 @@ On Windows, set the variable first: `$env:WT_DEV_SELF_SIGNED_TLS = "true"`, then
 ./bin/wtctl version --insecure-skip-tls-verify --server https://127.0.0.1:8443
 ```
 
-The core has three listeners: the console and public API on `127.0.0.1:8443`, the module API on `127.0.0.1:9443`, and health checks on `http://127.0.0.1:9090/healthz`. Its settings are in the [configuration reference](reference/configuration.md); `whitetower config print` shows the effective values.
+The core has three listeners: the console and public API on `127.0.0.1:8443`, the module API on `127.0.0.1:9443`, and operations on `http://127.0.0.1:9090`, with `/healthz`, `/readyz` and `/metrics`. Its settings are in the [configuration reference](reference/configuration.md); `whitetower config print` shows the effective values.
 
 ## Everyday tasks
 
@@ -73,6 +73,20 @@ To run the core in Docker as well, built from source:
 ```sh
 docker compose -f deploy/compose/dev/compose.yaml --profile core up -d --build
 ```
+
+## Logs, metrics and traces
+
+- **Logs** are JSON lines on standard output. The records of a request carry its `request_id`, which the response returns in `X-Request-Id`, and its `trace_id`.
+- **Metrics** are at <http://127.0.0.1:9090/metrics>. White Tower's own are prefixed `whitetower_`.
+- **Traces** stay in the process unless `tracing.otlp.endpoint` names an OTLP/HTTP receiver. To see them, start the development collector, which prints what it receives, and point the core at it:
+
+  ```sh
+  docker compose -f deploy/compose/dev/compose.yaml --profile otel up -d
+  WT_TRACING_OTLP_ENDPOINT=http://127.0.0.1:4318 task run
+  docker compose -f deploy/compose/dev/compose.yaml logs -f otel-collector
+  ```
+
+  On Windows, set the variable first: `$env:WT_TRACING_OTLP_ENDPOINT = "http://127.0.0.1:4318"`. For the core in Docker, start both profiles with `WT_TRACING_OTLP_ENDPOINT=http://otel-collector:4318` in `deploy/compose/dev/.env`.
 
 ## Generated code
 
@@ -121,3 +135,4 @@ The reasoning behind the layout is in [ADR-0007](adr/0007-monorepo-layout.md).
 | `ERR_PNPM_... Command "...\pnpm.cjs" not found` | An old standalone pnpm failed to switch to pnpm 12. Install pnpm 12 with npm, or pass `PNPM="npx --yes pnpm@12.6.0"` to Task. |
 | `corepack` fails with a signature or key error | The corepack bundled with Node.js 22.12 has outdated signing keys. Install pnpm with npm instead. |
 | `The console is not built` when running `task build:go` | Run `task build`, which builds the console first. |
+| `bind: An attempt was made to access a socket in a way forbidden by its access permissions` | Windows reserves port ranges for Hyper-V, and they can change after a restart: `netsh interface ipv4 show excludedportrange protocol=tcp` lists them. Choose a port outside them: `WT_CONSOLE_PORT` and the like in `deploy/compose/dev/.env` for Compose, or `WT_LISTENERS_CONSOLE_ADDRESS` for the binary. |

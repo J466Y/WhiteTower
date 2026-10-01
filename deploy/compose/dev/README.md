@@ -24,6 +24,15 @@ WT_OTLP_GRPC_PORT=4317
 WT_OTLP_HTTP_PORT=4318
 ```
 
+## Traces from the core
+
+The core exports no trace by default. To send them to the collector, which prints what it receives, add `WT_TRACING_OTLP_ENDPOINT=http://otel-collector:4318` to `.env` and start both profiles:
+
+```sh
+docker compose --profile core --profile otel up -d --build
+docker compose logs -f otel-collector
+```
+
 ## Test users
 
 Realm `whitetower` has one user per role of the [permission matrix](../../../docs/requirements/mvp-requirements.md#521-permission-matrix-initial-refined-in-plan-p1-03), each in the matching group. The password of every user is `whitetower`.

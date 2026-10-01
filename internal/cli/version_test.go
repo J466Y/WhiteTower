@@ -3,6 +3,8 @@ package cli_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -10,6 +12,40 @@ import (
 	"github.com/J466Y/WhiteTower/internal/cli"
 	"github.com/J466Y/WhiteTower/internal/server"
 )
+
+// What a hostile server sends reaches the terminal without control
+// sequences: here, one that would write to the clipboard (OSC 52) and one
+// that would clear the screen.
+func TestVersionSanitizesTheServersAnswer(t *testing.T) {
+	body, err := json.Marshal(map[string]string{
+		"version":    "1.0\x1b]52;c;cGF5bG9hZA==\x07",
+		"commit":     "abc\x1b[2J",
+		"apiVersion": "v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+
+	var out, errOut bytes.Buffer
+	cmd := cli.NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&errOut)
+	cmd.SetArgs([]string{"version", "--insecure-skip-tls-verify", "--server", srv.URL})
+	if err := cmd.ExecuteContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if strings.ContainsAny(out.String(), "\x1b\x07") {
+		t.Fatalf("control characters reached the terminal: %q", out.String())
+	}
+	if want := `server: 1.0\x1b]52;c;cGF5bG9hZA==\a (commit abc\x1b[2J, API v1)`; !strings.Contains(out.String(), want) {
+		t.Fatalf("output %q, want it to contain %q", out.String(), want)
+	}
+}
 
 func TestVersion(t *testing.T) {
 	srv := httptest.NewTLSServer(server.ConsoleHandler())
