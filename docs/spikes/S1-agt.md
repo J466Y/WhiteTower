@@ -5,7 +5,7 @@
 | **Plan** | [P0-05](../plans/phase-0/P0-05-spikes-and-nfr-targets.md), spikes S1 and S5 |
 | **Status** | Done. Option A was accepted on 2026-09-29 ([ADR-0011](../adr/0011-own-python-enforcement-point.md)); AGT is re-tested live in the pilot |
 | **Date** | 2026-09-29 |
-| **Tested** | `agent-governance-toolkit-core` and `-integrations` 5.0.0 (published 2026-08-03), `cedarpy` 4.12.1, LangGraph 0.6.11, Python 3.13 on Windows 11 |
+| **Tested** | `agent-governance-toolkit-core` and `-integrations` 5.0.0 (published 2026-08-03), `cedarpy` 4.12.1, LangGraph 0.6.11, Python 3.13 on Windows 11. Re-run on 2026-10-01 with LangGraph 1.2.12 and `cryptography` 50.0.2, which clear known vulnerabilities: same findings |
 | **Code** | [`hack/spikes/agt/`](../../hack/spikes/agt/README.md): three probes, reproducible |
 
 ## The question
@@ -181,7 +181,7 @@ AGT becomes a Phase 2 interoperability adapter for organizations that already ru
 ## Limitations of this spike
 
 - **Environment:** a single Windows workstation, Python 3.13, no real LLM.
-- **LangGraph 1.x** was not tested with AGT, because AGT does not support it. The White Tower hooks for LangGraph 1.x are part of P1-09.
+- **AGT's LangGraph extra** (`langgraph_trust`) was not tested with LangGraph 1.x, because it requires LangGraph below 1.0. The probes do not use it, and give the same findings with LangGraph 0.6.11 and 1.2.12. The White Tower hooks for LangGraph 1.x are part of P1-09.
 - **Microsoft Agent Framework** was not exercised. Its AGT adapter exists (`maf_adapter`) and should be checked if an organization needs it.
 - **ACS** could not be tested (no Windows wheel). It could be tried on Linux if the maintainers want Option B evaluated further.
 - **Spikes S2, S3 and S4** (watch streams, audit throughput, Go-side policy latency) are separate and still pending.

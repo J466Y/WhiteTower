@@ -1,7 +1,0 @@
-# Versions tested in spike S1 (2026-09-29). AGT's LangGraph extra requires langgraph<1.0.
-# Known advisories in these versions, and why they do not apply: osv-scanner.toml.
-agent-governance-toolkit-core==5.0.0
-agent-governance-toolkit-integrations[langgraph,langchain]==5.0.0
-cedarpy==4.12.1
-langgraph==0.6.11
-langchain-core==1.6.5

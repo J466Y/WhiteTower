@@ -1,0 +1,23 @@
+# The environment of spike S1's probes (see README.md); uv.lock holds every version.
+[project]
+name = "whitetower-spike-s1"
+version = "0"
+description = "Throwaway probes for spikes S1 and S5, never built into White Tower artifacts"
+requires-python = ">=3.13"
+dependencies = [
+  "agent-governance-toolkit-core==5.0.0",
+  "agent-governance-toolkit-integrations==5.0.0",
+  "cedarpy==4.12.1",
+  "langchain-core==1.6.5",
+  # Without AGT's LangGraph extra, which requires langgraph<1.0: the probes use
+  # LangGraph directly, and versions before 1.0.10 have known vulnerabilities.
+  "langgraph==1.2.12",
+]
+
+[tool.uv]
+package = false
+# agent-governance-toolkit-core 5.0.0 requires cryptography<50, and versions
+# 44.0.0 to 49.x are affected by PYSEC-2026-3552. Only AGT's signing command and
+# credential vault use cryptography; the probes load neither, and give the same
+# results with 50.0.2.
+override-dependencies = ["cryptography==50.0.2"]
