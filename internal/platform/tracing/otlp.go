@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/J466Y/WhiteTower/internal/platform/config"
+	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/version"
 )
 
@@ -126,15 +127,16 @@ func (c *httpClient) send(ctx context.Context, body []byte) (retry bool, wait ti
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 
-	switch code := resp.StatusCode; {
-	case code >= 200 && code < 300:
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return false, 0, nil
-	case code == http.StatusTooManyRequests || code == http.StatusBadGateway ||
-		code == http.StatusServiceUnavailable || code == http.StatusGatewayTimeout:
-		return true, retryAfter(resp.Header.Get("Retry-After")), fmt.Errorf("sending spans to %s: %s", c.url, resp.Status)
-	default:
-		return false, 0, fmt.Errorf("sending spans to %s: %s", c.url, resp.Status)
 	}
+	// The receiver writes the status line, and the error reaches the logs.
+	err = fmt.Errorf("sending spans to %s: %s", c.url, logging.Sanitize(resp.Status))
+	switch resp.StatusCode {
+	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true, retryAfter(resp.Header.Get("Retry-After")), err
+	}
+	return false, 0, err
 }
 
 // retryAfter reads a Retry-After header given in seconds, capped at 30

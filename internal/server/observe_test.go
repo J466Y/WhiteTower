@@ -37,6 +37,12 @@ func (b *syncBuffer) Write(p []byte) (int, error) {
 	return b.buf.Write(p)
 }
 
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 // records returns the JSON log records whose message is msg.
 func (b *syncBuffer) records(t *testing.T, msg string) []map[string]any {
 	t.Helper()
@@ -268,6 +274,32 @@ func TestFailuresUnmatchedRoutesAndOtherMethods(t *testing.T) {
 			t.Errorf("%v requests still in flight after the panic", v)
 		}
 	})
+}
+
+// The client chooses the method and the path. Decoded, this path would forge
+// a log record and clear a terminal; the logs and the traces get it as the
+// client sent it, percent-encoded, and the method escaped.
+func TestClientChosenValuesAreSanitized(t *testing.T) {
+	o := newObserved(t)
+	const path = "/x%0A%7B%22level%22:%22ERROR%22%7D%1B%5B2J"
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	// Set directly: net/http refuses such a method on the wire today, and the
+	// observer does not rely on it.
+	req.Method = "BREW\x1b[2J"
+	o.Wrap("console", http.NotFoundHandler()).ServeHTTP(httptest.NewRecorder(), req)
+
+	const method = `BREW\x1b[2J`
+	logs := o.logs.records(t, "request")
+	if len(logs) != 1 || logs[0]["path"] != path || logs[0]["method"] != method {
+		t.Fatalf("access log %v", logs)
+	}
+	span := o.span(t)
+	if attr(span, "url.path") != path || attr(span, "http.request.method_original") != method {
+		t.Errorf("span path %q, method %q", attr(span, "url.path"), attr(span, "http.request.method_original"))
+	}
+	if raw := o.logs.String(); strings.ContainsAny(raw, "\x1b\r") || strings.Count(raw, "\n") != 1 {
+		t.Errorf("a control character reached the log:\n%q", raw)
+	}
 }
 
 // Streams flush every message through the observer.

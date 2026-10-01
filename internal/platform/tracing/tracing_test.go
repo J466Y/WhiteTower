@@ -1,6 +1,7 @@
 package tracing
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -10,6 +11,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -253,6 +255,34 @@ func TestRedirectsAreNotFollowed(t *testing.T) {
 	}
 	if requests, _ := elsewhere.got(); requests != 0 {
 		t.Fatal("the client followed the redirect")
+	}
+}
+
+// The receiver writes the status line, and the error that carries it reaches
+// the logs: it arrives sanitized.
+func TestReceiverStatusLineIsSanitized(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	go func() {
+		conn, err := l.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_, _ = http.ReadRequest(bufio.NewReader(conn))
+		_, _ = io.WriteString(conn, "HTTP/1.1 400 Bad\x1b[2J Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+	}()
+
+	client, err := newHTTPClient(config.OTLP{Endpoint: "http://" + l.Addr().String()}, testVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.UploadTraces(context.Background(), nil)
+	if err == nil || strings.Contains(err.Error(), "\x1b") || !strings.Contains(err.Error(), `400 Bad\x1b[2J Request`) {
+		t.Fatalf("error %q, want the status line escaped", err)
 	}
 }
 

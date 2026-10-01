@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"go.opentelemetry.io/otel/trace"
 	"go.yaml.in/yaml/v3"
@@ -184,6 +185,55 @@ func TestSecretNeverShowsItsValue(t *testing.T) {
 // Secret is the type under test, aliased so that holder reads naturally.
 type Secret = logging.Secret
 
+func TestSanitize(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"/api/v1/version", "/api/v1/version"},
+		{"día/über/日本", "día/über/日本"},
+		{"/a\nforged record", `/a\nforged record`},
+		{"/a\r\n{\"level\":\"ERROR\"}", `/a\r\n{\"level\":\"ERROR\"}`},
+		{"\x1b[31mred\x1b]52;c;cGF5bG9hZA==\x07", `\x1b[31mred\x1b]52;c;cGF5bG9hZA==\a`},
+		{"invoice\u202efdp.exe", `invoice\u202efdp.exe`},
+		{"line\u2028sep\u00a0nbsp\u200bzero", `line\u2028sep\u00a0nbsp\u200bzero`},
+		{"nul\x00 del\x7f", `nul\x00 del\x7f`},
+		{"bad UTF-8 \xff\xfe", `bad UTF-8 \xff\xfe`},
+		// A backslash is escaped, so that this cannot pass for a line break.
+		{`already \n escaped`, `already \\n escaped`},
+	} {
+		if got := logging.Sanitize(tt.in); got != tt.want {
+			t.Errorf("Sanitize(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// Nothing that a log line or a terminal acts on survives: control
+// characters, invisible and bidirectional characters, separators.
+func TestSanitizeKeepsOnlyPrintableCharacters(t *testing.T) {
+	var inputs []string
+	for b := range 256 {
+		inputs = append(inputs, string([]byte{byte(b)}))
+	}
+	inputs = append(inputs, "\u202e", "\u2066", "\u2028", "\u2029", "\u200b", "\u00a0", "\ufeff", "\U000e0001")
+	for _, in := range inputs {
+		for _, r := range logging.Sanitize("x" + in + "y") {
+			if !unicode.IsPrint(r) {
+				t.Errorf("Sanitize(%q) keeps %U", in, r)
+			}
+		}
+	}
+}
+
+func TestSanitizeCutsLongValues(t *testing.T) {
+	exact := strings.Repeat("a", logging.MaxSanitized)
+	if got := logging.Sanitize(exact); got != exact {
+		t.Fatal("a value of exactly MaxSanitized bytes was changed")
+	}
+	// "é" takes two bytes and straddles the limit: it is dropped, not split.
+	long := strings.Repeat("a", logging.MaxSanitized-1) + "é" + strings.Repeat("b", 1<<20)
+	if got, want := logging.Sanitize(long), strings.Repeat("a", logging.MaxSanitized-1)+"[truncated]"; got != want {
+		t.Fatalf("got %d bytes ending in %q, want %d", len(got), got[len(got)-20:], len(want))
+	}
+}
+
 func TestHeaderRedactsCredentials(t *testing.T) {
 	h := http.Header{
 		"Authorization":        {"Bearer " + canary},
@@ -195,6 +245,7 @@ func TestHeaderRedactsCredentials(t *testing.T) {
 		"X-Csrf-Token":         {canary},
 		"Content-Type":         {"application/json"},
 		"Accept":               {"text/html", "application/json"},
+		"X-Note":               {"line\nbreak\x1b[2J"},
 	}
 	var buf bytes.Buffer
 	logging.New(&buf, "info").Info("request", "headers", logging.Header(h))
@@ -202,7 +253,8 @@ func TestHeaderRedactsCredentials(t *testing.T) {
 		t.Fatalf("a credential shows: %s", buf.String())
 	}
 	got, _ := last(t, &buf)["headers"].(map[string]any)
-	if got["Content-Type"] != "application/json" || got["Accept"] != "text/html, application/json" || got["Authorization"] != logging.Redacted {
+	if got["Content-Type"] != "application/json" || got["Accept"] != "text/html, application/json" ||
+		got["Authorization"] != logging.Redacted || got["X-Note"] != `line\nbreak\x1b[2J` {
 		t.Fatalf("headers %v", got)
 	}
 }
