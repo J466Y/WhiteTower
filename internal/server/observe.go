@@ -54,10 +54,15 @@ func (o *Observer) Wrap(listener string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		id := uuid.Must(uuid.NewV7()).String()
+		// The client chooses the method and the path: they are sanitized
+		// once, here, and only these values reach the logs and the traces.
+		// The path is the one the client sent, still percent-encoded.
+		sentMethod := logging.Sanitize(r.Method)
+		sentPath := logging.Sanitize(r.URL.EscapedPath())
 		method := metrics.Method(r.Method)
 		attrs := []attribute.KeyValue{
 			semconv.HTTPRequestMethodKey.String(method),
-			semconv.URLPath(r.URL.Path),
+			semconv.URLPath(sentPath),
 			semconv.URLScheme(scheme(r)),
 			semconv.NetworkProtocolVersion(protocolVersion(r)),
 			semconv.ClientAddress(clientAddress(r)),
@@ -66,7 +71,7 @@ func (o *Observer) Wrap(listener string, next http.Handler) http.Handler {
 		spanName := method
 		if method != r.Method {
 			spanName = "HTTP"
-			attrs = append(attrs, semconv.HTTPRequestMethodOriginal(r.Method))
+			attrs = append(attrs, semconv.HTTPRequestMethodOriginal(sentMethod))
 		}
 		ctx := logging.WithRequest(r.Context(), id)
 		ctx = o.propagator.Extract(ctx, propagation.HeaderCarrier(r.Header))
@@ -90,7 +95,17 @@ func (o *Observer) Wrap(listener string, next http.Handler) http.Handler {
 			took := time.Since(start)
 			o.metrics.Observe(listener, method, route, status, took)
 			endSpan(span, spanName, route, status)
-			o.log(ctx, listener, r, route, status, rec.bytes, took)
+			o.log(ctx, access{
+				listener:   listener,
+				method:     sentMethod,
+				path:       sentPath,
+				route:      route,
+				status:     status,
+				bytes:      rec.bytes,
+				took:       took,
+				protocol:   r.Proto,
+				remoteAddr: r.RemoteAddr,
+			})
 			if p != nil {
 				panic(p) // net/http logs it and drops the connection
 			}
@@ -112,25 +127,35 @@ func endSpan(span trace.Span, name, route string, status int) {
 	span.End()
 }
 
+// access is what the access log records about a request. It holds no raw
+// value from the client: the method and the path come sanitized, the route
+// is a server pattern, net/http has already validated the protocol, and the
+// remote address comes from the connection.
+type access struct {
+	listener, method, path, route string
+	status                        int
+	bytes                         int64
+	took                          time.Duration
+	protocol, remoteAddr          string
+}
+
 // log writes the access log. The request, trace and principal IDs come from
 // ctx; the query string is left out, as it can hold credentials.
-func (o *Observer) log(ctx context.Context, listener string, r *http.Request, route string, status int, bytes int64, took time.Duration) {
+func (o *Observer) log(ctx context.Context, a access) {
 	level := slog.LevelInfo
-	if status >= http.StatusInternalServerError {
+	if a.status >= http.StatusInternalServerError {
 		level = slog.LevelError
 	}
-	safePath := strings.ReplaceAll(r.URL.Path, "\n", "")
-	safePath = strings.ReplaceAll(safePath, "\r", "")
 	o.logger.LogAttrs(ctx, level, "request",
-		slog.String("listener", listener),
-		slog.String("method", r.Method),
-		slog.String("path", safePath),
-		slog.String("route", route),
-		slog.Int("status", status),
-		slog.Int64("bytes", bytes),
-		slog.Float64("duration_ms", float64(took.Microseconds())/1000),
-		slog.String("protocol", r.Proto),
-		slog.String("remote_addr", r.RemoteAddr),
+		slog.String("listener", a.listener),
+		slog.String("method", a.method),
+		slog.String("path", a.path),
+		slog.String("route", a.route),
+		slog.Int("status", a.status),
+		slog.Int64("bytes", a.bytes),
+		slog.Float64("duration_ms", float64(a.took.Microseconds())/1000),
+		slog.String("protocol", a.protocol),
+		slog.String("remote_addr", a.remoteAddr),
 	)
 }
 

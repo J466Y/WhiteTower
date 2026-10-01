@@ -45,9 +45,10 @@ func (Secret) MarshalText() ([]byte, error) { return []byte(Redacted), nil }
 // MarshalYAML implements the YAML encoder's Marshaler interface.
 func (Secret) MarshalYAML() (any, error) { return Redacted, nil }
 
-// Header returns h ready to log, with the values of the headers that carry
-// credentials, such as Authorization, Cookie and Set-Cookie, replaced by
-// [REDACTED].
+// Header returns h ready to log: the values of the headers that carry
+// credentials, such as Authorization, Cookie and Set-Cookie, are replaced by
+// [REDACTED], and the other names and values are sanitized, since clients
+// choose them.
 func Header(h http.Header) slog.LogValuer { return header(h) }
 
 type header http.Header
@@ -55,11 +56,11 @@ type header http.Header
 func (h header) LogValue() slog.Value {
 	attrs := make([]slog.Attr, 0, len(h))
 	for _, name := range slices.Sorted(maps.Keys(h)) {
-		value := strings.Join(h[name], ", ")
-		if credentialHeader(name) {
-			value = Redacted
+		value := Redacted
+		if !credentialHeader(name) {
+			value = Sanitize(strings.Join(h[name], ", "))
 		}
-		attrs = append(attrs, slog.String(name, value))
+		attrs = append(attrs, slog.String(Sanitize(name), value))
 	}
 	return slog.GroupValue(attrs...)
 }
