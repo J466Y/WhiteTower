@@ -19,9 +19,12 @@ import (
 	"connectrpc.com/connect"
 	"go.opentelemetry.io/otel/trace/noop"
 
+	"github.com/J466Y/WhiteTower/internal/api/rest"
+	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/health"
 	"github.com/J466Y/WhiteTower/internal/platform/metrics"
+	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 	"github.com/J466Y/WhiteTower/internal/server"
 	"github.com/J466Y/WhiteTower/internal/version"
 	"github.com/J466Y/WhiteTower/internal/webui"
@@ -30,7 +33,7 @@ import (
 )
 
 func TestConsoleHandler(t *testing.T) {
-	srv := httptest.NewServer(server.ConsoleHandler())
+	srv := httptest.NewServer(server.ConsoleHandler(publicAPI()))
 	t.Cleanup(srv.Close)
 
 	t.Run("public API version", func(t *testing.T) {
@@ -126,6 +129,89 @@ func TestOperationsHandler(t *testing.T) {
 	}
 }
 
+func TestLimitBody(t *testing.T) {
+	reached := false
+	h := server.LimitBody(10,
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusRequestEntityTooLarge) }),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			if _, err := io.ReadAll(r.Body); err != nil {
+				w.WriteHeader(http.StatusRequestEntityTooLarge)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+
+	for _, tt := range []struct {
+		name    string
+		body    io.Reader
+		size    int64
+		status  int
+		reached bool
+	}{
+		{"within the limit", strings.NewReader("small"), 5, http.StatusOK, true},
+		{"announced over the limit: refused before the handler", strings.NewReader(strings.Repeat("x", 11)), 11, http.StatusRequestEntityTooLarge, false},
+		{"unannounced over the limit: cut as the handler reads", strings.NewReader(strings.Repeat("x", 11)), -1, http.StatusRequestEntityTooLarge, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			reached = false
+			r := httptest.NewRequest(http.MethodPost, "/", tt.body)
+			r.ContentLength = tt.size
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, r)
+			if rec.Code != tt.status || reached != tt.reached {
+				t.Fatalf("status %d, handler reached %v; want %d and %v", rec.Code, reached, tt.status, tt.reached)
+			}
+		})
+	}
+}
+
+// Security test ST-05, for the console and operations listeners: a request
+// over the size limit is refused before it reaches a handler. The machine
+// listener's limits come with the module API.
+func TestListenersRefuseLargeBodies(t *testing.T) {
+	drain := server.NewDrain()
+	r := start(t, config.Defaults(), defaultHandlers(drain), drain)
+	post := func(client *http.Client, url string, size int) (int, http.Header) {
+		t.Helper()
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, strings.NewReader(strings.Repeat("x", size)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode, resp.Header
+	}
+	status, header := post(insecureClient(false), r.console+"/api/v1/me", server.MaxConsoleBody+1)
+	if status != http.StatusRequestEntityTooLarge || header.Get("Content-Type") != "application/problem+json" {
+		t.Errorf("console: %d %s, want 413 as a problem", status, header.Get("Content-Type"))
+	}
+	if status, _ := post(http.DefaultClient, r.operations+"/healthz", server.MaxOperationsBody+1); status != http.StatusRequestEntityTooLarge {
+		t.Errorf("operations: %d, want 413", status)
+	}
+}
+
+func TestListenersRefuseHugeHeaders(t *testing.T) {
+	drain := server.NewDrain()
+	r := start(t, config.Defaults(), defaultHandlers(drain), drain)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, r.operations+"/healthz", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Padding", strings.Repeat("x", 100<<10))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusRequestHeaderFieldsTooLarge {
+		t.Fatalf("status %d, want 431", resp.StatusCode)
+	}
+}
+
 // running is a server started on random local ports.
 type running struct {
 	console, machine, operations string
@@ -193,6 +279,17 @@ func insecureClient(h2 bool) *http.Client {
 	return &http.Client{Transport: tr, Timeout: 10 * time.Second}
 }
 
+// publicAPI is the public API as the server builds it before plan P1-03:
+// nobody is authenticated.
+func publicAPI() http.Handler {
+	return rest.Handler(rest.Options{
+		Logger:        slog.New(slog.DiscardHandler),
+		Authenticator: auth.Unauthenticated{},
+		Authorizer:    auth.DenyAll{},
+		Limiter:       ratelimit.New(1000, 1000),
+	})
+}
+
 // defaultHandlers are the handlers of the server binary, instrumented as it
 // instruments them.
 func defaultHandlers(drain *server.Drain) server.Handlers {
@@ -200,7 +297,7 @@ func defaultHandlers(drain *server.Drain) server.Handlers {
 	registry := metrics.NewRegistry(version.Get())
 	observer := server.NewObserver(discard, metrics.NewHTTP(registry), noop.NewTracerProvider())
 	return server.Handlers{
-		Console:    observer.Wrap("console", server.ConsoleHandler()),
+		Console:    observer.Wrap("console", server.ConsoleHandler(publicAPI())),
 		Machine:    observer.Wrap("machine", server.MachineHandler()),
 		Operations: server.OperationsHandler(drain, health.NewReadiness(discard), metrics.Handler(registry)),
 	}

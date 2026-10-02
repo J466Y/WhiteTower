@@ -227,6 +227,10 @@ func (s *Server) httpServer(h http.Handler, tlsConfig *tls.Config) *http.Server 
 		Protocols:         &protocols,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
-		ErrorLog:          slog.NewLogLogger(s.logger.Handler(), slog.LevelWarn),
+		// Headers larger than this get 431: no client needs more, and the
+		// default megabyte would let each connection hold one (threat model,
+		// T-11).
+		MaxHeaderBytes: 64 << 10,
+		ErrorLog:       slog.NewLogLogger(s.logger.Handler(), slog.LevelWarn),
 	}
 }

@@ -48,6 +48,7 @@ type HTTP struct {
 	requests *prometheus.CounterVec
 	duration *prometheus.HistogramVec
 	inFlight *prometheus.GaugeVec
+	limited  *prometheus.CounterVec
 }
 
 // NewHTTP registers the request metrics with reg.
@@ -72,9 +73,21 @@ func NewHTTP(reg prometheus.Registerer) *HTTP {
 			Name:      "requests_in_flight",
 			Help:      "Requests being handled, open streams included, by listener.",
 		}, []string{"listener"}),
+		limited: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace,
+			Subsystem: "http",
+			Name:      "requests_rate_limited_total",
+			Help:      "Requests refused because their client exceeded its rate, by listener.",
+		}, []string{"listener"}),
 	}
-	reg.MustRegister(m.requests, m.duration, m.inFlight)
+	reg.MustRegister(m.requests, m.duration, m.inFlight, m.limited)
 	return m
+}
+
+// RateLimited returns the counter of the requests refused on a listener
+// because their client exceeded its rate.
+func (m *HTTP) RateLimited(listener string) prometheus.Counter {
+	return m.limited.WithLabelValues(listener)
 }
 
 // InFlight returns the gauge of the requests in flight on a listener.

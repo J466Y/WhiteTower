@@ -11,7 +11,27 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for PrincipalKind.
+const (
+	Human          PrincipalKind = "human"
+	ServiceAccount PrincipalKind = "service_account"
+)
+
+// Valid indicates whether the value is a known member of the PrincipalKind enum.
+func (e PrincipalKind) Valid() bool {
+	switch e {
+	case Human:
+		return true
+	case ServiceAccount:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for VersionInfoApiVersion.
 const (
@@ -26,6 +46,38 @@ func (e VersionInfoApiVersion) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Principal defines model for Principal.
+type Principal struct {
+	DisplayName string `json:"displayName"`
+
+	// Id The principal's identifier.
+	Id   openapi_types.UUID `json:"id"`
+	Kind PrincipalKind      `json:"kind"`
+
+	// Roles The roles bound to the principal (requirements, permission matrix).
+	Roles []string `json:"roles"`
+}
+
+// PrincipalKind defines model for Principal.Kind.
+type PrincipalKind string
+
+// Problem RFC 9457 problem details. `type` and `code` identify the error;
+// `title` is the same for every occurrence of it, and `detail`
+// explains this one. No internal detail reaches the client.
+type Problem struct {
+	// Code The stable error code.
+	Code   string  `json:"code"`
+	Detail *string `json:"detail,omitempty"`
+
+	// Instance This occurrence, as `urn:uuid:` followed by the request ID, which the logs record.
+	Instance *string `json:"instance,omitempty"`
+	Status   int     `json:"status"`
+	Title    string  `json:"title"`
+
+	// Type Identifies the error, and links to its documentation.
+	Type string `json:"type"`
 }
 
 // VersionInfo defines model for VersionInfo.
@@ -117,6 +169,14 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// GetMe Get the calling principal
+	//
+	// Returns the principal that makes the request and its roles. Plan
+	// P1-03 adds its permissions and the CSRF token of the session.
+	//
+	// Corresponds with GET /me (the `GetMe` operationId).
+	GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetVersion Get the version of the running server
 	//
 	// Returns the release version and Git commit of the running server, and
@@ -125,6 +185,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /version (the `GetVersion` operationId).
 	GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// GetMe Get the calling principal
+//
+// Returns the principal that makes the request and its roles. Plan
+// P1-03 adds its permissions and the CSRF token of the session.
+//
+// Corresponds with GET /me (the `GetMe` operationId).
+func (c *Client) GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMeRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // GetVersion Get the version of the running server
@@ -144,6 +222,33 @@ func (c *Client) GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) 
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetMeRequest constructs an http.Request for the GetMe method
+func NewGetMeRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewGetVersionRequest constructs an http.Request for the GetVersion method
@@ -217,6 +322,16 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// GetMeWithResponse Get the calling principal
+	//
+	// Returns the principal that makes the request and its roles. Plan
+	// P1-03 adds its permissions and the CSRF token of the session.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /me (the `GetMe` operationId).
+	GetMeWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMeResponse, error)
+
 	// GetVersionWithResponse Get the version of the running server
 	//
 	// Returns the release version and Git commit of the running server, and
@@ -229,16 +344,71 @@ type ClientWithResponsesInterface interface {
 	GetVersionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVersionResponse, error)
 }
 
+type GetMeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Principal
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMeResponse) GetJSON200() *Principal {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetMeResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetVersionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *VersionInfo
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetVersionResponse) GetJSON200() *VersionInfo {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetVersionResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -270,6 +440,22 @@ func (r GetVersionResponse) ContentType() string {
 	return ""
 }
 
+// GetMeWithResponse Get the calling principal
+//
+// Returns the principal that makes the request and its roles. Plan
+// P1-03 adds its permissions and the CSRF token of the session.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me (the `GetMe` operationId).
+func (c *ClientWithResponses) GetMeWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMeResponse, error) {
+	rsp, err := c.GetMe(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMeResponse(rsp)
+}
+
 // GetVersionWithResponse Get the version of the running server
 //
 // Returns the release version and Git commit of the running server, and
@@ -285,6 +471,39 @@ func (c *ClientWithResponses) GetVersionWithResponse(ctx context.Context, reqEdi
 		return nil, err
 	}
 	return ParseGetVersionResponse(rsp)
+}
+
+// ParseGetMeResponse parses an HTTP response from a GetMeWithResponse call
+func ParseGetMeResponse(rsp *http.Response) (*GetMeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Principal
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseGetVersionResponse parses an HTTP response from a GetVersionWithResponse call
@@ -307,6 +526,13 @@ func ParseGetVersionResponse(rsp *http.Response) (*GetVersionResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
 
 	}
 

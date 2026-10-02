@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"net"
@@ -47,8 +48,9 @@ func NewObserver(logger *slog.Logger, m *metrics.HTTP, tp trace.TracerProvider) 
 }
 
 // Wrap instruments the handler of the named listener. The route of a request
-// is the ServeMux pattern that matched it, so no handler between Wrap and the
-// muxes may replace the request.
+// is the pattern of the innermost ServeMux that matched it: a handler that
+// replaces the request, as authentication does, reports it with
+// logging.SetRoute.
 func (o *Observer) Wrap(listener string, next http.Handler) http.Handler {
 	inFlight := o.metrics.InFlight(listener)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +93,7 @@ func (o *Observer) Wrap(listener string, next http.Handler) http.Handler {
 			case status == 0:
 				status = http.StatusOK // nothing written: net/http sends 200
 			}
-			route := routeOf(r.Pattern)
+			route := routeOf(cmp.Or(logging.Route(ctx), r.Pattern))
 			took := time.Since(start)
 			o.metrics.Observe(listener, method, route, status, took)
 			endSpan(span, spanName, route, status)

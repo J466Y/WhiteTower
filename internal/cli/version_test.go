@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/J466Y/WhiteTower/internal/api/rest"
 	"github.com/J466Y/WhiteTower/internal/cli"
+	"github.com/J466Y/WhiteTower/internal/platform/auth"
+	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 	"github.com/J466Y/WhiteTower/internal/server"
 )
 
@@ -48,7 +52,12 @@ func TestVersionSanitizesTheServersAnswer(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	srv := httptest.NewTLSServer(server.ConsoleHandler())
+	srv := httptest.NewTLSServer(server.ConsoleHandler(rest.Handler(rest.Options{
+		Logger:        slog.New(slog.DiscardHandler),
+		Authenticator: auth.Unauthenticated{},
+		Authorizer:    auth.DenyAll{},
+		Limiter:       ratelimit.New(1000, 1000),
+	})))
 	t.Cleanup(srv.Close)
 
 	tests := []struct {

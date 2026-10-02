@@ -43,6 +43,21 @@ func TestSmoke(t *testing.T) {
 		}
 	})
 
+	t.Run("OpenAPI document", func(t *testing.T) {
+		status, _, body := get(t, client, base+"/api/v1/openapi.json")
+		if status != http.StatusOK || !strings.Contains(body, `"openapi":"3.1.0"`) {
+			t.Fatalf("got %d", status)
+		}
+	})
+
+	t.Run("protected operation", func(t *testing.T) {
+		status, header, body := get(t, client, base+"/api/v1/me")
+		if status != http.StatusUnauthorized || header.Get("Content-Type") != "application/problem+json" ||
+			!strings.Contains(body, `"code":"unauthenticated"`) {
+			t.Fatalf("got %d %s %q, want a 401 problem", status, header.Get("Content-Type"), body)
+		}
+	})
+
 	t.Run("metrics", func(t *testing.T) {
 		status, _, body := get(t, client, operations+"/metrics")
 		if status != http.StatusOK {
