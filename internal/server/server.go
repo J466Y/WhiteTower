@@ -221,6 +221,7 @@ func (s *Server) httpServer(h http.Handler, tlsConfig *tls.Config) *http.Server 
 	if tlsConfig != nil {
 		protocols.SetHTTP2(true)
 	}
+	h2 := http2Config
 	return &http.Server{
 		Handler:           h,
 		TLSConfig:         tlsConfig,
@@ -231,6 +232,21 @@ func (s *Server) httpServer(h http.Handler, tlsConfig *tls.Config) *http.Server 
 		// default megabyte would let each connection hold one (threat model,
 		// T-11).
 		MaxHeaderBytes: 64 << 10,
+		HTTP2:          &h2,
 		ErrorLog:       slog.NewLogLogger(s.logger.Handler(), slog.LevelWarn),
 	}
+}
+
+// http2Config is the HTTP/2 configuration of the HTTPS listeners. The module
+// API's watch streams stay open for as long as their instances run, and each
+// carries what its instance must learn, halts first: a peer that is gone, or
+// that stops reading, must not keep its streams. A connection silent for 20
+// seconds gets a ping, and is closed when the ping is not answered within 10;
+// a connection that takes no data for 30 seconds while the server has some
+// to write is closed, which ends the streams of a client too slow to read
+// (module contracts, CORE-7).
+var http2Config = http.HTTP2Config{
+	SendPingTimeout:  20 * time.Second,
+	PingTimeout:      10 * time.Second,
+	WriteByteTimeout: 30 * time.Second,
 }

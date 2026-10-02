@@ -1,9 +1,12 @@
 package server
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strings"
+
+	"connectrpc.com/connect"
 
 	"github.com/J466Y/WhiteTower/internal/api/moduleapi"
 	"github.com/J466Y/WhiteTower/internal/api/rest"
@@ -18,10 +21,13 @@ import (
 const HSTS = "max-age=63072000"
 
 // Body size limits of the listeners: a request over them is refused before
-// any handler runs (security test ST-05). The machine listener's follow the
-// module contracts, with the module API.
+// any handler runs (security test ST-05). The module API has no
+// client-streaming procedure, so a request body holds one message: the
+// machine listener allows a message of the module contracts' size (section
+// 4.8) and room for its framing.
 const (
 	MaxConsoleBody    = 1 << 20
+	MaxMachineBody    = moduleapi.MaxMessageBytes + 64<<10
 	MaxOperationsBody = 4 << 10
 )
 
@@ -56,13 +62,24 @@ func LimitBody(limit int64, refuse, next http.Handler) http.Handler {
 	})
 }
 
-// MachineHandler serves the machine listener: the module API.
-func MachineHandler() http.Handler {
-	mux := http.NewServeMux()
-	mux.Handle(moduleapi.Handler())
+// MachineHandler serves the machine listener: the module API, built with
+// moduleapi.Handler. A body over the limit is refused as RESOURCE_EXHAUSTED
+// in the caller's protocol, as the module API refuses a message over its
+// limit, so that clients handle both alike.
+func MachineHandler(api http.Handler) http.Handler {
+	rpc := connect.NewErrorWriter()
+	tooLarge := connect.NewError(connect.CodeResourceExhausted,
+		errors.New("the request is larger than a message may be (module contracts, section 4.8)"))
+	limited := LimitBody(MaxMachineBody, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !rpc.IsSupported(r) {
+			plain(w, http.StatusRequestEntityTooLarge, "request body too large\n")
+			return
+		}
+		_ = rpc.Write(w, r, tooLarge)
+	}), api)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		mux.ServeHTTP(w, r)
+		limited.ServeHTTP(w, r)
 	})
 }
 

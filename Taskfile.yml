@@ -165,7 +165,7 @@ tasks:
       - docker compose -f deploy/compose/dev/compose.yaml down {{.CLI_ARGS}}
 
   e2e:
-    desc: Run the end-to-end tests against a running core (WT_E2E_URL, default https://127.0.0.1:8443; WT_E2E_OPERATIONS_URL, default http://127.0.0.1:9090)
+    desc: Run the end-to-end tests against a running core (WT_E2E_URL, default https://127.0.0.1:8443; WT_E2E_MACHINE_URL, default https://127.0.0.1:9443; WT_E2E_OPERATIONS_URL, default http://127.0.0.1:9090)
     cmds:
       - go test -tags e2e -count=1 ./test/e2e/...
       - "{{.PNPM}} --dir web run e2e"
