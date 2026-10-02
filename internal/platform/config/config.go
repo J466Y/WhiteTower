@@ -25,6 +25,8 @@ type Config struct {
 	Listeners Listeners `yaml:"listeners"`
 	// TLS settings shared by the console and machine listeners.
 	TLS TLS `yaml:"tls"`
+	// The public REST API.
+	API API `yaml:"api"`
 	// The PostgreSQL database. The server connects with the runtime role only; whitetower migrate alone uses the migration role (threat model, DC-3).
 	Database Database `yaml:"database"`
 	// How the server stops.
@@ -69,6 +71,14 @@ type Listener struct {
 type TLS struct {
 	// The oldest TLS version accepted: 1.2 or 1.3.
 	MinVersion string `yaml:"min_version"`
+}
+
+// API holds the settings of the public REST API.
+type API struct {
+	// Requests per second that each principal may make on average, and each client address before login. Behind a proxy, every client shares the proxy's address until trusted proxies come (plan P1-12).
+	RateLimit float64 `yaml:"rate_limit"`
+	// Requests that each principal or client address may make at once, above the average.
+	RateBurst int `yaml:"rate_burst"`
 }
 
 // Database holds the PostgreSQL settings.
@@ -143,6 +153,7 @@ func Defaults() Config {
 			Operations: Listener{Address: "127.0.0.1:9090"},
 		},
 		TLS:      TLS{MinVersion: "1.2"},
+		API:      API{RateLimit: 50, RateBurst: 100},
 		Database: Database{MaxConnections: 10},
 		Shutdown: Shutdown{Timeout: 8 * time.Second},
 		Log:      Log{Level: "info"},
@@ -209,6 +220,12 @@ func (c Config) Validate() error {
 
 	if _, err := c.TLS.Version(); err != nil {
 		add("tls.min_version", "%v", err)
+	}
+	if r := c.API.RateLimit; !(r > 0 && r <= 100_000) {
+		add("api.rate_limit", "%v: want more than 0 and at most 100000 requests per second", r)
+	}
+	if b := c.API.RateBurst; b < 1 || b > 100_000 {
+		add("api.rate_burst", "%d: want 1 to 100000", b)
 	}
 	if u := c.Database.URL; u != "" {
 		if err := checkDatabaseURL(u); err != nil {

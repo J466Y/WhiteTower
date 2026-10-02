@@ -26,6 +26,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the calling principal
+         * @description Returns the principal that makes the request and its roles. Plan
+         *     P1-03 adds its permissions and the CSRF token of the session.
+         */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -41,8 +62,49 @@ export interface components {
              */
             apiVersion: "v1";
         };
+        Principal: {
+            /**
+             * Format: uuid
+             * @description The principal's identifier.
+             */
+            id: string;
+            /** @enum {string} */
+            kind: "human" | "service_account";
+            displayName: string;
+            /** @description The roles bound to the principal (requirements, permission matrix). */
+            roles: string[];
+        };
+        /**
+         * @description RFC 9457 problem details. `type` and `code` identify the error;
+         *     `title` is the same for every occurrence of it, and `detail`
+         *     explains this one. No internal detail reaches the client.
+         */
+        Problem: {
+            /**
+             * Format: uri
+             * @description Identifies the error, and links to its documentation.
+             */
+            type: string;
+            title: string;
+            status: number;
+            detail?: string;
+            /** @description This occurrence, as `urn:uuid:` followed by the request ID, which the logs record. */
+            instance?: string;
+            /** @description The stable error code. */
+            code: string;
+        };
     };
-    responses: never;
+    responses: {
+        /** @description An error, as RFC 9457 problem details. */
+        Problem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -68,6 +130,28 @@ export interface operations {
                     "application/json": components["schemas"]["VersionInfo"];
                 };
             };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The calling principal. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Principal"];
+                };
+            };
+            default: components["responses"]["Problem"];
         };
     };
 }

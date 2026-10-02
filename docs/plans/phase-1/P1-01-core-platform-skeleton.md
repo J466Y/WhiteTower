@@ -146,7 +146,7 @@ The plan lands in seven pull requests:
 | 1. Configuration, commands and listeners | 1, 2 | Done |
 | 2. Observability and health | 3 | Done |
 | 3. Database layer and `whitetower migrate` | 4, and the PostgreSQL fixture of step 10 | Done |
-| 4. REST API scaffolding and the console | 5, 9 | Not started |
+| 4. REST API scaffolding and the console | 5, 9 | Done |
 | 5. Module API scaffolding | 6 | Not started |
 | 6. Background jobs and notifications across replicas | 7, 8 | Not started |
 | 7. Test harness, internal rules and security tests | 10, 11, ST-01 to ST-05 | Not started |
@@ -197,3 +197,14 @@ The plan lands in seven pull requests:
   - the runtime role cannot drop triggers, create tables or touch the version table (T-54);
   - `InTx` commits, rolls back, retries and runs its hooks as described.
 - Supply chain: testcontainers adds test-only modules, none of which the server binary links. Two advisories came with the new modules and are fixed by upgrading: GO-2026-6253 (`moby/go-archive` 0.3.3) and GO-2026-6094 (`google/cel-go` 0.31.0, in the tools). The root `osv-scanner.toml` records GO-2026-5932, as `hack/tools` does.
+
+### 2026-10-02: REST API scaffolding and the console
+
+- The OpenAPI document declares the session cookie and the API tokens as security schemes, and requires one of them unless an operation declares `security: []`. `/me`, the placeholder that P1-03 completes, returns the calling principal. The server serves the document at `/api/v1/openapi.json`, with an ETag.
+- The middleware of the public API, from the outside in: security headers (`default-src 'none'`, `no-store`, `Cross-Origin-Resource-Policy`), panic recovery, authentication, rate limiting, then the router.
+- Authorization runs for each operation, in the strict middleware of the generated code, so no operation can bypass it. An operation the document does not mark public needs a principal, and the authorizer gets the document's `operationId`. `auth.Authenticator` and `auth.Authorizer` are the hooks of P1-03; until then nobody is authenticated and nothing is permitted.
+- Errors are RFC 9457 problem details with stable codes, listed in the [errors reference](../../reference/api-errors.md), which a test keeps in step with the code. `instance` holds the request ID. Unknown paths and methods answer 404 and 405 as problems, and an internal error shows nothing of its cause, which goes to the log.
+- Helpers: `PageSize` (50 by default, 200 at most), opaque cursors that refuse anything they did not make, and `ETag` and `IfMatch`: an update without `If-Match` is refused with 428. A sample resource in the tests shows each of them through the middleware.
+- Rate limits: a token bucket per principal or, before login, per client address, with an IPv6 client counted per /64. The default is 50 requests per second with bursts of 100 (`api.rate_limit`, `api.rate_burst`), and refusals are counted in `whitetower_http_requests_rate_limited_total`. Behind a proxy, every client shares the proxy's address until P1-12 adds trusted proxies.
+- Size limits: the console listener refuses bodies over 1 MiB and the operations listener over 4 KiB, before any handler runs, and every listener answers headers over 64 KiB with 431. That is ST-05 for these two listeners; the machine listener's limits come with PR 5.
+- Step 9 was in place since P0-01. Tests now cover deep links, the caching of hashed assets and of `index.html`, and a policy that allows no other origin; the browser test opens a deep link too.

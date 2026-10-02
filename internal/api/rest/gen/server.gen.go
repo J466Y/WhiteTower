@@ -11,7 +11,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for PrincipalKind.
+const (
+	Human          PrincipalKind = "human"
+	ServiceAccount PrincipalKind = "service_account"
+)
+
+// Valid indicates whether the value is a known member of the PrincipalKind enum.
+func (e PrincipalKind) Valid() bool {
+	switch e {
+	case Human:
+		return true
+	case ServiceAccount:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for VersionInfoApiVersion.
 const (
@@ -26,6 +46,38 @@ func (e VersionInfoApiVersion) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Principal defines model for Principal.
+type Principal struct {
+	DisplayName string `json:"displayName"`
+
+	// Id The principal's identifier.
+	Id   openapi_types.UUID `json:"id"`
+	Kind PrincipalKind      `json:"kind"`
+
+	// Roles The roles bound to the principal (requirements, permission matrix).
+	Roles []string `json:"roles"`
+}
+
+// PrincipalKind defines model for Principal.Kind.
+type PrincipalKind string
+
+// Problem RFC 9457 problem details. `type` and `code` identify the error;
+// `title` is the same for every occurrence of it, and `detail`
+// explains this one. No internal detail reaches the client.
+type Problem struct {
+	// Code The stable error code.
+	Code   string  `json:"code"`
+	Detail *string `json:"detail,omitempty"`
+
+	// Instance This occurrence, as `urn:uuid:` followed by the request ID, which the logs record.
+	Instance *string `json:"instance,omitempty"`
+	Status   int     `json:"status"`
+	Title    string  `json:"title"`
+
+	// Type Identifies the error, and links to its documentation.
+	Type string `json:"type"`
 }
 
 // VersionInfo defines model for VersionInfo.
@@ -45,6 +97,9 @@ type VersionInfoApiVersion string
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetMe Get the calling principal
+	// (GET /me)
+	GetMe(w http.ResponseWriter, r *http.Request)
 	// GetVersion Get the version of the running server
 	// (GET /version)
 	GetVersion(w http.ResponseWriter, r *http.Request)
@@ -58,6 +113,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetMe operation middleware
+func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetVersion operation middleware
 func (siw *ServerInterfaceWrapper) GetVersion(w http.ResponseWriter, r *http.Request) {
@@ -194,8 +263,49 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/version", wrapper.GetVersion)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 
 	return m
+}
+
+type ProblemApplicationProblemPlusJSONResponse Problem
+
+type GetMeRequestObject struct {
+}
+
+type GetMeResponseObject interface {
+	VisitGetMeResponse(w http.ResponseWriter) error
+}
+
+type GetMe200JSONResponse Principal
+
+func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetMedefaultApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetVersionRequestObject struct {
@@ -219,8 +329,28 @@ func (response GetVersion200JSONResponse) VisitGetVersionResponse(w http.Respons
 	return err
 }
 
+type GetVersiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetVersiondefaultApplicationProblemPlusJSONResponse) VisitGetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetMe Get the calling principal
+	// (GET /me)
+	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
 	// GetVersion Get the version of the running server
 	// (GET /version)
 	GetVersion(ctx context.Context, request GetVersionRequestObject) (GetVersionResponseObject, error)
@@ -263,6 +393,30 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetMe operation middleware
+func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	var request GetMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMe(ctx, request.(GetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeResponseObject); ok {
+		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetVersion operation middleware

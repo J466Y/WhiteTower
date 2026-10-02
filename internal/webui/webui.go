@@ -20,8 +20,9 @@ const ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 
 
 // Handler serves the console. Paths without a file extension that match no
 // file are client-side routes and receive index.html; missing assets are 404s.
-func Handler() http.Handler {
-	files := assets()
+func Handler() http.Handler { return newHandler(assets()) }
+
+func newHandler(files fs.FS) http.Handler {
 	index, err := fs.ReadFile(files, "index.html")
 	if err != nil {
 		panic("webui: the console has no index.html: " + err.Error())

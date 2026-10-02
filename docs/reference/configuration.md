@@ -46,6 +46,15 @@ TLS settings shared by the console and machine listeners.
 | --- | --- | --- | --- | --- |
 | `tls.min_version` | `WT_TLS_MIN_VERSION` | string | `1.2` | The oldest TLS version accepted: 1.2 or 1.3. |
 
+## `api`
+
+The public REST API.
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `api.rate_limit` | `WT_API_RATE_LIMIT` | number | `50` | Requests per second that each principal may make on average, and each client address before login. Behind a proxy, every client shares the proxy's address until trusted proxies come (plan P1-12). |
+| `api.rate_burst` | `WT_API_RATE_BURST` | integer | `100` | Requests that each principal or client address may make at once, above the average. |
+
 ## `database`
 
 The PostgreSQL database. The server connects with the runtime role only; whitetower migrate alone uses the migration role (threat model, DC-3).

@@ -19,8 +19,11 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/J466Y/WhiteTower/internal/api/rest"
+	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/metrics"
+	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 	"github.com/J466Y/WhiteTower/internal/server"
 	"github.com/J466Y/WhiteTower/internal/version"
 )
@@ -118,7 +121,7 @@ const (
 // logs and the traces by its IDs.
 func TestARequestCanBeFollowedByItsIDs(t *testing.T) {
 	o := newObserved(t)
-	srv := httptest.NewServer(o.Wrap("console", server.ConsoleHandler()))
+	srv := httptest.NewServer(o.Wrap("console", server.ConsoleHandler(publicAPI())))
 	t.Cleanup(srv.Close)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/api/v1/version", nil)
@@ -182,6 +185,35 @@ func TestARequestCanBeFollowedByItsIDs(t *testing.T) {
 	}
 	if v := testutil.ToFloat64(o.metrics.InFlight("console")); v != 0 {
 		t.Errorf("%v requests still in flight", v)
+	}
+}
+
+// everyone authenticates every request as the same principal.
+type everyone struct{}
+
+func (everyone) Authenticate(*http.Request) (*auth.Principal, error) {
+	return &auth.Principal{ID: "0192f2c4-0000-7000-8000-000000000007", Kind: auth.Human}, nil
+}
+
+// Authentication hands the router a copy of the request; the route it
+// matched still reaches the metrics and the access log.
+func TestTheRouteSurvivesAuthentication(t *testing.T) {
+	o := newObserved(t)
+	api := rest.Handler(rest.Options{
+		Logger:        slog.New(slog.DiscardHandler),
+		Authenticator: everyone{},
+		Authorizer:    auth.DenyAll{},
+		Limiter:       ratelimit.New(1000, 1000),
+	})
+	o.Wrap("console", server.ConsoleHandler(api)).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/me", nil))
+
+	logs := o.logs.records(t, "request")
+	if len(logs) != 1 || logs[0]["route"] != "/api/v1/me" || logs[0]["status"] != float64(http.StatusForbidden) ||
+		logs[0]["principal_id"] != "0192f2c4-0000-7000-8000-000000000007" {
+		t.Fatalf("access log %v", logs)
+	}
+	if want := `code="403",listener="console",method="GET",route="/api/v1/me"`; !strings.Contains(o.scrape(), want) {
+		t.Fatalf("metrics lack %s", want)
 	}
 }
 
