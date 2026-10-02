@@ -273,6 +273,8 @@ Later capabilities attach without redesigning the MVP schema. Their tables are n
 | Sessions, used assertions, outbox | SELECT, INSERT, UPDATE and DELETE (short-lived data cleaned by jobs) |
 | Every other governance table | SELECT, INSERT and UPDATE, never DELETE |
 
+`whitetower migrate` also lets the runtime role read goose's version table, `goose_db_version`, through which the server checks that the schema is the one its binary needs.
+
 **Partitions.**
 
 - `audit_events` and `audit_event_ids` are partitioned by month.

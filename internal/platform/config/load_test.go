@@ -18,17 +18,35 @@ func writeFile(t *testing.T, content string) string {
 	return path
 }
 
-func TestDefaultsNeedCertificatesOrDevelopmentTLS(t *testing.T) {
-	err := Defaults().Validate()
-	for _, key := range []string{"listeners.console.cert_file", "listeners.console.key_file", "listeners.machine.cert_file", "listeners.machine.key_file"} {
+func TestEachCommandChecksWhatItNeeds(t *testing.T) {
+	if err := Defaults().Validate(); err != nil {
+		t.Fatalf("the defaults hold invalid values: %v", err)
+	}
+
+	err := Defaults().CheckServe()
+	for _, key := range []string{
+		"listeners.console.cert_file", "listeners.console.key_file",
+		"listeners.machine.cert_file", "listeners.machine.key_file", "database.url",
+	} {
 		if err == nil || !strings.Contains(err.Error(), key) {
-			t.Errorf("defaults without certificates: error %v, want it to name %s", err, key)
+			t.Errorf("serving with the defaults: error %v, want it to name %s", err, key)
 		}
 	}
 	cfg := Defaults()
 	cfg.Dev.SelfSignedTLS = true
-	if err := cfg.Validate(); err != nil {
-		t.Errorf("defaults with development TLS: %v", err)
+	cfg.Database.URL = "postgres://whitetower_app@db/whitetower"
+	if err := cfg.CheckServe(); err != nil {
+		t.Errorf("serving with development TLS and a database: %v", err)
+	}
+
+	if err := Defaults().CheckMigrate(); err == nil || !strings.Contains(err.Error(), "database.migration.url") {
+		t.Errorf("migrating with the defaults: error %v, want it to name database.migration.url", err)
+	}
+	// whitetower migrate needs no certificate, and no runtime role.
+	cfg = Defaults()
+	cfg.Database.Migration.URL = "postgres://whitetower_migrator@db/whitetower"
+	if err := cfg.CheckMigrate(); err != nil {
+		t.Errorf("migrating without certificates: %v", err)
 	}
 }
 
@@ -105,6 +123,12 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 		{"OTLP without host", []string{"WT_TRACING_OTLP_ENDPOINT=https:///v1"}, "tracing.otlp.endpoint"},
 		{"OTLP with a query", []string{"WT_TRACING_OTLP_ENDPOINT=https://collector:4318/?tenant=a"}, "tracing.otlp.endpoint"},
 		{"CA file without https", []string{"WT_TRACING_OTLP_ENDPOINT=http://collector:4318", "WT_TRACING_OTLP_CA_FILE=/ca.pem"}, "tracing.otlp.ca_file"},
+		{"database scheme", []string{"WT_DATABASE_URL=mysql://app@db/whitetower"}, "database.url"},
+		{"database key-value string", []string{"WT_DATABASE_URL=host=db user=app"}, "database.url"},
+		{"password in the database URL", []string{"WT_DATABASE_URL=postgres://app:secret@db/whitetower"}, "database.url"},
+		{"password parameter", []string{"WT_DATABASE_MIGRATION_URL=postgres://owner@db/whitetower?password=secret"}, "database.migration.url"},
+		{"TLS key password parameter", []string{"WT_DATABASE_MIGRATION_URL=postgres://owner@db/whitetower?sslpassword=secret"}, "database.migration.url"},
+		{"no connections", []string{"WT_DATABASE_MAX_CONNECTIONS=0"}, "database.max_connections"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -130,6 +154,24 @@ func TestEndpointErrorsDoNotRepeatTheURL(t *testing.T) {
 		}
 		if strings.Contains(err.Error(), "canary-5e3f") {
 			t.Fatalf("the error repeats the endpoint: %v", err)
+		}
+	}
+}
+
+// The same holds for the database URLs, which name roles with privileges.
+func TestDatabaseURLErrorsDoNotRepeatTheURL(t *testing.T) {
+	for _, env := range []string{
+		"WT_DATABASE_URL=postgres://app:canary-5e3f@db/whitetower",
+		"WT_DATABASE_URL=postgres://app@db/whitetower?password=canary-5e3f",
+		"WT_DATABASE_MIGRATION_URL=postgres://owner@db/whitetower?sslpassword=canary-5e3f",
+		"WT_DATABASE_MIGRATION_URL=postgres://owner:canary-5e3f@db/%zz",
+	} {
+		_, err := Load("", []string{"WT_DEV_SELF_SIGNED_TLS=true", env})
+		if err == nil || !strings.Contains(err.Error(), "database.") {
+			t.Fatalf("%s: error %v, want it to name the setting", env, err)
+		}
+		if strings.Contains(err.Error(), "canary-5e3f") {
+			t.Fatalf("the error repeats the URL: %v", err)
 		}
 	}
 }

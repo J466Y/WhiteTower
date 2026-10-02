@@ -46,6 +46,25 @@ TLS settings shared by the console and machine listeners.
 | --- | --- | --- | --- | --- |
 | `tls.min_version` | `WT_TLS_MIN_VERSION` | string | `1.2` | The oldest TLS version accepted: 1.2 or 1.3. |
 
+## `database`
+
+The PostgreSQL database. The server connects with the runtime role only; whitetower migrate alone uses the migration role (threat model, DC-3).
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `database.url` | `WT_DATABASE_URL` | string | none | Connection of the runtime role, as a postgres:// URL without the password, such as postgres://whitetower_app@db:5432/whitetower?sslmode=verify-full. Required to serve. |
+| `database.password_file` | `WT_DATABASE_PASSWORD_FILE` | string | none | File holding the runtime role's password. It is the only source of the password: PGPASSWORD and .pgpass are ignored. |
+| `database.max_connections` | `WT_DATABASE_MAX_CONNECTIONS` | integer | `10` | The most connections the server keeps open to the database. |
+
+### `database.migration`
+
+The migration role, which owns the schema.
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `database.migration.url` | `WT_DATABASE_MIGRATION_URL` | string | none | Connection of the migration role, as a postgres:// URL without the password. Required by whitetower migrate; the server never reads it. |
+| `database.migration.password_file` | `WT_DATABASE_MIGRATION_PASSWORD_FILE` | string | none | File holding the migration role's password. Mount it only where whitetower migrate runs, such as its init container. |
+
 ## `shutdown`
 
 How the server stops.

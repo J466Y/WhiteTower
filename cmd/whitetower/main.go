@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"go.opentelemetry.io/otel"
 
 	"github.com/J466Y/WhiteTower/internal/platform/config"
+	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/health"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/metrics"
@@ -69,6 +71,7 @@ func newRootCommand(environ []string, stdout io.Writer) *cobra.Command {
 
 	root.AddCommand(
 		newServeCommand(load, stdout),
+		newMigrateCommand(load, stdout),
 		newConfigCommand(load),
 		newHealthcheckCommand(load),
 		&cobra.Command{
@@ -94,9 +97,35 @@ func newServeCommand(load func() (config.Config, error), stdout io.Writer) *cobr
 			if err != nil {
 				return err
 			}
+			if err := cfg.CheckServe(); err != nil {
+				return fmt.Errorf("invalid configuration:\n%w", err)
+			}
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 			return serve(ctx, cfg, stdout)
+		},
+	}
+}
+
+func newMigrateCommand(load func() (config.Config, error), stdout io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "migrate",
+		Short: "Apply the pending database migrations as the migration role, then exit",
+		Long: "Apply the pending database migrations as the migration role (database.migration.*), then exit. " +
+			"It runs before the server: as an init container on Kubernetes, as a one-off service in Compose. " +
+			"Concurrent runs take turns on an advisory lock. The server never reads the migration role's settings.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg, err := load()
+			if err != nil {
+				return err
+			}
+			if err := cfg.CheckMigrate(); err != nil {
+				return fmt.Errorf("invalid configuration:\n%w", err)
+			}
+			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			return db.Migrate(ctx, cfg.Database.Migration, logging.New(stdout, cfg.Log.Level))
 		},
 	}
 }
@@ -128,10 +157,23 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		}
 	}()
 
+	// The runtime role only: the migration role's settings stay unread
+	// (threat model, DC-3).
+	database, err := db.Open(cfg.Database)
+	if err != nil {
+		return err
+	}
+	defer database.Close()
+	if err := checkSchemaAtStart(ctx, database, logger); err != nil {
+		return err
+	}
+
 	registry := metrics.NewRegistry(v)
 	observer := server.NewObserver(logger, metrics.NewHTTP(registry), traces.TracerProvider())
 	drain := server.NewDrain()
 	ready := health.NewReadiness(logger)
+	ready.Add("database", database.Ping)
+	ready.Add("schema", database.CheckSchema)
 	srv, err := server.New(cfg, server.Handlers{
 		Console:    observer.Wrap("console", server.ConsoleHandler()),
 		Machine:    observer.Wrap("machine", server.MachineHandler()),
@@ -146,6 +188,23 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 // traceFlushTimeout bounds how long the last spans may take to leave after
 // the listeners have stopped.
 const traceFlushTimeout = 5 * time.Second
+
+// checkSchemaAtStart refuses a database whose schema is newer than the
+// binary. A database that does not answer yet, or is not migrated yet, only
+// delays readiness: the server starts and waits for it.
+func checkSchemaAtStart(ctx context.Context, database *db.DB, logger *slog.Logger) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	switch err := database.CheckSchema(ctx); {
+	case errors.Is(err, db.ErrSchemaAhead):
+		return err
+	case err != nil:
+		logger.Warn("the database is not ready; the server waits for it, and for whitetower migrate", "error", err.Error())
+	default:
+		logger.Info("the database schema is current", "version", db.ExpectedVersion())
+	}
+	return nil
+}
 
 func newConfigCommand(load func() (config.Config, error)) *cobra.Command {
 	cmd := &cobra.Command{

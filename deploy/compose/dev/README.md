@@ -4,7 +4,7 @@ Local services for development and evaluation, started with `task dev` (see [doc
 
 | Service | Address | Credentials |
 | --- | --- | --- |
-| PostgreSQL | `127.0.0.1:5432`, database `whitetower` | `whitetower` / `whitetower-dev-only` |
+| PostgreSQL | `127.0.0.1:5432`, database `whitetower` | Superuser, for administration: `whitetower` / `whitetower-dev-only`. Roles of the deployment: see below |
 | Keycloak | `http://127.0.0.1:8180`, realm `whitetower` | Administration console: `admin` / `admin-dev-only` |
 | Core (profile `core`) | Console and API `https://127.0.0.1:8443`; module API `https://127.0.0.1:9443`; health and metrics `http://127.0.0.1:9090` | none yet. The certificate is self-signed, made at startup |
 | OpenTelemetry collector (profile `otel`) | OTLP gRPC `127.0.0.1:4317`, HTTP `127.0.0.1:4318` | none |
@@ -23,6 +23,17 @@ WT_OPERATIONS_PORT=9090
 WT_OTLP_GRPC_PORT=4317
 WT_OTLP_HTTP_PORT=4318
 ```
+
+## Database roles
+
+[`postgres/roles.sql`](postgres/roles.sql) creates the roles of a deployment when PostgreSQL starts on an empty volume. Their passwords are in `secrets/`, mounted as files under `/run/secrets` as a Kubernetes Secret would be.
+
+| Role | Password | Used by |
+| --- | --- | --- |
+| `whitetower_migrator` | `whitetower-migrator-dev-only` | `whitetower migrate`: the one-off `migrate` service of the `core` profile, and `task migrate`. It owns the schema |
+| `whitetower_app` | `whitetower-app-dev-only` | The core. It belongs to `whitetower_runtime`, which may read and write data but never change the schema |
+
+A volume created before these roles existed lacks them: `docker compose down --volumes` deletes it, with the development data, and the next start creates the roles.
 
 ## Traces from the core
 

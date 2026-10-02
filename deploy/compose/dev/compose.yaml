@@ -22,6 +22,8 @@ services:
       - "127.0.0.1:${WT_POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      # Creates the migration and runtime roles on the first start.
+      - ./postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U whitetower -d whitetower"]
       interval: 5s
@@ -53,24 +55,43 @@ services:
       retries: 30
       start_period: 20s
 
-  whitetower:
+  # Applies the migrations as the migration role, then exits; the core waits
+  # for it. Only this service gets the migration role's password (DC-3).
+  migrate:
     profiles: [core]
-    build:
+    image: whitetower-dev-core
+    build: &core-build
       context: ../../..
       dockerfile: deploy/docker/Dockerfile
+    command: ["migrate"]
+    environment:
+      WT_DATABASE_MIGRATION_URL: postgres://whitetower_migrator@postgres:5432/whitetower?sslmode=disable
+      WT_DATABASE_MIGRATION_PASSWORD_FILE: /run/secrets/db-migrator-password
+    secrets: [db-migrator-password]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  whitetower:
+    profiles: [core]
+    image: whitetower-dev-core
+    build: *core-build
     environment:
       # A self-signed certificate made at startup: for development only.
       WT_DEV_SELF_SIGNED_TLS: "true"
+      WT_DATABASE_URL: postgres://whitetower_app@postgres:5432/whitetower?sslmode=disable
+      WT_DATABASE_PASSWORD_FILE: /run/secrets/db-app-password
       # Empty: no trace leaves the core. http://otel-collector:4318 sends them
       # to the collector of the otel profile.
       WT_TRACING_OTLP_ENDPOINT: ${WT_TRACING_OTLP_ENDPOINT:-}
+    secrets: [db-app-password]
     ports:
       - "127.0.0.1:${WT_CONSOLE_PORT:-8443}:8443"
       - "127.0.0.1:${WT_MACHINE_PORT:-9443}:9443"
       - "127.0.0.1:${WT_OPERATIONS_PORT:-9090}:9090"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       # Distroless images have no shell: the binary checks itself.
       test: ["CMD", "/usr/local/bin/whitetower", "healthcheck"]
@@ -90,3 +111,10 @@ services:
 
 volumes:
   postgres-data:
+
+# Password files, mounted under /run/secrets as a Kubernetes Secret would be.
+secrets:
+  db-app-password:
+    file: ./secrets/db-app-password
+  db-migrator-password:
+    file: ./secrets/db-migrator-password

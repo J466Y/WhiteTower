@@ -1,0 +1,34 @@
+# sqlc turns the SQL queries into typed Go code: `task gen:sql`. https://docs.sqlc.dev
+# The schema it checks them against is the migrations themselves.
+version: "2"
+sql:
+  - engine: postgresql
+    schema:
+      - internal/platform/db/goose_db_version.sql
+      - internal/platform/db/migrations
+    queries: internal/platform/db/queries
+    gen:
+      go:
+        package: gen
+        out: internal/platform/db/gen
+        sql_package: pgx/v5
+        omit_unused_structs: true
+        emit_pointers_for_null_types: true
+        # The types the code uses (plan P0-02 left the choice to P1-01).
+        overrides:
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID
+          - db_type: uuid
+            nullable: true
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+              pointer: true
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              import: time
+              type: Time
+              pointer: true

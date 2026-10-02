@@ -1,0 +1,7 @@
+# Read by OSV-Scanner, and by the OpenSSF Scorecard check built on it, for the
+# product's go.mod. CI also checks the code by reachability (govulncheck, job
+# "Go"), so code that starts calling a vulnerable package still fails it.
+
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = "golang.org/x/crypto/openpgp is deprecated and will not be fixed, so every x/crypto version matches. x/crypto is only a test dependency here, and no package imports openpgp (go list -deps -test ./...)."

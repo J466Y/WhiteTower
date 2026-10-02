@@ -52,7 +52,7 @@ func TestConfigPrint(t *testing.T) {
 }
 
 func TestInvalidConfigurationStopsWithTheSettingNamed(t *testing.T) {
-	for _, command := range []string{"serve", "healthcheck"} {
+	for _, command := range []string{"serve", "migrate", "healthcheck"} {
 		var stdout, stderr bytes.Buffer
 		env := append([]string{"WT_SHUTDOWN_TIMEOUT=30s"}, devEnv...)
 		if code := run([]string{command}, env, &stdout, &stderr); code != 1 {
