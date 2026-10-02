@@ -4,6 +4,9 @@
 #   go tool -modfile=hack/tools/go.mod task <name>
 version: "3"
 
+# The local overrides of the development services, such as WT_POSTGRES_PORT.
+dotenv: ["deploy/compose/dev/.env"]
+
 vars:
   # Go tools pinned in hack/tools/go.mod (Task, Buf, protoc plugins, oapi-codegen).
   GO_TOOL: go tool -modfile=hack/tools/go.mod
@@ -15,6 +18,8 @@ vars:
   COMMIT:
     sh: git rev-parse HEAD
   LDFLAGS: -s -w -X {{.MODULE}}/internal/version.version={{.VERSION}} -X {{.MODULE}}/internal/version.commit={{.COMMIT}}
+  # The development database of `task dev`, and its roles (deploy/compose/dev/README.md).
+  DEV_DATABASE: 127.0.0.1:{{.WT_POSTGRES_PORT | default "5432"}}/whitetower?sslmode=disable
 
 tasks:
   default:
@@ -35,6 +40,7 @@ tasks:
     cmds:
       - task: gen:openapi
       - task: gen:proto
+      - task: gen:sql
 
   gen:openapi:
     desc: Generate the Go server, the Go client and the console's types from the OpenAPI document
@@ -48,11 +54,16 @@ tasks:
     cmds:
       - "{{.GO_TOOL}} buf generate"
 
+  gen:sql:
+    desc: Generate typed Go code from the SQL queries, checked against the migrations (sqlc.yaml)
+    cmds:
+      - "{{.GO_TOOL}} sqlc generate"
+
   verify:gen:
     desc: Fail if the generated code is not up to date (used by CI)
     cmds:
       - task: gen
-      - git diff --exit-code -- internal/api/rest/gen pkg/apiclient pkg/moduleapi web/src/api
+      - git diff --exit-code -- internal/api/rest/gen pkg/apiclient pkg/moduleapi web/src/api internal/platform/db/gen
 
   build:
     desc: Build the console and the binaries into bin/ (the console is embedded in whitetower)
@@ -74,11 +85,22 @@ tasks:
       - sh: test -f internal/webui/dist/index.html
         msg: "The console is not built: run `task build` (or `task build:web` first)."
 
+  migrate:
+    desc: Apply the database migrations to the development database (`task dev`), as the migration role
+    env:
+      WT_DATABASE_MIGRATION_URL: postgres://whitetower_migrator@{{.DEV_DATABASE}}
+      WT_DATABASE_MIGRATION_PASSWORD_FILE: deploy/compose/dev/secrets/db-migrator-password
+    cmds:
+      - go run ./cmd/whitetower migrate
+
   run:
-    desc: Run the core from source on https://127.0.0.1:8443, with a self-signed development certificate (placeholder console; use `task dev:web` for the real one)
+    desc: Migrate the development database, then run the core from source on https://127.0.0.1:8443, with a self-signed development certificate (placeholder console; use `task dev:web` for the real one)
     env:
       WT_DEV_SELF_SIGNED_TLS: "true"
+      WT_DATABASE_URL: postgres://whitetower_app@{{.DEV_DATABASE}}
+      WT_DATABASE_PASSWORD_FILE: deploy/compose/dev/secrets/db-app-password
     cmds:
+      - task: migrate
       - go run ./cmd/whitetower serve {{.CLI_ARGS}}
 
   test:

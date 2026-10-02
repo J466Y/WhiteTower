@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/J466Y/WhiteTower/internal/platform/config"
+	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 )
 
 // syncBuffer collects the server's logs while it runs.
@@ -103,17 +105,41 @@ type serving struct {
 	stop                         func() error
 }
 
+// startServe starts the server on a database with the binary's schema.
 func startServe(t *testing.T, environ ...string) *serving {
 	t.Helper()
+	return startServeOn(t, dbtest.New(t), environ...)
+}
+
+// databaseEnv names the runtime role's connection to d, as the server reads it.
+func databaseEnv(d *dbtest.Database) []string {
+	return []string{"WT_DATABASE_URL=" + d.Config.URL, "WT_DATABASE_PASSWORD_FILE=" + d.Config.PasswordFile}
+}
+
+// migrationEnv names the migration role's connection to d, as whitetower
+// migrate reads it.
+func migrationEnv(d *dbtest.Database) []string {
+	return []string{
+		"WT_DATABASE_MIGRATION_URL=" + d.Config.Migration.URL,
+		"WT_DATABASE_MIGRATION_PASSWORD_FILE=" + d.Config.Migration.PasswordFile,
+	}
+}
+
+// startServeOn starts the server on the database d.
+func startServeOn(t *testing.T, d *dbtest.Database, environ ...string) *serving {
+	t.Helper()
 	console, machine, operations := unusedAddr(t), unusedAddr(t), unusedAddr(t)
-	cfg, err := config.Load("", append([]string{
+	cfg, err := config.Load("", slices.Concat([]string{
 		"WT_DEV_SELF_SIGNED_TLS=true",
 		"WT_LISTENERS_CONSOLE_ADDRESS=" + console,
 		"WT_LISTENERS_MACHINE_ADDRESS=" + machine,
 		"WT_LISTENERS_OPERATIONS_ADDRESS=" + operations,
 		"WT_SHUTDOWN_TIMEOUT=2s",
-	}, environ...))
+	}, databaseEnv(d), environ))
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.CheckServe(); err != nil {
 		t.Fatal(err)
 	}
 	s := &serving{
@@ -137,6 +163,12 @@ func startServe(t *testing.T, environ ...string) *serving {
 	t.Cleanup(func() { _ = s.stop() })
 
 	for deadline := time.Now().Add(10 * time.Second); ; {
+		select {
+		case err := <-done:
+			done <- err // for stop
+			t.Fatalf("serve returned %v; it logged:\n%s", err, s.logs)
+		default:
+		}
 		if resp, err := http.Get(s.operations + "/healthz"); err == nil {
 			_ = resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
@@ -148,6 +180,21 @@ func startServe(t *testing.T, environ ...string) *serving {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
+}
+
+// readiness returns the operations listener's answer to /readyz.
+func (s *serving) readiness(t *testing.T) (int, string) {
+	t.Helper()
+	resp, err := http.Get(s.operations + "/readyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp.StatusCode, string(body)
 }
 
 // insecure trusts the development certificate.

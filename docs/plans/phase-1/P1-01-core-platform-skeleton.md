@@ -145,7 +145,7 @@ The plan lands in seven pull requests:
 | --- | --- | --- |
 | 1. Configuration, commands and listeners | 1, 2 | Done |
 | 2. Observability and health | 3 | Done |
-| 3. Database layer and `whitetower migrate` | 4, and the PostgreSQL fixture of step 10 | Not started |
+| 3. Database layer and `whitetower migrate` | 4, and the PostgreSQL fixture of step 10 | Done |
 | 4. REST API scaffolding and the console | 5, 9 | Not started |
 | 5. Module API scaffolding | 6 | Not started |
 | 6. Background jobs and notifications across replicas | 7, 8 | Not started |
@@ -175,3 +175,25 @@ The plan lands in seven pull requests:
   - the defaults make no outbound connection, with the `OTEL_*` variables pointing at a fake collector (acceptance criteria);
   - gRPC, Connect and the stream tests run through the instrumentation.
 - **Open:** OTLP export of logs (OPS-05) waits for the OpenTelemetry Go logs SDK and its OTLP exporter to reach 1.0. They are at 0.22 today, with 1.0 at the release candidate stage. Until then, the platform collects the JSON logs from standard output, for example with the collector's `filelog` receiver.
+
+### 2026-10-02: database layer and `whitetower migrate`
+
+- `internal/platform/db`: a `pgx` pool of the runtime role. `database.url` holds no password: it comes only from `database.password_file`, and `PGPASSWORD`, `.pgpass` and service files are ignored. `Ping` and `CheckSchema` are the readiness checks `database` and `schema`.
+- `whitetower migrate` applies the embedded `goose` migrations as the migration role (`database.migration.*`), under an advisory lock that holds concurrent runs for up to 30 minutes. It then lets the runtime role read goose's version table.
+- The server never reads the migration role's settings. It starts and waits while the schema is behind, with readiness failing on `schema`, and refuses to start on a newer schema.
+- Each command checks what it needs: `serve` the certificates and the database, `migrate` the migration role. `Validate` checks values only, so the migration's init container needs no certificate.
+- `InTx`:
+  - `BeforeCommit` hooks run in the transaction, and an error rolls everything back; the audit writer of P1-02 relies on it.
+  - `AfterCommit` hooks run only after a commit, with a context that the caller's cancellation does not end.
+  - Serialization failures and deadlocks run the transaction again, three times at most.
+  - A `Tx` cannot commit or roll back by itself.
+- `sqlc` 1.31, pinned in `hack/tools` and built without cgo, runs in `task gen` and checks the queries against the migrations. UUIDs map to `google/uuid` and timestamps to `time.Time`, the choice P0-02 left open. The first query reads the schema version.
+- `internal/platform/db/dbtest`: testcontainers starts PostgreSQL 17 once per test binary, with the roles of a deployment and a template migrated by the real code. Each test gets a copy. Without Docker the tests skip, except in CI.
+- The 28 schema checks of P0-02 now run as a Go test, on the schema that `whitetower migrate` applies.
+- Compose: `postgres/roles.sql` creates the roles on an empty volume, a one-off `migrate` service runs before the core, and the passwords are files under `/run/secrets`. `task run` migrates first.
+- Tests:
+  - two replicas migrate an empty database at once, one waiting for the other, and both servers become ready (the step's criterion);
+  - the server waits for the migrations, refuses a newer schema, and starts without the migration role's password file (DC-3);
+  - the runtime role cannot drop triggers, create tables or touch the version table (T-54);
+  - `InTx` commits, rolls back, retries and runs its hooks as described.
+- Supply chain: testcontainers adds test-only modules, none of which the server binary links. Two advisories came with the new modules and are fixed by upgrading: GO-2026-6253 (`moby/go-archive` 0.3.3) and GO-2026-6094 (`google/cel-go` 0.31.0, in the tools). The root `osv-scanner.toml` records GO-2026-5932, as `hack/tools` does.

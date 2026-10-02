@@ -23,15 +23,17 @@ How to build, run and test White Tower on Windows, macOS and Linux.
 git clone https://github.com/J466Y/WhiteTower.git
 cd WhiteTower
 task setup    # Go modules, pinned tools, console packages
-task build    # console, then bin/whitetower and bin/wtctl
-WT_DEV_SELF_SIGNED_TLS=true ./bin/whitetower serve
+task dev      # PostgreSQL and Keycloak, in Docker
+task run      # migrates the database, then runs the core from source
 ```
 
-On Windows, set the variable first: `$env:WT_DEV_SELF_SIGNED_TLS = "true"`, then run `.\bin\whitetower.exe serve`. The core then serves a self-signed certificate made at startup, which is for development only. Open <https://127.0.0.1:8443> and accept the browser's warning: the console shows the server's version. Check it from the CLI too:
+The core serves a self-signed certificate made at startup, which is for development only. Open <https://127.0.0.1:8443> and accept the browser's warning: the page shows the server's version. Check it from the CLI too:
 
 ```sh
-./bin/wtctl version --insecure-skip-tls-verify --server https://127.0.0.1:8443
+go run ./cmd/wtctl version --insecure-skip-tls-verify --server https://127.0.0.1:8443
 ```
+
+`task run` serves a placeholder page; [Working on the console](#working-on-the-console) shows how to run the real console. `task build` builds both into `bin/whitetower`, with the CLI next to it.
 
 The core has three listeners: the console and public API on `127.0.0.1:8443`, the module API on `127.0.0.1:9443`, and operations on `http://127.0.0.1:9090`, with `/healthz`, `/readyz` and `/metrics`. Its settings are in the [configuration reference](reference/configuration.md); `whitetower config print` shows the effective values.
 
@@ -45,7 +47,8 @@ The core has three listeners: the console and public API on `127.0.0.1:8443`, th
 | `task lint` | Runs `go vet`, golangci-lint, Biome, the TypeScript compiler and `buf lint` |
 | `task fmt` | Formats Go and console code |
 | `task vuln` | Checks Go dependencies for reachable known vulnerabilities |
-| `task run` | Runs the core from source with a development certificate, and a placeholder console |
+| `task run` | Migrates the development database, then runs the core from source with a development certificate and a placeholder console |
+| `task migrate` | Applies the database migrations to the development database |
 | `task dev` | Starts PostgreSQL and Keycloak in Docker |
 | `task dev:web` | Runs the console with live reload |
 | `task dev:down` | Stops the development services |
@@ -68,7 +71,9 @@ Vite forwards `/api` and `/auth` to the core, accepting its development certific
 
 `task dev` starts PostgreSQL and Keycloak. Keycloak comes with one test user per role. Addresses, users and credentials, all for local use only, are in [deploy/compose/dev/README.md](../deploy/compose/dev/README.md).
 
-To run the core in Docker as well, built from source:
+PostgreSQL has the roles of a deployment. `whitetower_migrator` owns the schema, and only `whitetower migrate` uses it. The core connects as `whitetower_app`, which may read and write data but never change the schema ([threat model](security/threat-model.md), DC-3). The roles are created when the database starts on an empty volume. A volume from before October 2026 lacks them: recreate it with `docker compose -f deploy/compose/dev/compose.yaml down --volumes`, which deletes the development data.
+
+To run the core in Docker as well, built from source, after a one-off `migrate` service:
 
 ```sh
 docker compose -f deploy/compose/dev/compose.yaml --profile core up -d --build
@@ -102,6 +107,7 @@ Commit the generated code with the contract change. Never edit it by hand: CI re
 ## Tests
 
 - **Unit tests:** `task test`.
+- **Database tests:** they start PostgreSQL in Docker with testcontainers, through `internal/platform/db/dbtest`, which gives each test a fresh database with the roles of a deployment. Without Docker they are skipped, except in CI, where they fail. `WT_TEST_POSTGRES_IMAGE` picks another PostgreSQL version, for example `postgres:16-alpine`.
 - **End-to-end tests:** start a core that serves the built console (`task build` then `./bin/whitetower serve` with a development certificate, or the Compose `core` profile), then run `task e2e`. The browser test needs Chromium, installed once with `pnpm --dir web exec playwright install chromium`. Set `WT_E2E_URL` and `WT_E2E_OPERATIONS_URL` to test another deployment.
 - **Race detector:** `go test -race ./...` needs cgo (a C compiler). CI runs it on Linux.
 

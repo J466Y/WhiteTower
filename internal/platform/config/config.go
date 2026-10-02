@@ -25,6 +25,8 @@ type Config struct {
 	Listeners Listeners `yaml:"listeners"`
 	// TLS settings shared by the console and machine listeners.
 	TLS TLS `yaml:"tls"`
+	// The PostgreSQL database. The server connects with the runtime role only; whitetower migrate alone uses the migration role (threat model, DC-3).
+	Database Database `yaml:"database"`
 	// How the server stops.
 	Shutdown Shutdown `yaml:"shutdown"`
 	// Logging.
@@ -67,6 +69,27 @@ type Listener struct {
 type TLS struct {
 	// The oldest TLS version accepted: 1.2 or 1.3.
 	MinVersion string `yaml:"min_version"`
+}
+
+// Database holds the PostgreSQL settings.
+type Database struct {
+	// Connection of the runtime role, as a postgres:// URL without the password, such as postgres://whitetower_app@db:5432/whitetower?sslmode=verify-full. Required to serve.
+	URL string `yaml:"url"`
+	// File holding the runtime role's password. It is the only source of the password: PGPASSWORD and .pgpass are ignored.
+	PasswordFile string `yaml:"password_file"`
+	// The most connections the server keeps open to the database.
+	MaxConnections int `yaml:"max_connections"`
+	// The migration role, which owns the schema.
+	Migration Migration `yaml:"migration"`
+}
+
+// Migration is the connection of the migration role, which only whitetower
+// migrate reads.
+type Migration struct {
+	// Connection of the migration role, as a postgres:// URL without the password. Required by whitetower migrate; the server never reads it.
+	URL string `yaml:"url"`
+	// File holding the migration role's password. Mount it only where whitetower migrate runs, such as its init container.
+	PasswordFile string `yaml:"password_file"`
 }
 
 // Shutdown holds how the server stops.
@@ -120,14 +143,49 @@ func Defaults() Config {
 			Operations: Listener{Address: "127.0.0.1:9090"},
 		},
 		TLS:      TLS{MinVersion: "1.2"},
+		Database: Database{MaxConnections: 10},
 		Shutdown: Shutdown{Timeout: 8 * time.Second},
 		Log:      Log{Level: "info"},
 		Tracing:  Tracing{SampleRatio: 1},
 	}
 }
 
-// Validate checks the configuration and returns every problem found, each
-// naming its setting.
+// CheckServe returns what the server needs beyond valid values: its
+// certificates, or the development certificate, and the runtime role's
+// connection. Each problem names its setting.
+func (c Config) CheckServe() error {
+	var errs []error
+	if !c.Dev.SelfSignedTLS {
+		for _, l := range []struct {
+			name string
+			TLSListener
+		}{{"console", c.Listeners.Console}, {"machine", c.Listeners.Machine}} {
+			if l.CertFile == "" {
+				errs = append(errs, fmt.Errorf("listeners.%s.cert_file: required, unless dev.self_signed_tls is set", l.name))
+			}
+			if l.KeyFile == "" {
+				errs = append(errs, fmt.Errorf("listeners.%s.key_file: required, unless dev.self_signed_tls is set", l.name))
+			}
+		}
+	}
+	if c.Database.URL == "" {
+		errs = append(errs, errors.New("database.url: required to serve"))
+	}
+	return errors.Join(errs...)
+}
+
+// CheckMigrate returns what whitetower migrate needs beyond valid values:
+// the migration role's connection.
+func (c Config) CheckMigrate() error {
+	if c.Database.Migration.URL == "" {
+		return errors.New("database.migration.url: required to migrate")
+	}
+	return nil
+}
+
+// Validate checks the values of the configuration and returns every problem
+// found, each naming its setting. What a command needs besides, such as the
+// server's certificates, CheckServe and CheckMigrate check.
 func (c Config) Validate() error {
 	var errs []error
 	add := func(key, format string, args ...any) {
@@ -149,22 +207,21 @@ func (c Config) Validate() error {
 	checkAddress("listeners.machine.address", c.Listeners.Machine.Address)
 	checkAddress("listeners.operations.address", c.Listeners.Operations.Address)
 
-	if !c.Dev.SelfSignedTLS {
-		for _, l := range []struct {
-			name string
-			TLSListener
-		}{{"console", c.Listeners.Console}, {"machine", c.Listeners.Machine}} {
-			if l.CertFile == "" {
-				add("listeners."+l.name+".cert_file", "required, unless dev.self_signed_tls is set")
-			}
-			if l.KeyFile == "" {
-				add("listeners."+l.name+".key_file", "required, unless dev.self_signed_tls is set")
-			}
-		}
-	}
-
 	if _, err := c.TLS.Version(); err != nil {
 		add("tls.min_version", "%v", err)
+	}
+	if u := c.Database.URL; u != "" {
+		if err := checkDatabaseURL(u); err != nil {
+			add("database.url", "%v", err)
+		}
+	}
+	if n := c.Database.MaxConnections; n < 1 || n > 1000 {
+		add("database.max_connections", "%d: want 1 to 1000", n)
+	}
+	if u := c.Database.Migration.URL; u != "" {
+		if err := checkDatabaseURL(u); err != nil {
+			add("database.migration.url", "%v", err)
+		}
 	}
 	if t := c.Shutdown.Timeout; t <= 0 || t >= MaxShutdownTimeout {
 		add("shutdown.timeout", "%s: must be more than 0 and less than %s, the shortest lease TTL", t, MaxShutdownTimeout)
@@ -186,6 +243,26 @@ func (c Config) Validate() error {
 		add("tracing.otlp.ca_file", "set it only with an https endpoint")
 	}
 	return errors.Join(errs...)
+}
+
+// checkDatabaseURL accepts a postgres:// URL that holds no password: the
+// password comes from a file. Its errors never repeat the URL.
+func checkDatabaseURL(s string) error {
+	u, err := url.Parse(s)
+	switch {
+	case err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql"):
+		return errors.New("want a postgres:// URL")
+	case u.User != nil:
+		if _, ok := u.User.Password(); ok {
+			return errors.New("the URL holds a password: put it in the password file")
+		}
+	}
+	for key := range u.Query() {
+		if key == "password" || key == "sslpassword" {
+			return fmt.Errorf("the URL holds a %s: put the password in the password file", key)
+		}
+	}
+	return nil
 }
 
 // checkEndpoint accepts the base URL of an OTLP/HTTP receiver. Its errors
