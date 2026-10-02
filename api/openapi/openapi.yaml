@@ -6,7 +6,13 @@ info:
   description: |
     This document is the source of truth of the public API: the Go server
     interfaces, the Go client and the console's TypeScript types are generated
-    from it with `task gen`.
+    from it with `task gen`. The server serves it at `/api/v1/openapi.json`.
+
+    Every operation needs a session or an API token, unless it says
+    otherwise. Errors are RFC 9457 problem details, whose `code` member is a
+    stable error code (docs/reference/api-errors.md); messages are in
+    English. Clients are rate-limited, per principal or, before login, per
+    client address.
 
     Pre-alpha: only placeholder operations exist until the Phase 1 plans add
     the real ones.
@@ -18,9 +24,14 @@ info:
     identifier: Apache-2.0
 servers:
   - url: /api/v1
+security:
+  - session: []
+  - apiToken: []
 tags:
   - name: meta
     description: Information about the server itself.
+  - name: identity
+    description: Who is calling.
 paths:
   /version:
     get:
@@ -39,7 +50,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VersionInfo"
+        default:
+          $ref: "#/components/responses/Problem"
+  /me:
+    get:
+      operationId: getMe
+      summary: Get the calling principal
+      description: |
+        Returns the principal that makes the request and its roles. Plan
+        P1-03 adds its permissions and the CSRF token of the session.
+      tags: [identity]
+      responses:
+        "200":
+          description: The calling principal.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Principal"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: __Host-wt_session
+      description: |
+        The console's session, which the login under /auth sets
+        (ADR-0009). State-changing requests also send the session's CSRF
+        token in a header.
+    apiToken:
+      type: http
+      scheme: bearer
+      description: An API token, prefixed `wt_pat_`, for the CLI and the organization's tools.
+  responses:
+    Problem:
+      description: An error, as RFC 9457 problem details.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
   schemas:
     VersionInfo:
       type: object
@@ -56,3 +106,48 @@ components:
           type: string
           description: Version of this API.
           enum: [v1]
+    Principal:
+      type: object
+      additionalProperties: false
+      required: [id, kind, displayName, roles]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The principal's identifier.
+        kind:
+          type: string
+          enum: [human, service_account]
+        displayName:
+          type: string
+        roles:
+          type: array
+          description: The roles bound to the principal (requirements, permission matrix).
+          items:
+            type: string
+    Problem:
+      type: object
+      description: |
+        RFC 9457 problem details. `type` and `code` identify the error;
+        `title` is the same for every occurrence of it, and `detail`
+        explains this one. No internal detail reaches the client.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Identifies the error, and links to its documentation.
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          description: This occurrence, as `urn:uuid:` followed by the request ID, which the logs record.
+        code:
+          type: string
+          description: The stable error code.

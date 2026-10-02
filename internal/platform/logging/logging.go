@@ -38,10 +38,12 @@ func New(w io.Writer, level string) *slog.Logger {
 type requestKey struct{}
 
 // request holds the identifiers of one request. Authentication learns the
-// principal after the request has started, so it is set in place.
+// principal, and the innermost router the route, after the request has
+// started, so they are set in place.
 type request struct {
 	id        string
 	principal atomic.Pointer[string]
+	route     atomic.Pointer[string]
 }
 
 func requestFrom(ctx context.Context) *request {
@@ -77,6 +79,25 @@ func SetPrincipal(ctx context.Context, id string) {
 func PrincipalID(ctx context.Context) string {
 	if r := requestFrom(ctx); r != nil {
 		if p := r.principal.Load(); p != nil {
+			return *p
+		}
+	}
+	return ""
+}
+
+// SetRoute records the pattern of the innermost router that matched the
+// request that ctx belongs to. Middleware that hands on a copy of the request
+// hides the router's match from the outer layers, which read it here.
+func SetRoute(ctx context.Context, pattern string) {
+	if r := requestFrom(ctx); r != nil && pattern != "" {
+		r.route.Store(&pattern)
+	}
+}
+
+// Route returns the pattern recorded with SetRoute, or "".
+func Route(ctx context.Context) string {
+	if r := requestFrom(ctx); r != nil {
+		if p := r.route.Load(); p != nil {
 			return *p
 		}
 	}

@@ -18,11 +18,14 @@ import (
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 
+	"github.com/J466Y/WhiteTower/internal/api/rest"
+	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/health"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/metrics"
+	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 	"github.com/J466Y/WhiteTower/internal/platform/tracing"
 	"github.com/J466Y/WhiteTower/internal/server"
 	"github.com/J466Y/WhiteTower/internal/version"
@@ -169,13 +172,23 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	}
 
 	registry := metrics.NewRegistry(v)
-	observer := server.NewObserver(logger, metrics.NewHTTP(registry), traces.TracerProvider())
+	httpMetrics := metrics.NewHTTP(registry)
+	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
+	api := rest.Handler(rest.Options{
+		Logger: logger,
+		// Until plan P1-03 brings sessions, API tokens and the permission
+		// matrix, nobody is authenticated: only public operations answer.
+		Authenticator: auth.Unauthenticated{},
+		Authorizer:    auth.DenyAll{},
+		Limiter:       ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
+		RateLimited:   httpMetrics.RateLimited("console").Inc,
+	})
 	drain := server.NewDrain()
 	ready := health.NewReadiness(logger)
 	ready.Add("database", database.Ping)
 	ready.Add("schema", database.CheckSchema)
 	srv, err := server.New(cfg, server.Handlers{
-		Console:    observer.Wrap("console", server.ConsoleHandler()),
+		Console:    observer.Wrap("console", server.ConsoleHandler(api)),
 		Machine:    observer.Wrap("machine", server.MachineHandler()),
 		Operations: server.OperationsHandler(drain, ready, metrics.Handler(registry)),
 	}, drain, logger)

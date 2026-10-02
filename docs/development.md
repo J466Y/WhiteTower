@@ -104,6 +104,8 @@ The contracts in `api/` are the source of truth ([ADR-0004](adr/0004-api-and-con
 
 Commit the generated code with the contract change. Never edit it by hand: CI regenerates it and fails on any difference.
 
+The server serves the OpenAPI document at `/api/v1/openapi.json`. The API's errors, and the conventions for lists and updates, are in the [errors reference](reference/api-errors.md).
+
 ## Tests
 
 - **Unit tests:** `task test`.
