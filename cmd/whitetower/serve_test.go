@@ -203,9 +203,16 @@ var insecure = &http.Client{
 	Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 }
 
-// call makes a request that must succeed, and returns the response's header
-// and body.
-func call(t *testing.T, method, url, body string, header http.Header) (http.Header, string) {
+// get makes a GET request that must succeed, and returns the response's
+// header and body.
+func get(t *testing.T, url string, header http.Header) (http.Header, string) {
+	t.Helper()
+	return call(t, http.StatusOK, http.MethodGet, url, "", header)
+}
+
+// call makes a request that must get the status want, and returns the
+// response's header and body.
+func call(t *testing.T, want int, method, url, body string, header http.Header) (http.Header, string) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(context.Background(), method, url, strings.NewReader(body))
 	if err != nil {
@@ -223,8 +230,8 @@ func call(t *testing.T, method, url, body string, header http.Header) (http.Head
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("%s %s: %s %s", method, url, resp.Status, data)
+	if resp.StatusCode != want {
+		t.Fatalf("%s %s: %s %s, want %d", method, url, resp.Status, data, want)
 	}
 	return resp.Header, string(data)
 }
@@ -239,15 +246,22 @@ func TestDefaultsMakeNoOutboundConnection(t *testing.T) {
 	t.Setenv("OTEL_TRACES_EXPORTER", "otlp")
 	s := startServe(t)
 
-	call(t, http.MethodGet, s.console+"/api/v1/version", "", nil)
-	call(t, http.MethodPost, s.machine+"/whitetower.module.v1alpha1.MetaService/GetServerInfo", "{}",
-		http.Header{"Content-Type": {"application/json"}})
-	call(t, http.MethodGet, s.operations+"/readyz", "", nil)
-	_, body := call(t, http.MethodGet, s.operations+"/metrics", "", nil)
+	get(t, s.console+"/api/v1/version", nil)
+	// Until plan P1-05 issues access tokens, the module API refuses every
+	// call.
+	_, refused := call(t, http.StatusUnauthorized, http.MethodPost,
+		s.machine+"/whitetower.module.v1alpha1.MetaService/GetServerInfo", "{}",
+		http.Header{"Content-Type": {"application/json"}, "Authorization": {"Bearer anything"}})
+	if !strings.Contains(refused, `"code":"unauthenticated"`) {
+		t.Errorf("module API answer %s", refused)
+	}
+	get(t, s.operations+"/readyz", nil)
+	_, body := get(t, s.operations+"/metrics", nil)
 	for _, want := range []string{
 		"whitetower_build_info{",
 		`whitetower_http_requests_total{code="200",listener="console",method="GET",route="/api/v1/version"} 1`,
-		`listener="machine",method="POST",route="/whitetower.module.v1alpha1.MetaService/"`,
+		`whitetower_http_requests_total{code="401",listener="machine",method="POST",route="/whitetower.module.v1alpha1.MetaService/GetServerInfo"} 1`,
+		`whitetower_rpc_server_handled_total{code="unauthenticated",procedure="/whitetower.module.v1alpha1.MetaService/GetServerInfo"} 1`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("metrics lack %s", want)
@@ -278,7 +292,7 @@ func TestARequestIsFollowedThroughLogsAndExportedTraces(t *testing.T) {
 	c := newCollector(t)
 	s := startServe(t, "WT_TRACING_OTLP_ENDPOINT="+c.URL)
 
-	header, _ := call(t, http.MethodGet, s.console+"/api/v1/version", "",
+	header, _ := get(t, s.console+"/api/v1/version",
 		http.Header{"Traceparent": {"00-" + callerTrace + "-" + callerSpan + "-01"}})
 	requestID := header.Get("X-Request-Id")
 	if err := s.stop(); err != nil { // shutting down sends the last spans

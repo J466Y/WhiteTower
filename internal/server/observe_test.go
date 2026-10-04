@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -26,6 +27,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 	"github.com/J466Y/WhiteTower/internal/server"
 	"github.com/J466Y/WhiteTower/internal/version"
+	"github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1/modulev1alpha1connect"
 )
 
 // syncBuffer is a bytes.Buffer that handlers and the test may share.
@@ -214,6 +216,45 @@ func TestTheRouteSurvivesAuthentication(t *testing.T) {
 	}
 	if want := `code="403",listener="console",method="GET",route="/api/v1/me"`; !strings.Contains(o.scrape(), want) {
 		t.Fatalf("metrics lack %s", want)
+	}
+}
+
+// A module API call is known by its procedure in the access log, the metrics
+// and the span, and by its caller once its token is checked.
+func TestModuleAPICallsAreKnownByTheirProcedure(t *testing.T) {
+	o := newObserved(t)
+	h := o.Wrap("machine", server.MachineHandler(moduleAPI(prometheus.NewRegistry())))
+	procedure := modulev1alpha1connect.MetaServiceGetServerInfoProcedure
+	for _, token := range []string{"test", ""} {
+		r := httptest.NewRequest(http.MethodPost, procedure, strings.NewReader("{}"))
+		r.Header.Set("Content-Type", "application/json")
+		if token != "" {
+			r.Header.Set("Authorization", "Bearer "+token)
+		}
+		h.ServeHTTP(httptest.NewRecorder(), r)
+	}
+
+	access := o.logs.records(t, "request")
+	if len(access) != 2 ||
+		access[0]["route"] != procedure || access[0]["status"] != float64(http.StatusOK) || access[0]["principal_id"] != moduleIdentity ||
+		access[1]["route"] != procedure || access[1]["status"] != float64(http.StatusUnauthorized) || access[1]["principal_id"] != nil {
+		t.Fatalf("access log %v", access)
+	}
+	for _, code := range []string{"200", "401"} {
+		if want := `code="` + code + `",listener="machine",method="POST",route="` + procedure + `"`; !strings.Contains(o.scrape(), want) {
+			t.Errorf("metrics lack %s", want)
+		}
+	}
+	spans := o.spans.Ended()
+	if len(spans) != 2 {
+		t.Fatalf("%d spans", len(spans))
+	}
+	for i, code := range []string{"ok", "unauthenticated"} {
+		span := spans[i]
+		if span.Name() != "POST "+procedure || attr(span, "rpc.method") != strings.TrimPrefix(procedure, "/") ||
+			attr(span, "rpc.response.status_code") != code || span.Status().Code == codes.Error {
+			t.Errorf("span %q, attributes %v, status %v", span.Name(), span.Attributes(), span.Status())
+		}
 	}
 }
 

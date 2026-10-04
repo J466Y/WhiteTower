@@ -17,8 +17,10 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/trace/noop"
 
+	"github.com/J466Y/WhiteTower/internal/api/moduleapi"
 	"github.com/J466Y/WhiteTower/internal/api/rest"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
@@ -166,31 +168,57 @@ func TestLimitBody(t *testing.T) {
 	}
 }
 
-// Security test ST-05, for the console and operations listeners: a request
-// over the size limit is refused before it reaches a handler. The machine
-// listener's limits come with the module API.
+// Security test ST-05: a request over the size limit of its listener is
+// refused before it reaches a handler. The machine listener answers in the
+// caller's RPC protocol, as the module API answers a message over its limit.
 func TestListenersRefuseLargeBodies(t *testing.T) {
 	drain := server.NewDrain()
 	r := start(t, config.Defaults(), defaultHandlers(drain), drain)
-	post := func(client *http.Client, url string, size int) (int, http.Header) {
+	post := func(client *http.Client, url, contentType string, size int) (int, http.Header, string) {
 		t.Helper()
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, strings.NewReader(strings.Repeat("x", size)))
 		if err != nil {
 			t.Fatal(err)
 		}
+		req.Header.Set("Content-Type", contentType)
 		resp, err := client.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_ = resp.Body.Close()
-		return resp.StatusCode, resp.Header
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// gRPC sends its status in the trailers.
+		for k, v := range resp.Trailer {
+			resp.Header[k] = v
+		}
+		return resp.StatusCode, resp.Header, string(body)
 	}
-	status, header := post(insecureClient(false), r.console+"/api/v1/me", server.MaxConsoleBody+1)
+	status, header, _ := post(insecureClient(false), r.console+"/api/v1/me", "application/json", server.MaxConsoleBody+1)
 	if status != http.StatusRequestEntityTooLarge || header.Get("Content-Type") != "application/problem+json" {
 		t.Errorf("console: %d %s, want 413 as a problem", status, header.Get("Content-Type"))
 	}
-	if status, _ := post(http.DefaultClient, r.operations+"/healthz", server.MaxOperationsBody+1); status != http.StatusRequestEntityTooLarge {
+	if status, _, _ := post(http.DefaultClient, r.operations+"/healthz", "text/plain", server.MaxOperationsBody+1); status != http.StatusRequestEntityTooLarge {
 		t.Errorf("operations: %d, want 413", status)
+	}
+	for _, tt := range []struct {
+		contentType string
+		status      int
+		grpcStatus  string
+		body        string
+	}{
+		{"application/proto", http.StatusTooManyRequests, "", `"code":"resource_exhausted"`},
+		{"application/grpc", http.StatusOK, "8", ""},
+		{"text/plain", http.StatusRequestEntityTooLarge, "", "request body too large\n"},
+	} {
+		status, header, body := post(insecureClient(true), r.machine+modulev1alpha1connect.MetaServiceGetServerInfoProcedure,
+			tt.contentType, server.MaxMachineBody+1)
+		if status != tt.status || header.Get("Grpc-Status") != tt.grpcStatus || !strings.Contains(body, tt.body) {
+			t.Errorf("machine, %s: %d, grpc-status %q, body %q; want %d, %q, %q",
+				tt.contentType, status, header.Get("Grpc-Status"), body, tt.status, tt.grpcStatus, tt.body)
+		}
 	}
 }
 
@@ -290,15 +318,45 @@ func publicAPI() http.Handler {
 	})
 }
 
+// moduleIdentity is the caller that the test token stands for.
+const moduleIdentity = "spiffe://example.org/module/0192f2c4-0000-7000-8000-000000000009"
+
+// moduleTokens accepts the token "test", and nothing else.
+type moduleTokens struct{}
+
+func (moduleTokens) Authenticate(_ context.Context, header http.Header) (*moduleapi.Caller, error) {
+	if header.Get("Authorization") != "Bearer test" {
+		return nil, errors.New("not the test token")
+	}
+	return &moduleapi.Caller{Identity: moduleIdentity}, nil
+}
+
+// moduleAPI is the module API as the server builds it, but for its tokens:
+// the server issues none before plan P1-05, and tests use the token "test".
+func moduleAPI(reg prometheus.Registerer) http.Handler {
+	return moduleapi.Handler(moduleapi.Options{
+		Logger:        slog.New(slog.DiscardHandler),
+		Authenticator: moduleTokens{},
+		Metrics:       metrics.NewRPC(reg),
+	})
+}
+
+// withToken is a module API request with the test token.
+func withToken[T any](msg *T) *connect.Request[T] {
+	req := connect.NewRequest(msg)
+	req.Header().Set("Authorization", "Bearer test")
+	return req
+}
+
 // defaultHandlers are the handlers of the server binary, instrumented as it
-// instruments them.
+// instruments them, with the module API of moduleAPI.
 func defaultHandlers(drain *server.Drain) server.Handlers {
 	discard := slog.New(slog.DiscardHandler)
 	registry := metrics.NewRegistry(version.Get())
 	observer := server.NewObserver(discard, metrics.NewHTTP(registry), noop.NewTracerProvider())
 	return server.Handlers{
 		Console:    observer.Wrap("console", server.ConsoleHandler(publicAPI())),
-		Machine:    observer.Wrap("machine", server.MachineHandler()),
+		Machine:    observer.Wrap("machine", server.MachineHandler(moduleAPI(registry))),
 		Operations: server.OperationsHandler(drain, health.NewReadiness(discard), metrics.Handler(registry)),
 	}
 }
@@ -326,7 +384,7 @@ func TestListeners(t *testing.T) {
 	}{{"gRPC", connect.WithGRPC()}, {"Connect with JSON", connect.WithProtoJSON()}} {
 		t.Run("module API over "+protocol.name, func(t *testing.T) {
 			client := modulev1alpha1connect.NewMetaServiceClient(insecureClient(true), r.machine, protocol.opt)
-			resp, err := client.GetServerInfo(context.Background(), connect.NewRequest(&modulev1alpha1.GetServerInfoRequest{}))
+			resp, err := client.GetServerInfo(context.Background(), withToken(&modulev1alpha1.GetServerInfoRequest{}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -335,6 +393,14 @@ func TestListeners(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("module API without a token", func(t *testing.T) {
+		client := modulev1alpha1connect.NewMetaServiceClient(insecureClient(true), r.machine, connect.WithGRPC())
+		_, err := client.GetServerInfo(context.Background(), connect.NewRequest(&modulev1alpha1.GetServerInfoRequest{}))
+		if connect.CodeOf(err) != connect.CodeUnauthenticated {
+			t.Fatalf("got %v, want UNAUTHENTICATED", err)
+		}
+	})
 
 	t.Run("operations over plain HTTP", func(t *testing.T) {
 		if got := get(t, http.DefaultClient, r.operations+"/healthz"); got.status != http.StatusOK {
@@ -351,6 +417,66 @@ func TestListeners(t *testing.T) {
 			}
 		}
 	})
+}
+
+// A connection that falls silent gets a ping, and is closed when the ping
+// goes unanswered: the module API's watch streams do not outlive their peers.
+func TestSilentConnectionsArePingedThenClosed(t *testing.T) {
+	saved := *server.HTTP2Config
+	t.Cleanup(func() { *server.HTTP2Config = saved })
+	server.HTTP2Config.SendPingTimeout = 200 * time.Millisecond
+	server.HTTP2Config.PingTimeout = 300 * time.Millisecond
+	drain := server.NewDrain()
+	r := start(t, config.Defaults(), defaultHandlers(drain), drain)
+
+	conn, err := tls.Dial("tcp", strings.TrimPrefix(r.machine, "https://"),
+		&tls.Config{InsecureSkipVerify: true, NextProtos: []string{"h2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	if p := conn.ConnectionState().NegotiatedProtocol; p != "h2" {
+		t.Fatalf("negotiated %q, want h2", p)
+	}
+	write := func(b []byte) {
+		t.Helper()
+		if _, err := conn.Write(b); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// An HTTP/2 frame header (RFC 9113, section 4.1): a 24-bit length, the
+	// type, the flags and a 31-bit stream identifier.
+	const settings, ping, ack = 0x4, 0x6, 0x1
+	frame := func(typ, flags byte) []byte { return []byte{0, 0, 0, typ, flags, 0, 0, 0, 0} }
+	// The client's preface and empty settings; then nothing but the
+	// acknowledgement of the server's settings.
+	write(append([]byte("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"), frame(settings, 0)...))
+	began := time.Now()
+	_ = conn.SetReadDeadline(began.Add(5 * time.Second))
+	var timeout net.Error
+	pinged := false
+	for header := make([]byte, 9); ; {
+		_, err := io.ReadFull(conn, header)
+		if err == nil {
+			length := int64(header[0])<<16 | int64(header[1])<<8 | int64(header[2])
+			_, err = io.CopyN(io.Discard, conn, length)
+		}
+		if errors.As(err, &timeout) && timeout.Timeout() {
+			t.Fatalf("the connection is still open after %s; pinged: %v", time.Since(began), pinged)
+		}
+		if err != nil {
+			break
+		}
+		switch {
+		case header[3] == settings && header[4]&ack == 0:
+			write(frame(settings, ack))
+		case header[3] == ping && header[4]&ack == 0:
+			pinged = true
+		}
+	}
+	if !pinged {
+		t.Fatal("the connection was closed without a ping")
+	}
 }
 
 func TestTLSVersions(t *testing.T) {

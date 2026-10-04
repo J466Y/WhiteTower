@@ -110,7 +110,7 @@ The server serves the OpenAPI document at `/api/v1/openapi.json`. The API's erro
 
 - **Unit tests:** `task test`.
 - **Database tests:** they start PostgreSQL in Docker with testcontainers, through `internal/platform/db/dbtest`, which gives each test a fresh database with the roles of a deployment. Without Docker they are skipped, except in CI, where they fail. `WT_TEST_POSTGRES_IMAGE` picks another PostgreSQL version, for example `postgres:16-alpine`.
-- **End-to-end tests:** start a core that serves the built console (`task build` then `./bin/whitetower serve` with a development certificate, or the Compose `core` profile), then run `task e2e`. The browser test needs Chromium, installed once with `pnpm --dir web exec playwright install chromium`. Set `WT_E2E_URL` and `WT_E2E_OPERATIONS_URL` to test another deployment.
+- **End-to-end tests:** start a core that serves the built console (`task build` then `./bin/whitetower serve` with a development certificate, or the Compose `core` profile), then run `task e2e`. The browser test needs Chromium, installed once with `pnpm --dir web exec playwright install chromium`. Set `WT_E2E_URL`, `WT_E2E_MACHINE_URL` and `WT_E2E_OPERATIONS_URL` to test another deployment.
 - **Race detector:** `go test -race ./...` needs cgo (a C compiler). CI runs it on Linux.
 
 ## Repository layout

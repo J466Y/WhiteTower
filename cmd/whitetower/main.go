@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 
+	"github.com/J466Y/WhiteTower/internal/api/moduleapi"
 	"github.com/J466Y/WhiteTower/internal/api/rest"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
@@ -187,9 +188,16 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	ready := health.NewReadiness(logger)
 	ready.Add("database", database.Ping)
 	ready.Add("schema", database.CheckSchema)
+	moduleAPI := moduleapi.Handler(moduleapi.Options{
+		Logger: logger,
+		// Until plan P1-05 issues access tokens, every call is refused as
+		// unauthenticated.
+		Authenticator: moduleapi.NoTokens{},
+		Metrics:       metrics.NewRPC(registry),
+	})
 	srv, err := server.New(cfg, server.Handlers{
 		Console:    observer.Wrap("console", server.ConsoleHandler(api)),
-		Machine:    observer.Wrap("machine", server.MachineHandler()),
+		Machine:    observer.Wrap("machine", server.MachineHandler(moduleAPI)),
 		Operations: server.OperationsHandler(drain, ready, metrics.Handler(registry)),
 	}, drain, logger)
 	if err != nil {

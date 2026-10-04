@@ -2,7 +2,8 @@
 
 // Package e2e holds end-to-end tests that run against a live deployment.
 // Run them with `task e2e`. WT_E2E_URL selects the console listener
-// (default https://127.0.0.1:8443) and WT_E2E_OPERATIONS_URL the operations
+// (default https://127.0.0.1:8443), WT_E2E_MACHINE_URL the machine listener
+// (default https://127.0.0.1:9443) and WT_E2E_OPERATIONS_URL the operations
 // listener (default http://127.0.0.1:9090). The deployment may serve a
 // self-signed development certificate: these tests do not verify it.
 package e2e
@@ -20,6 +21,7 @@ import (
 
 func TestSmoke(t *testing.T) {
 	base := envOr("WT_E2E_URL", "https://127.0.0.1:8443")
+	machine := envOr("WT_E2E_MACHINE_URL", "https://127.0.0.1:9443")
 	operations := envOr("WT_E2E_OPERATIONS_URL", "http://127.0.0.1:9090")
 	client := &http.Client{
 		Timeout:   10 * time.Second,
@@ -58,6 +60,22 @@ func TestSmoke(t *testing.T) {
 		}
 	})
 
+	// Until plan P1-05 issues access tokens, the module API refuses every
+	// call.
+	t.Run("module API", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost,
+			machine+"/whitetower.module.v1alpha1.MetaService/GetServerInfo", strings.NewReader("{}"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer not-a-token")
+		status, _, body := do(t, client, req)
+		if status != http.StatusUnauthorized || !strings.Contains(body, `"code":"unauthenticated"`) {
+			t.Fatalf("got %d %q, want UNAUTHENTICATED", status, body)
+		}
+	})
+
 	t.Run("metrics", func(t *testing.T) {
 		status, _, body := get(t, client, operations+"/metrics")
 		if status != http.StatusOK {
@@ -66,6 +84,7 @@ func TestSmoke(t *testing.T) {
 		for _, want := range []string{
 			"whitetower_build_info{",
 			`whitetower_http_requests_total{code="200",listener="console",method="GET",route="/api/v1/version"}`,
+			`whitetower_rpc_server_handled_total{code="unauthenticated",procedure="/whitetower.module.v1alpha1.MetaService/GetServerInfo"}`,
 		} {
 			if !strings.Contains(body, want) {
 				t.Errorf("missing %s", want)
@@ -122,6 +141,11 @@ func get(t *testing.T, client *http.Client, url string) (int, http.Header, strin
 	if err != nil {
 		t.Fatal(err)
 	}
+	return do(t, client, req)
+}
+
+func do(t *testing.T, client *http.Client, req *http.Request) (int, http.Header, string) {
+	t.Helper()
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md). Contract version `v1alpha1` |
-| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)) |
+| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)) and 2026-10-02 (how message sizes are measured, from P1-01) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |
 | **Conformance** | [`test/conformance/`](../../test/conformance/README.md) |
@@ -145,7 +145,7 @@ JSON examples of every method are in appendix A.
 | `INVALID_ARGUMENT` | Malformed request | Do not retry the same request |
 | `FAILED_PRECONDITION` | No common contract version; manifest hash mismatch; instance not registered | Fix the cause (for example register again), then retry |
 | `NOT_FOUND` | Unknown bundle version | Wait for the next state; do not retry the same version |
-| `RESOURCE_EXHAUSTED` | Rate limit or backpressure | Retry with backoff |
+| `RESOURCE_EXHAUSTED` | Rate limit or backpressure; or a message over the limits of section 4.8 | Retry with backoff, but never a message over the limits as it is |
 | `UNAVAILABLE`, `DEADLINE_EXCEEDED`, `ABORTED` | Transient | Retry with backoff |
 | `INTERNAL`, `UNKNOWN` | Server error | Retry with backoff |
 
@@ -155,6 +155,8 @@ JSON examples of every method are in appendix A.
 - Retrying is always safe: acknowledgements carry an `acknowledgement_id` chosen by the instance, and events are de-duplicated on their source and ID.
 
 ### 4.8 Limits
+
+A message's size is that of its encoding in the call, binary protobuf or JSON, once decompressed: a client that compresses its messages, or accepts compressed ones, gains no room. The core refuses a larger request with `RESOURCE_EXHAUSTED`, and never sends a larger message.
 
 | Limit | `v1alpha1` |
 | --- | --- |

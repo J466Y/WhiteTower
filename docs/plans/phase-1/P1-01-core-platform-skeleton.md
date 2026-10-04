@@ -147,7 +147,7 @@ The plan lands in seven pull requests:
 | 2. Observability and health | 3 | Done |
 | 3. Database layer and `whitetower migrate` | 4, and the PostgreSQL fixture of step 10 | Done |
 | 4. REST API scaffolding and the console | 5, 9 | Done |
-| 5. Module API scaffolding | 6 | Not started |
+| 5. Module API scaffolding | 6 | Done |
 | 6. Background jobs and notifications across replicas | 7, 8 | Not started |
 | 7. Test harness, internal rules and security tests | 10, 11, ST-01 to ST-05 | Not started |
 
@@ -208,3 +208,23 @@ The plan lands in seven pull requests:
 - Rate limits: a token bucket per principal or, before login, per client address, with an IPv6 client counted per /64. The default is 50 requests per second with bursts of 100 (`api.rate_limit`, `api.rate_burst`), and refusals are counted in `whitetower_http_requests_rate_limited_total`. Behind a proxy, every client shares the proxy's address until P1-12 adds trusted proxies.
 - Size limits: the console listener refuses bodies over 1 MiB and the operations listener over 4 KiB, before any handler runs, and every listener answers headers over 64 KiB with 431. That is ST-05 for these two listeners; the machine listener's limits come with PR 5.
 - Step 9 was in place since P0-01. Tests now cover deep links, the caching of hashed assets and of `index.html`, and a policy that allows no other origin; the browser test opens a deep link too.
+
+### 2026-10-02: module API scaffolding
+
+- `internal/api/moduleapi` mounts the five services of the module contracts on the machine listener, behind one middleware. `MetaService.GetServerInfo` answers. The other procedures answer `UNIMPLEMENTED` until the plans that implement them: the registry, the watch stream, the acknowledgements and the events with P1-07, the policy bundles with P1-06.
+- Every call needs a bearer token (contracts, section 4.2). A request gate checks it once the headers arrive, before connect reads the message, so a caller without a valid token costs no decoding. `moduleapi.Authenticator` is the hook of P1-05, which issues and verifies the tokens; until then the server refuses every call as `UNAUTHENTICATED`. Handlers read the caller with `CallerFrom`, and the contract version of the procedure's package with `ContractVersion`. CORE-1, which ends a watch stream when its token expires, and CORE-2, `PERMISSION_DENIED` outside the caller's scope, come with P1-07, which knows the scopes.
+- `NegotiateVersion` is CORE-3, for `RegisterInstance` in P1-07: the highest version that both sides support, ordered as Kubernetes orders API versions, or `FAILED_PRECONDITION` naming the core's.
+- Observability: the procedure is the route in the access log and the HTTP metrics. Spans get `rpc.system.name`, `rpc.method`, `rpc.response.status_code` and `whitetower.contract_version`, and are errors only for the codes of server faults. New metrics: `whitetower_rpc_server_handled_total` by procedure and code, `whitetower_rpc_server_duration_seconds` for unary calls, and `whitetower_rpc_server_open_streams`.
+- Errors: a panic, or an error coded `UNKNOWN`, `INTERNAL` or `DATA_LOSS`, reaches the caller as "internal error". Its cause, with a panic's stack, goes to the log ([threat model](../../security/threat-model.md), T-10). That includes a panic in the authenticator, which connect's recovery does not cover.
+- Message sizes (contracts, section 4.8):
+  - A request over 4 MiB is refused with `RESOURCE_EXHAUSTED`, measured once decompressed, so that a compressed request cannot unpack past the limit (T-11).
+  - The core sends no message over 4 MiB, and no watch message over 1 MiB, measured in the encoding of the call. connect's own send limit measures the compressed message, which a client that accepts gzip would refuse once decompressed: a snapshot over the limit would leave the client reconnecting to the same snapshot while its agents stay closed. A message over the limit is a bug of the core's, and fails as an internal error.
+  - The contract now says how sizes are measured, and that a message over the limits is never retried as it is.
+- Machine listener: bodies over 4 MiB and 64 KiB are refused before any handler, in the caller's RPC protocol. ST-05 now covers the three listeners.
+- HTTP/2 keepalives on the HTTPS listeners: a connection silent for 20 seconds gets a ping, and is closed when the ping goes unanswered for 10 seconds. A connection that takes no data for 30 seconds while the server has some to write is closed, which ends the streams of a client too slow to read (CORE-7).
+- Tests:
+  - a generated client calls `GetServerInfo` over gRPC, gRPC-Web and Connect, in binary protobuf and JSON, compressed or not (the step's criterion);
+  - every other procedure of the contracts answers `UNIMPLEMENTED` from its stub, and the test fails when the contracts gain a procedure it does not call;
+  - calls without a valid token, requests and responses over the limits, panics, the metrics, the spans, and the caller and version that handlers see;
+  - a silent HTTP/2 connection is pinged, then closed;
+  - the server binary refuses module API calls until P1-05.

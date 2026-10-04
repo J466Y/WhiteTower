@@ -103,6 +103,64 @@ func (m *HTTP) Observe(listener, method, route string, code int, took time.Durat
 	m.duration.WithLabelValues(listener, method, route).Observe(took.Seconds())
 }
 
+// RPC holds the metrics of the module API's calls. Procedures are those the
+// server serves: a call to any other never reaches them.
+type RPC struct {
+	handled  *prometheus.CounterVec
+	duration *prometheus.HistogramVec
+	streams  *prometheus.GaugeVec
+}
+
+// NewRPC registers the module API's metrics with reg.
+func NewRPC(reg prometheus.Registerer) *RPC {
+	m := &RPC{
+		handled: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace,
+			Subsystem: "rpc",
+			Name:      "server_handled_total",
+			Help:      "Module API calls that ended, by procedure and code.",
+		}, []string{"procedure", "code"}),
+		duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: Namespace,
+			Subsystem: "rpc",
+			Name:      "server_duration_seconds",
+			Help:      "Time spent on unary module API calls, by procedure.",
+			Buckets:   prometheus.DefBuckets,
+		}, []string{"procedure"}),
+		streams: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Subsystem: "rpc",
+			Name:      "server_open_streams",
+			Help:      "Module API streams open, such as the Watch streams of connected instances, by procedure.",
+		}, []string{"procedure"}),
+	}
+	reg.MustRegister(m.handled, m.duration, m.streams)
+	return m
+}
+
+// Refused counts a call refused before its handler ran, such as one without
+// a valid token.
+func (m *RPC) Refused(procedure, code string) {
+	m.handled.WithLabelValues(procedure, code).Inc()
+}
+
+// Started counts a call whose handler runs; the returned function records
+// its end, with its code.
+func (m *RPC) Started(procedure string, stream bool) func(code string) {
+	start := time.Now()
+	if stream {
+		m.streams.WithLabelValues(procedure).Inc()
+	}
+	return func(code string) {
+		m.handled.WithLabelValues(procedure, code).Inc()
+		if stream {
+			m.streams.WithLabelValues(procedure).Dec()
+		} else {
+			m.duration.WithLabelValues(procedure).Observe(time.Since(start).Seconds())
+		}
+	}
+}
+
 // Method returns a standard HTTP method as it is, and anything else as
 // _OTHER, as the OpenTelemetry conventions do: clients choose the method.
 func Method(method string) string {
