@@ -52,9 +52,11 @@ func (t *Tx) BeforeCommit(fn func(ctx context.Context) error) {
 }
 
 // AfterCommit registers fn to run once the transaction has committed, for
-// what must never happen for a change that rolled back, such as notifying the
-// other replicas. fn gets a context that the caller's cancellation does not
-// end, and handles its own failures: the change is already made.
+// what must never happen for a change that rolled back and cannot take part
+// in the transaction, such as work outside the database. fn gets a context
+// that the caller's cancellation does not end, and handles its own failures:
+// the change is already made. Notifications to the other replicas need no
+// hook: notify.Bus sends them in the transaction itself.
 func (t *Tx) AfterCommit(fn func(ctx context.Context)) {
 	t.afterCommit = append(t.afterCommit, fn)
 }
