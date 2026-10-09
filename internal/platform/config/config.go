@@ -87,7 +87,7 @@ type Database struct {
 	URL string `yaml:"url"`
 	// File holding the runtime role's password. It is the only source of the password: PGPASSWORD and .pgpass are ignored.
 	PasswordFile string `yaml:"password_file"`
-	// The most connections the server keeps open to the database.
+	// The most connections of the server's pool. The server opens two more, outside the pool: one listens for notifications from the other replicas, the other holds the locks of the background jobs.
 	MaxConnections int `yaml:"max_connections"`
 	// The migration role, which owns the schema.
 	Migration Migration `yaml:"migration"`

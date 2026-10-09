@@ -69,7 +69,7 @@ The `eval` profile grows with the project: P1-12.1 ships it with the core, Postg
 
 - CloudNativePG example manifests: three instances, backups with point-in-time recovery to S3-compatible storage (MinIO for air-gapped sites).
 - Creation of the migration and runtime roles.
-- Connection pooling guidance, including the gotcha that `LISTEN/NOTIFY` does not work through PgBouncer in transaction mode: the core's listener connection must go direct, or through session mode.
+- Connection pooling guidance, including the gotcha that `LISTEN/NOTIFY` and session advisory locks do not work through PgBouncer in transaction mode: each replica's two sessions outside its pool, the notification listener and the job locks, must go direct, or through session mode.
 - Sizing guidance ([spike S3](../../spikes/S3-audit-throughput.md)): the database's disk follows from the average audit rate and the retention period. Count about 2.2 KB per retained event, plus about 370 bytes per event that outlive retention. For example, an average of 10 events per second kept for six months takes about 350 GB.
 
 **Done when:** the reference setup is used by the Kubernetes end-to-end tests.

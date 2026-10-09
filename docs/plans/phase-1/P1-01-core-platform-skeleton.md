@@ -148,7 +148,7 @@ The plan lands in seven pull requests:
 | 3. Database layer and `whitetower migrate` | 4, and the PostgreSQL fixture of step 10 | Done |
 | 4. REST API scaffolding and the console | 5, 9 | Done |
 | 5. Module API scaffolding | 6 | Done |
-| 6. Background jobs and notifications across replicas | 7, 8 | Not started |
+| 6. Background jobs and notifications across replicas | 7, 8 | Done |
 | 7. Test harness, internal rules and security tests | 10, 11, ST-01 to ST-05 | Not started |
 
 ### 2026-09-30: configuration, commands and listeners
@@ -228,3 +228,25 @@ The plan lands in seven pull requests:
   - calls without a valid token, requests and responses over the limits, panics, the metrics, the spans, and the caller and version that handlers see;
   - a silent HTTP/2 connection is pinged, then closed;
   - the server binary refuses module API calls until P1-05.
+
+### 2026-10-09: background jobs and notifications across replicas
+
+- `internal/platform/clock`: the core's time behind an interface, and in `clocktest` a fake clock whose timers fire as a test moves it forward.
+- `internal/platform/jobs`: every replica registers the same jobs, and each job runs on one replica at a time, the one that holds its advisory lock. Jobs run at an interval (`Every`) or on a cron schedule (`Cron`: five fields, in UTC, written here rather than added as a dependency).
+  - A replica holds its locks on a session of its own and checks in every 5 seconds; when the session fails, it stops its jobs at once. The database releases the locks when the replica stops or its connection closes, and after 30 seconds without a check-in (`idle_session_timeout`) when the replica is cut off, by which time the replica has stopped its jobs. Another replica takes over at its next check-in.
+  - A new leader keeps the pace: it schedules from the last start on any replica, which `job_state` records with the run's replica, outcome and error. A run missed while no replica led the job happens once, at once.
+  - A run that a lost session or a shutdown interrupts is no failure. A panic fails the run, with its stack in the log. Jobs must be idempotent: after the database ends a session, the old leader may run once more before its next check-in tells it.
+  - Metrics by job: `whitetower_job_leader`, `whitetower_job_last_run_timestamp_seconds`, `whitetower_job_last_success_timestamp_seconds`, `whitetower_job_duration_seconds` and `whitetower_job_failures_total`.
+- `internal/platform/notify`: `notify.Bus`, with a PostgreSQL implementation and one in memory for unit tests.
+  - A change publishes in its own transaction, with `pg_notify`: nothing goes out for a change that rolls back, and notifications arrive in commit order. Payloads carry identifiers and versions only, at most 1 KiB.
+  - Each replica listens on one session of its own, whatever the number of subscribers. Each subscriber receives on a goroutine of its own, through a bounded queue: one that falls behind is told to resynchronize instead, and holds up neither the listener nor the other subscribers.
+  - Subscribers resynchronize whenever the bus starts listening for them: when they subscribe, and after each reconnection. The listener checks in every 10 seconds, even on a busy channel, and the database ends its session after a minute without a check-in. A dead session would otherwise hold back PostgreSQL's queue of notifications, and a full queue makes every notifying transaction fail.
+  - Transactions that notify commit one at a time, under a database-wide lock: one notification per transaction, never per row. A halt of the whole fleet is therefore one notification, whatever the number of agents (P1-08).
+  - Metrics: `whitetower_notify_listener_connected`, `whitetower_notify_received_total` by channel, and `whitetower_notify_resyncs_total` by reason.
+- `db.Connect` opens those two sessions as the runtime role; `pg_stat_activity` names them "whitetower jobs" and "whitetower notify". Like `LISTEN`, session advisory locks need a direct connection, or PgBouncer's session mode (P1-12).
+- The server starts the bus and the runner, and stops them before it closes the database. Nothing uses them yet: P1-02 registers the first jobs, P1-07 the first subscriber.
+- Tests:
+  - two replicas on one database: each job runs on exactly one of them, without overlap, and on the other once the first stops; when the database ends the leader's session, the other replica takes over (the criterion of step 7);
+  - a change committed on one replica reaches the subscribers of every replica, in commit order, and one rolled back reaches none; a forced disconnection makes the subscribers resynchronize (the criterion of step 8);
+  - with the fake clock: runs on schedule, the pace kept by a new leader, a missed run, failures, panics, a lost session; cron schedules, including 29 February across 2100;
+  - a slow subscriber resynchronizes without holding up the others; a busy channel does not make the listening session look idle; the database ends an idle session.

@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -50,6 +52,28 @@ func Open(cfg config.Database) (*DB, error) {
 
 // Close closes every connection of the pool.
 func (db *DB) Close() { db.pool.Close() }
+
+// Connect opens a session of the runtime role outside the pool, for work
+// that holds a session: the notification listener and the locks of the
+// background jobs. pg_stat_activity names it after the pool's connections and
+// its purpose. The database ends the session once it has run no statement for
+// idle, so that a replica cut off from the database neither holds locks nor
+// holds back notifications for longer: the caller checks in more often.
+// Closing the connection ends the session, and with it its locks and listens.
+func (db *DB) Connect(ctx context.Context, purpose string, idle time.Duration) (*pgx.Conn, error) {
+	cc := db.pool.Config().ConnConfig
+	cc.RuntimeParams["application_name"] += " " + purpose
+	conn, err := pgx.ConnectConfig(ctx, cc)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := conn.Exec(ctx, "SELECT set_config('idle_session_timeout', $1, false)",
+		strconv.FormatInt(idle.Milliseconds(), 10)); err != nil {
+		_ = conn.Close(ctx)
+		return nil, err
+	}
+	return conn, nil
+}
 
 // Ping checks that the database answers. It is the readiness check
 // "database".

@@ -63,7 +63,7 @@ The PostgreSQL database. The server connects with the runtime role only; whiteto
 | --- | --- | --- | --- | --- |
 | `database.url` | `WT_DATABASE_URL` | string | none | Connection of the runtime role, as a postgres:// URL without the password, such as postgres://whitetower_app@db:5432/whitetower?sslmode=verify-full. Required to serve. |
 | `database.password_file` | `WT_DATABASE_PASSWORD_FILE` | string | none | File holding the runtime role's password. It is the only source of the password: PGPASSWORD and .pgpass are ignored. |
-| `database.max_connections` | `WT_DATABASE_MAX_CONNECTIONS` | integer | `10` | The most connections the server keeps open to the database. |
+| `database.max_connections` | `WT_DATABASE_MAX_CONNECTIONS` | integer | `10` | The most connections of the server's pool. The server opens two more, outside the pool: one listens for notifications from the other replicas, the other holds the locks of the background jobs. |
 
 ### `database.migration`
 
