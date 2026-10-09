@@ -19,14 +19,17 @@ import (
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 
+	"github.com/J466Y/WhiteTower/api/events"
 	"github.com/J466Y/WhiteTower/internal/api/moduleapi"
 	"github.com/J466Y/WhiteTower/internal/api/rest"
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
+	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/health"
 	"github.com/J466Y/WhiteTower/internal/platform/jobs"
+	"github.com/J466Y/WhiteTower/internal/platform/keys"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/metrics"
 	"github.com/J466Y/WhiteTower/internal/platform/notify"
@@ -214,8 +217,26 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	bus := notify.NewPostgres(notify.PostgresOptions{DB: database, Logger: logger, Metrics: metrics.NewNotify(registry)})
 	replica, _ := os.Hostname()
 	runner := jobs.New(jobs.Options{DB: database, Replica: replica, Logger: logger, Metrics: metrics.NewJobs(registry)})
-	if err := runner.Add(audit.PartitionsJob(database)); err != nil {
+
+	// The audit log: every change records its event through the writer, and
+	// the sealer appends the events to the Merkle tree and signs checkpoints.
+	catalog, err := audit.LoadCatalog(events.Files)
+	if err != nil {
 		return err
+	}
+	writer := audit.NewWriter(catalog, clock.System)
+	checkpointKey, err := keys.LoadEd25519(cfg.Audit.CheckpointKeyFile)
+	if err != nil {
+		return fmt.Errorf("audit.checkpoint_key_file: %w", err)
+	}
+	sealer := audit.NewSealer(audit.SealerOptions{
+		DB: database, Writer: writer, Key: checkpointKey, Origin: cfg.Audit.Origin,
+		Interval: cfg.Audit.CheckpointInterval, Logger: logger, Metrics: metrics.NewAudit(registry),
+	})
+	for _, job := range []jobs.Job{audit.PartitionsJob(database), sealer.Job()} {
+		if err := runner.Add(job); err != nil {
+			return err
+		}
 	}
 	background, stopBackground := context.WithCancel(ctx)
 	var running sync.WaitGroup

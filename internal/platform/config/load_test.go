@@ -27,6 +27,7 @@ func TestEachCommandChecksWhatItNeeds(t *testing.T) {
 	for _, key := range []string{
 		"listeners.console.cert_file", "listeners.console.key_file",
 		"listeners.machine.cert_file", "listeners.machine.key_file", "database.url",
+		"audit.origin", "audit.checkpoint_key_file",
 	} {
 		if err == nil || !strings.Contains(err.Error(), key) {
 			t.Errorf("serving with the defaults: error %v, want it to name %s", err, key)
@@ -35,6 +36,7 @@ func TestEachCommandChecksWhatItNeeds(t *testing.T) {
 	cfg := Defaults()
 	cfg.Dev.SelfSignedTLS = true
 	cfg.Database.URL = "postgres://whitetower_app@db/whitetower"
+	cfg.Audit.Origin, cfg.Audit.CheckpointKeyFile = "whitetower.example.org/audit", "/run/secrets/audit-checkpoint-key"
 	if err := cfg.CheckServe(); err != nil {
 		t.Errorf("serving with development TLS and a database: %v", err)
 	}
@@ -139,6 +141,10 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 		{"password parameter", []string{"WT_DATABASE_MIGRATION_URL=postgres://owner@db/whitetower?password=secret"}, "database.migration.url"},
 		{"TLS key password parameter", []string{"WT_DATABASE_MIGRATION_URL=postgres://owner@db/whitetower?sslpassword=secret"}, "database.migration.url"},
 		{"no connections", []string{"WT_DATABASE_MAX_CONNECTIONS=0"}, "database.max_connections"},
+		{"origin with a space", []string{"WT_AUDIT_ORIGIN=white tower/audit"}, "audit.origin"},
+		{"origin with a plus sign", []string{"WT_AUDIT_ORIGIN=whitetower+audit"}, "audit.origin"},
+		{"checkpoints too rare", []string{"WT_AUDIT_CHECKPOINT_INTERVAL=2m"}, "audit.checkpoint_interval"},
+		{"checkpoints too frequent", []string{"WT_AUDIT_CHECKPOINT_INTERVAL=100ms"}, "audit.checkpoint_interval"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

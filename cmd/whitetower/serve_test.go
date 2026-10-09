@@ -4,12 +4,18 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -116,6 +122,25 @@ func databaseEnv(d *dbtest.Database) []string {
 	return []string{"WT_DATABASE_URL=" + d.Config.URL, "WT_DATABASE_PASSWORD_FILE=" + d.Config.PasswordFile}
 }
 
+// auditEnv names the audit log's origin, and a checkpoint key of the test's
+// own.
+func auditEnv(t *testing.T) []string {
+	t.Helper()
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "audit-checkpoint-key.pem")
+	if err := os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return []string{"WT_AUDIT_ORIGIN=whitetower.test/audit", "WT_AUDIT_CHECKPOINT_KEY_FILE=" + path}
+}
+
 // migrationEnv names the migration role's connection to d, as whitetower
 // migrate reads it.
 func migrationEnv(d *dbtest.Database) []string {
@@ -135,7 +160,7 @@ func startServeOn(t *testing.T, d *dbtest.Database, environ ...string) *serving 
 		"WT_LISTENERS_MACHINE_ADDRESS=" + machine,
 		"WT_LISTENERS_OPERATIONS_ADDRESS=" + operations,
 		"WT_SHUTDOWN_TIMEOUT=2s",
-	}, databaseEnv(d), environ))
+	}, databaseEnv(d), auditEnv(t), environ))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -32,6 +32,8 @@ type Config struct {
 	API API `yaml:"api"`
 	// The PostgreSQL database. The server connects with the runtime role only; whitetower migrate alone uses the migration role (threat model, DC-3).
 	Database Database `yaml:"database"`
+	// The tamper-evident audit log (ADR-0006).
+	Audit Audit `yaml:"audit"`
 	// How the server stops.
 	Shutdown Shutdown `yaml:"shutdown"`
 	// Logging.
@@ -135,6 +137,20 @@ type OTLP struct {
 	CAFile string `yaml:"ca_file"`
 }
 
+// Audit holds the settings of the audit log.
+type Audit struct {
+	// The audit log's name in its signed checkpoints, unique to the deployment, such as whitetower.example.org/audit: those who keep checkpoints, such as a SIEM, tell logs apart by it. Without spaces or plus signs.
+	Origin string `yaml:"origin"`
+	// PEM file with the Ed25519 private key that signs the checkpoints, in PKCS #8, as openssl genpkey -algorithm ed25519 writes it. Keep a copy apart from the database's backups: with the database, the key could sign a rewritten history.
+	CheckpointKeyFile string `yaml:"checkpoint_key_file"`
+	// How often the audit log signs a checkpoint, when events were sealed since the last one: at most every minute (requirement AUD-03).
+	CheckpointInterval time.Duration `yaml:"checkpoint_interval"`
+}
+
+// MaxCheckpointInterval is the longest wait for a checkpoint that
+// requirement AUD-03 allows.
+const MaxCheckpointInterval = time.Minute
+
 // Dev holds settings for development only.
 type Dev struct {
 	// Serve a self-signed certificate generated at startup on the HTTPS listeners, instead of the certificate files. For development only: the server logs a warning.
@@ -158,6 +174,7 @@ func Defaults() Config {
 		TLS:      TLS{MinVersion: "1.2"},
 		API:      API{RateLimit: 50, RateBurst: 100},
 		Database: Database{MaxConnections: 10},
+		Audit:    Audit{CheckpointInterval: MaxCheckpointInterval},
 		Shutdown: Shutdown{Timeout: 8 * time.Second},
 		Log:      Log{Level: "info"},
 		Tracing:  Tracing{SampleRatio: 1},
@@ -185,6 +202,12 @@ func (c Config) CheckServe() error {
 	}
 	if c.Database.URL == "" {
 		errs = append(errs, errors.New("database.url: required to serve"))
+	}
+	if c.Audit.Origin == "" {
+		errs = append(errs, errors.New("audit.origin: required to serve: the audit log's name in its checkpoints"))
+	}
+	if c.Audit.CheckpointKeyFile == "" {
+		errs = append(errs, errors.New("audit.checkpoint_key_file: required to serve: the key that signs the audit log's checkpoints"))
 	}
 	return errors.Join(errs...)
 }
@@ -278,6 +301,12 @@ func (c Config) Validate() error {
 	}
 	if c.Tracing.OTLP.CAFile != "" && !strings.HasPrefix(c.Tracing.OTLP.Endpoint, "https://") {
 		add("tracing.otlp.ca_file", "set it only with an https endpoint")
+	}
+	if o := c.Audit.Origin; len(o) > 255 || strings.ContainsFunc(o, func(r rune) bool { return r <= ' ' || r == '+' || r > '~' }) {
+		add("audit.origin", "%q: want printable ASCII without spaces or plus signs, at most 255 characters", o)
+	}
+	if i := c.Audit.CheckpointInterval; i < time.Second || i > MaxCheckpointInterval {
+		add("audit.checkpoint_interval", "%s: want from 1s to %s", i, MaxCheckpointInterval)
 	}
 	return errors.Join(errs...)
 }

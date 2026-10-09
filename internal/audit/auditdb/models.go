@@ -3,3 +3,19 @@
 //   sqlc v1.31.1
 
 package auditdb
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type WhitetowerAuditTreeHash struct {
+	HashIndex int64
+	Hash      []byte
+}
+
+type WhitetowerAuditUnsealed struct {
+	AuditID    uuid.UUID
+	IngestedAt time.Time
+}

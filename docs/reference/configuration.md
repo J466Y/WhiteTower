@@ -74,6 +74,16 @@ The migration role, which owns the schema.
 | `database.migration.url` | `WT_DATABASE_MIGRATION_URL` | string | none | Connection of the migration role, as a postgres:// URL without the password. Required by whitetower migrate; the server never reads it. |
 | `database.migration.password_file` | `WT_DATABASE_MIGRATION_PASSWORD_FILE` | string | none | File holding the migration role's password. Mount it only where whitetower migrate runs, such as its init container. |
 
+## `audit`
+
+The tamper-evident audit log (ADR-0006).
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `audit.origin` | `WT_AUDIT_ORIGIN` | string | none | The audit log's name in its signed checkpoints, unique to the deployment, such as whitetower.example.org/audit: those who keep checkpoints, such as a SIEM, tell logs apart by it. Without spaces or plus signs. |
+| `audit.checkpoint_key_file` | `WT_AUDIT_CHECKPOINT_KEY_FILE` | string | none | PEM file with the Ed25519 private key that signs the checkpoints, in PKCS #8, as openssl genpkey -algorithm ed25519 writes it. Keep a copy apart from the database's backups: with the database, the key could sign a rewritten history. |
+| `audit.checkpoint_interval` | `WT_AUDIT_CHECKPOINT_INTERVAL` | duration | `1m0s` | How often the audit log signs a checkpoint, when events were sealed since the last one: at most every minute (requirement AUD-03). |
+
 ## `shutdown`
 
 How the server stops.

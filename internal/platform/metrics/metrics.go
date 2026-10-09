@@ -279,6 +279,70 @@ func (m *Notify) Received(channel string) { m.received.WithLabelValues(channel).
 // Resynced counts a subscriber told to re-read what it follows.
 func (m *Notify) Resynced(reason string) { m.resyncs.WithLabelValues(reason).Inc() }
 
+// Audit holds the metrics of the audit log's sealer, on the replica that
+// runs it.
+type Audit struct {
+	delay          prometheus.Histogram
+	claim          prometheus.Histogram
+	sealed         prometheus.Counter
+	size           prometheus.Gauge
+	lastCheckpoint prometheus.Gauge
+	failures       prometheus.Counter
+}
+
+// NewAudit registers the metrics of the sealer with reg.
+func NewAudit(reg prometheus.Registerer) *Audit {
+	m := &Audit{
+		delay: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "sealing_delay_seconds",
+			Help:    "Time from an event's ingestion to its sealing into the Merkle tree (NFR-09).",
+			Buckets: []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60},
+		}),
+		claim: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "claim_seconds",
+			Help:    "Time to take a batch of events off the queue of events to seal.",
+			Buckets: prometheus.ExponentialBuckets(0.001, 4, 8),
+		}),
+		sealed: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "sealed_total",
+			Help: "Events sealed into the Merkle tree.",
+		}),
+		size: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "tree_size",
+			Help: "Leaves of the Merkle tree.",
+		}),
+		lastCheckpoint: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "last_checkpoint_timestamp_seconds",
+			Help: "When the sealer last signed a checkpoint, in seconds since the Unix epoch.",
+		}),
+		failures: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "sealing_failures_total",
+			Help: "Rounds of the sealer that failed; the next one reloads the tree from the database.",
+		}),
+	}
+	reg.MustRegister(m.delay, m.claim, m.sealed, m.size, m.lastCheckpoint, m.failures)
+	return m
+}
+
+// Claimed records the time a batch took to claim.
+func (m *Audit) Claimed(took time.Duration) { m.claim.Observe(took.Seconds()) }
+
+// Sealed records an event sealed after delay, and the tree's new size.
+func (m *Audit) Sealed(delay time.Duration, size int64) {
+	m.delay.Observe(delay.Seconds())
+	m.sealed.Inc()
+	m.size.Set(float64(size))
+}
+
+// Size records the tree's size.
+func (m *Audit) Size(size int64) { m.size.Set(float64(size)) }
+
+// Checkpointed records a checkpoint signed at t.
+func (m *Audit) Checkpointed(t time.Time) { m.lastCheckpoint.Set(float64(t.UnixMilli()) / 1000) }
+
+// Failed counts a failed round.
+func (m *Audit) Failed() { m.failures.Inc() }
+
 // Method returns a standard HTTP method as it is, and anything else as
 // _OTHER, as the OpenTelemetry conventions do: clients choose the method.
 func Method(method string) string {

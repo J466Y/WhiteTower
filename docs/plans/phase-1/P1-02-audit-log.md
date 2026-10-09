@@ -176,10 +176,10 @@ The plan lands in seven pull requests. The first holds the writer, which every o
 | Pull request | Steps | Status |
 | --- | --- | --- |
 | 1. Event model, writer and storage | 1, 2, ST-09 | Done |
-| 2. Sealer and checkpoints | 3, 4 | Not started |
+| 2. Sealer and checkpoints | 3, 4 | Done |
 | 3. Verification library and tamper suite | 7, part of 10, ST-06 to ST-08 | Not started |
 | 4. Ingestion from modules | 5, ST-10, ST-11 | Not started |
-| 5. Query API | 6, ST-12 | Not started |
+| 5. Query API | 6, the keys of step 4, ST-12 | Not started |
 | 6. Export | 8 | Not started |
 | 7. Retention and throughput | 9, the rest of 10 | Not started |
 
@@ -202,4 +202,24 @@ The plan lands in seven pull requests. The first holds the writer, which every o
   - the runtime role cannot update, delete or truncate events;
   - a dropped partition is created again by the job, three months ahead;
   - the catalog's examples are valid and indexed, and invalid events are refused by name.
-- Found for later: the note of the checkpoint example in the catalog is mis-encoded (its em dash was encoded twice). PR 2, which signs checkpoints, fixes it.
+
+### 2026-10-09: sealer and checkpoints
+
+- `internal/platform/keys`: the shared interface of the signing keys that plan P1-05 foresees, with a file backend. Its first key is Ed25519, in PKCS #8 PEM, as `openssl genpkey -algorithm ed25519` writes it; its ID is its RFC 7638 thumbprint, tested against RFC 8037's example. P1-05 adds ES256 and rotation with overlap.
+- `audit.Sealer` is the background job `audit-sealer`, on one replica at a time:
+  - Each round, every 200 ms, drains the queue: batches of at most 5,000 events, each in one transaction, which takes them off the queue (`DELETE ... RETURNING`, no row locks), orders them by ingestion time and audit ID, and stores their RFC 6962 leaves and the tree's new hashes (`golang.org/x/mod/sumdb/tlog`), with `COPY`.
+  - The sealer keeps the tree's right edge in memory, which is all an append reads. A failed round makes the next one load the tree again from the database, so a crash in the middle of a batch leaves no gap and no duplicate. Should two sealers ever run at once, the primary key of the leaves refuses the batch of the one that is behind.
+  - A failed round is logged once, and the end of the failures once; retries back off up to 5 seconds.
+  - Metrics: `whitetower_audit_sealing_delay_seconds` (NFR-09), `whitetower_audit_claim_seconds`, `whitetower_audit_sealed_total`, `whitetower_audit_tree_size`, `whitetower_audit_last_checkpoint_timestamp_seconds` and `whitetower_audit_sealing_failures_total`.
+- Checkpoints: once the interval has passed (`audit.checkpoint_interval`, a minute at most, AUD-03), or after 10,000 new leaves, the sealer signs a C2SP tlog-checkpoint over the tree, under the log's origin (`audit.origin`) as the key's name. It stores the checkpoint and records its `whitetower.audit.checkpoint.v1` event in one transaction, and the next round seals that event. An idle log signs no more: a checkpoint needs a leaf besides the previous checkpoint's own event.
+- The checkpoint key comes from `audit.checkpoint_key_file`, which `serve` requires with `audit.origin`. The sealer registers its public half in `signing_keys` as the active checkpoint key, and retires the others, whose public halves stay so that their checkpoints still verify. Publishing the keys at `/api/v1/audit/keys` comes with the other audit operations, in PR 5.
+- Compose and `task run` use a development key, public like the development passwords. ST-03 covers the new secret file: a canary key, which the server signs with, never leaves it.
+- The catalog's checkpoint example is now a real checkpoint, signed as the sealer signs one. The first pull request's notes said its note was mis-encoded: it was not; the file had been read with the wrong encoding.
+- Tests, with the tree recomputed independently from the events' canonical bytes:
+  - every event is sealed, in order, and the tree's hashes are those that `tlog` computes;
+  - a batch that fails in its middle leaves a consistent tree, and the next round goes on from it (the criterion of step 3);
+  - two sealers at once do not fork the tree;
+  - checkpoints verify with `golang.org/x/mod/sumdb/note`, and say the tree's size and root (the criterion of step 4);
+  - after a rotation, the old key's checkpoints still verify with its public half (the criterion of step 4);
+  - checkpoints come at their interval, and an idle log signs no more;
+  - `Run` recovers from failed rounds.
