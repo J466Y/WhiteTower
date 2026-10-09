@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -295,3 +296,29 @@ var _ = []interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...any) pgx.Row
 }{(*db.DB)(nil), (*db.Tx)(nil)}
+
+// A session outside the pool is the runtime role's, is named after its
+// purpose, and ends once it has run nothing for its idle time: a replica cut
+// off from the database holds no lock for longer.
+func TestConnect(t *testing.T) {
+	d := dbtest.New(t)
+	ctx := context.Background()
+	conn, err := d.OpenReplica(t, "replica-a").Connect(ctx, "jobs", 500*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close(ctx) })
+	var role, name, idle string
+	if err := conn.QueryRow(ctx,
+		"SELECT current_user, current_setting('application_name'), current_setting('idle_session_timeout')",
+	).Scan(&role, &name, &idle); err != nil {
+		t.Fatal(err)
+	}
+	if role != dbtest.RuntimeRole || name != "replica-a jobs" || idle != "500ms" {
+		t.Fatalf("role %q, application_name %q, idle_session_timeout %q", role, name, idle)
+	}
+	time.Sleep(1500 * time.Millisecond)
+	if err := conn.Ping(ctx); err == nil {
+		t.Fatal("the idle session is still open")
+	}
+}

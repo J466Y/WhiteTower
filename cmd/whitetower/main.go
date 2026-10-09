@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -24,8 +25,10 @@ import (
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/health"
+	"github.com/J466Y/WhiteTower/internal/platform/jobs"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/metrics"
+	"github.com/J466Y/WhiteTower/internal/platform/notify"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 	"github.com/J466Y/WhiteTower/internal/platform/tracing"
 	"github.com/J466Y/WhiteTower/internal/server"
@@ -203,6 +206,20 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+
+	// The notifications across replicas and the background jobs, which the
+	// domain plans subscribe to and register. They stop before the database
+	// closes.
+	bus := notify.NewPostgres(notify.PostgresOptions{DB: database, Logger: logger, Metrics: metrics.NewNotify(registry)})
+	replica, _ := os.Hostname()
+	runner := jobs.New(jobs.Options{DB: database, Replica: replica, Logger: logger, Metrics: metrics.NewJobs(registry)})
+	background, stopBackground := context.WithCancel(ctx)
+	var running sync.WaitGroup
+	defer running.Wait()
+	defer stopBackground()
+	running.Go(func() { bus.Run(background) })
+	running.Go(func() { runner.Run(background) })
+
 	return srv.Run(ctx)
 }
 

@@ -161,6 +161,124 @@ func (m *RPC) Started(procedure string, stream bool) func(code string) {
 	}
 }
 
+// Jobs holds the metrics of the background jobs. A replica reports the runs
+// of the jobs it leads.
+type Jobs struct {
+	leader      *prometheus.GaugeVec
+	lastRun     *prometheus.GaugeVec
+	lastSuccess *prometheus.GaugeVec
+	duration    *prometheus.HistogramVec
+	failures    *prometheus.CounterVec
+}
+
+// NewJobs registers the metrics of the background jobs with reg.
+func NewJobs(reg prometheus.Registerer) *Jobs {
+	m := &Jobs{
+		leader: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Subsystem: "job",
+			Name:      "leader",
+			Help:      "1 on the replica that leads the job, 0 on the others.",
+		}, []string{"job"}),
+		lastRun: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Subsystem: "job",
+			Name:      "last_run_timestamp_seconds",
+			Help:      "When the job's last run on this replica ended, in seconds since the Unix epoch.",
+		}, []string{"job"}),
+		lastSuccess: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Subsystem: "job",
+			Name:      "last_success_timestamp_seconds",
+			Help:      "When the job's last successful run on this replica ended, in seconds since the Unix epoch.",
+		}, []string{"job"}),
+		duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: Namespace,
+			Subsystem: "job",
+			Name:      "duration_seconds",
+			Help:      "Time spent on the job's runs.",
+			Buckets:   prometheus.ExponentialBuckets(0.005, 4, 10),
+		}, []string{"job"}),
+		failures: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace,
+			Subsystem: "job",
+			Name:      "failures_total",
+			Help:      "Runs of the job that failed.",
+		}, []string{"job"}),
+	}
+	reg.MustRegister(m.leader, m.lastRun, m.lastSuccess, m.duration, m.failures)
+	return m
+}
+
+// Leading records whether this replica leads the job.
+func (m *Jobs) Leading(job string, leading bool) {
+	v := 0.0
+	if leading {
+		v = 1
+	}
+	m.leader.WithLabelValues(job).Set(v)
+}
+
+// Ran records a run of the job that ended at end, after took.
+func (m *Jobs) Ran(job string, took time.Duration, end time.Time, succeeded bool) {
+	m.duration.WithLabelValues(job).Observe(took.Seconds())
+	m.lastRun.WithLabelValues(job).Set(float64(end.UnixMilli()) / 1000)
+	if succeeded {
+		m.lastSuccess.WithLabelValues(job).Set(float64(end.UnixMilli()) / 1000)
+	} else {
+		m.failures.WithLabelValues(job).Inc()
+	}
+}
+
+// Notify holds the metrics of the notifications across replicas.
+type Notify struct {
+	connected prometheus.Gauge
+	received  *prometheus.CounterVec
+	resyncs   *prometheus.CounterVec
+}
+
+// NewNotify registers the metrics of the notifications with reg.
+func NewNotify(reg prometheus.Registerer) *Notify {
+	m := &Notify{
+		connected: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Subsystem: "notify",
+			Name:      "listener_connected",
+			Help:      "1 while the replica listens for notifications from the others, 0 while it reconnects.",
+		}),
+		received: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace,
+			Subsystem: "notify",
+			Name:      "received_total",
+			Help:      "Notifications received, by channel.",
+		}, []string{"channel"}),
+		resyncs: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace,
+			Subsystem: "notify",
+			Name:      "resyncs_total",
+			Help: "Times a subscriber was told to re-read what it follows, by reason: listening (the replica " +
+				"started listening for it, when it subscribed or after a reconnection) or overflow (it fell behind).",
+		}, []string{"reason"}),
+	}
+	reg.MustRegister(m.connected, m.received, m.resyncs)
+	return m
+}
+
+// Connected records whether the listener is connected.
+func (m *Notify) Connected(connected bool) {
+	v := 0.0
+	if connected {
+		v = 1
+	}
+	m.connected.Set(v)
+}
+
+// Received counts a notification received on channel.
+func (m *Notify) Received(channel string) { m.received.WithLabelValues(channel).Inc() }
+
+// Resynced counts a subscriber told to re-read what it follows.
+func (m *Notify) Resynced(reason string) { m.resyncs.WithLabelValues(reason).Inc() }
+
 // Method returns a standard HTTP method as it is, and anything else as
 // _OTHER, as the OpenTelemetry conventions do: clients choose the method.
 func Method(method string) string {

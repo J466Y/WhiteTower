@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -224,6 +225,36 @@ func (d *Database) Open(t testing.TB) *db.DB {
 	}
 	t.Cleanup(pool.Close)
 	return pool
+}
+
+// OpenReplica returns a pool of the runtime role's connections as another
+// replica of the server opens it, closed when the test ends. pg_stat_activity
+// names its sessions after the replica: "<replica>", or "<replica> <purpose>"
+// for those that db.Connect opens.
+func (d *Database) OpenReplica(t testing.TB, replica string) *db.DB {
+	t.Helper()
+	cfg := d.Config
+	cfg.URL += "&application_name=" + url.QueryEscape(replica)
+	pool, err := db.Open(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	return pool
+}
+
+// Terminate ends the sessions that pg_stat_activity names application, as a
+// failure of the database or of the network would, and returns how many it
+// ended.
+func (d *Database) Terminate(t testing.TB, application string) int {
+	t.Helper()
+	var n int
+	if err := d.Superuser(t).QueryRow(context.Background(),
+		"SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname = $1 AND application_name = $2",
+		d.Name, application).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
 }
 
 // Superuser connects to the test's database as the superuser, for checks
