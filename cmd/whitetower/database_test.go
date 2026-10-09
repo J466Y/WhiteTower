@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -91,7 +92,7 @@ func TestServeRefusesANewerSchema(t *testing.T) {
 	}
 	var stdout, stderr bytes.Buffer
 	start := time.Now()
-	code := run([]string{"serve"}, append(databaseEnv(d), devEnv...), &stdout, &stderr)
+	code := run([]string{"serve"}, slices.Concat(databaseEnv(d), devEnv, auditEnv(t)), &stdout, &stderr)
 	if code != 1 || !strings.Contains(stderr.String(), "newer than this binary") {
 		t.Fatalf("exit code %d, stderr %q", code, stderr.String())
 	}

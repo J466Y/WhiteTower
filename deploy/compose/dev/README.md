@@ -35,6 +35,14 @@ WT_OTLP_HTTP_PORT=4318
 
 A volume created before these roles existed lacks them: `docker compose down --volumes` deletes it, with the development data, and the next start creates the roles.
 
+## Audit checkpoint key
+
+The core signs the checkpoints of its audit log with the Ed25519 key in `secrets/audit-checkpoint-key`, under the origin `whitetower.localhost/audit`. The key is public and for development only. A deployment makes its own, and keeps it apart from the database's backups:
+
+```sh
+openssl genpkey -algorithm ed25519 -out audit-checkpoint-key.pem
+```
+
 ## Traces from the core
 
 The core exports no trace by default. To send them to the collector, which prints what it receives, add `WT_TRACING_OTLP_ENDPOINT=http://otel-collector:4318` to `.env` and start both profiles:

@@ -99,6 +99,8 @@ tasks:
       WT_DEV_SELF_SIGNED_TLS: "true"
       WT_DATABASE_URL: postgres://whitetower_app@{{.DEV_DATABASE}}
       WT_DATABASE_PASSWORD_FILE: deploy/compose/dev/secrets/db-app-password
+      WT_AUDIT_ORIGIN: whitetower.localhost/audit
+      WT_AUDIT_CHECKPOINT_KEY_FILE: deploy/compose/dev/secrets/audit-checkpoint-key
     cmds:
       - task: migrate
       - go run ./cmd/whitetower serve {{.CLI_ARGS}}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
@@ -74,6 +75,7 @@ var (
 	secretFiles = []string{
 		"listeners.console.key_file", "listeners.machine.key_file",
 		"database.password_file", "database.migration.password_file",
+		"audit.checkpoint_key_file",
 	}
 	otherFiles = []string{"listeners.console.cert_file", "listeners.machine.cert_file", "tracing.otlp.ca_file"}
 )
@@ -141,6 +143,29 @@ func keyPair(t *testing.T, dir string) (certFile, keyFile string, keyLines []str
 	return certFile, keyFile, keyLines
 }
 
+// checkpointKeyFile writes an Ed25519 key to path, and returns the base64
+// lines of its PEM, which must never leave the file.
+func checkpointKeyFile(t *testing.T, path string) []string {
+	t.Helper()
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+	writeSecret(t, path, string(keyPEM))
+	var lines []string
+	for line := range strings.Lines(string(keyPEM)) {
+		if !strings.HasPrefix(line, "-----") {
+			lines = append(lines, strings.TrimSpace(line))
+		}
+	}
+	return lines
+}
+
 func writeSecret(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
@@ -200,6 +225,10 @@ func TestSecretsNeverLeak(t *testing.T) {
 	for i, line := range keyLines {
 		canaries["TLS key, line "+strconv.Itoa(i+1)] = line
 	}
+	checkpointKey := filepath.Join(dir, "checkpoint.pem")
+	for i, line := range checkpointKeyFile(t, checkpointKey) {
+		canaries["checkpoint key, line "+strconv.Itoa(i+1)] = line
+	}
 	runtimeFile, migrationFile, refusedFile := filepath.Join(dir, "runtime"), filepath.Join(dir, "migration"), filepath.Join(dir, "refused")
 	writeSecret(t, runtimeFile, canaries["runtime password"]+"\n")
 	writeSecret(t, migrationFile, canaries["migration password"]+"\n")
@@ -213,6 +242,7 @@ func TestSecretsNeverLeak(t *testing.T) {
 		"WT_DATABASE_URL=" + url, "WT_DATABASE_PASSWORD_FILE=" + runtimeFile,
 		"WT_DATABASE_MIGRATION_URL=" + d.Config.Migration.URL, "WT_DATABASE_MIGRATION_PASSWORD_FILE=" + migrationFile,
 		"WT_TRACING_OTLP_ENDPOINT=" + c.URL,
+		"WT_AUDIT_CHECKPOINT_KEY_FILE=" + checkpointKey,
 	}
 	s := startServeOn(t, d, env...)
 	if status, body := s.readiness(t); status != http.StatusOK {

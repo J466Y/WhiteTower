@@ -81,10 +81,13 @@ services:
       WT_DEV_SELF_SIGNED_TLS: "true"
       WT_DATABASE_URL: postgres://whitetower_app@postgres:5432/whitetower?sslmode=disable
       WT_DATABASE_PASSWORD_FILE: /run/secrets/db-app-password
+      # The audit log, with a checkpoint key for development only.
+      WT_AUDIT_ORIGIN: whitetower.localhost/audit
+      WT_AUDIT_CHECKPOINT_KEY_FILE: /run/secrets/audit-checkpoint-key
       # Empty: no trace leaves the core. http://otel-collector:4318 sends them
       # to the collector of the otel profile.
       WT_TRACING_OTLP_ENDPOINT: ${WT_TRACING_OTLP_ENDPOINT:-}
-    secrets: [db-app-password]
+    secrets: [db-app-password, audit-checkpoint-key]
     ports:
       - "127.0.0.1:${WT_CONSOLE_PORT:-8443}:8443"
       - "127.0.0.1:${WT_MACHINE_PORT:-9443}:9443"
@@ -118,3 +121,5 @@ secrets:
     file: ./secrets/db-app-password
   db-migrator-password:
     file: ./secrets/db-migrator-password
+  audit-checkpoint-key:
+    file: ./secrets/audit-checkpoint-key
