@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | Draft |
+| **Status** | In progress (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P1-01 |
 | **Unblocks** | P1-03 and every plan that changes state (through the writer, step 1); P1-11 (verification commands) |
@@ -168,3 +168,38 @@ A consistency check that runs on a schedule, against the latest checkpoint the S
 - Never compute hashes over JSONB round-trips: keep the canonical bytes.
 - Keep the audit tables out of the ORM-style convenience layer: only the writer and the sealer touch them.
 - The spike code in [`hack/spikes/s3`](../../../hack/spikes/s3/README.md) has working versions of the ingestion, sealing and verification queries.
+
+## Progress notes
+
+The plan lands in seven pull requests. The first holds the writer, which every other plan needs.
+
+| Pull request | Steps | Status |
+| --- | --- | --- |
+| 1. Event model, writer and storage | 1, 2, ST-09 | Done |
+| 2. Sealer and checkpoints | 3, 4 | Not started |
+| 3. Verification library and tamper suite | 7, part of 10, ST-06 to ST-08 | Not started |
+| 4. Ingestion from modules | 5, ST-10, ST-11 | Not started |
+| 5. Query API | 6, ST-12 | Not started |
+| 6. Export | 8 | Not started |
+| 7. Retention and throughput | 9, the rest of 10 | Not started |
+
+### 2026-10-09: event model, writer and storage
+
+- `api/events` embeds the event catalog in the binary. `audit.LoadCatalog` compiles it: the envelope's schema and, for each type, the schema of its data, who emits it and whether it is about an agent.
+- `audit.Writer.Record(ctx, tx, event)` records an event of the core in the caller's transaction, and queues it for the sealer in the same statement:
+  - The envelope: source `/core`, a UUIDv7, the time from the clock in UTC to the millisecond, the trace context and, as `wtrequestid`, the ID of the request, which ties the event to the access log. The contract and the envelope's schema now define `wtrequestid`.
+  - The event is stored as its canonical JSON (RFC 8785, with `gowebpki/jcs`), and checked from those bytes against the envelope's schema and its type's. The core cannot record a type that only modules emit.
+  - Every data schema refuses unknown members, so an email address or a name cannot slip into an event (NFR-20).
+  - The event is written when `Record` is called, not in a `BeforeCommit` hook as P1-01 foresaw: a failure then surfaces where the change records its event, and still rolls it back.
+- The columns of `audit_events` (actor, action, outcome, reason) are read from the event by a rule per type, never given apart from it, so they always say what the canonical bytes say. `LoadCatalog` refuses a type without a rule, and a rule without a type; a golden file holds what is indexed of every example of the catalog.
+- Migration 2:
+  - `audit_unsealed`, the queue of events to seal, which the runtime role may read, add to and take from, but not change;
+  - the event catalog came after the schema, and the indexed actors and outcomes now include service accounts and cancelled actions.
+- `audit-partitions`, the first background job, keeps the partitions of the audit tables three months ahead, checking every hour.
+- Tests:
+  - an event is stored with the columns of its canonical bytes, the request and trace IDs, and its entry in the queue;
+  - ST-09: a change whose event is invalid, or which the database refuses, is rolled back entirely;
+  - the runtime role cannot update, delete or truncate events;
+  - a dropped partition is created again by the job, three months ahead;
+  - the catalog's examples are valid and indexed, and invalid events are refused by name.
+- Found for later: the note of the checkpoint example in the catalog is mis-encoded (its em dash was encoded twice). PR 2, which signs checkpoints, fixes it.

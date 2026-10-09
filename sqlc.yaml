@@ -3,12 +3,12 @@
 version: "2"
 sql:
   - engine: postgresql
-    schema:
+    schema: &schema
       - internal/platform/db/goose_db_version.sql
       - internal/platform/db/migrations
     queries: internal/platform/db/queries
     gen:
-      go:
+      go: &go
         package: gen
         out: internal/platform/db/gen
         sql_package: pgx/v5
@@ -32,3 +32,12 @@ sql:
               import: time
               type: Time
               pointer: true
+  # Each domain package keeps its queries, and their generated code, to itself.
+  - engine: postgresql
+    schema: *schema
+    queries: internal/audit/queries
+    gen:
+      go:
+        <<: *go
+        package: auditdb
+        out: internal/audit/auditdb

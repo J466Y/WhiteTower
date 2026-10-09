@@ -63,7 +63,7 @@ tasks:
     desc: Fail if the generated code is not up to date (used by CI)
     cmds:
       - task: gen
-      - git diff --exit-code -- internal/api/rest/gen pkg/apiclient pkg/moduleapi web/src/api internal/platform/db/gen
+      - git diff --exit-code -- internal/api/rest/gen pkg/apiclient pkg/moduleapi web/src/api internal/platform/db/gen internal/audit/auditdb
 
   build:
     desc: Build the console and the binaries into bin/ (the console is embedded in whitetower)

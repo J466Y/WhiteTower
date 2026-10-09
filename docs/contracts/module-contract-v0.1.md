@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md). Contract version `v1alpha1` |
-| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)) and 2026-10-02 (how message sizes are measured, from P1-01) |
+| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01) and 2026-10-09 (the core's request IDs in its events, from P1-02) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |
 | **Conformance** | [`test/conformance/`](../../test/conformance/README.md) |
@@ -483,6 +483,7 @@ Events are **CloudEvents 1.0 in the JSON format**, validated by [`cloudevent.sch
 | `wtseq` | Required from modules, absent from the core: the event's position in its source, as a decimal string (`"1"`, `"2"` and so on, without gaps). A string, because CloudEvents integers are limited to 32 bits |
 | `traceparent`, `tracestate` | The W3C trace context (CloudEvents distributed tracing extension), when the action has a trace |
 | `wtorigtype` | For events translated by an adapter, the original type, for example AGT's `ai.agentos.tool.blocked` |
+| `wtrequestid` | From the core only: the ID of the request that made the change, as the core's logs and its `X-Request-Id` header give it |
 | `dataschema` | Optional in `v1alpha1`; it becomes required, with stable URLs, once the project settles its domain (open question Q6) |
 
 Other extension attributes are allowed and kept, since they are part of the evidence.
