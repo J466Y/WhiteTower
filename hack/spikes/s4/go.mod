@@ -2,7 +2,7 @@ module github.com/J466Y/WhiteTower/hack/spikes/s4
 
 go 1.26.0
 
-toolchain go1.27.1
+toolchain go1.27.2
 
 require (
 	github.com/cedar-policy/cedar-go v1.8.0
