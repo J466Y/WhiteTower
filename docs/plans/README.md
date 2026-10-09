@@ -31,7 +31,7 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | ID | Plan | Size | Depends on | Main requirements | Status |
 | --- | --- | --- | --- | --- | --- |
 | [P1-01](phase-1/P1-01-core-platform-skeleton.md) | Core platform skeleton | M | P0-01, P0-02 | OPS-04, OPS-05, OPS-07 | Done |
-| [P1-02](phase-1/P1-02-audit-log.md) | Audit log | L | P1-01 | AUD-01 to AUD-10, NFR-08 to NFR-10 | Draft |
+| [P1-02](phase-1/P1-02-audit-log.md) | Audit log | L | P1-01 | AUD-01 to AUD-10, NFR-08 to NFR-10 | In progress (1 of 7 pull requests) |
 | [P1-03](phase-1/P1-03-human-identity-and-access.md) | Human identity and access | M | P1-01, P1-02 (writer) | HUM-01 to HUM-08 | Draft |
 | [P1-04](phase-1/P1-04-inventory-and-lifecycle.md) | Inventory and lifecycle | L | P1-03 | INV-01 to INV-10 | Draft |
 | [P1-05](phase-1/P1-05-agent-identity-and-credentials.md) | Agent identity and credentials | L | P1-04 | AID-01 to AID-09 | Draft |

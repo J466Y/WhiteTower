@@ -1,0 +1,107 @@
+{
+  "whitetower.action.executed.v1": {
+    "action": "tool.invoke",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "actor_type": "agent",
+    "outcome": "success",
+    "reason": ""
+  },
+  "whitetower.agent.created.v1": {
+    "action": "agent.created",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+    "actor_type": "human",
+    "outcome": "",
+    "reason": ""
+  },
+  "whitetower.agent.lifecycle_changed.v1": {
+    "action": "validate",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a2",
+    "actor_type": "human",
+    "outcome": "",
+    "reason": ""
+  },
+  "whitetower.audit.checkpoint.v1": {
+    "action": "audit.checkpoint",
+    "actor_id": "",
+    "actor_type": "system",
+    "outcome": "",
+    "reason": ""
+  },
+  "whitetower.bundle.activated.v1": {
+    "action": "bundle.activated",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "actor_type": "agent",
+    "outcome": "success",
+    "reason": ""
+  },
+  "whitetower.bundle.rejected.v1": {
+    "action": "bundle.rejected",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "actor_type": "agent",
+    "outcome": "failure",
+    "reason": "file_hash"
+  },
+  "whitetower.decision.made.v1": {
+    "action": "tool.invoke",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "actor_type": "agent",
+    "outcome": "deny",
+    "reason": "policy.forbid"
+  },
+  "whitetower.halt.issued.v1": {
+    "action": "halt.issued",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a3",
+    "actor_type": "human",
+    "outcome": "",
+    "reason": "Suspected exfiltration through send_email"
+  },
+  "whitetower.halt.released.v1": {
+    "action": "halt.released",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a2",
+    "actor_type": "human",
+    "outcome": "",
+    "reason": "Investigation closed: the recipient was a test mailbox"
+  },
+  "whitetower.instance.halted.v1": {
+    "action": "instance.halted",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "actor_type": "agent",
+    "outcome": "",
+    "reason": ""
+  },
+  "whitetower.instance.started.v1": {
+    "action": "instance.started",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "actor_type": "agent",
+    "outcome": "",
+    "reason": ""
+  },
+  "whitetower.lease.expired.v1": {
+    "action": "lease.expired",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "actor_type": "agent",
+    "outcome": "",
+    "reason": ""
+  },
+  "whitetower.policy.version_approved.v1": {
+    "action": "policy.version_approved",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a2",
+    "actor_type": "human",
+    "outcome": "",
+    "reason": ""
+  },
+  "whitetower.quarantine.applied.v1": {
+    "action": "quarantine.applied",
+    "actor_id": "k8s-quarantine",
+    "actor_type": "module",
+    "outcome": "success",
+    "reason": ""
+  },
+  "whitetower.quarantine.lifted.v1": {
+    "action": "quarantine.lifted",
+    "actor_id": "k8s-quarantine",
+    "actor_type": "module",
+    "outcome": "success",
+    "reason": ""
+  }
+}

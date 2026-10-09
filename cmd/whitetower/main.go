@@ -21,6 +21,7 @@ import (
 
 	"github.com/J466Y/WhiteTower/internal/api/moduleapi"
 	"github.com/J466Y/WhiteTower/internal/api/rest"
+	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
@@ -213,6 +214,9 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	bus := notify.NewPostgres(notify.PostgresOptions{DB: database, Logger: logger, Metrics: metrics.NewNotify(registry)})
 	replica, _ := os.Hostname()
 	runner := jobs.New(jobs.Options{DB: database, Replica: replica, Logger: logger, Metrics: metrics.NewJobs(registry)})
+	if err := runner.Add(audit.PartitionsJob(database)); err != nil {
+		return err
+	}
 	background, stopBackground := context.WithCancel(ctx)
 	var running sync.WaitGroup
 	defer running.Wait()

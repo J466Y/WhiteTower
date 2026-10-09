@@ -69,6 +69,10 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 256
+    },
+    "wtrequestid": {
+      "description": "From the core only: the ID of the request that made the change, as the core's logs and its X-Request-Id header give it.",
+      "$ref": "schemas/common.schema.json#/$defs/uuid"
     }
   },
   "additionalProperties": {

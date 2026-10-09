@@ -44,9 +44,9 @@ func (t *Tx) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
 }
 
 // BeforeCommit registers fn to run in the transaction, after the work and
-// just before the commit; an error rolls the whole transaction back. The
-// audit writer (plan P1-02) relies on it, so that no change commits without
-// its evidence.
+// just before the commit; an error rolls the whole transaction back. It
+// serves what must be done, or checked, once the transaction's work is
+// complete.
 func (t *Tx) BeforeCommit(fn func(ctx context.Context) error) {
 	t.beforeCommit = append(t.beforeCommit, fn)
 }
