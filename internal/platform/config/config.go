@@ -14,9 +14,12 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/J466Y/WhiteTower/internal/version"
 )
 
 // Config is the configuration of the whitetower server.
@@ -163,9 +166,10 @@ func Defaults() Config {
 
 // CheckServe returns what the server needs beyond valid values: its
 // certificates, or the development certificate, and the runtime role's
-// connection. Each problem names its setting.
+// connection. A release build also refuses every development setting. Each
+// problem names its setting.
 func (c Config) CheckServe() error {
-	var errs []error
+	errs := c.checkDevelopment(version.Get().Release())
 	if !c.Dev.SelfSignedTLS {
 		for _, l := range []struct {
 			name string
@@ -183,6 +187,22 @@ func (c Config) CheckServe() error {
 		errs = append(errs, errors.New("database.url: required to serve"))
 	}
 	return errors.Join(errs...)
+}
+
+// checkDevelopment refuses, in a release build, every development setting
+// that is set: whatever dev holds, now or later, is for development only
+// (threat model, T-61).
+func (c Config) checkDevelopment(release bool) []error {
+	if !release {
+		return nil
+	}
+	var errs []error
+	for _, s := range settings(reflect.ValueOf(c.Dev), []string{"dev"}) {
+		if !s.Value.IsZero() {
+			errs = append(errs, fmt.Errorf("%s: for development only; a release build refuses it (threat model, T-61)", s.Key()))
+		}
+	}
+	return errs
 }
 
 // CheckMigrate returns what whitetower migrate needs beyond valid values:

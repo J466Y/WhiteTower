@@ -39,6 +39,16 @@ func TestEachCommandChecksWhatItNeeds(t *testing.T) {
 		t.Errorf("serving with development TLS and a database: %v", err)
 	}
 
+	// A development build, as the tests are, serves with development
+	// settings; a release build refuses each one that is set, by name.
+	if errs := cfg.checkDevelopment(true); len(errs) != 1 ||
+		!strings.Contains(errs[0].Error(), "dev.self_signed_tls: for development only; a release build refuses it") {
+		t.Errorf("a release build with development TLS: %v", errs)
+	}
+	if errs := Defaults().checkDevelopment(true); len(errs) != 0 {
+		t.Errorf("a release build without development settings: %v", errs)
+	}
+
 	if err := Defaults().CheckMigrate(); err == nil || !strings.Contains(err.Error(), "database.migration.url") {
 		t.Errorf("migrating with the defaults: error %v, want it to name database.migration.url", err)
 	}

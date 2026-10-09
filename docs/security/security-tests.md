@@ -8,6 +8,8 @@
 
 Each test turns an abuse case of the threat model into a check that fails if the control it covers is missing. Each has one owner plan: its acceptance criteria require the test to pass, and it runs in CI from then on. Plan [P1-13](../plans/phase-1/P1-13-security-hardening-and-release.md) runs the whole catalog before the first release.
 
+An automated test names its entry in the comment above it, as `// Security test ST-05: ...`, and `test/security` checks that every unit, integration, end-to-end and fuzz test of a finished plan has one.
+
 **Kinds:** unit, integration, end-to-end (e2e), fuzz, scan, review, exercise. The "Covers" column names the threats (`T-`), design changes (`DC-`) or attack trees (`AT-`) of the [threat model](threat-model.md), or a requirement.
 
 ## P1-01: Core platform skeleton

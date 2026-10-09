@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (see [progress notes](#progress-notes)) |
+| **Status** | Done on 2026-10-09 (see [progress notes](#progress-notes)) |
 | **Size** | M |
 | **Depends on** | P0-01, P0-02 |
 | **Unblocks** | Every Phase 1 backend plan; P1-12 |
@@ -149,7 +149,7 @@ The plan lands in seven pull requests:
 | 4. REST API scaffolding and the console | 5, 9 | Done |
 | 5. Module API scaffolding | 6 | Done |
 | 6. Background jobs and notifications across replicas | 7, 8 | Done |
-| 7. Test harness, internal rules and security tests | 10, 11, ST-01 to ST-05 | Not started |
+| 7. Test harness, internal rules and security tests | 10, 11, ST-01 to ST-05 | Done |
 
 ### 2026-09-30: configuration, commands and listeners
 
@@ -250,3 +250,21 @@ The plan lands in seven pull requests:
   - a change committed on one replica reaches the subscribers of every replica, in commit order, and one rolled back reaches none; a forced disconnection makes the subscribers resynchronize (the criterion of step 8);
   - with the fake clock: runs on schedule, the pace kept by a new leader, a missed run, failures, panics, a lost session; cron schedules, including 29 February across 2100;
   - a slow subscriber resynchronizes without holding up the others; a busy channel does not make the listening session look idle; the database ends an idle session.
+
+### 2026-10-09: test harness, internal rules and security tests
+
+- Test harness (step 10):
+  - `internal/platform/golden` compares what a test produces with a file in `testdata`, which `-update` rewrites. The configuration reference test uses it.
+  - `internal/api/rest/resttest` serves the public API for a test, with its generated client; `As` makes a call as a principal. What a test leaves out of `rest.Options` gets a test default.
+  - With the PostgreSQL fixture (PR 3), the fake clock (PR 6) and the smoke test in CI, a package's integration test takes a few lines; [internals](../../development/internals.md#writing-tests) shows one.
+- Internal rules (step 11): [internals](../../development/internals.md) documents the package layout and the rules, and `golangci-lint` enforces what imports and calls show:
+  - `depguard`: domain packages never import transport packages, the platform imports nothing above it, test helpers stay out of the server, and no dependency injection framework comes in;
+  - `forbidigo`: no global state (Prometheus's default registry, slog's default logger, `http.DefaultServeMux`, OpenTelemetry's global providers), and outside the platform no `DB.Exec` and no connection of one's own, so that changes go through `InTx`;
+  - a violation of each rule was checked to fail the lint.
+- The security tests of the catalog name their entry in their comment, and `test/security` fails when an automated test of a finished plan has none:
+  - ST-01: the TLS listeners accept TLS 1.2 or later, and no plain HTTP; the console listener sends HSTS with every answer, errors included.
+  - ST-02: a release build, whose version the release pipeline sets, refuses every `dev.*` setting, including those that later plans add (threat model, T-61). The test builds the binary as the pipeline does, and runs it.
+  - ST-03: canary values in every secret file never reach the logs, the answers, the metrics or the traces, nor `config print`, a server whose password the database refuses, or a failed `migrate`. The server really uses them: a role of the test's own has the canary password, and the listeners serve the canary key. The credentials that callers send get canaries too. A new setting ending in `_file` fails the test until it is classified as a secret or not.
+  - ST-04: every session that the server opens is the runtime role's, and only `migrate` reads the migration role's settings.
+  - ST-05: as in PR 5.
+- The acceptance criteria hold: `whitetower migrate`, then the server on its three listeners, with the smoke test in CI (PRs 1, 3 and 4); each job on one replica, and notifications across replicas (PR 6); the shutdown deadline with open streams (PR 1); no outbound connection by default (PR 2); ST-01 to ST-05 (above).
