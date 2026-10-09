@@ -10,7 +10,9 @@ linters:
   default: standard
   enable:
     - bodyclose
+    - depguard
     - errorlint
+    - forbidigo
     - gosec
     - misspell
     - nilerr
@@ -20,6 +22,82 @@ linters:
     - unparam
     - usestdlibvars
   settings:
+    # The internal rules of docs/development/internals.md that imports can
+    # enforce.
+    depguard:
+      rules:
+        domain:
+          files:
+            - "**/internal/**"
+            - "!**/internal/api/**"
+            - "!**/internal/cli/**"
+            - "!**/internal/platform/**"
+            - "!**/internal/server/**"
+            - "!**/internal/version/**"
+            - "!**/internal/webui/**"
+          deny:
+            - pkg: github.com/J466Y/WhiteTower/internal/api
+              desc: domain packages never import transport packages (docs/development/internals.md)
+            - pkg: github.com/J466Y/WhiteTower/internal/server
+              desc: domain packages never import transport packages (docs/development/internals.md)
+            - pkg: github.com/J466Y/WhiteTower/internal/webui
+              desc: domain packages never import transport packages (docs/development/internals.md)
+            - pkg: github.com/J466Y/WhiteTower/internal/cli
+              desc: domain packages never import transport packages (docs/development/internals.md)
+            - pkg: github.com/J466Y/WhiteTower/pkg
+              desc: domain packages never import the wire types of the APIs (docs/development/internals.md)
+            - pkg: connectrpc.com/connect
+              desc: domain packages never import transport packages (docs/development/internals.md)
+        platform:
+          files:
+            - "**/internal/platform/**"
+          list-mode: lax
+          allow:
+            - github.com/J466Y/WhiteTower/internal/platform
+            - github.com/J466Y/WhiteTower/internal/version
+          deny:
+            - pkg: github.com/J466Y/WhiteTower
+              desc: internal/platform imports no package above it (docs/development/internals.md)
+        test-helpers:
+          files:
+            - $all
+            - "!$test"
+          deny:
+            - pkg: github.com/J466Y/WhiteTower/internal/api/rest/resttest
+              desc: test helpers stay out of the server (docs/development/internals.md)
+            - pkg: github.com/J466Y/WhiteTower/internal/platform/clock/clocktest
+              desc: test helpers stay out of the server (docs/development/internals.md)
+            - pkg: github.com/J466Y/WhiteTower/internal/platform/db/dbtest
+              desc: test helpers stay out of the server (docs/development/internals.md)
+            - pkg: github.com/J466Y/WhiteTower/internal/platform/golden
+              desc: test helpers stay out of the server (docs/development/internals.md)
+        wiring:
+          deny:
+            - pkg: go.uber.org/fx
+              desc: dependencies are wired by hand in cmd/whitetower/main.go (docs/development/internals.md)
+            - pkg: go.uber.org/dig
+              desc: dependencies are wired by hand in cmd/whitetower/main.go (docs/development/internals.md)
+            - pkg: github.com/google/wire
+              desc: dependencies are wired by hand in cmd/whitetower/main.go (docs/development/internals.md)
+            - pkg: github.com/samber/do
+              desc: dependencies are wired by hand in cmd/whitetower/main.go (docs/development/internals.md)
+    # No global state, and state changes inside InTx
+    # (docs/development/internals.md).
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^slog\.SetDefault$
+          msg: no global state; hand the logger to what uses it (docs/development/internals.md)
+        - pattern: ^prometheus\.(MustRegister|Register|Unregister|DefaultRegisterer|DefaultGatherer)$
+          msg: no global state; register with the registry that main makes (docs/development/internals.md)
+        - pattern: ^http\.(Handle|HandleFunc|DefaultServeMux)$
+          msg: no global state; make a ServeMux (docs/development/internals.md)
+        - pattern: ^otel\.(SetTracerProvider|SetMeterProvider|SetTextMapPropagator)$
+          msg: no global state; hand the provider to what uses it (docs/development/internals.md)
+        - pattern: ^db\.DB\.Exec$
+          msg: change state inside InTx, through its Tx (docs/development/internals.md)
+        - pattern: ^(pgx\.Connect|pgx\.ConnectConfig|pgxpool\.New|pgxpool\.NewWithConfig)$
+          msg: open connections through internal/platform/db, whose InTx runs the transactions (docs/development/internals.md)
     misspell:
       locale: US
     revive:
@@ -33,11 +111,19 @@ linters:
     presets:
       - std-error-handling
     rules:
-      # Tests may use simpler error handling and fixed test data.
+      # Tests may use simpler error handling and fixed test data, and set up
+      # what they need as they need it.
       - path: _test\.go
         linters:
+          - forbidigo
           - gosec
           - noctx
+      # internal/platform holds the database access that the rules send
+      # everyone else to.
+      - path: internal[/\\]platform[/\\]
+        linters:
+          - forbidigo
+        text: "InTx"
 
 formatters:
   enable:

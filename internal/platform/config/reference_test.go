@@ -2,20 +2,18 @@ package config
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-)
 
-var update = flag.Bool("update", false, "rewrite docs/reference/configuration.md")
+	"github.com/J466Y/WhiteTower/internal/platform/golden"
+)
 
 const referencePath = "../../../docs/reference/configuration.md"
 
@@ -28,20 +26,7 @@ func TestReferenceIsCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := renderReference(docs)
-	if *update {
-		if err := os.WriteFile(referencePath, got, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		return
-	}
-	want, err := os.ReadFile(referencePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(bytes.ReplaceAll(want, []byte("\r\n"), []byte("\n")), got) {
-		t.Fatalf("%s is out of date: run go test ./internal/platform/config -run TestReferenceIsCurrent -update", referencePath)
-	}
+	golden.Assert(t, referencePath, renderReference(docs))
 }
 
 // fieldComments returns the doc comment of every struct field declared in a

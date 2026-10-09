@@ -408,15 +408,51 @@ func TestListeners(t *testing.T) {
 		}
 	})
 
-	t.Run("no plain HTTP on the console listener", func(t *testing.T) {
-		resp, err := http.Get("http" + strings.TrimPrefix(r.console, "https") + "/")
-		if err == nil {
-			_ = resp.Body.Close()
-			if resp.StatusCode < 400 {
-				t.Fatalf("plain HTTP got %d", resp.StatusCode)
+	// Security test ST-01: the TLS listeners serve nothing over plain HTTP.
+	for name, addr := range map[string]string{"console": r.console, "machine": r.machine} {
+		t.Run("no plain HTTP on the "+name+" listener", func(t *testing.T) {
+			resp, err := http.Get("http" + strings.TrimPrefix(addr, "https") + "/")
+			if err == nil {
+				_ = resp.Body.Close()
+				if resp.StatusCode != http.StatusBadRequest {
+					t.Fatalf("plain HTTP got %d, want the 400 of an HTTPS server", resp.StatusCode)
+				}
 			}
+		})
+	}
+}
+
+// Security test ST-01: the console listener sends HSTS with every answer:
+// the console, the API, its errors and its refusals.
+func TestTheConsoleListenerSendsHSTS(t *testing.T) {
+	drain := server.NewDrain()
+	r := start(t, config.Defaults(), defaultHandlers(drain), drain)
+	client := insecureClient(true)
+	for _, tt := range []struct {
+		method, path string
+		body         string
+	}{
+		{http.MethodGet, "/", ""},
+		{http.MethodGet, "/agents/42", ""},
+		{http.MethodGet, "/api/v1/version", ""},
+		{http.MethodGet, "/api/v1/me", ""},
+		{http.MethodGet, "/api/v1/nothing-here", ""},
+		{http.MethodDelete, "/api/v1/version", ""},
+		{http.MethodPost, "/api/v1/me", strings.Repeat("x", server.MaxConsoleBody+1)},
+	} {
+		req, err := http.NewRequestWithContext(context.Background(), tt.method, r.console+tt.path, strings.NewReader(tt.body))
+		if err != nil {
+			t.Fatal(err)
 		}
-	})
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if got := resp.Header.Get("Strict-Transport-Security"); got != server.HSTS {
+			t.Errorf("%s %s: %d with Strict-Transport-Security %q, want %q", tt.method, tt.path, resp.StatusCode, got, server.HSTS)
+		}
+	}
 }
 
 // A connection that falls silent gets a ping, and is closed when the ping
@@ -479,6 +515,8 @@ func TestSilentConnectionsArePingedThenClosed(t *testing.T) {
 	}
 }
 
+// Security test ST-01: the console and machine listeners accept TLS 1.2 or
+// later, and 1.3 only when the configuration asks for it.
 func TestTLSVersions(t *testing.T) {
 	for _, tt := range []struct {
 		name       string
@@ -486,6 +524,7 @@ func TestTLSVersions(t *testing.T) {
 		client     uint16
 		ok         bool
 	}{
+		{"TLS 1.0 refused", "1.2", tls.VersionTLS10, false},
 		{"TLS 1.1 refused", "1.2", tls.VersionTLS11, false},
 		{"TLS 1.2 accepted", "1.2", tls.VersionTLS12, true},
 		{"TLS 1.3 accepted", "1.2", tls.VersionTLS13, true},
