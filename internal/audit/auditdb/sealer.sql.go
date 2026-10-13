@@ -101,8 +101,8 @@ func (q *Queries) ClaimUnsealed(ctx context.Context, maxEvents int32) ([]Whiteto
 }
 
 const insertCheckpoint = `-- name: InsertCheckpoint :exec
-INSERT INTO whitetower.audit_checkpoints (tree_size, root_hash, signed_note, key_id)
-VALUES ($1, $2, $3, $4)
+INSERT INTO whitetower.audit_checkpoints (tree_size, root_hash, signed_note, key_id, created_at)
+VALUES ($1, $2, $3, $4, $5)
 `
 
 type InsertCheckpointParams struct {
@@ -110,14 +110,18 @@ type InsertCheckpointParams struct {
 	RootHash   []byte
 	SignedNote string
 	KeyID      string
+	CreatedAt  time.Time
 }
 
+// Stores a checkpoint with the time on the sealer's clock, which also decides
+// when the next one is due: the database's clock would mix two clocks.
 func (q *Queries) InsertCheckpoint(ctx context.Context, arg InsertCheckpointParams) error {
 	_, err := q.db.Exec(ctx, insertCheckpoint,
 		arg.TreeSize,
 		arg.RootHash,
 		arg.SignedNote,
 		arg.KeyID,
+		arg.CreatedAt,
 	)
 	return err
 }

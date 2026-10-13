@@ -33,8 +33,10 @@ SELECT hash_index, hash FROM whitetower.audit_tree_hashes WHERE hash_index = ANY
 SELECT tree_size, created_at FROM whitetower.audit_checkpoints ORDER BY tree_size DESC LIMIT 1;
 
 -- name: InsertCheckpoint :exec
-INSERT INTO whitetower.audit_checkpoints (tree_size, root_hash, signed_note, key_id)
-VALUES (sqlc.arg(tree_size), sqlc.arg(root_hash), sqlc.arg(signed_note), sqlc.arg(key_id));
+-- Stores a checkpoint with the time on the sealer's clock, which also decides
+-- when the next one is due: the database's clock would mix two clocks.
+INSERT INTO whitetower.audit_checkpoints (tree_size, root_hash, signed_note, key_id, created_at)
+VALUES (sqlc.arg(tree_size), sqlc.arg(root_hash), sqlc.arg(signed_note), sqlc.arg(key_id), sqlc.arg(created_at));
 
 -- name: AddCheckpointKey :exec
 -- Registers the public half of a checkpoint key, unless it is already.
