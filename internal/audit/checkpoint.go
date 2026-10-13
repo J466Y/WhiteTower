@@ -60,7 +60,7 @@ func (s *Sealer) checkpoint(ctx context.Context) error {
 	}
 	err = s.opts.DB.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		if err := auditdb.New(tx).InsertCheckpoint(ctx, auditdb.InsertCheckpointParams{
-			TreeSize: s.size, RootHash: root[:], SignedNote: signed, KeyID: s.opts.Key.ID(),
+			TreeSize: s.size, RootHash: root[:], SignedNote: signed, KeyID: s.opts.Key.ID(), CreatedAt: now,
 		}); err != nil {
 			return err
 		}

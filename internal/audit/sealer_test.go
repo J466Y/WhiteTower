@@ -30,6 +30,9 @@ import (
 
 const origin = "whitetower.test/audit"
 
+// epoch is where the tests' clocks start. It lies in the past of the
+// database's clock, so the tests also catch a sealer that would decide
+// anything on the database's clock rather than on its own.
 var epoch = time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 
 func newKey(t *testing.T) keys.Ed25519 {
@@ -238,7 +241,8 @@ func TestAFailedBatchLeavesTheTreeConsistent(t *testing.T) {
 	d := dbtest.New(t)
 	pool, superuser := d.Open(t), d.Superuser(t)
 	ctx := context.Background()
-	s := newTestSealer(t, pool, newKey(t), clocktest.New(epoch))
+	clk := clocktest.New(epoch)
+	s := newTestSealer(t, pool, newKey(t), clk)
 	record(t, pool, s.writer, 3)
 	if err := s.round(ctx); err != nil {
 		t.Fatal(err)
@@ -265,11 +269,19 @@ func TestAFailedBatchLeavesTheTreeConsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.loaded = false // as Run does after a failed round
+	// A checkpoint is due again: its root must be that of the whole tree,
+	// which proves the right edge the restart loaded.
+	clk.Advance(time.Minute)
 	if err := s.round(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if size, _ := verifyTree(t, superuser); size != 6 || count(t, superuser, "audit_unsealed") != 1 {
+	size, root := verifyTree(t, superuser)
+	if size != 6 || count(t, superuser, "audit_unsealed") != 1 {
 		t.Fatalf("after the restart: %d leaves, %d queued", size, count(t, superuser, "audit_unsealed"))
+	}
+	var signed []byte
+	if err := superuser.QueryRow(ctx, "SELECT root_hash FROM whitetower.audit_checkpoints WHERE tree_size = 6").Scan(&signed); err != nil || !bytes.Equal(signed, root[:]) {
+		t.Fatalf("the checkpoint after the restart: root %x, %v; want %x", signed, err, root[:])
 	}
 }
 
