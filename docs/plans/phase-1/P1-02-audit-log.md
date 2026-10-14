@@ -177,7 +177,7 @@ The plan lands in seven pull requests. The first holds the writer, which every o
 | --- | --- | --- |
 | 1. Event model, writer and storage | 1, 2, ST-09 | Done |
 | 2. Sealer and checkpoints | 3, 4 | Done |
-| 3. Verification library and tamper suite | 7, part of 10, ST-06 to ST-08 | Not started |
+| 3. Verification library and tamper suite | 7, part of 10, ST-06 to ST-08 | Done |
 | 4. Ingestion from modules | 5, ST-10, ST-11 | Not started |
 | 5. Query API | 6, the keys of step 4, ST-12 | Not started |
 | 6. Export | 8 | Not started |
@@ -223,3 +223,23 @@ The plan lands in seven pull requests. The first holds the writer, which every o
   - after a rotation, the old key's checkpoints still verify with its public half (the criterion of step 4);
   - checkpoints come at their interval, and an idle log signs no more;
   - `Run` recovers from failed rounds.
+
+### 2026-10-13: the sealer's clock
+
+The sealer stored each checkpoint with the database's clock and, once it loaded the tree again, compared that time with its own clock to decide when the next checkpoint was due. Two tests passed only while the database's clock was behind their fake clock, and failed in CI from 2026-10-13. A checkpoint now takes its time from the sealer's clock, which also decides when the next one is due.
+
+### 2026-10-14: verification library and tamper suite
+
+- `pkg/auditverify` verifies the log from the outside. It imports nothing of White Tower (`depguard`, rule `verifier`): it implements the tree and the checkpoints from their standards, so that a fault in the core is not repeated in what checks it.
+  - `Verify` reads the whole log through a `Source`, 10,000 leaves at a time. It recomputes every leaf from its event and the tree from the leaves, keeping only the tree's right edge, and checks the stored leaves, tree hashes and checkpoints against them.
+  - It reports problems in the order of the log, so the first one is where the log first differs from what was signed: a leaf or an event missing, an event altered, a stored tree hash altered, a checkpoint invalid, altered, beyond the log or at odds with the events.
+  - The caller gives the keys that checkpoints must be signed with, as Ed25519 keys or as the JSON Web Keys the core publishes. A log rewritten and signed again with another key verifies with that key, so the keys must come from somewhere the database's administrators cannot change.
+  - `Extends` checks that the log still holds the tree of a checkpoint kept outside it, such as the SIEM's (DC-8): `ErrShorter` for a rollback, `ErrForked` for a rewrite. It reads a few stored hashes, so it can run often; `Verify` checks those hashes against the events.
+  - `OpenCheckpoint`, `CheckInclusion` and `CheckConsistency` check what the query API (PR 5) and exports (PR 6) will serve. Opening checkpoints, which come from outside, is fuzzed.
+  - A missing event reports a problem but does not stop the tree: the leaf's stored hash keeps it going. Retention (PR 7) drops events, and what remains must still verify.
+- `audit.Log` reads the database for the library. A domain package does not import `pkg/`, so it satisfies `auditverify.Source` without naming it. Leaves are read with their events through the events' primary key, as spike S3 found fastest; a stored value that is not a hash counts as missing.
+- `test/tamper` is the tamper suite. As a superuser, with the append-only triggers off:
+  - ST-06: an event modified, deleted, inserted or reordered, a leaf deleted, an event rebuilt into the tree, a checkpoint's stored root modified: each is found where it starts.
+  - ST-07: the latest events and checkpoints removed. The log still verifies on its own, and the check against the checkpoint exported earlier fails, with `ErrShorter`, then with `ErrForked` once the log has grown back past it.
+  - ST-08: the tree rebuilt over an altered event, and its checkpoints signed with another key. The log verifies with the key the database now holds, not with the genuine one, and the check against the exported checkpoint fails.
+- Still to come: the library's sources for the API (PR 5) and for exports (PR 6), and the commands `wtctl audit verify`, `prove` and `consistency` (P1-11).
