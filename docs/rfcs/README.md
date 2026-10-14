@@ -4,4 +4,5 @@ An RFC proposes a change to the module contracts (`api/proto`, `api/events`, `ap
 
 | RFC | Title | Status |
 | --- | --- | --- |
-| [0001](0001-module-contracts-v0.1.md) | Module contracts v0.1 | Draft, review not open yet (plan [P0-03](../plans/phase-0/P0-03-module-contracts.md)) |
+| [0001](0001-module-contracts-v0.1.md) | Module contracts v0.1 | In review: approved by the maintainer on 2026-09-30, external review pending (plan [P0-03](../plans/phase-0/P0-03-module-contracts.md)) |
+| [0002](0002-mcp-servers-tools-and-models.md) | MCP servers, tools and models | Draft, review not open yet |
