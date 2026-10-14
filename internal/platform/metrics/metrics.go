@@ -288,6 +288,11 @@ type Audit struct {
 	size           prometheus.Gauge
 	lastCheckpoint prometheus.Gauge
 	failures       prometheus.Counter
+	exported       *prometheus.CounterVec
+	cursor         *prometheus.GaugeVec
+	lag            *prometheus.GaugeVec
+	exportFailures *prometheus.CounterVec
+	exportDuration *prometheus.HistogramVec
 }
 
 // NewAudit registers the metrics of the sealer with reg.
@@ -319,8 +324,30 @@ func NewAudit(reg prometheus.Registerer) *Audit {
 			Namespace: Namespace, Subsystem: "audit", Name: "sealing_failures_total",
 			Help: "Rounds of the sealer that failed; the next one reloads the tree from the database.",
 		}),
+		exported: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "exported_total",
+			Help: "Events exported, by sink.",
+		}, []string{"sink"}),
+		cursor: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "export_cursor_leaf_index",
+			Help: "Highest leaf index exported, by sink.",
+		}, []string{"sink"}),
+		lag: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "export_lag",
+			Help: "Leaves waiting to be exported, by sink.",
+		}, []string{"sink"}),
+		exportFailures: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "export_failures_total",
+			Help: "Export batches that failed, by sink.",
+		}, []string{"sink"}),
+		exportDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "export_duration_seconds",
+			Help:    "Time taken to ship an export batch, by sink.",
+			Buckets: prometheus.DefBuckets,
+		}, []string{"sink"}),
 	}
-	reg.MustRegister(m.delay, m.claim, m.sealed, m.size, m.lastCheckpoint, m.failures)
+	reg.MustRegister(m.delay, m.claim, m.sealed, m.size, m.lastCheckpoint, m.failures,
+		m.exported, m.cursor, m.lag, m.exportFailures, m.exportDuration)
 	return m
 }
 
@@ -342,6 +369,31 @@ func (m *Audit) Checkpointed(t time.Time) { m.lastCheckpoint.Set(float64(t.UnixM
 
 // Failed counts a failed round.
 func (m *Audit) Failed() { m.failures.Inc() }
+
+// Exported records count events exported to sink.
+func (m *Audit) Exported(sink string, count int) {
+	m.exported.WithLabelValues(sink).Add(float64(count))
+}
+
+// ExportCursor records the latest leaf index exported to sink.
+func (m *Audit) ExportCursor(sink string, index int64) {
+	m.cursor.WithLabelValues(sink).Set(float64(index))
+}
+
+// ExportLag records the number of leaves waiting to be exported to sink.
+func (m *Audit) ExportLag(sink string, lag int64) {
+	m.lag.WithLabelValues(sink).Set(float64(lag))
+}
+
+// ExportFailed records a failed export batch for sink.
+func (m *Audit) ExportFailed(sink string) {
+	m.exportFailures.WithLabelValues(sink).Inc()
+}
+
+// ExportDuration records the time spent exporting a batch to sink.
+func (m *Audit) ExportDuration(sink string, took time.Duration) {
+	m.exportDuration.WithLabelValues(sink).Observe(took.Seconds())
+}
 
 // Method returns a standard HTTP method as it is, and anything else as
 // _OTHER, as the OpenTelemetry conventions do: clients choose the method.

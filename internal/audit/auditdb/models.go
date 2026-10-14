@@ -10,6 +10,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type WhitetowerAuditExportCursor struct {
+	Sink          string
+	LastLeafIndex int64
+	UpdatedAt     time.Time
+}
+
 type WhitetowerAuditTreeHash struct {
 	HashIndex int64
 	Hash      []byte

@@ -145,6 +145,44 @@ type Audit struct {
 	CheckpointKeyFile string `yaml:"checkpoint_key_file"`
 	// How often the audit log signs a checkpoint, when events were sealed since the last one: at most every minute (requirement AUD-03).
 	CheckpointInterval time.Duration `yaml:"checkpoint_interval"`
+	// Continuous export to external systems (requirement AUD-06).
+	Export AuditExport `yaml:"export"`
+}
+
+// AuditExport holds settings for continuous export of sealed events to external systems.
+type AuditExport struct {
+	// How often the exporter polls for newly sealed leaves when idle.
+	PollInterval time.Duration `yaml:"poll_interval"`
+	// The largest number of leaves exported in a single batch to a sink.
+	BatchSize int `yaml:"batch_size"`
+	// Whether human principal IDs are pseudonymized on export (requirement NFR-20).
+	Pseudonymize bool `yaml:"pseudonymize"`
+	// Secret key file used to pseudonymize human identifiers with HMAC-SHA256 (requirement NFR-20).
+	PseudonymKeyFile string `yaml:"pseudonym_key_file"`
+	// JSON Lines export sink (file with rotation or stdout).
+	JSONL JSONLSink `yaml:"jsonl"`
+	// OpenTelemetry log (OTLP/HTTP) export sink.
+	OTLP OTLPSink `yaml:"otlp"`
+}
+
+// JSONLSink holds the settings of the JSON Lines export sink.
+type JSONLSink struct {
+	// Destination path: a file path for JSON Lines output, or - for stdout. Empty disables the sink.
+	Path string `yaml:"path"`
+	// The largest size in megabytes of a JSON Lines export file before it rotates.
+	MaxSizeMB int `yaml:"max_size_mb"`
+	// The most rotated export files to keep.
+	MaxBackups int `yaml:"max_backups"`
+}
+
+// OTLPSink holds the settings of the OpenTelemetry log export sink.
+type OTLPSink struct {
+	// Base URL of the OTLP/HTTP receiver, such as https://otel-collector:4318; logs are sent to /v1/logs. Empty disables the sink.
+	Endpoint string `yaml:"endpoint"`
+	// PEM file with the certificate authorities that sign the receiver's certificate, for an https endpoint. Empty: the system's.
+	CAFile string `yaml:"ca_file"`
+	// Timeout for export HTTP requests.
+	Timeout time.Duration `yaml:"timeout"`
 }
 
 // MaxCheckpointInterval is the longest wait for a checkpoint that
@@ -174,7 +212,20 @@ func Defaults() Config {
 		TLS:      TLS{MinVersion: "1.2"},
 		API:      API{RateLimit: 50, RateBurst: 100},
 		Database: Database{MaxConnections: 10},
-		Audit:    Audit{CheckpointInterval: MaxCheckpointInterval},
+		Audit: Audit{
+			CheckpointInterval: MaxCheckpointInterval,
+			Export: AuditExport{
+				PollInterval: time.Second,
+				BatchSize:    500,
+				JSONL: JSONLSink{
+					MaxSizeMB:  100,
+					MaxBackups: 5,
+				},
+				OTLP: OTLPSink{
+					Timeout: 10 * time.Second,
+				},
+			},
+		},
 		Shutdown: Shutdown{Timeout: 8 * time.Second},
 		Log:      Log{Level: "info"},
 		Tracing:  Tracing{SampleRatio: 1},
@@ -208,6 +259,9 @@ func (c Config) CheckServe() error {
 	}
 	if c.Audit.CheckpointKeyFile == "" {
 		errs = append(errs, errors.New("audit.checkpoint_key_file: required to serve: the key that signs the audit log's checkpoints"))
+	}
+	if c.Audit.Export.Pseudonymize && c.Audit.Export.PseudonymKeyFile == "" {
+		errs = append(errs, errors.New("audit.export.pseudonym_key_file: required when audit.export.pseudonymize is true"))
 	}
 	return errors.Join(errs...)
 }
@@ -307,6 +361,20 @@ func (c Config) Validate() error {
 	}
 	if i := c.Audit.CheckpointInterval; i < time.Second || i > MaxCheckpointInterval {
 		add("audit.checkpoint_interval", "%s: want from 1s to %s", i, MaxCheckpointInterval)
+	}
+	if c.Audit.Export.PollInterval < 0 {
+		add("audit.export.poll_interval", "cannot be negative")
+	}
+	if c.Audit.Export.BatchSize < 0 {
+		add("audit.export.batch_size", "cannot be negative")
+	}
+	if e := c.Audit.Export.OTLP.Endpoint; e != "" {
+		if err := checkEndpoint(e); err != nil {
+			add("audit.export.otlp.endpoint", "%v", err)
+		}
+	}
+	if c.Audit.Export.OTLP.CAFile != "" && !strings.HasPrefix(c.Audit.Export.OTLP.Endpoint, "https://") {
+		add("audit.export.otlp.ca_file", "set it only with an https endpoint")
 	}
 	return errors.Join(errs...)
 }

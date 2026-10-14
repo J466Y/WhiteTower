@@ -84,6 +84,37 @@ The tamper-evident audit log (ADR-0006).
 | `audit.checkpoint_key_file` | `WT_AUDIT_CHECKPOINT_KEY_FILE` | string | none | PEM file with the Ed25519 private key that signs the checkpoints, in PKCS #8, as openssl genpkey -algorithm ed25519 writes it. Keep a copy apart from the database's backups: with the database, the key could sign a rewritten history. |
 | `audit.checkpoint_interval` | `WT_AUDIT_CHECKPOINT_INTERVAL` | duration | `1m0s` | How often the audit log signs a checkpoint, when events were sealed since the last one: at most every minute (requirement AUD-03). |
 
+### `audit.export`
+
+Continuous export to external systems (requirement AUD-06).
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `audit.export.poll_interval` | `WT_AUDIT_EXPORT_POLL_INTERVAL` | duration | `1s` | How often the exporter polls for newly sealed leaves when idle. |
+| `audit.export.batch_size` | `WT_AUDIT_EXPORT_BATCH_SIZE` | integer | `500` | The largest number of leaves exported in a single batch to a sink. |
+| `audit.export.pseudonymize` | `WT_AUDIT_EXPORT_PSEUDONYMIZE` | boolean | `false` | Whether human principal IDs are pseudonymized on export (requirement NFR-20). |
+| `audit.export.pseudonym_key_file` | `WT_AUDIT_EXPORT_PSEUDONYM_KEY_FILE` | string | none | Secret key file used to pseudonymize human identifiers with HMAC-SHA256 (requirement NFR-20). |
+
+#### `audit.export.jsonl`
+
+JSON Lines export sink (file with rotation or stdout).
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `audit.export.jsonl.path` | `WT_AUDIT_EXPORT_JSONL_PATH` | string | none | Destination path: a file path for JSON Lines output, or - for stdout. Empty disables the sink. |
+| `audit.export.jsonl.max_size_mb` | `WT_AUDIT_EXPORT_JSONL_MAX_SIZE_MB` | integer | `100` | The largest size in megabytes of a JSON Lines export file before it rotates. |
+| `audit.export.jsonl.max_backups` | `WT_AUDIT_EXPORT_JSONL_MAX_BACKUPS` | integer | `5` | The most rotated export files to keep. |
+
+#### `audit.export.otlp`
+
+OpenTelemetry log (OTLP/HTTP) export sink.
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `audit.export.otlp.endpoint` | `WT_AUDIT_EXPORT_OTLP_ENDPOINT` | string | none | Base URL of the OTLP/HTTP receiver, such as https://otel-collector:4318; logs are sent to /v1/logs. Empty disables the sink. |
+| `audit.export.otlp.ca_file` | `WT_AUDIT_EXPORT_OTLP_CA_FILE` | string | none | PEM file with the certificate authorities that sign the receiver's certificate, for an https endpoint. Empty: the system's. |
+| `audit.export.otlp.timeout` | `WT_AUDIT_EXPORT_OTLP_TIMEOUT` | duration | `10s` | Timeout for export HTTP requests. |
+
 ## `shutdown`
 
 How the server stops.
