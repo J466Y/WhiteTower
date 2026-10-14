@@ -1,0 +1,17 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000017",
+  "source": "/core",
+  "type": "whitetower.principal.deactivated.v1",
+  "time": "2026-10-14T16:00:00.000Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+  "datacontenttype": "application/json",
+  "data": {
+    "principal_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+    "actor": {
+      "type": "human",
+      "id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1"
+    },
+    "reason": "Employee left organization"
+  }
+}

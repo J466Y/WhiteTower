@@ -70,6 +70,23 @@ func authenticate(next http.Handler, a auth.Authenticator) http.Handler {
 	})
 }
 
+// csrf validates that state-changing requests on cookie-backed sessions carry a valid CSRF token (ST-13).
+func csrf(next http.Handler, validator CSRFValidator) http.Handler {
+	if validator == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+			if !validator.ValidateRequestCSRF(r) {
+				problem.Write(w, r, problem.New(problem.Forbidden, "a valid CSRF token is required in X-CSRF-Token for state-changing requests"))
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // limitRate refuses a caller over its rate: each principal has its own
 // bucket and, before login, each client address.
 func limitRate(next http.Handler, opts Options) http.Handler {

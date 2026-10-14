@@ -23,6 +23,11 @@ import (
 // BasePath is where the public API is mounted.
 const BasePath = "/api/v1"
 
+// CSRFValidator validates whether a request carries a valid CSRF token.
+type CSRFValidator interface {
+	ValidateRequestCSRF(r *http.Request) bool
+}
+
 // Options are what the public API needs from the rest of the server.
 type Options struct {
 	// Logger receives what clients only see as an internal error.
@@ -31,6 +36,8 @@ type Options struct {
 	Authenticator auth.Authenticator
 	// Authorizer decides which operations a principal may call.
 	Authorizer auth.Authorizer
+	// CSRF validates CSRF tokens on state-changing requests when sessions are used.
+	CSRF CSRFValidator
 	// Limiter limits each principal or, before login, each client address.
 	Limiter *ratelimit.Limiter
 	// RateLimited, when set, counts the requests that Limiter refuses.
@@ -95,6 +102,7 @@ func Handler(opts Options) http.Handler {
 // guards.
 func chain(router http.Handler, opts Options) http.Handler {
 	h := limitRate(router, opts)
+	h = csrf(h, opts.CSRF)
 	h = authenticate(h, opts.Authenticator)
 	h = recoverPanics(h, opts.Logger)
 	return secure(h)

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (1 of 6 pull requests) |
+| **Status** | In progress (2 of 6 pull requests) |
 | **Size** | M |
 | **Depends on** | P1-01, P1-02 (writer) |
 | **Unblocks** | P1-04, P1-10, P1-11 |
@@ -156,8 +156,8 @@ The plan lands in six pull requests. The first builds the authorization engine a
 
 | Pull request | Steps | Status |
 | --- | --- | --- |
-| 1. Roles, permissions and authorization engine | 5, ST-17, ST-18 (partial) | In progress |
-| 2. Principals, sessions and CSRF | 2, 3, ST-13, ST-14 | Not started |
+| 1. Roles, permissions and authorization engine | 5, ST-17, ST-18 (partial) | Done (PR #36) |
+| 2. Principals, sessions and CSRF | 2, 3, ST-13, ST-14 | In progress |
 | 3. OIDC login, role mapping and /me | 1, 4, 11, ST-15, ST-16, ST-22 | Not started |
 | 4. API tokens | 6, ST-19 | Not started |
 | 5. CLI token exchange and break-glass | 7, 9, ST-20 | Not started |
@@ -177,5 +177,25 @@ The plan lands in six pull requests. The first builds the authorization engine a
   - ST-17: table-driven unit test verifying every one of the 7 roles x 24 permissions (168 test cases), asserting exact allow/deny semantics and scopes.
   - ST-18: tests verifying separation of duties enforcement (self-approval refusal, single-person halt release refusal, and self-grant refusal).
   - Authorizer tests covering unauthenticated calls, unknown operations, valid role operations, and relationship checks.
+
+### 2026-10-14: principals, sessions and CSRF (PR 2)
+
+- Domain package `internal/authn`:
+  - `SessionStore`: manages sessions in PostgreSQL table `sessions`. Generates 256-bit cryptographic tokens (RFC 6750 URL-safe base64), stores SHA-256 hashes (`id_hash`).
+  - Session lifecycle: configurable idle timeout (default 30m) and absolute lifetime (default 12h) in `internal/platform/config` (`Auth.Session`). Activity slides idle expiration up to the absolute ceiling.
+  - Session fixation prevention: `Rotate` replaces the session token while preserving identity and roles upon authentication state changes (ST-14).
+  - Session revocation: manual revocation on logout (`Revoke`), bulk revocation on principal deactivation (`RevokeAllForPrincipal` and `RevokeAllForPrincipalTx`).
+  - Cookie generation: sets `__Host-wt_session` (when TLS enabled) with `HttpOnly`, `Secure`, `SameSite=Lax`, and `Path=/`. Fallback to `wt_session` when TLS is not enabled.
+  - Periodic cleanup job: `CleanupSessionsJob` registered with `jobs.Runner` to purge expired sessions.
+  - CSRF protection: HMAC-SHA256 derived tokens bound to the session token. `CSRFValidator` interface and middleware in `internal/api/rest` refuse state-changing methods (POST, PUT, PATCH, DELETE) without a matching `X-CSRF-Token` or `X-WT-CSRF-Token` header (ST-13).
+  - `PrincipalStore`: human principal management in PostgreSQL table `principals`. `UpsertHuman` for IdP synchronization, `GetByID`, `GetByIdentity`.
+  - Principal deactivation and reactivation (HUM-05): `Deactivate` marks principal inactive, immediately revokes active sessions in the same transaction, and records audited `whitetower.principal.deactivated.v1` event. `Reactivate` restores active status and records `whitetower.principal.reactivated.v1`.
+- Contracts and audit:
+  - Added event schemas and examples for `whitetower.principal.deactivated.v1` and `whitetower.principal.reactivated.v1`.
+  - Registered events in `api/events/catalog.json` and added fact rules in `internal/audit/facts.go`.
+- Tests:
+  - ST-14 in `internal/authn/session_test.go`: verified cookie attributes, session rotation, idle and absolute timeout expiration, revocation at logout, revocation on principal deactivation, and background cleanup.
+  - ST-13 in `internal/api/rest/csrf_test.go`: verified GET requests bypass CSRF, state-changing requests without CSRF token or with invalid CSRF token are refused with 403 Forbidden, and valid CSRF token succeeds.
+  - Unit & integration tests in `internal/authn/principal_test.go`: tested principal upsert, retrieval, deactivation, and reactivation with audit events.
 
 

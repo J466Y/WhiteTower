@@ -41,3 +41,11 @@ sql:
         <<: *go
         package: auditdb
         out: internal/audit/auditdb
+  - engine: postgresql
+    schema: *schema
+    queries: internal/authn/queries
+    gen:
+      go:
+        <<: *go
+        package: authndb
+        out: internal/authn/authndb
