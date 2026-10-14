@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Audit gap detected",
+  "description": "A gap was detected in a source's sequence of events during ingestion (AUD-02).",
+  "type": "object",
+  "required": [
+    "source",
+    "expected_seq",
+    "received_seq"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "source": {
+      "description": "The event source whose sequence had a gap.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "expected_seq": {
+      "description": "The sequence number expected next from this source.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "received_seq": {
+      "description": "The sequence number received.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "gap_size": {
+      "description": "Number of missing sequence positions (received_seq - expected_seq).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "instance_id": {
+      "description": "The module instance that published the batch, if known.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  }
+}

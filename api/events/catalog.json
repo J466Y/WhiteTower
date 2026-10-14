@@ -154,6 +154,16 @@
       "subject": "none",
       "schema": "schemas/whitetower.audit.checkpoint.v1.json",
       "example": "examples/whitetower.audit.checkpoint.v1.json"
+    },
+    {
+      "type": "whitetower.audit.gap_detected.v1",
+      "summary": "A gap was detected in a source's sequence of events during ingestion (AUD-02).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.audit.gap_detected.v1.json",
+      "example": "examples/whitetower.audit.gap_detected.v1.json"
     }
   ]
 }
