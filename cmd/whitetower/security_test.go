@@ -75,9 +75,12 @@ var (
 	secretFiles = []string{
 		"listeners.console.key_file", "listeners.machine.key_file",
 		"database.password_file", "database.migration.password_file",
-		"audit.checkpoint_key_file",
+		"audit.checkpoint_key_file", "audit.export.pseudonym_key_file",
 	}
-	otherFiles = []string{"listeners.console.cert_file", "listeners.machine.cert_file", "tracing.otlp.ca_file"}
+	otherFiles = []string{
+		"listeners.console.cert_file", "listeners.machine.cert_file",
+		"tracing.otlp.ca_file", "audit.export.otlp.ca_file",
+	}
 )
 
 // fileSettings returns the keys of the configuration that end in _file.
@@ -229,10 +232,12 @@ func TestSecretsNeverLeak(t *testing.T) {
 	for i, line := range checkpointKeyFile(t, checkpointKey) {
 		canaries["checkpoint key, line "+strconv.Itoa(i+1)] = line
 	}
-	runtimeFile, migrationFile, refusedFile := filepath.Join(dir, "runtime"), filepath.Join(dir, "migration"), filepath.Join(dir, "refused")
+	runtimeFile, migrationFile, refusedFile, pseudonymFile := filepath.Join(dir, "runtime"), filepath.Join(dir, "migration"), filepath.Join(dir, "refused"), filepath.Join(dir, "pseudonym")
+	canaries["pseudonym key"] = canary("pseudonym")
 	writeSecret(t, runtimeFile, canaries["runtime password"]+"\n")
 	writeSecret(t, migrationFile, canaries["migration password"]+"\n")
 	writeSecret(t, refusedFile, canaries["refused password"]+"\n")
+	writeSecret(t, pseudonymFile, canaries["pseudonym key"]+"\n")
 
 	c := newCollector(t)
 	env := []string{
@@ -243,6 +248,8 @@ func TestSecretsNeverLeak(t *testing.T) {
 		"WT_DATABASE_MIGRATION_URL=" + d.Config.Migration.URL, "WT_DATABASE_MIGRATION_PASSWORD_FILE=" + migrationFile,
 		"WT_TRACING_OTLP_ENDPOINT=" + c.URL,
 		"WT_AUDIT_CHECKPOINT_KEY_FILE=" + checkpointKey,
+		"WT_AUDIT_EXPORT_PSEUDONYMIZE=true",
+		"WT_AUDIT_EXPORT_PSEUDONYM_KEY_FILE=" + pseudonymFile,
 	}
 	s := startServeOn(t, d, env...)
 	if status, body := s.readiness(t); status != http.StatusOK {

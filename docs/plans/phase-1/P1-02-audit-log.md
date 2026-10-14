@@ -180,7 +180,7 @@ The plan lands in seven pull requests. The first holds the writer, which every o
 | 3. Verification library and tamper suite | 7, part of 10, ST-06 to ST-08 | Done |
 | 4. Ingestion from modules | 5, ST-10, ST-11 | Done |
 | 5. Query API | 6, the keys of step 4, ST-12 | Not started |
-| 6. Export | 8 | Not started |
+| 6. Export | 8 | Done |
 | 7. Retention and throughput | 9, the rest of 10 | Not started |
 
 ### 2026-10-09: event model, writer and storage
@@ -256,3 +256,14 @@ The sealer stored each checkpoint with the database's clock and, once it loaded 
 - Rate limiting and backpressure: per-instance token bucket rate limiting via `internal/platform/ratelimit`. Backpressure evaluates sealing lag via `OldestUnsealedTime`; if lag exceeds the threshold (NFR-09), `ErrResourceExhausted` is returned with a retry hint, ensuring no acknowledged events are lost (NFR-08).
 - New core event type `whitetower.audit.gap_detected.v1`: schema in `api/events/schemas/`, example in `api/events/examples/`, registered in `catalog.json` and `rules` in `facts.go`, indexed in `facts.json`.
 - Tests: ST-10 covers authorization refusals, per-instance rate limits, backpressure under lag, duplicate handling, out-of-order delivery, and concurrent deadlock avoidance. ST-11 fuzzes the CloudEvents parser and ingestion path.
+
+### 2026-10-14: export
+
+- `audit.Exporter`: background job (`audit-exporter`) that queries `audit_leaves` and exports sealed events strictly in Merkle tree index order (`leaf_index` 0, 1, 2, ...).
+- Cursors: persistent per-sink progress tracking in PostgreSQL (`whitetower.audit_export_cursors`), updated atomically per batch. At-least-once delivery: on core restart or sink failure, export resumes from the last committed cursor without skipping any events.
+- Sinks:
+  - `JSONLSink`: streams events as line-delimited canonical JSON either to stdout or to a file with size-based rotation and backup retention.
+  - `OTLPSink`: sends OpenTelemetry log records over HTTP (`/v1/logs`) using protobuf (`ExportLogsServiceRequest`), mapping canonical JSON to the log body, event timestamp to nanoseconds, and attributes (`specversion`, `id`, `source`, `type`, `subject`, `wtrequestid`, `trace_id`). Signed checkpoints are exported as ordinary events (`whitetower.audit.checkpoint.v1`).
+- Pseudonymization: optional deterministic pseudonymization of human principal identifiers on export (NFR-20) via RFC 4122 UUID v5 derived with an HMAC-SHA256 namespace key, leaving the internal database log unaltered.
+- Health metrics per sink: `whitetower_audit_exported_total`, `whitetower_audit_export_cursor_leaf_index`, `whitetower_audit_export_lag`, `whitetower_audit_export_failures_total`, and `whitetower_audit_export_duration_seconds`.
+- Tests prove strict index ordering, cursor persistence, zero events skipped across core restarts or sink failures, OTLP protobuf formatting, JSONL file rotation, and export pseudonymization without affecting internal logs.

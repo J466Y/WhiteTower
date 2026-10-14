@@ -229,11 +229,54 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("audit.checkpoint_key_file: %w", err)
 	}
+	auditMetrics := metrics.NewAudit(registry)
 	sealer := audit.NewSealer(audit.SealerOptions{
 		DB: database, Writer: writer, Key: checkpointKey, Origin: cfg.Audit.Origin,
-		Interval: cfg.Audit.CheckpointInterval, Logger: logger, Metrics: metrics.NewAudit(registry),
+		Interval: cfg.Audit.CheckpointInterval, Logger: logger, Metrics: auditMetrics,
 	})
-	for _, job := range []jobs.Job{audit.PartitionsJob(database), sealer.Job()} {
+
+	var sinks []audit.Sink
+	if cfg.Audit.Export.JSONL.Path != "" {
+		js, err := audit.NewJSONLSink(
+			cfg.Audit.Export.JSONL.Path,
+			cfg.Audit.Export.JSONL.MaxSizeMB,
+			cfg.Audit.Export.JSONL.MaxBackups,
+		)
+		if err != nil {
+			return fmt.Errorf("audit.export.jsonl: %w", err)
+		}
+		sinks = append(sinks, js)
+	}
+	if cfg.Audit.Export.OTLP.Endpoint != "" {
+		os, err := audit.NewOTLPSink(audit.OTLPSinkOptions{
+			Endpoint: cfg.Audit.Export.OTLP.Endpoint,
+			CAFile:   cfg.Audit.Export.OTLP.CAFile,
+			Timeout:  cfg.Audit.Export.OTLP.Timeout,
+		})
+		if err != nil {
+			return fmt.Errorf("audit.export.otlp: %w", err)
+		}
+		sinks = append(sinks, os)
+	}
+	var pseudonymKey []byte
+	if cfg.Audit.Export.Pseudonymize && cfg.Audit.Export.PseudonymKeyFile != "" {
+		pseudonymKey, err = os.ReadFile(cfg.Audit.Export.PseudonymKeyFile) //nolint:gosec // G304: the operator chooses the key file
+		if err != nil {
+			return fmt.Errorf("audit.export.pseudonym_key_file: %w", err)
+		}
+	}
+	exporter := audit.NewExporter(audit.ExporterOptions{
+		DB:           database,
+		Sinks:        sinks,
+		PollInterval: cfg.Audit.Export.PollInterval,
+		BatchSize:    cfg.Audit.Export.BatchSize,
+		PseudonymKey: pseudonymKey,
+		Clock:        clock.System,
+		Logger:       logger,
+		Metrics:      auditMetrics,
+	})
+
+	for _, job := range []jobs.Job{audit.PartitionsJob(database), sealer.Job(), exporter.Job()} {
 		if err := runner.Add(job); err != nil {
 			return err
 		}
