@@ -22,6 +22,7 @@ flowchart LR
 | `internal/platform/...` | What every part shares: configuration, logging, metrics, tracing, the database, background jobs, notifications across replicas, the clock, the authentication hooks, rate limits, health, TLS | Other platform packages, `internal/version` |
 | `internal/cli` | `wtctl` | The generated API client, the platform |
 | `pkg/apiclient`, `pkg/moduleapi` | Generated code, public: the API client and the module API's types | |
+| `pkg/auditverify` | Public: the verification library of the audit log, for `wtctl`, the API and auditors | Nothing of White Tower |
 
 ## Rules
 
@@ -47,6 +48,10 @@ Outside `internal/platform`, `DB.Exec` is refused, and only `internal/platform/d
 **Enforced** (`depguard`, rule `wiring`, and `forbidigo`). `serve` makes every dependency and passes it to what uses it: no dependency injection framework, and no global state. No package registers with Prometheus's default registry, sets slog's default logger, serves through `http.DefaultServeMux` or sets OpenTelemetry's global providers. The one exception is `otel.SetErrorHandler` in `main`, the only way OpenTelemetry reports its own errors.
 
 Package-level values that never change are fine: constants, lookup tables, compiled regular expressions, sentinel errors.
+
+### The audit log's verifier shares no code with the core
+
+**Enforced** (`depguard`, rule `verifier`). `pkg/auditverify` imports nothing of White Tower: it implements the formats the core writes (RFC 6962 trees, C2SP checkpoints) on its own, from their standards, so that a fault in the core is not repeated in what checks it, and auditors can trust it apart from White Tower. The core's side is `audit.Log`, which reads the log for it; `test/tamper` checks the two against each other. A domain package does not import `pkg/`, so the two meet only in tests, the APIs and the CLI.
 
 ### Test helpers stay out of the server
 
@@ -74,6 +79,7 @@ The test harness (plan P1-01, step 10):
 | `internal/platform/clock/clocktest` | A clock whose time moves only when the test moves it |
 | `internal/platform/golden` | Comparison with files in `testdata`, which `-update` rewrites |
 | `test/e2e` | The smoke test of a running deployment; CI runs it against the Compose stack |
+| `test/tamper` | The tamper suite of the audit log: a database administrator changes the sealed log, and `pkg/auditverify` finds it (ST-06 to ST-08) |
 
 A domain package's integration test takes a few lines. Once plan P1-04 adds the agents, for example:
 
