@@ -51,6 +51,7 @@ var rules = map[string]rule{
 	"whitetower.halt.issued.v1":             {actor: "issuer", reason: "reason"},
 	"whitetower.halt.released.v1":           {actor: "approved_by", reason: "reason"},
 	"whitetower.audit.checkpoint.v1":        {},
+	"whitetower.audit.gap_detected.v1":      {},
 }
 
 // outcomes maps the outcomes that events tell to those the audit log

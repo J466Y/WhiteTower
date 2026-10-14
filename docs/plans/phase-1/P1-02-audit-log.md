@@ -178,7 +178,7 @@ The plan lands in seven pull requests. The first holds the writer, which every o
 | 1. Event model, writer and storage | 1, 2, ST-09 | Done |
 | 2. Sealer and checkpoints | 3, 4 | Done |
 | 3. Verification library and tamper suite | 7, part of 10, ST-06 to ST-08 | Done |
-| 4. Ingestion from modules | 5, ST-10, ST-11 | Not started |
+| 4. Ingestion from modules | 5, ST-10, ST-11 | Done |
 | 5. Query API | 6, the keys of step 4, ST-12 | Not started |
 | 6. Export | 8 | Not started |
 | 7. Retention and throughput | 9, the rest of 10 | Not started |
@@ -243,3 +243,16 @@ The sealer stored each checkpoint with the database's clock and, once it loaded 
   - ST-07: the latest events and checkpoints removed. The log still verifies on its own, and the check against the checkpoint exported earlier fails, with `ErrShorter`, then with `ErrForked` once the log has grown back past it.
   - ST-08: the tree rebuilt over an altered event, and its checkpoints signed with another key. The log verifies with the key the database now holds, not with the genuine one, and the check against the exported checkpoint fails.
 - Still to come: the library's sources for the API (PR 5) and for exports (PR 6), and the commands `wtctl audit verify`, `prove` and `consistency` (P1-11).
+
+### 2026-10-14: ingestion from modules
+
+- `audit.Ingester`: ingests batches of up to 500 CloudEvents from module instances (`EventService.Publish` logic), taking the instance identity, its served agents and its declared types as input.
+- Validation: checks each event against the CloudEvents envelope and its data schema (`jsonschema`). Refuses events larger than 64 KiB or malformed payloads.
+- Scope and authorization: verifies that event types are declared in the instance's manifest and permitted for module emitters, that agent sources match the agents the instance serves, and that module sources match its own instance ID. Core-only types and unauthorized sources are rejected.
+- At-least-once de-duplication: inserts into `audit_event_ids` on `(source, event_id, ingest_month)`. Previously seen events return `StatusDuplicate`.
+- Sequence tracking and gap detection: tracks per-source sequences in `audit_source_sequences`. A gap in `wtseq` records a `whitetower.audit.gap_detected.v1` event via `Writer.Record` in the batch transaction.
+- Deadlock prevention: locks and updates source sequences in strictly sorted source order (`slices.Sort(uniqueSources)`), preventing cyclic waits between concurrent batches sharing sources (spike S3).
+- Atomicity: accepted events and their queue entries in `audit_unsealed` are inserted in a single atomic CTE statement.
+- Rate limiting and backpressure: per-instance token bucket rate limiting via `internal/platform/ratelimit`. Backpressure evaluates sealing lag via `OldestUnsealedTime`; if lag exceeds the threshold (NFR-09), `ErrResourceExhausted` is returned with a retry hint, ensuring no acknowledged events are lost (NFR-08).
+- New core event type `whitetower.audit.gap_detected.v1`: schema in `api/events/schemas/`, example in `api/events/examples/`, registered in `catalog.json` and `rules` in `facts.go`, indexed in `facts.json`.
+- Tests: ST-10 covers authorization refusals, per-instance rate limits, backpressure under lag, duplicate handling, out-of-order delivery, and concurrent deadlock avoidance. ST-11 fuzzes the CloudEvents parser and ingestion path.
