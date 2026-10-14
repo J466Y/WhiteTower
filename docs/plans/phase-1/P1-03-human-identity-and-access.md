@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | Draft |
+| **Status** | In progress (1 of 6 pull requests) |
 | **Size** | M |
 | **Depends on** | P1-01, P1-02 (writer) |
 | **Unblocks** | P1-04, P1-10, P1-11 |
@@ -149,3 +149,33 @@ Tests from the [P0-04 catalog](../../security/security-tests.md#p1-03-human-iden
 - `coreos/go-oidc` and `golang.org/x/oauth2` cover the OIDC client side.
 - Keep the permission matrix readable by non-developers: it is reviewed by committee members during the pilot.
 - Store only what the IdP sends and what White Tower needs; no profile photos, no extra claims.
+
+## Progress notes
+
+The plan lands in six pull requests. The first builds the authorization engine and role-to-permission matrix, which API operations and domain services evaluate.
+
+| Pull request | Steps | Status |
+| --- | --- | --- |
+| 1. Roles, permissions and authorization engine | 5, ST-17, ST-18 (partial) | In progress |
+| 2. Principals, sessions and CSRF | 2, 3, ST-13, ST-14 | Not started |
+| 3. OIDC login, role mapping and /me | 1, 4, 11, ST-15, ST-16, ST-22 | Not started |
+| 4. API tokens | 6, ST-19 | Not started |
+| 5. CLI token exchange and break-glass | 7, 9, ST-20 | Not started |
+| 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Not started |
+
+### 2026-10-14: roles, permissions and authorization engine
+
+- `internal/authz`: the authorization engine of White Tower.
+  - Roles: `steering`, `advisory`, `owner`, `user`, `operator`, `auditor`, and `admin`, representing the 7 roles of the White Tower governance model.
+  - Permissions: 24 stable permission identifiers covering all actions of the governance lifecycle and platform operations.
+  - The role-to-permission matrix in `matrix.go`, derived directly from requirements section 5.2.1, with explicit scopes (`ScopeAll`, `ScopeOwn`, `ScopeActiveOnly`, `ScopeSignOff`).
+  - Separation of duties (`duties.go`, HUM-04): checks for self-approval/self-validation (`CheckApproval`), two-distinct-person requirement for halt releases (`CheckHaltRelease`), and prohibition of self role-granting (`CheckRoleGrant`).
+  - `Authorizer`: implements `auth.Authorizer` (`internal/platform/auth`), mapping OpenAPI operation IDs to permissions with default-deny behavior for unknown operations, unauthenticated callers, or unauthorized roles.
+  - Context helpers: `ContextWithRelationship` and `RelationshipFromContext` for resource-level authorization checks.
+- Wiring: wired `authz.NewAuthorizer()` in `cmd/whitetower/main.go` into `rest.Options`.
+- Tests:
+  - ST-17: table-driven unit test verifying every one of the 7 roles x 24 permissions (168 test cases), asserting exact allow/deny semantics and scopes.
+  - ST-18: tests verifying separation of duties enforcement (self-approval refusal, single-person halt release refusal, and self-grant refusal).
+  - Authorizer tests covering unauthenticated calls, unknown operations, valid role operations, and relationship checks.
+
+
