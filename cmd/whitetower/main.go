@@ -23,6 +23,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/api/moduleapi"
 	"github.com/J466Y/WhiteTower/internal/api/rest"
 	"github.com/J466Y/WhiteTower/internal/audit"
+	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
@@ -184,10 +185,10 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
 	api := rest.Handler(rest.Options{
 		Logger: logger,
-		// Until plan P1-03 brings sessions, API tokens and the permission
-		// matrix, nobody is authenticated: only public operations answer.
+		// Until plan P1-03 PR 2 and 4 bring sessions and API tokens,
+		// nobody is authenticated: only public operations answer.
 		Authenticator: auth.Unauthenticated{},
-		Authorizer:    auth.DenyAll{},
+		Authorizer:    authz.NewAuthorizer(),
 		Limiter:       ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
 		RateLimited:   httpMetrics.RateLimited("console").Inc,
 	})
