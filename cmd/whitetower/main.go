@@ -275,8 +275,16 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Logger:       logger,
 		Metrics:      auditMetrics,
 	})
+	retentionJob := audit.RetentionJob(audit.RetentionOptions{
+		DB:      database,
+		Writer:  writer,
+		Days:    cfg.Audit.Retention.Days,
+		Clock:   clock.System,
+		Logger:  logger,
+		Metrics: auditMetrics,
+	})
 
-	for _, job := range []jobs.Job{audit.PartitionsJob(database), sealer.Job(), exporter.Job()} {
+	for _, job := range []jobs.Job{audit.PartitionsJob(database), sealer.Job(), exporter.Job(), retentionJob} {
 		if err := runner.Add(job); err != nil {
 			return err
 		}

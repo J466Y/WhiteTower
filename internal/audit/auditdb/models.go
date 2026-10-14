@@ -16,6 +16,13 @@ type WhitetowerAuditExportCursor struct {
 	UpdatedAt     time.Time
 }
 
+type WhitetowerAuditPrunedRange struct {
+	FromLeafIndex int64
+	ToLeafIndex   int64
+	PartitionName string
+	DroppedAt     time.Time
+}
+
 type WhitetowerAuditTreeHash struct {
 	HashIndex int64
 	Hash      []byte

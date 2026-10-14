@@ -145,6 +145,8 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 		{"origin with a plus sign", []string{"WT_AUDIT_ORIGIN=whitetower+audit"}, "audit.origin"},
 		{"checkpoints too rare", []string{"WT_AUDIT_CHECKPOINT_INTERVAL=2m"}, "audit.checkpoint_interval"},
 		{"checkpoints too frequent", []string{"WT_AUDIT_CHECKPOINT_INTERVAL=100ms"}, "audit.checkpoint_interval"},
+		{"retention negative", []string{"WT_AUDIT_RETENTION_DAYS=-5"}, "audit.retention.days"},
+		{"retention too short without override", []string{"WT_AUDIT_RETENTION_DAYS=90"}, "audit.retention.days"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -153,6 +155,20 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 				t.Fatalf("error %v, want it to name %s", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestRetentionAllowShort(t *testing.T) {
+	cfg, err := Load("", []string{
+		"WT_DEV_SELF_SIGNED_TLS=true",
+		"WT_AUDIT_RETENTION_DAYS=30",
+		"WT_AUDIT_RETENTION_ALLOW_SHORT=true",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error with allow_short: %v", err)
+	}
+	if cfg.Audit.Retention.Days != 30 || !cfg.Audit.Retention.AllowShort {
+		t.Fatalf("unexpected retention settings: %+v", cfg.Audit.Retention)
 	}
 }
 

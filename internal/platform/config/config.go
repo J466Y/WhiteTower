@@ -147,6 +147,19 @@ type Audit struct {
 	CheckpointInterval time.Duration `yaml:"checkpoint_interval"`
 	// Continuous export to external systems (requirement AUD-06).
 	Export AuditExport `yaml:"export"`
+	// Retention and cleanup of old audit events (requirement AUD-07, NFR-10).
+	Retention AuditRetention `yaml:"retention"`
+}
+
+// MinRetentionDays is the minimum retention period in days without an explicit override (NFR-10).
+const MinRetentionDays = 180
+
+// AuditRetention holds settings for dropping old audit events (plan P1-02, step 9).
+type AuditRetention struct {
+	// How long audit events are kept before their partitions are dropped, in days: at least 180 days (6 months, requirement NFR-10). 0 disables retention drops.
+	Days int `yaml:"days"`
+	// Explicit override required when setting retention below 180 days (requirement NFR-10).
+	AllowShort bool `yaml:"allow_short"`
 }
 
 // AuditExport holds settings for continuous export of sealed events to external systems.
@@ -224,6 +237,9 @@ func Defaults() Config {
 				OTLP: OTLPSink{
 					Timeout: 10 * time.Second,
 				},
+			},
+			Retention: AuditRetention{
+				Days: MinRetentionDays,
 			},
 		},
 		Shutdown: Shutdown{Timeout: 8 * time.Second},
@@ -375,6 +391,11 @@ func (c Config) Validate() error {
 	}
 	if c.Audit.Export.OTLP.CAFile != "" && !strings.HasPrefix(c.Audit.Export.OTLP.Endpoint, "https://") {
 		add("audit.export.otlp.ca_file", "set it only with an https endpoint")
+	}
+	if c.Audit.Retention.Days < 0 {
+		add("audit.retention.days", "cannot be negative")
+	} else if c.Audit.Retention.Days > 0 && c.Audit.Retention.Days < MinRetentionDays && !c.Audit.Retention.AllowShort {
+		add("audit.retention.days", "%d: cannot be less than %d days without audit.retention.allow_short (requirement NFR-10)", c.Audit.Retention.Days, MinRetentionDays)
 	}
 	return errors.Join(errs...)
 }

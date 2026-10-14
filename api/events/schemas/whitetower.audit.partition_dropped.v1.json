@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Audit partition dropped",
+  "description": "An audit events partition was dropped according to the retention policy (plan P1-02, step 9).",
+  "type": "object",
+  "required": [
+    "partition",
+    "from_time",
+    "to_time"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "partition": {
+      "description": "The name of the dropped partition table.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "from_time": {
+      "description": "Start of the partition's ingestion time range.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "to_time": {
+      "description": "End of the partition's ingestion time range.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "from_leaf_index": {
+      "description": "Lowest leaf index in the pruned partition, if any.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "to_leaf_index": {
+      "description": "Exclusive upper bound leaf index in the pruned partition, if any.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "events_count": {
+      "description": "Number of audit events dropped with the partition.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "retention_days": {
+      "description": "The retention window in days that prompted the drop.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "reason": {
+      "description": "Reason for dropping the partition.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    }
+  }
+}

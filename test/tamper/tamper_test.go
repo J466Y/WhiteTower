@@ -34,7 +34,10 @@ import (
 const origin = "whitetower.test/audit"
 
 // The core's audit log is a source for the verification library.
-var _ auditverify.Source = (*audit.Log)(nil)
+var (
+	_ auditverify.Source       = (*audit.Log)(nil)
+	_ auditverify.PrunedSource = (*audit.Log)(nil)
+)
 
 // fixture is a database whose audit log the core writes and seals, with the
 // key that signs its checkpoints.
@@ -475,5 +478,55 @@ func TestARewriteFailsTheConsistencyCheck(t *testing.T) {
 	}
 	if err := auditverify.Extends(context.Background(), f.log, kept); !errors.Is(err, auditverify.ErrForked) {
 		t.Fatalf("against the exported checkpoint: %v", err)
+	}
+}
+
+// Lawful retention drop versus unlawful deletion (plan P1-02, step 9):
+// Dropping a partition lawfully (recorded in audit_pruned_ranges) passes
+// verification: auditverify acknowledges missing events in pruned ranges,
+// confirms the root against checkpoints, and reports the pruned range.
+// Any deletion outside the pruned range is detected and fails verification.
+func TestRetentionDroppedPartitionPassesVerificationWhileUnlawfulDeletionFails(t *testing.T) {
+	f := newLog(t)
+
+	// Lawfully drop the first 20 leaves by recording the pruned range and deleting
+	// the corresponding events (as DropExpiredPartitions does).
+	f.tamper(t, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `INSERT INTO whitetower.audit_pruned_ranges (from_leaf_index, to_leaf_index, partition_name)
+			VALUES (0, 20, 'audit_events_2025_01')`); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `DELETE FROM whitetower.audit_events
+			WHERE id IN (SELECT audit_id FROM whitetower.audit_leaves WHERE leaf_index < 20)`)
+		return err
+	})
+
+	r := f.verify(t, f.trusted(t))
+	if !r.OK() {
+		t.Fatalf("lawfully pruned log failed verification: %+v", r)
+	}
+	if r.PrunedLeaves != 20 {
+		t.Fatalf("expected 20 pruned leaves, got %d", r.PrunedLeaves)
+	}
+	if len(r.PrunedRanges) != 1 || r.PrunedRanges[0].From != 0 || r.PrunedRanges[0].To != 20 {
+		t.Fatalf("expected pruned range [0, 20), got %v", r.PrunedRanges)
+	}
+	if r.Checkpoints != 2 {
+		t.Fatalf("expected 2 valid checkpoints, got %d", r.Checkpoints)
+	}
+
+	// Unlawfully delete an event outside the pruned range (leaf 25).
+	f.tamper(t, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `DELETE FROM whitetower.audit_events
+			WHERE id = (SELECT audit_id FROM whitetower.audit_leaves WHERE leaf_index = 25)`)
+		return err
+	})
+
+	r2 := f.verify(t, f.trusted(t))
+	if r2.OK() {
+		t.Fatal("unlawful deletion outside pruned range passed verification")
+	}
+	if len(r2.Problems) == 0 || r2.Problems[0].Kind != auditverify.EventMissing || r2.Problems[0].Index != 25 {
+		t.Fatalf("expected EventMissing at leaf 25, got: %v", r2.Problems)
 	}
 }
