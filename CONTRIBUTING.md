@@ -1,6 +1,6 @@
 # Contributing to White Tower
 
-Thank you for your interest. White Tower is in its design phase, which is the best time to shape it. Read the [README](README.md) and the [design documents](docs/README.md) first.
+Thank you for your interest. White Tower is in its design phase, which is the best time to shape it. Read the [README](README.md) and the [design documents](docs/README.md) first. Coding agents also follow [AGENTS.md](AGENTS.md).
 
 Please follow the [code of conduct](CODE_OF_CONDUCT.md). **Never report security vulnerabilities in public issues**: see [SECURITY.md](SECURITY.md).
 
