@@ -181,7 +181,7 @@ The plan lands in seven pull requests. The first holds the writer, which every o
 | 4. Ingestion from modules | 5, ST-10, ST-11 | Done |
 | 5. Query API | 6, the keys of step 4, ST-12 | Not started |
 | 6. Export | 8 | Done |
-| 7. Retention and throughput | 9, the rest of 10 | Not started |
+| 7. Retention and throughput | 9, the rest of 10 | Done |
 
 ### 2026-10-09: event model, writer and storage
 
@@ -267,3 +267,25 @@ The sealer stored each checkpoint with the database's clock and, once it loaded 
 - Pseudonymization: optional deterministic pseudonymization of human principal identifiers on export (NFR-20) via RFC 4122 UUID v5 derived with an HMAC-SHA256 namespace key, leaving the internal database log unaltered.
 - Health metrics per sink: `whitetower_audit_exported_total`, `whitetower_audit_export_cursor_leaf_index`, `whitetower_audit_export_lag`, `whitetower_audit_export_failures_total`, and `whitetower_audit_export_duration_seconds`.
 - Tests prove strict index ordering, cursor persistence, zero events skipped across core restarts or sink failures, OTLP protobuf formatting, JSONL file rotation, and export pseudonymization without affecting internal logs.
+
+### 2026-10-14: retention and throughput
+
+- Storage of pruned tree data (decision of step 9): `audit_leaves` and `audit_tree_hashes` stay whole in PostgreSQL, while older monthly partition tables of `audit_events_YYYY_MM` and `audit_event_ids_YYYY_MM` are dropped. This reclaims >83% of storage, maintains all historical checkpoints and consistency proofs intact, and preserves the append-only invariant on leaf and tree tables without row deletions.
+- Configuration (`internal/platform/config`): `audit.retention.days` (minimum 180 days by default, NFR-10). Setting a lower retention threshold requires `audit.retention.allow_short: true` and logs an operator warning.
+- Partition management and security:
+  - Migration 3 creates table `whitetower.audit_pruned_ranges` (`(from_leaf_index, to_leaf_index, partition_name, dropped_at)`) with append-only and no-truncate triggers (`whitetower.reject_change()`).
+  - PostgreSQL function `whitetower.drop_audit_partition(suffix)` (security definer) drops monthly partitions of `audit_events` and `audit_event_ids` for the runtime role without granting broad DDL privileges.
+  - PostgreSQL function `whitetower.list_audit_partitions()` enumerates existing partition tables.
+- Retention job (`audit.DropExpiredPartitions` and background job `audit-retention`):
+  - Identifies partitions older than the retention threshold, queries the leaf index bounds (`PartitionLeafBounds`), records an audited event `whitetower.audit.partition_dropped.v1`, records the pruned index range in `audit_pruned_ranges`, and drops the partition tables.
+  - Metrics: `whitetower_audit_partitions_dropped_total` and `whitetower_audit_pruned_leaves_total`.
+- Core event type `whitetower.audit.partition_dropped.v1`: schema in `api/events/schemas/`, example in `api/events/examples/`, registered in `catalog.json` and `rules` in `facts.go`, indexed in `facts.json`.
+- Verification library (`pkg/auditverify`):
+  - `PrunedSource` interface: optional capability on `Source` providing `Pruned(ctx, visit func(from, to int64) error) error`.
+  - `Report` records `PrunedRanges` and `PrunedLeaves`.
+  - Missing events within lawfully pruned ranges are recognized without reporting verification failures (`EventMissing`), and checkpoints continue to verify against the Merkle tree reconstructed from leaf hashes.
+  - `audit.Log` implements `PrunedSource` via structural typing without importing `pkg/auditverify`.
+- Tests and benchmarks:
+  - `retention_test.go`: proves partition dropping, pruned range recording, leaf/hash preservation, and active partition retention.
+  - `test/tamper`: `TestRetentionDroppedPartitionPassesVerificationWhileUnlawfulDeletionFails` proves that lawfully pruned partitions pass verification with intact checkpoints, while any deletion outside pruned ranges is detected and fails verification with `EventMissing`.
+  - `throughput_test.go`: `TestThroughputSustainedAndBurst` verifies sustained 200 eps (NFR-07) and peak burst of 2,000 eps (NFR-09) under concurrent publishers, ensuring queue drain, zero event loss, and checkpoint generation. `BenchmarkSealerRound` benchmarks batch sealing latency.

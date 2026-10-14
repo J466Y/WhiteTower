@@ -115,6 +115,15 @@ OpenTelemetry log (OTLP/HTTP) export sink.
 | `audit.export.otlp.ca_file` | `WT_AUDIT_EXPORT_OTLP_CA_FILE` | string | none | PEM file with the certificate authorities that sign the receiver's certificate, for an https endpoint. Empty: the system's. |
 | `audit.export.otlp.timeout` | `WT_AUDIT_EXPORT_OTLP_TIMEOUT` | duration | `10s` | Timeout for export HTTP requests. |
 
+### `audit.retention`
+
+Retention and cleanup of old audit events (requirement AUD-07, NFR-10).
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `audit.retention.days` | `WT_AUDIT_RETENTION_DAYS` | integer | `180` | How long audit events are kept before their partitions are dropped, in days: at least 180 days (6 months, requirement NFR-10). 0 disables retention drops. |
+| `audit.retention.allow_short` | `WT_AUDIT_RETENTION_ALLOW_SHORT` | boolean | `false` | Explicit override required when setting retention below 180 days (requirement NFR-10). |
+
 ## `shutdown`
 
 How the server stops.

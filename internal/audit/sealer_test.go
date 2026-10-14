@@ -35,7 +35,7 @@ const origin = "whitetower.test/audit"
 // anything on the database's clock rather than on its own.
 var epoch = time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 
-func newKey(t *testing.T) keys.Ed25519 {
+func newKey(t testing.TB) keys.Ed25519 {
 	t.Helper()
 	_, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

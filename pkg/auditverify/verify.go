@@ -26,6 +26,21 @@ type Source interface {
 	Checkpoints(ctx context.Context, visit func(size int64, root Hash, note []byte) error) error
 }
 
+// PrunedRange represents a range of leaf indexes [From, To) whose events were
+// dropped by retention (plan P1-02, step 9).
+type PrunedRange struct {
+	From int64
+	To   int64
+}
+
+// PrunedSource is an optional capability of a Source that tracks leaf ranges
+// whose events were pruned by retention. Found with a type assertion.
+type PrunedSource interface {
+	// Pruned calls visit with each pruned range [from, to) the log has,
+	// in ascending index order.
+	Pruned(ctx context.Context, visit func(from, to int64) error) error
+}
+
 // Options tune Verify.
 type Options struct {
 	// Keys are those the checkpoints must be signed with (see Keys). Required.
@@ -83,6 +98,12 @@ type Report struct {
 	// Latest is the latest of those checkpoints, nil if there is none. The
 	// leaves after it are not signed yet: the next checkpoint signs them.
 	Latest *Checkpoint
+	// PrunedRanges lists the ranges of leaves whose events were pruned by
+	// retention.
+	PrunedRanges []PrunedRange
+	// PrunedLeaves is how many leaves had their events pruned within those
+	// ranges.
+	PrunedLeaves int64
 	// Problems are the first problems found, in the order of the log: the
 	// first is where the log first differs from what was signed.
 	Problems []Problem
@@ -117,6 +138,8 @@ type verifier struct {
 	keys  *Keys
 	chunk int64
 	max   int
+
+	pruned []PrunedRange
 
 	report Report
 	// signed holds the problems of the checkpoints themselves, found first;
@@ -168,6 +191,20 @@ func (v *verifier) run(ctx context.Context) (*Report, error) {
 		}
 	}
 
+	if ps, ok := v.src.(PrunedSource); ok {
+		err := ps.Pruned(ctx, func(from, to int64) error {
+			if from < to {
+				v.pruned = append(v.pruned, PrunedRange{From: from, To: to})
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		slices.SortStableFunc(v.pruned, func(a, b PrunedRange) int { return cmp.Compare(a.From, b.From) })
+		v.report.PrunedRanges = slices.Clone(v.pruned)
+	}
+
 	v.tree = &tree{}
 	for from := int64(0); from < size; from += v.chunk {
 		if err := v.read(ctx, from, min(from+v.chunk, size)); err != nil {
@@ -179,6 +216,19 @@ func (v *verifier) run(ctx context.Context) (*Report, error) {
 	slices.SortStableFunc(problems, func(a, b Problem) int { return cmp.Compare(a.Index, b.Index) })
 	v.report.Problems = problems[:min(len(problems), v.max)]
 	return &v.report, nil
+}
+
+func (v *verifier) isPruned(index int64) bool {
+	_, found := slices.BinarySearchFunc(v.pruned, index, func(r PrunedRange, target int64) int {
+		if target < r.From {
+			return 1
+		}
+		if target >= r.To {
+			return -1
+		}
+		return 0
+	})
+	return found
 }
 
 // read checks the leaves of index from to to-1, with the tree hashes stored
@@ -220,9 +270,13 @@ func (v *verifier) read(ctx context.Context, from, to int64) error {
 // leaf checks a leaf against its event, and adds it to the tree.
 func (v *verifier) leaf(index int64, hash Hash, event []byte, stored map[int64]Hash) {
 	if event == nil {
-		// The leaf's own hash keeps the tree going: its checkpoints still
-		// verify what remains.
-		v.problem(&v.found, EventMissing, index, "the event of leaf %d is missing", index)
+		if v.isPruned(index) {
+			v.report.PrunedLeaves++
+		} else {
+			// The leaf's own hash keeps the tree going: its checkpoints still
+			// verify what remains.
+			v.problem(&v.found, EventMissing, index, "the event of leaf %d is missing", index)
+		}
 	} else if h := LeafHash(event); h != hash {
 		v.problem(&v.found, EventAltered, index, "the event hashes to %x, and the leaf is %x", h, hash)
 		// The tree is rebuilt from what the events say. Its stored hashes

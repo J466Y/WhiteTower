@@ -175,3 +175,65 @@ func TestVerifyRefusesWhatItCannotTrust(t *testing.T) {
 		t.Errorf("a source that fails: %v", err)
 	}
 }
+
+// prunedLog is a Source that also implements PrunedSource.
+type prunedLog struct {
+	*memLog
+	pruned []auditverify.PrunedRange
+}
+
+func (p prunedLog) Pruned(_ context.Context, visit func(from, to int64) error) error {
+	for _, r := range p.pruned {
+		if err := visit(r.From, r.To); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// A log with pruned ranges verifies: missing events within pruned ranges do
+// not report problems, while missing events outside pruned ranges are still flagged.
+func TestPrunedRangesVerifyAndReport(t *testing.T) {
+	s := newSigner(t)
+	m := newLog(t, s, 50, 10)
+
+	// Prune leaves 10 to 20: keep hash, nil event.
+	for i := int64(10); i < 20; i++ {
+		m.leaves[i] = memLeaf{hash: m.leaves[i].hash, event: nil}
+	}
+	plog := prunedLog{
+		memLog: m,
+		pruned: []auditverify.PrunedRange{{From: 10, To: 20}},
+	}
+
+	r := verify(t, plog.memLog, s.keys(t), 7)
+	// Without PrunedSource, leaves 10..20 are reported as missing events.
+	if r.OK() || r.Total != 10 || r.Problems[0].Kind != auditverify.EventMissing || r.Problems[0].Index != 10 {
+		t.Fatalf("without PrunedSource: got %d problems, want 10 starting at 10: %v", r.Total, r.Problems)
+	}
+
+	// With PrunedSource, pruned leaves are acknowledged, and the log verifies.
+	pr, err := auditverify.Verify(context.Background(), plog, auditverify.Options{Keys: s.keys(t), Chunk: 7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pr.OK() {
+		t.Fatalf("pruned log did not verify: %v", pr.Problems)
+	}
+	if pr.PrunedLeaves != 10 {
+		t.Errorf("got %d pruned leaves, want 10", pr.PrunedLeaves)
+	}
+	if len(pr.PrunedRanges) != 1 || pr.PrunedRanges[0] != (auditverify.PrunedRange{From: 10, To: 20}) {
+		t.Errorf("got pruned ranges %v, want [{10 20}]", pr.PrunedRanges)
+	}
+
+	// An event missing OUTSIDE the pruned range is still detected as a problem.
+	m.leaves[35] = memLeaf{hash: m.leaves[35].hash, event: nil}
+	pr2, err := auditverify.Verify(context.Background(), plog, auditverify.Options{Keys: s.keys(t), Chunk: 7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pr2.OK() || pr2.Total != 1 || pr2.Problems[0].Kind != auditverify.EventMissing || pr2.Problems[0].Index != 35 {
+		t.Fatalf("got %d problems (%v); want 1 EventMissing at index 35", pr2.Total, pr2.Problems)
+	}
+}

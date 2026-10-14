@@ -113,6 +113,27 @@ func (l *Log) CheckpointKeys(ctx context.Context) ([][]byte, error) {
 	return keys, err
 }
 
+// Pruned calls visit with each pruned range [from, to) the log has,
+// in ascending index order. It satisfies auditverify.PrunedSource through
+// structural typing without importing pkg/auditverify.
+func (l *Log) Pruned(ctx context.Context, visit func(from, to int64) error) error {
+	var rows []auditdb.WhitetowerAuditPrunedRange
+	err := l.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
+		var err error
+		rows, err = auditdb.New(tx).ListPrunedRanges(ctx)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	for _, r := range rows {
+		if err := visit(r.FromLeafIndex, r.ToLeafIndex); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // toHash reads a stored hash, and reports whether it is one: the database
 // refuses other lengths, unless someone changed it from outside the core.
 func toHash(b []byte) (tlog.Hash, bool) {

@@ -164,6 +164,16 @@
       "subject": "optional",
       "schema": "schemas/whitetower.audit.gap_detected.v1.json",
       "example": "examples/whitetower.audit.gap_detected.v1.json"
+    },
+    {
+      "type": "whitetower.audit.partition_dropped.v1",
+      "summary": "An audit events partition was dropped according to the retention policy (plan P1-02, step 9).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "none",
+      "schema": "schemas/whitetower.audit.partition_dropped.v1.json",
+      "example": "examples/whitetower.audit.partition_dropped.v1.json"
     }
   ]
 }

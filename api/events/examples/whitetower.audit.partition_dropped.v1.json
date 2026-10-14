@@ -1,0 +1,18 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000017",
+  "source": "/core",
+  "type": "whitetower.audit.partition_dropped.v1",
+  "time": "2026-09-29T10:15:02.119Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "partition": "audit_events_2026_01",
+    "from_time": "2026-01-01T00:00:00.000Z",
+    "to_time": "2026-02-01T00:00:00.000Z",
+    "from_leaf_index": 0,
+    "to_leaf_index": 12500,
+    "events_count": 12500,
+    "retention_days": 180,
+    "reason": "retention policy threshold elapsed"
+  }
+}

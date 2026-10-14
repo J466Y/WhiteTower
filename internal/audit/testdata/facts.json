@@ -34,6 +34,13 @@
     "outcome": "",
     "reason": ""
   },
+  "whitetower.audit.partition_dropped.v1": {
+    "action": "audit.partition_dropped",
+    "actor_id": "",
+    "actor_type": "system",
+    "outcome": "success",
+    "reason": "retention policy threshold elapsed"
+  },
   "whitetower.bundle.activated.v1": {
     "action": "bundle.activated",
     "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",

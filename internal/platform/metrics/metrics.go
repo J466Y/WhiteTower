@@ -282,17 +282,19 @@ func (m *Notify) Resynced(reason string) { m.resyncs.WithLabelValues(reason).Inc
 // Audit holds the metrics of the audit log's sealer, on the replica that
 // runs it.
 type Audit struct {
-	delay          prometheus.Histogram
-	claim          prometheus.Histogram
-	sealed         prometheus.Counter
-	size           prometheus.Gauge
-	lastCheckpoint prometheus.Gauge
-	failures       prometheus.Counter
-	exported       *prometheus.CounterVec
-	cursor         *prometheus.GaugeVec
-	lag            *prometheus.GaugeVec
-	exportFailures *prometheus.CounterVec
-	exportDuration *prometheus.HistogramVec
+	delay             prometheus.Histogram
+	claim             prometheus.Histogram
+	sealed            prometheus.Counter
+	size              prometheus.Gauge
+	lastCheckpoint    prometheus.Gauge
+	failures          prometheus.Counter
+	exported          *prometheus.CounterVec
+	cursor            *prometheus.GaugeVec
+	lag               *prometheus.GaugeVec
+	exportFailures    *prometheus.CounterVec
+	exportDuration    *prometheus.HistogramVec
+	partitionsDropped prometheus.Counter
+	prunedLeaves      prometheus.Counter
 }
 
 // NewAudit registers the metrics of the sealer with reg.
@@ -345,9 +347,18 @@ func NewAudit(reg prometheus.Registerer) *Audit {
 			Help:    "Time taken to ship an export batch, by sink.",
 			Buckets: prometheus.DefBuckets,
 		}, []string{"sink"}),
+		partitionsDropped: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "partitions_dropped_total",
+			Help: "Audit monthly partition tables dropped by retention.",
+		}),
+		prunedLeaves: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: Namespace, Subsystem: "audit", Name: "pruned_leaves_total",
+			Help: "Leaves whose events were pruned by retention.",
+		}),
 	}
 	reg.MustRegister(m.delay, m.claim, m.sealed, m.size, m.lastCheckpoint, m.failures,
-		m.exported, m.cursor, m.lag, m.exportFailures, m.exportDuration)
+		m.exported, m.cursor, m.lag, m.exportFailures, m.exportDuration,
+		m.partitionsDropped, m.prunedLeaves)
 	return m
 }
 
@@ -393,6 +404,14 @@ func (m *Audit) ExportFailed(sink string) {
 // ExportDuration records the time spent exporting a batch to sink.
 func (m *Audit) ExportDuration(sink string, took time.Duration) {
 	m.exportDuration.WithLabelValues(sink).Observe(took.Seconds())
+}
+
+// PartitionDropped records an audit partition dropped by retention, and how many leaves it held.
+func (m *Audit) PartitionDropped(leaves int64) {
+	m.partitionsDropped.Inc()
+	if leaves > 0 {
+		m.prunedLeaves.Add(float64(leaves))
+	}
 }
 
 // Method returns a standard HTTP method as it is, and anything else as
