@@ -521,6 +521,21 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		}
 	})
 
+	t.Run("IdP error callback returns unauthorized and sanitizes input", func(t *testing.T) {
+		stateCookie, stateParam, _ := initiateLogin(t, "/")
+		req := httptest.NewRequest(http.MethodGet, "/auth/callback?state="+url.QueryEscape(stateParam)+"&error=access_denied&error_description=user%0Acanceled", nil)
+		req.AddCookie(stateCookie)
+		rec := httptest.NewRecorder()
+
+		svc.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401 Unauthorized for IdP error, got %d", rec.Code)
+		}
+		if strings.Contains(rec.Body.String(), "\ncanceled") {
+			t.Errorf("expected newlines to be sanitized in error response, got %q", rec.Body.String())
+		}
+	})
+
 	t.Run("logout revokes session and redirects", func(t *testing.T) {
 		// Create a session to log out from
 		p, err := principalStore.UpsertHuman(context.Background(), idp.server.URL, "sub-logout-user", "Logout User", nil, []string{})

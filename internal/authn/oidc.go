@@ -24,6 +24,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/authn/authndb"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
+	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 )
 
@@ -280,8 +281,12 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	if idpErr := r.URL.Query().Get("error"); idpErr != "" {
 		desc := r.URL.Query().Get("error_description")
-		s.logger.Warn("IdP returned authentication error", "error", idpErr, "description", desc)
-		http.Error(w, fmt.Sprintf("authentication failed: %s (%s)", idpErr, desc), http.StatusUnauthorized)
+		s.logger.Warn("IdP returned authentication error", "error", logging.Sanitize(idpErr), "description", logging.Sanitize(desc))
+		if desc != "" {
+			http.Error(w, fmt.Sprintf("authentication failed: %s (%s)", logging.Sanitize(idpErr), logging.Sanitize(desc)), http.StatusUnauthorized)
+		} else {
+			http.Error(w, fmt.Sprintf("authentication failed: %s", logging.Sanitize(idpErr)), http.StatusUnauthorized)
+		}
 		return
 	}
 
@@ -323,7 +328,7 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if idToken.Nonce != state.Nonce {
-		s.logger.Warn("nonce mismatch", "expected", state.Nonce, "actual", idToken.Nonce)
+		s.logger.Warn("nonce mismatch", "expected", state.Nonce, "actual", logging.Sanitize(idToken.Nonce))
 		http.Error(w, "id token nonce mismatch", http.StatusBadRequest)
 		return
 	}
