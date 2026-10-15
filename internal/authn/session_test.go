@@ -14,12 +14,13 @@ import (
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
+	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 )
 
 var testEpoch = time.Date(2026, 10, 14, 16, 0, 0, 0, time.UTC)
 
-func setupAuthn(t *testing.T, clk *clocktest.Fake) (*authn.SessionStore, *authn.PrincipalStore) {
+func setupAuthn(t *testing.T, clk *clocktest.Fake) (*authn.SessionStore, *authn.PrincipalStore, *db.DB) {
 	t.Helper()
 	d := dbtest.New(t)
 	database := d.Open(t)
@@ -35,14 +36,14 @@ func setupAuthn(t *testing.T, clk *clocktest.Fake) (*authn.SessionStore, *authn.
 		AbsoluteLifetime: 12 * time.Hour,
 	})
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore)
-	return sessionStore, principalStore
+	return sessionStore, principalStore, database
 }
 
 // Security test ST-14: Session fixation is impossible; cookie flags are set; idle and absolute expiry apply; sessions are rotated at login and revoked at logout, on deactivation and on role changes
 func TestSessionLifecycleAndSecurity(t *testing.T) {
 	ctx := context.Background()
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore := setupAuthn(t, clk)
+	sessionStore, principalStore, _ := setupAuthn(t, clk)
 
 	email := "alice@example.com"
 	principal, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-12345", "Alice Operator", &email, []string{"operators"})

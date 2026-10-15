@@ -50,11 +50,16 @@ func (e VersionInfoApiVersion) Valid() bool {
 
 // Principal defines model for Principal.
 type Principal struct {
-	DisplayName string `json:"displayName"`
+	// CsrfToken The session's CSRF token for state-changing requests, if authenticated via session.
+	CsrfToken   *string `json:"csrfToken,omitempty"`
+	DisplayName string  `json:"displayName"`
 
 	// Id The principal's identifier.
 	Id   openapi_types.UUID `json:"id"`
 	Kind PrincipalKind      `json:"kind"`
+
+	// Permissions The permissions granted by the principal's roles (permission matrix).
+	Permissions []string `json:"permissions"`
 
 	// Roles The roles bound to the principal (requirements, permission matrix).
 	Roles []string `json:"roles"`
@@ -171,8 +176,8 @@ type ClientInterface interface {
 
 	// GetMe Get the calling principal
 	//
-	// Returns the principal that makes the request and its roles. Plan
-	// P1-03 adds its permissions and the CSRF token of the session.
+	// Returns the calling principal, their roles, their permissions derived
+	// from the governance matrix, and the CSRF token of the active session.
 	//
 	// Corresponds with GET /me (the `GetMe` operationId).
 	GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -189,8 +194,8 @@ type ClientInterface interface {
 
 // GetMe Get the calling principal
 //
-// Returns the principal that makes the request and its roles. Plan
-// P1-03 adds its permissions and the CSRF token of the session.
+// Returns the calling principal, their roles, their permissions derived
+// from the governance matrix, and the CSRF token of the active session.
 //
 // Corresponds with GET /me (the `GetMe` operationId).
 func (c *Client) GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -324,8 +329,8 @@ type ClientWithResponsesInterface interface {
 
 	// GetMeWithResponse Get the calling principal
 	//
-	// Returns the principal that makes the request and its roles. Plan
-	// P1-03 adds its permissions and the CSRF token of the session.
+	// Returns the calling principal, their roles, their permissions derived
+	// from the governance matrix, and the CSRF token of the active session.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -442,8 +447,8 @@ func (r GetVersionResponse) ContentType() string {
 
 // GetMeWithResponse Get the calling principal
 //
-// Returns the principal that makes the request and its roles. Plan
-// P1-03 adds its permissions and the CSRF token of the session.
+// Returns the calling principal, their roles, their permissions derived
+// from the governance matrix, and the CSRF token of the active session.
 //
 // Returns a wrapper object for the known response body format(s).
 //

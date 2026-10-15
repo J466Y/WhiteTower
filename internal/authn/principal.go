@@ -61,6 +61,9 @@ func (ps *PrincipalStore) UpsertHuman(ctx context.Context, issuer, subject, disp
 	if issuer == "" || subject == "" || displayName == "" {
 		return nil, errors.New("issuer, subject, and displayName are required")
 	}
+	if idpGroups == nil {
+		idpGroups = []string{}
+	}
 
 	newID, err := uuid.NewV7()
 	if err != nil {

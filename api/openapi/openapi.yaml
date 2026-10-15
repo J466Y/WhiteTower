@@ -57,8 +57,8 @@ paths:
       operationId: getMe
       summary: Get the calling principal
       description: |
-        Returns the principal that makes the request and its roles. Plan
-        P1-03 adds its permissions and the CSRF token of the session.
+        Returns the calling principal, their roles, their permissions derived
+        from the governance matrix, and the CSRF token of the active session.
       tags: [identity]
       responses:
         "200":
@@ -109,7 +109,7 @@ components:
     Principal:
       type: object
       additionalProperties: false
-      required: [id, kind, displayName, roles]
+      required: [id, kind, displayName, roles, permissions]
       properties:
         id:
           type: string
@@ -125,6 +125,14 @@ components:
           description: The roles bound to the principal (requirements, permission matrix).
           items:
             type: string
+        permissions:
+          type: array
+          description: The permissions granted by the principal's roles (permission matrix).
+          items:
+            type: string
+        csrfToken:
+          type: string
+          description: The session's CSRF token for state-changing requests, if authenticated via session.
     Problem:
       type: object
       description: |

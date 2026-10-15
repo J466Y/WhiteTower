@@ -14,6 +14,8 @@ import (
 
 	"github.com/J466Y/WhiteTower/internal/api/rest/gen"
 	"github.com/J466Y/WhiteTower/internal/api/rest/problem"
+	"github.com/J466Y/WhiteTower/internal/authn"
+	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
@@ -70,12 +72,17 @@ func (Server) GetMe(ctx context.Context, _ gen.GetMeRequestObject) (gen.GetMeRes
 	if err != nil {
 		return nil, fmt.Errorf("principal ID %q: %w", p.ID, err)
 	}
-	return gen.GetMe200JSONResponse{
+	res := gen.GetMe200JSONResponse{
 		Id:          id,
 		Kind:        gen.PrincipalKind(p.Kind),
 		DisplayName: p.Name,
 		Roles:       append([]string{}, p.Roles...),
-	}, nil
+		Permissions: authz.PermissionsList(p.Roles),
+	}
+	if session := authn.SessionFromContext(ctx); session != nil && session.CSRFToken != "" {
+		res.CsrfToken = &session.CSRFToken
+	}
+	return res, nil
 }
 
 // Handler returns the public API, which expects requests under BasePath: the

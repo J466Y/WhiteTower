@@ -19,6 +19,7 @@ import (
 
 	"github.com/J466Y/WhiteTower/internal/api/rest/gen"
 	"github.com/J466Y/WhiteTower/internal/api/rest/problem"
+	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
@@ -37,6 +38,9 @@ func (testAuthenticator) Authenticate(r *http.Request) (*auth.Principal, error) 
 	case "bad":
 		return nil, errors.New("the signature does not verify")
 	default:
+		if csrf := r.Header.Get("X-Test-CSRF-Token"); csrf != "" {
+			*r = *r.WithContext(authn.ContextWithSession(r.Context(), &authn.Session{CSRFToken: csrf}))
+		}
 		return &auth.Principal{ID: id, Kind: auth.Human, Name: "Olivia Owner", Roles: []string{"owner"}}, nil
 	}
 }
@@ -149,8 +153,26 @@ func TestMe(t *testing.T) {
 		if me.Id.String() != olivia || me.Kind != gen.Human || me.DisplayName != "Olivia Owner" || len(me.Roles) != 1 {
 			t.Fatalf("got %+v", me)
 		}
+		if len(me.Permissions) == 0 {
+			t.Fatalf("permissions are empty: %+v", me.Permissions)
+		}
+		if me.CsrfToken != nil {
+			t.Fatalf("unexpected csrfToken: %v", *me.CsrfToken)
+		}
 		if strings.Join(az.asked, ",") != "getMe" {
 			t.Fatalf("the authorizer was asked about %v, want the document's operationId", az.asked)
+		}
+	})
+	t.Run("authenticated with session includes csrf token", func(t *testing.T) {
+		header := http.Header{}
+		header.Set("X-Test-CSRF-Token", "test-csrf-token-xyz")
+		res := call(h, http.MethodGet, "/api/v1/me", olivia, header, nil)
+		var me gen.Principal
+		if err := json.Unmarshal(res.body, &me); err != nil || res.status != http.StatusOK {
+			t.Fatalf("got %d %s", res.status, res.body)
+		}
+		if me.CsrfToken == nil || *me.CsrfToken != "test-csrf-token-xyz" {
+			t.Fatalf("csrfToken %v, want test-csrf-token-xyz", me.CsrfToken)
 		}
 	})
 	t.Run("authenticated but not permitted", func(t *testing.T) {

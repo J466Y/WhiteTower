@@ -2,6 +2,21 @@
   "displayName": "Olivia Owner",
   "id": "0192f2c4-8d1e-7c3a-9b2f-5e1d2c3b4a59",
   "kind": "human",
+  "permissions": [
+    "agent.activate",
+    "agent.credentials.manage",
+    "agent.metadata.edit",
+    "agent.propose",
+    "agent.retire",
+    "agent.review",
+    "agent.suspend",
+    "audit.events.read",
+    "halt.agent.issue",
+    "halt.release.request",
+    "identity.me.read",
+    "inventory.view",
+    "policy.agent.author"
+  ],
   "roles": [
     "owner"
   ]

@@ -152,6 +152,26 @@
       "emailVerified": true,
       "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
       "groups": ["/wt-admins"]
+    },
+    {
+      "username": "multirole",
+      "email": "multirole@example.test",
+      "firstName": "Morgan",
+      "lastName": "Multi",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
+      "groups": ["/wt-owners", "/wt-operators"]
+    },
+    {
+      "username": "inactive",
+      "email": "inactive@example.test",
+      "firstName": "Ian",
+      "lastName": "Inactive",
+      "enabled": false,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "whitetower", "temporary": false }],
+      "groups": ["/wt-users"]
     }
   ]
 }

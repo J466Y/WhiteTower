@@ -57,7 +57,7 @@ func TestVersion(t *testing.T) {
 		Authenticator: auth.Unauthenticated{},
 		Authorizer:    auth.DenyAll{},
 		Limiter:       ratelimit.New(1000, 1000),
-	})))
+	}), nil))
 	t.Cleanup(srv.Close)
 
 	tests := []struct {
