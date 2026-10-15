@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Principal deactivated",
+  "description": "An administrator or SCIM deprovisioning deactivated a principal (HUM-05).",
+  "type": "object",
+  "required": [
+    "principal_id",
+    "actor",
+    "reason"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "principal_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    }
+  }
+}

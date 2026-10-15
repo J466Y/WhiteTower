@@ -74,6 +74,19 @@ The migration role, which owns the schema.
 | `database.migration.url` | `WT_DATABASE_MIGRATION_URL` | string | none | Connection of the migration role, as a postgres:// URL without the password. Required by whitetower migrate; the server never reads it. |
 | `database.migration.password_file` | `WT_DATABASE_MIGRATION_PASSWORD_FILE` | string | none | File holding the migration role's password. Mount it only where whitetower migrate runs, such as its init container. |
 
+## `auth`
+
+Human identity, access and sessions (plan P1-03).
+
+### `auth.session`
+
+User session settings (ADR-0009).
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `auth.session.idle_timeout` | `WT_AUTH_SESSION_IDLE_TIMEOUT` | duration | `30m0s` | Inactivity duration before an idle session expires: 30m by default. |
+| `auth.session.absolute_lifetime` | `WT_AUTH_SESSION_ABSOLUTE_LIFETIME` | duration | `12h0m0s` | Maximum lifetime of a session regardless of activity: 12h by default. |
+
 ## `audit`
 
 The tamper-evident audit log (ADR-0006).

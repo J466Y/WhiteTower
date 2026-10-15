@@ -104,6 +104,20 @@
     "outcome": "",
     "reason": ""
   },
+  "whitetower.principal.deactivated.v1": {
+    "action": "principal.deactivated",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+    "actor_type": "human",
+    "outcome": "success",
+    "reason": "Employee left organization"
+  },
+  "whitetower.principal.reactivated.v1": {
+    "action": "principal.reactivated",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+    "actor_type": "human",
+    "outcome": "success",
+    "reason": "Reinstated after leave of absence"
+  },
   "whitetower.quarantine.applied.v1": {
     "action": "quarantine.applied",
     "actor_id": "k8s-quarantine",

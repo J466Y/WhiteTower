@@ -32,6 +32,8 @@ type Config struct {
 	API API `yaml:"api"`
 	// The PostgreSQL database. The server connects with the runtime role only; whitetower migrate alone uses the migration role (threat model, DC-3).
 	Database Database `yaml:"database"`
+	// Human identity, access and sessions (plan P1-03).
+	Auth Auth `yaml:"auth"`
 	// The tamper-evident audit log (ADR-0006).
 	Audit Audit `yaml:"audit"`
 	// How the server stops.
@@ -105,6 +107,20 @@ type Migration struct {
 	URL string `yaml:"url"`
 	// File holding the migration role's password. Mount it only where whitetower migrate runs, such as its init container.
 	PasswordFile string `yaml:"password_file"`
+}
+
+// Auth holds human identity, access and session settings (plan P1-03).
+type Auth struct {
+	// User session settings (ADR-0009).
+	Session Session `yaml:"session"`
+}
+
+// Session holds the settings for human user sessions (ADR-0009).
+type Session struct {
+	// Inactivity duration before an idle session expires: 30m by default.
+	IdleTimeout time.Duration `yaml:"idle_timeout"`
+	// Maximum lifetime of a session regardless of activity: 12h by default.
+	AbsoluteLifetime time.Duration `yaml:"absolute_lifetime"`
 }
 
 // Shutdown holds how the server stops.
@@ -225,6 +241,12 @@ func Defaults() Config {
 		TLS:      TLS{MinVersion: "1.2"},
 		API:      API{RateLimit: 50, RateBurst: 100},
 		Database: Database{MaxConnections: 10},
+		Auth: Auth{
+			Session: Session{
+				IdleTimeout:      30 * time.Minute,
+				AbsoluteLifetime: 12 * time.Hour,
+			},
+		},
 		Audit: Audit{
 			CheckpointInterval: MaxCheckpointInterval,
 			Export: AuditExport{
@@ -347,6 +369,15 @@ func (c Config) Validate() error {
 	}
 	if n := c.Database.MaxConnections; n < 1 || n > 1000 {
 		add("database.max_connections", "%d: want 1 to 1000", n)
+	}
+	if c.Auth.Session.IdleTimeout < time.Minute || c.Auth.Session.IdleTimeout > 24*time.Hour {
+		add("auth.session.idle_timeout", "%v: want 1m to 24h", c.Auth.Session.IdleTimeout)
+	}
+	if c.Auth.Session.AbsoluteLifetime < time.Minute || c.Auth.Session.AbsoluteLifetime > 7*24*time.Hour {
+		add("auth.session.absolute_lifetime", "%v: want 1m to 168h", c.Auth.Session.AbsoluteLifetime)
+	}
+	if c.Auth.Session.IdleTimeout > c.Auth.Session.AbsoluteLifetime {
+		add("auth.session.idle_timeout", "cannot be longer than auth.session.absolute_lifetime")
 	}
 	if u := c.Database.Migration.URL; u != "" {
 		if err := checkDatabaseURL(u); err != nil {

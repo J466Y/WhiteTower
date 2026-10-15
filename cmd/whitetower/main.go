@@ -23,8 +23,8 @@ import (
 	"github.com/J466Y/WhiteTower/internal/api/moduleapi"
 	"github.com/J466Y/WhiteTower/internal/api/rest"
 	"github.com/J466Y/WhiteTower/internal/audit"
+	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/authz"
-	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
@@ -180,15 +180,27 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		return err
 	}
 
+	catalog, err := audit.LoadCatalog(events.Files)
+	if err != nil {
+		return err
+	}
+	writer := audit.NewWriter(catalog, clock.System)
+
+	sessionStore := authn.NewSessionStore(database, clock.System, authn.SessionOptions{
+		IdleTimeout:      cfg.Auth.Session.IdleTimeout,
+		AbsoluteLifetime: cfg.Auth.Session.AbsoluteLifetime,
+	})
+	principalStore := authn.NewPrincipalStore(database, clock.System, writer, sessionStore)
+	authenticator := authn.NewAuthenticator(sessionStore, principalStore)
+
 	registry := metrics.NewRegistry(v)
 	httpMetrics := metrics.NewHTTP(registry)
 	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
 	api := rest.Handler(rest.Options{
-		Logger: logger,
-		// Until plan P1-03 PR 2 and 4 bring sessions and API tokens,
-		// nobody is authenticated: only public operations answer.
-		Authenticator: auth.Unauthenticated{},
+		Logger:        logger,
+		Authenticator: authenticator,
 		Authorizer:    authz.NewAuthorizer(),
+		CSRF:          sessionStore,
 		Limiter:       ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
 		RateLimited:   httpMetrics.RateLimited("console").Inc,
 	})
@@ -218,14 +230,12 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	bus := notify.NewPostgres(notify.PostgresOptions{DB: database, Logger: logger, Metrics: metrics.NewNotify(registry)})
 	replica, _ := os.Hostname()
 	runner := jobs.New(jobs.Options{DB: database, Replica: replica, Logger: logger, Metrics: metrics.NewJobs(registry)})
+	if err := runner.Add(authn.CleanupSessionsJob(sessionStore)); err != nil {
+		return err
+	}
 
 	// The audit log: every change records its event through the writer, and
 	// the sealer appends the events to the Merkle tree and signs checkpoints.
-	catalog, err := audit.LoadCatalog(events.Files)
-	if err != nil {
-		return err
-	}
-	writer := audit.NewWriter(catalog, clock.System)
 	checkpointKey, err := keys.LoadEd25519(cfg.Audit.CheckpointKeyFile)
 	if err != nil {
 		return fmt.Errorf("audit.checkpoint_key_file: %w", err)
