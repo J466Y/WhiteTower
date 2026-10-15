@@ -47,6 +47,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List API tokens
+         * @description Lists active and historical API tokens for the calling principal or a service account.
+         */
+        get: operations["listTokens"];
+        put?: never;
+        /**
+         * Create an API token
+         * @description Generates a new API token. The raw token secret is returned in the response
+         *     and is never retrievable again.
+         */
+        post: operations["createToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke an API token
+         * @description Revokes an active API token by its ID.
+         */
+        delete: operations["revokeToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/service-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List service accounts
+         * @description Lists service accounts owned by the calling principal or all service accounts for administrators.
+         */
+        get: operations["listServiceAccounts"];
+        put?: never;
+        /**
+         * Create a service account
+         * @description Creates a non-human service account principal with the caller as responsible principal.
+         */
+        post: operations["createServiceAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -96,6 +165,74 @@ export interface components {
             instance?: string;
             /** @description The stable error code. */
             code: string;
+        };
+        CreateTokenRequest: {
+            /** @description Friendly name for the token. */
+            name: string;
+            /** @description The permissions granted to the token (must be subset of effective permissions). */
+            scopes: string[];
+            /**
+             * @description Lifetime of the token in days (max 90).
+             * @default 30
+             */
+            expiresInDays: number;
+            /**
+             * Format: uuid
+             * @description Optional principal ID to issue the token for (service account owned by caller or by admin).
+             */
+            principalId?: string;
+        };
+        CreatedToken: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            principalId: string;
+            name: string;
+            /** @description The prefix of the token, useful for identification. */
+            tokenPrefix: string;
+            scopes: string[];
+            /** @description The raw plaintext API token. It is only returned once and never stored. */
+            token: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        ApiTokenMetadata: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            principalId: string;
+            name: string;
+            tokenPrefix: string;
+            scopes: string[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            lastUsedAt?: string | null;
+            /** Format: date-time */
+            revokedAt?: string | null;
+        };
+        CreateServiceAccountRequest: {
+            displayName: string;
+            /** Format: email */
+            email?: string | null;
+            roles: string[];
+        };
+        ServiceAccount: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            email?: string | null;
+            /** @enum {string} */
+            status: "active" | "inactive";
+            /** Format: uuid */
+            responsiblePrincipalId: string;
+            roles: string[];
+            /** Format: date-time */
+            createdAt: string;
         };
     };
     responses: {
@@ -153,6 +290,126 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Principal"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listTokens: {
+        parameters: {
+            query?: {
+                /** @description Optional principal ID to filter tokens (allowed for responsible owners and administrators). */
+                principalId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list of API tokens. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenMetadata"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description The created API token including its plaintext secret. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedToken"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    revokeToken: {
+        parameters: {
+            query?: {
+                /** @description Reason for revocation. */
+                reason?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The token identifier. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Token successfully revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listServiceAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list of service accounts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccount"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createServiceAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateServiceAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description The created service account. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccount"];
                 };
             };
             default: components["responses"]["Problem"];

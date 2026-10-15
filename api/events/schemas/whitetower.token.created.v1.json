@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "API token created",
+  "description": "A personal access token or service account token was created (HUM-07).",
+  "type": "object",
+  "required": [
+    "token_id",
+    "principal_id",
+    "token_prefix",
+    "scopes",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "token_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "principal_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "token_prefix": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 30
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    }
+  }
+}

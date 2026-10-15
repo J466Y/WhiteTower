@@ -16,11 +16,16 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/J466Y/WhiteTower/api/events"
 	"github.com/J466Y/WhiteTower/internal/api/rest/gen"
 	"github.com/J466Y/WhiteTower/internal/api/rest/problem"
+	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
+	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
+	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 )
@@ -150,7 +155,7 @@ func TestMe(t *testing.T) {
 		if err := json.Unmarshal(res.body, &me); err != nil || res.status != http.StatusOK {
 			t.Fatalf("got %d %s", res.status, res.body)
 		}
-		if me.Id.String() != olivia || me.Kind != gen.Human || me.DisplayName != "Olivia Owner" || len(me.Roles) != 1 {
+		if me.Id.String() != olivia || me.Kind != gen.PrincipalKindHuman || me.DisplayName != "Olivia Owner" || len(me.Roles) != 1 {
 			t.Fatalf("got %+v", me)
 		}
 		if len(me.Permissions) == 0 {
@@ -195,8 +200,12 @@ func TestEveryOperationIsGuarded(t *testing.T) {
 			start, end := strings.Index(path, "{"), strings.Index(path, "}")
 			path = path[:start] + olivia + path[end+1:]
 		}
-		anonymous := call(h, op.Method, path, "", nil, nil)
-		denied := call(h, op.Method, path, olivia, nil, nil)
+		body := func() io.Reader { return nil }
+		if op.Method == http.MethodPost || op.Method == http.MethodPut || op.Method == http.MethodPatch {
+			body = func() io.Reader { return strings.NewReader("{}") }
+		}
+		anonymous := call(h, op.Method, path, "", nil, body())
+		denied := call(h, op.Method, path, olivia, nil, body())
 		switch {
 		case op.Public && (anonymous.status == http.StatusUnauthorized || anonymous.status == http.StatusForbidden):
 			t.Errorf("%s, public: anonymous call refused with %d", op.ID, anonymous.status)
@@ -557,4 +566,134 @@ func TestErrorCodesAreDocumented(t *testing.T) {
 			t.Errorf("%s is documented but not defined", code)
 		}
 	}
+}
+
+func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
+	d := dbtest.New(t)
+	database := d.Open(t)
+	clk := clocktest.New(time.Date(2026, 10, 15, 10, 0, 0, 0, time.UTC))
+
+	cat, err := audit.LoadCatalog(events.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := audit.NewWriter(cat, clk)
+	sessionStore := authn.NewSessionStore(database, clk, authn.SessionOptions{})
+	tokenStore := authn.NewTokenStore(database, clk, writer)
+	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
+
+	email := "operator@example.com"
+	user, err := principalStore.UpsertHuman(context.Background(), "https://idp.example.com", "sub-op", "Test Operator", &email, []string{"operators"})
+	if err != nil {
+		t.Fatalf("upserting test user: %v", err)
+	}
+	callerID := user.ID.String()
+
+	opts := options(io.Discard)
+	opts.Tokens = tokenStore
+	opts.Principals = principalStore
+	opts.Authorizer = &allow{ops: map[string]bool{
+		"createToken":          true,
+		"listTokens":           true,
+		"revokeToken":          true,
+		"createServiceAccount": true,
+		"listServiceAccounts":  true,
+	}}
+	h := Handler(opts)
+
+	var tokenID string
+
+	t.Run("createToken", func(t *testing.T) {
+		body := strings.NewReader(`{"name":"cli-key","scopes":["agent.propose"],"expiresInDays":30}`)
+		res := call(h, http.MethodPost, "/api/v1/tokens", callerID, nil, body)
+		if res.status != http.StatusCreated {
+			t.Fatalf("createToken status %d, body %s", res.status, res.body)
+		}
+		var created gen.CreatedToken
+		if err := json.Unmarshal(res.body, &created); err != nil {
+			t.Fatalf("unmarshal created token: %v", err)
+		}
+		if !strings.HasPrefix(created.Token, authn.TokenPrefix) {
+			t.Errorf("token %q does not have prefix %s", created.Token, authn.TokenPrefix)
+		}
+		if created.Name != "cli-key" {
+			t.Errorf("name %q, want cli-key", created.Name)
+		}
+		tokenID = created.Id.String()
+	})
+
+	t.Run("listTokens", func(t *testing.T) {
+		res := call(h, http.MethodGet, "/api/v1/tokens", callerID, nil, nil)
+		if res.status != http.StatusOK {
+			t.Fatalf("listTokens status %d, body %s", res.status, res.body)
+		}
+		var tokens []gen.ApiTokenMetadata
+		if err := json.Unmarshal(res.body, &tokens); err != nil {
+			t.Fatalf("unmarshal tokens: %v", err)
+		}
+		if len(tokens) == 0 {
+			t.Fatal("expected at least 1 token")
+		}
+		if tokens[0].Id.String() != tokenID {
+			t.Errorf("token ID %s, want %s", tokens[0].Id, tokenID)
+		}
+	})
+
+	t.Run("createServiceAccount", func(t *testing.T) {
+		body := strings.NewReader(`{"displayName":"Sync Bot","roles":["operator"]}`)
+		res := call(h, http.MethodPost, "/api/v1/service-accounts", callerID, nil, body)
+		if res.status != http.StatusCreated {
+			t.Fatalf("createServiceAccount status %d, body %s", res.status, res.body)
+		}
+		var sa gen.ServiceAccount
+		if err := json.Unmarshal(res.body, &sa); err != nil {
+			t.Fatalf("unmarshal service account: %v", err)
+		}
+		if sa.DisplayName != "Sync Bot" {
+			t.Errorf("displayName %q, want Sync Bot", sa.DisplayName)
+		}
+		if sa.ResponsiblePrincipalId.String() != callerID {
+			t.Errorf("responsiblePrincipalId %s, want %s", sa.ResponsiblePrincipalId, callerID)
+		}
+	})
+
+	t.Run("listServiceAccounts", func(t *testing.T) {
+		res := call(h, http.MethodGet, "/api/v1/service-accounts", callerID, nil, nil)
+		if res.status != http.StatusOK {
+			t.Fatalf("listServiceAccounts status %d, body %s", res.status, res.body)
+		}
+		var list []gen.ServiceAccount
+		if err := json.Unmarshal(res.body, &list); err != nil {
+			t.Fatalf("unmarshal service accounts: %v", err)
+		}
+		if len(list) == 0 {
+			t.Fatal("expected at least 1 service account")
+		}
+	})
+
+	t.Run("revokeToken", func(t *testing.T) {
+		res := call(h, http.MethodDelete, "/api/v1/tokens/"+tokenID, callerID, nil, nil)
+		if res.status != http.StatusNoContent {
+			t.Fatalf("revokeToken status %d, body %s", res.status, res.body)
+		}
+
+		// Listing tokens shows revokedAt is set
+		res = call(h, http.MethodGet, "/api/v1/tokens", callerID, nil, nil)
+		var tokens []gen.ApiTokenMetadata
+		if err := json.Unmarshal(res.body, &tokens); err != nil {
+			t.Fatalf("unmarshal tokens: %v", err)
+		}
+		found := false
+		for _, tok := range tokens {
+			if tok.Id.String() == tokenID {
+				found = true
+				if tok.RevokedAt == nil {
+					t.Errorf("revoked token still has revokedAt == nil")
+				}
+			}
+		}
+		if !found {
+			t.Errorf("revoked token not found in list")
+		}
+	})
 }

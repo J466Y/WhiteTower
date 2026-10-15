@@ -1,0 +1,22 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000018",
+  "source": "/core",
+  "type": "whitetower.token.created.v1",
+  "time": "2026-10-15T12:00:00.000Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+  "datacontenttype": "application/json",
+  "data": {
+    "token_id": "0192f1d0-4a1b-7c3d-8e5f-000000000001",
+    "principal_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+    "token_prefix": "wt_pat_a1b2c3d4",
+    "scopes": [
+      "inventory.view",
+      "agent.propose"
+    ],
+    "actor": {
+      "type": "human",
+      "id": "0192f1c2-7a3b-7c4d-8e5f-000000000002"
+    }
+  }
+}

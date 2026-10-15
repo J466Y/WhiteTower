@@ -65,6 +65,11 @@ func (az *Authorizer) registerDefaults() {
 	az.operations["approveAgentPolicy"] = PermissionPolicyAgentApprove
 	az.operations["manageModules"] = PermissionModuleManage
 	az.operations["manageSettings"] = PermissionSettingsManage
+	az.operations["listTokens"] = PermissionIdentityMeRead
+	az.operations["createToken"] = PermissionIdentityMeRead
+	az.operations["revokeToken"] = PermissionIdentityMeRead
+	az.operations["listServiceAccounts"] = PermissionIdentityMeRead
+	az.operations["createServiceAccount"] = PermissionIdentityMeRead
 }
 
 // RegisterOperation maps an OpenAPI operation ID to a Permission.
@@ -100,6 +105,20 @@ func (az *Authorizer) Authorize(ctx context.Context, p *auth.Principal, operatio
 	perm, ok := az.ResolveOperation(operation)
 	if !ok {
 		return fmt.Errorf("%w: unknown operation %q", auth.ErrDenied, operation)
+	}
+
+	// Enforce API token scopes: a scoped token can do only what its scopes allow (ST-19).
+	if p.Scopes != nil {
+		hasScope := false
+		for _, s := range p.Scopes {
+			if s == string(perm) || s == "*" {
+				hasScope = true
+				break
+			}
+		}
+		if !hasScope {
+			return auth.ErrDenied
+		}
 	}
 
 	rel, hasRel := RelationshipFromContext(ctx)
