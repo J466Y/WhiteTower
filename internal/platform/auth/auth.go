@@ -30,6 +30,9 @@ type Principal struct {
 	Name string
 	// Roles are the roles bound to the principal.
 	Roles []string
+	// Scopes are the permissions allowed to the API token, if authenticated via token.
+	// When non-empty, operations are constrained to the intersection of scopes and roles.
+	Scopes []string
 }
 
 // Authenticator identifies the principal of a request from its credentials.

@@ -32,6 +32,8 @@ tags:
     description: Information about the server itself.
   - name: identity
     description: Who is calling.
+  - name: tokens
+    description: API tokens for personal access and automation.
 paths:
   /version:
     get:
@@ -67,6 +69,115 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Principal"
+        default:
+          $ref: "#/components/responses/Problem"
+  /tokens:
+    get:
+      operationId: listTokens
+      summary: List API tokens
+      description: Lists active and historical API tokens for the calling principal or a service account.
+      tags: [tokens]
+      parameters:
+        - name: principalId
+          in: query
+          required: false
+          description: Optional principal ID to filter tokens (allowed for responsible owners and administrators).
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The list of API tokens.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiTokenMetadata"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createToken
+      summary: Create an API token
+      description: |
+        Generates a new API token. The raw token secret is returned in the response
+        and is never retrievable again.
+      tags: [tokens]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTokenRequest"
+      responses:
+        "201":
+          description: The created API token including its plaintext secret.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedToken"
+        default:
+          $ref: "#/components/responses/Problem"
+  /tokens/{id}:
+    delete:
+      operationId: revokeToken
+      summary: Revoke an API token
+      description: Revokes an active API token by its ID.
+      tags: [tokens]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The token identifier.
+          schema:
+            type: string
+            format: uuid
+        - name: reason
+          in: query
+          required: false
+          description: Reason for revocation.
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Token successfully revoked.
+        default:
+          $ref: "#/components/responses/Problem"
+  /service-accounts:
+    get:
+      operationId: listServiceAccounts
+      summary: List service accounts
+      description: Lists service accounts owned by the calling principal or all service accounts for administrators.
+      tags: [identity]
+      responses:
+        "200":
+          description: The list of service accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceAccount"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createServiceAccount
+      summary: Create a service account
+      description: Creates a non-human service account principal with the caller as responsible principal.
+      tags: [identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceAccountRequest"
+      responses:
+        "201":
+          description: The created service account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceAccount"
         default:
           $ref: "#/components/responses/Problem"
 components:
@@ -159,3 +270,136 @@ components:
         code:
           type: string
           description: The stable error code.
+    CreateTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [name, scopes]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Friendly name for the token.
+        scopes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: The permissions granted to the token (must be subset of effective permissions).
+        expiresInDays:
+          type: integer
+          minimum: 1
+          maximum: 90
+          default: 30
+          description: Lifetime of the token in days (max 90).
+        principalId:
+          type: string
+          format: uuid
+          description: Optional principal ID to issue the token for (service account owned by caller or by admin).
+    CreatedToken:
+      type: object
+      additionalProperties: false
+      required: [id, principalId, name, tokenPrefix, scopes, token, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        principalId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        tokenPrefix:
+          type: string
+          description: The prefix of the token, useful for identification.
+        scopes:
+          type: array
+          items:
+            type: string
+        token:
+          type: string
+          description: The raw plaintext API token. It is only returned once and never stored.
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+    ApiTokenMetadata:
+      type: object
+      additionalProperties: false
+      required: [id, principalId, name, tokenPrefix, scopes, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        principalId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        tokenPrefix:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreateServiceAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName, roles]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          nullable: true
+        roles:
+          type: array
+          minItems: 1
+          items:
+            type: string
+    ServiceAccount:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, status, responsiblePrincipalId, roles, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive]
+        responsiblePrincipalId:
+          type: string
+          format: uuid
+        roles:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+

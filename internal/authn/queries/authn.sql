@@ -69,3 +69,64 @@ WHERE absolute_expires_at < $1
 -- name: ListActiveRoleBindings :many
 SELECT role FROM whitetower.role_bindings
 WHERE principal_id = $1 AND revoked_at IS NULL;
+
+-- name: CreateAPIToken :exec
+INSERT INTO whitetower.api_tokens (
+    id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
+);
+
+-- name: GetAPITokenByHash :one
+SELECT * FROM whitetower.api_tokens
+WHERE token_hash = $1;
+
+-- name: GetAPITokenByID :one
+SELECT * FROM whitetower.api_tokens
+WHERE id = $1;
+
+-- name: TouchAPITokenLastUsed :exec
+UPDATE whitetower.api_tokens
+SET last_used_at = $2
+WHERE id = $1;
+
+-- name: RevokeAPIToken :execrows
+UPDATE whitetower.api_tokens
+SET revoked_at = $2
+WHERE id = $1 AND revoked_at IS NULL;
+
+-- name: RevokeAPITokensForPrincipal :execrows
+UPDATE whitetower.api_tokens
+SET revoked_at = $2
+WHERE principal_id = $1 AND revoked_at IS NULL;
+
+-- name: ListAPITokensByPrincipal :many
+SELECT * FROM whitetower.api_tokens
+WHERE principal_id = $1
+ORDER BY created_at DESC;
+
+-- name: CreateServiceAccountPrincipal :one
+INSERT INTO whitetower.principals (
+    id, kind, display_name, email, status, responsible_principal_id, created_at, updated_at
+) VALUES (
+    $1, 'service_account', $2, $3, 'active', $4, $5, $5
+)
+RETURNING *;
+
+-- name: ListServiceAccountsByResponsiblePrincipal :many
+SELECT * FROM whitetower.principals
+WHERE kind = 'service_account' AND responsible_principal_id = $1
+ORDER BY created_at DESC;
+
+-- name: ListAllServiceAccounts :many
+SELECT * FROM whitetower.principals
+WHERE kind = 'service_account'
+ORDER BY created_at DESC;
+
+-- name: AddRoleBinding :exec
+INSERT INTO whitetower.role_bindings (
+    id, principal_id, role, reason, granted_by, granted_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+);
+

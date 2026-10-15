@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "API token revoked",
+  "description": "An API token was revoked (HUM-07).",
+  "type": "object",
+  "required": [
+    "token_id",
+    "principal_id",
+    "actor",
+    "reason"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "token_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "principal_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    }
+  }
+}

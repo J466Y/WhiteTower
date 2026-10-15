@@ -158,8 +158,8 @@ The plan lands in six pull requests. The first builds the authorization engine a
 | --- | --- | --- |
 | 1. Roles, permissions and authorization engine | 5, ST-17, ST-18 (partial) | Done (PR #36) |
 | 2. Principals, sessions and CSRF | 2, 3, ST-13, ST-14 | Done (PR #37) |
-| 3. OIDC login, role mapping and /me | 1, 4, 11, ST-15, ST-16, ST-22 | In progress |
-| 4. API tokens | 6, ST-19 | Not started |
+| 3. OIDC login, role mapping and /me | 1, 4, 11, ST-15, ST-16, ST-22 | Done (PR #38) |
+| 4. API tokens | 6, ST-19 | In progress (4 of 6 pull requests) |
 | 5. CLI token exchange and break-glass | 7, 9, ST-20 | Not started |
 | 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Not started |
 
@@ -225,6 +225,32 @@ The plan lands in six pull requests. The first builds the authorization engine a
   - Inactive principal login refusal and RP-initiated logout session revocation tests.
   - Unit tests in `internal/authn/roles_test.go`: role resolution, prefix normalization, invalid role ignoring, and deduplication.
   - Golden file and HTTP endpoint tests in `internal/api/rest` and `internal/api/rest/resttest` asserting `permissions` and `csrfToken`.
+
+### 2026-10-15: API tokens and service accounts (PR 4)
+
+- `internal/authn/tokens.go`: personal access and automation token management (`TokenStore`, HUM-03, HUM-05; ST-19).
+  - High-entropy cryptographic token generation: `GenerateToken` generates 256 bits of CSPRNG entropy encoded as URL-safe base64 with `wt_pat_` prefix and 15-character display prefix.
+  - Token hashing: stores exclusively SHA-256 hashes (`token_hash bytea UNIQUE`) in PostgreSQL `whitetower.api_tokens`. Raw tokens are returned once and never stored.
+  - Expiry and lifetime: defaults to 30 days, configurable up to 90 days. Expired tokens are rejected (`ErrTokenExpired`).
+  - Scopes: strictly validates requested scopes against the governance permission catalog and requires at least one valid scope.
+  - Usage tracking: touches `last_used_at` synchronously upon every successful authentication.
+  - Revocation: supports individual revocation with an audit trail, and bulk cascade-revocation when a principal is deactivated (`RevokeAllForPrincipalTx`).
+- Service accounts (`internal/authn/principal.go`):
+  - Non-human principals (`kind: service_account`) tied to an active responsible human principal.
+  - Prevents creating service accounts with inactive or nonexistent responsible principals.
+  - Cascade deactivation: deactivating a responsible human automatically deactivates associated service accounts and revokes their API tokens inside the same transaction.
+- Authentication and authorization:
+  - `Authenticator` (`internal/authn/authenticator.go`): accepts `Authorization: Bearer <token>`, looks up token hash via `TokenStore`, verifies active status and expiration, resolves effective roles, and populates `auth.Principal` with `Scopes`.
+  - `Authorizer` (`internal/authz/authorizer.go`): enforces token scopes. If `p.Scopes` is non-nil, an operation is allowed only if permitted by both the principal's roles and present in the token's scopes (ST-19).
+- REST API and OpenAPI contracts (`api/openapi/openapi.yaml`, `internal/api/rest`):
+  - Added endpoints: `GET /tokens`, `POST /tokens`, `DELETE /tokens/{id}`, `GET /service-accounts`, `POST /service-accounts`.
+  - Scope validation in `CreateToken`: enforces that requested token scopes must be a strict subset of the principal's effective role permissions.
+  - Generated Go server, API client, and console TypeScript definitions via `task gen`.
+- Audit events:
+  - Added `whitetower.token.created.v1` and `whitetower.token.revoked.v1` schemas, examples, catalog entries, and facts rules. Updated `facts.json` golden file.
+- Tests:
+  - ST-19 in `internal/authn/tokens_test.go`: verified scope enforcement, token expiry, storage only as a hash, revocation on principal deactivation, manual revocation, service account lifecycle, and input validations.
+  - REST API endpoint tests in `internal/api/rest/rest_test.go` covering creation, listing, service accounts, and revocation.
 
 
 

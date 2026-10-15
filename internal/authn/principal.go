@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn/authndb"
+	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
@@ -44,15 +46,17 @@ type PrincipalStore struct {
 	clk          clock.Clock
 	writer       *audit.Writer
 	sessionStore *SessionStore
+	tokenStore   *TokenStore
 }
 
 // NewPrincipalStore returns an initialized PrincipalStore.
-func NewPrincipalStore(database *db.DB, clk clock.Clock, writer *audit.Writer, sessionStore *SessionStore) *PrincipalStore {
+func NewPrincipalStore(database *db.DB, clk clock.Clock, writer *audit.Writer, sessionStore *SessionStore, tokenStore *TokenStore) *PrincipalStore {
 	return &PrincipalStore{
 		database:     database,
 		clk:          clk,
 		writer:       writer,
 		sessionStore: sessionStore,
+		tokenStore:   tokenStore,
 	}
 }
 
@@ -146,6 +150,13 @@ func (ps *PrincipalStore) Deactivate(ctx context.Context, id uuid.UUID, actor au
 		// Revoke all sessions within the transaction.
 		if err := ps.sessionStore.RevokeAllForPrincipalTx(ctx, tx, id); err != nil {
 			return fmt.Errorf("revoking sessions for deactivated principal: %w", err)
+		}
+
+		// Revoke all API tokens within the transaction (ST-19).
+		if ps.tokenStore != nil {
+			if err := ps.tokenStore.RevokeAllForPrincipalTx(ctx, tx, id); err != nil {
+				return fmt.Errorf("revoking api tokens for deactivated principal: %w", err)
+			}
 		}
 
 		// Record audit event in the same transaction.
@@ -258,4 +269,114 @@ func fromDBModel(r authndb.WhitetowerPrincipal) *Principal {
 		UpdatedAt:              r.UpdatedAt,
 		Version:                r.Version,
 	}
+}
+
+// CreateServiceAccount creates a new service account principal with a designated responsible human principal.
+func (ps *PrincipalStore) CreateServiceAccount(
+	ctx context.Context,
+	displayName string,
+	email *string,
+	responsiblePrincipalID uuid.UUID,
+	roles []string,
+	grantedBy uuid.UUID,
+) (*Principal, error) {
+	displayName = strings.TrimSpace(displayName)
+	if len(displayName) < 1 || len(displayName) > 200 {
+		return nil, errors.New("service account display name must be between 1 and 200 characters")
+	}
+
+	newID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("generating service account UUID: %w", err)
+	}
+
+	now := ps.clk.Now().UTC()
+	var created *Principal
+
+	err = ps.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
+		q := authndb.New(tx)
+		// Verify responsible principal exists and is active
+		resp, err := q.GetPrincipalByID(ctx, responsiblePrincipalID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("verifying responsible principal: %w", ErrPrincipalNotFound)
+			}
+			return fmt.Errorf("verifying responsible principal: %w", err)
+		}
+		if resp.Status != "active" {
+			return fmt.Errorf("verifying responsible principal: %w", ErrPrincipalInactive)
+		}
+
+		row, err := q.CreateServiceAccountPrincipal(ctx, authndb.CreateServiceAccountPrincipalParams{
+			ID:                     newID,
+			DisplayName:            displayName,
+			Email:                  email,
+			ResponsiblePrincipalID: &responsiblePrincipalID,
+			CreatedAt:              now,
+		})
+		if err != nil {
+			return fmt.Errorf("inserting service account principal: %w", err)
+		}
+
+		// Bind initial roles
+		for _, rStr := range roles {
+			if !authz.IsValidRole(authz.Role(rStr)) {
+				return fmt.Errorf("invalid role %q", rStr)
+			}
+			bindingID, err := uuid.NewV7()
+			if err != nil {
+				return fmt.Errorf("generating role binding UUID: %w", err)
+			}
+			if err := q.AddRoleBinding(ctx, authndb.AddRoleBindingParams{
+				ID:          bindingID,
+				PrincipalID: newID,
+				Role:        rStr,
+				Reason:      "initial service account provisioning",
+				GrantedBy:   grantedBy,
+				GrantedAt:   now,
+			}); err != nil {
+				return fmt.Errorf("adding role binding %q: %w", rStr, err)
+			}
+		}
+
+		created = fromDBModel(row)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return created, nil
+}
+
+// ListServiceAccounts returns service accounts, optionally filtered by responsiblePrincipalID.
+func (ps *PrincipalStore) ListServiceAccounts(ctx context.Context, responsiblePrincipalID *uuid.UUID) ([]*Principal, error) {
+	q := authndb.New(ps.database)
+	if responsiblePrincipalID != nil {
+		rows, err := q.ListServiceAccountsByResponsiblePrincipal(ctx, responsiblePrincipalID)
+		if err != nil {
+			return nil, fmt.Errorf("querying service accounts: %w", err)
+		}
+		result := make([]*Principal, len(rows))
+		for i, r := range rows {
+			result[i] = fromDBModel(r)
+		}
+		return result, nil
+	}
+
+	rows, err := q.ListAllServiceAccounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("querying all service accounts: %w", err)
+	}
+	result := make([]*Principal, len(rows))
+	for i, r := range rows {
+		result[i] = fromDBModel(r)
+	}
+	return result, nil
+}
+
+// GetRoles returns all active roles for the given principal ID.
+func (ps *PrincipalStore) GetRoles(ctx context.Context, principalID uuid.UUID) ([]string, error) {
+	q := authndb.New(ps.database)
+	return q.ListActiveRoleBindings(ctx, principalID)
 }

@@ -190,8 +190,9 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		IdleTimeout:      cfg.Auth.Session.IdleTimeout,
 		AbsoluteLifetime: cfg.Auth.Session.AbsoluteLifetime,
 	})
-	principalStore := authn.NewPrincipalStore(database, clock.System, writer, sessionStore)
-	authenticator := authn.NewAuthenticator(sessionStore, principalStore)
+	tokenStore := authn.NewTokenStore(database, clock.System, writer)
+	principalStore := authn.NewPrincipalStore(database, clock.System, writer, sessionStore, tokenStore)
+	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, cfg.Auth.OIDC.RoleMapping)
 
 	var authHandler http.Handler
 	if cfg.Auth.OIDC.Issuer != "" {
@@ -228,6 +229,8 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		CSRF:          sessionStore,
 		Limiter:       ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
 		RateLimited:   httpMetrics.RateLimited("console").Inc,
+		Tokens:        tokenStore,
+		Principals:    principalStore,
 	})
 	drain := server.NewDrain()
 	ready := health.NewReadiness(logger)

@@ -12,6 +12,116 @@ import (
 	"github.com/google/uuid"
 )
 
+const addRoleBinding = `-- name: AddRoleBinding :exec
+INSERT INTO whitetower.role_bindings (
+    id, principal_id, role, reason, granted_by, granted_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+)
+`
+
+type AddRoleBindingParams struct {
+	ID          uuid.UUID
+	PrincipalID uuid.UUID
+	Role        string
+	Reason      string
+	GrantedBy   uuid.UUID
+	GrantedAt   time.Time
+}
+
+func (q *Queries) AddRoleBinding(ctx context.Context, arg AddRoleBindingParams) error {
+	_, err := q.db.Exec(ctx, addRoleBinding,
+		arg.ID,
+		arg.PrincipalID,
+		arg.Role,
+		arg.Reason,
+		arg.GrantedBy,
+		arg.GrantedAt,
+	)
+	return err
+}
+
+const createAPIToken = `-- name: CreateAPIToken :exec
+INSERT INTO whitetower.api_tokens (
+    id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
+)
+`
+
+type CreateAPITokenParams struct {
+	ID          uuid.UUID
+	PrincipalID uuid.UUID
+	Name        string
+	TokenPrefix string
+	TokenHash   []byte
+	Scopes      []string
+	CreatedBy   uuid.UUID
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+}
+
+func (q *Queries) CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) error {
+	_, err := q.db.Exec(ctx, createAPIToken,
+		arg.ID,
+		arg.PrincipalID,
+		arg.Name,
+		arg.TokenPrefix,
+		arg.TokenHash,
+		arg.Scopes,
+		arg.CreatedBy,
+		arg.CreatedAt,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
+const createServiceAccountPrincipal = `-- name: CreateServiceAccountPrincipal :one
+INSERT INTO whitetower.principals (
+    id, kind, display_name, email, status, responsible_principal_id, created_at, updated_at
+) VALUES (
+    $1, 'service_account', $2, $3, 'active', $4, $5, $5
+)
+RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version
+`
+
+type CreateServiceAccountPrincipalParams struct {
+	ID                     uuid.UUID
+	DisplayName            string
+	Email                  *string
+	ResponsiblePrincipalID *uuid.UUID
+	CreatedAt              time.Time
+}
+
+func (q *Queries) CreateServiceAccountPrincipal(ctx context.Context, arg CreateServiceAccountPrincipalParams) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, createServiceAccountPrincipal,
+		arg.ID,
+		arg.DisplayName,
+		arg.Email,
+		arg.ResponsiblePrincipalID,
+		arg.CreatedAt,
+	)
+	var i WhitetowerPrincipal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.Email,
+		&i.Status,
+		&i.StatusChangedAt,
+		&i.StatusReason,
+		&i.IdpGroups,
+		&i.LastLoginAt,
+		&i.ResponsiblePrincipalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const createSession = `-- name: CreateSession :exec
 INSERT INTO whitetower.sessions (
     id_hash, principal_id, method, roles, csrf_token_hash,
@@ -64,6 +174,54 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context, arg DeleteExpiredSe
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getAPITokenByHash = `-- name: GetAPITokenByHash :one
+SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at FROM whitetower.api_tokens
+WHERE token_hash = $1
+`
+
+func (q *Queries) GetAPITokenByHash(ctx context.Context, tokenHash []byte) (WhitetowerApiToken, error) {
+	row := q.db.QueryRow(ctx, getAPITokenByHash, tokenHash)
+	var i WhitetowerApiToken
+	err := row.Scan(
+		&i.ID,
+		&i.PrincipalID,
+		&i.Name,
+		&i.TokenPrefix,
+		&i.TokenHash,
+		&i.Scopes,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.LastUsedAt,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
+const getAPITokenByID = `-- name: GetAPITokenByID :one
+SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at FROM whitetower.api_tokens
+WHERE id = $1
+`
+
+func (q *Queries) GetAPITokenByID(ctx context.Context, id uuid.UUID) (WhitetowerApiToken, error) {
+	row := q.db.QueryRow(ctx, getAPITokenByID, id)
+	var i WhitetowerApiToken
+	err := row.Scan(
+		&i.ID,
+		&i.PrincipalID,
+		&i.Name,
+		&i.TokenPrefix,
+		&i.TokenHash,
+		&i.Scopes,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.LastUsedAt,
+		&i.RevokedAt,
+	)
+	return i, err
 }
 
 const getHumanPrincipalByIdentity = `-- name: GetHumanPrincipalByIdentity :one
@@ -150,6 +308,44 @@ func (q *Queries) GetSessionByHash(ctx context.Context, idHash []byte) (Whitetow
 	return i, err
 }
 
+const listAPITokensByPrincipal = `-- name: ListAPITokensByPrincipal :many
+SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at FROM whitetower.api_tokens
+WHERE principal_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListAPITokensByPrincipal(ctx context.Context, principalID uuid.UUID) ([]WhitetowerApiToken, error) {
+	rows, err := q.db.Query(ctx, listAPITokensByPrincipal, principalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhitetowerApiToken
+	for rows.Next() {
+		var i WhitetowerApiToken
+		if err := rows.Scan(
+			&i.ID,
+			&i.PrincipalID,
+			&i.Name,
+			&i.TokenPrefix,
+			&i.TokenHash,
+			&i.Scopes,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+			&i.LastUsedAt,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listActiveRoleBindings = `-- name: ListActiveRoleBindings :many
 SELECT role FROM whitetower.role_bindings
 WHERE principal_id = $1 AND revoked_at IS NULL
@@ -173,6 +369,128 @@ func (q *Queries) ListActiveRoleBindings(ctx context.Context, principalID uuid.U
 		return nil, err
 	}
 	return items, nil
+}
+
+const listAllServiceAccounts = `-- name: ListAllServiceAccounts :many
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+WHERE kind = 'service_account'
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListAllServiceAccounts(ctx context.Context) ([]WhitetowerPrincipal, error) {
+	rows, err := q.db.Query(ctx, listAllServiceAccounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhitetowerPrincipal
+	for rows.Next() {
+		var i WhitetowerPrincipal
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.Issuer,
+			&i.Subject,
+			&i.DisplayName,
+			&i.Email,
+			&i.Status,
+			&i.StatusChangedAt,
+			&i.StatusReason,
+			&i.IdpGroups,
+			&i.LastLoginAt,
+			&i.ResponsiblePrincipalID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listServiceAccountsByResponsiblePrincipal = `-- name: ListServiceAccountsByResponsiblePrincipal :many
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+WHERE kind = 'service_account' AND responsible_principal_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListServiceAccountsByResponsiblePrincipal(ctx context.Context, responsiblePrincipalID *uuid.UUID) ([]WhitetowerPrincipal, error) {
+	rows, err := q.db.Query(ctx, listServiceAccountsByResponsiblePrincipal, responsiblePrincipalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhitetowerPrincipal
+	for rows.Next() {
+		var i WhitetowerPrincipal
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.Issuer,
+			&i.Subject,
+			&i.DisplayName,
+			&i.Email,
+			&i.Status,
+			&i.StatusChangedAt,
+			&i.StatusReason,
+			&i.IdpGroups,
+			&i.LastLoginAt,
+			&i.ResponsiblePrincipalID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const revokeAPIToken = `-- name: RevokeAPIToken :execrows
+UPDATE whitetower.api_tokens
+SET revoked_at = $2
+WHERE id = $1 AND revoked_at IS NULL
+`
+
+type RevokeAPITokenParams struct {
+	ID        uuid.UUID
+	RevokedAt *time.Time
+}
+
+func (q *Queries) RevokeAPIToken(ctx context.Context, arg RevokeAPITokenParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAPIToken, arg.ID, arg.RevokedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeAPITokensForPrincipal = `-- name: RevokeAPITokensForPrincipal :execrows
+UPDATE whitetower.api_tokens
+SET revoked_at = $2
+WHERE principal_id = $1 AND revoked_at IS NULL
+`
+
+type RevokeAPITokensForPrincipalParams struct {
+	PrincipalID uuid.UUID
+	RevokedAt   *time.Time
+}
+
+func (q *Queries) RevokeAPITokensForPrincipal(ctx context.Context, arg RevokeAPITokensForPrincipalParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAPITokensForPrincipal, arg.PrincipalID, arg.RevokedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const revokeSession = `-- name: RevokeSession :exec
@@ -204,6 +522,22 @@ type RevokeSessionsForPrincipalParams struct {
 
 func (q *Queries) RevokeSessionsForPrincipal(ctx context.Context, arg RevokeSessionsForPrincipalParams) error {
 	_, err := q.db.Exec(ctx, revokeSessionsForPrincipal, arg.PrincipalID, arg.RevokedAt)
+	return err
+}
+
+const touchAPITokenLastUsed = `-- name: TouchAPITokenLastUsed :exec
+UPDATE whitetower.api_tokens
+SET last_used_at = $2
+WHERE id = $1
+`
+
+type TouchAPITokenLastUsedParams struct {
+	ID         uuid.UUID
+	LastUsedAt *time.Time
+}
+
+func (q *Queries) TouchAPITokenLastUsed(ctx context.Context, arg TouchAPITokenLastUsedParams) error {
+	_, err := q.db.Exec(ctx, touchAPITokenLastUsed, arg.ID, arg.LastUsedAt)
 	return err
 }
 

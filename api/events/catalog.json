@@ -194,6 +194,26 @@
       "subject": "optional",
       "schema": "schemas/whitetower.principal.reactivated.v1.json",
       "example": "examples/whitetower.principal.reactivated.v1.json"
+    },
+    {
+      "type": "whitetower.token.created.v1",
+      "summary": "A personal access token or service account token was created (HUM-07).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.token.created.v1.json",
+      "example": "examples/whitetower.token.created.v1.json"
+    },
+    {
+      "type": "whitetower.token.revoked.v1",
+      "summary": "An API token was revoked (HUM-07).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.token.revoked.v1.json",
+      "example": "examples/whitetower.token.revoked.v1.json"
     }
   ]
 }

@@ -10,6 +10,20 @@ import (
 	"github.com/google/uuid"
 )
 
+type WhitetowerApiToken struct {
+	ID          uuid.UUID
+	PrincipalID uuid.UUID
+	Name        string
+	TokenPrefix string
+	TokenHash   []byte
+	Scopes      []string
+	CreatedBy   uuid.UUID
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+	LastUsedAt  *time.Time
+	RevokedAt   *time.Time
+}
+
 type WhitetowerPrincipal struct {
 	ID                     uuid.UUID
 	Kind                   string

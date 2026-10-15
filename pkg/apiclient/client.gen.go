@@ -4,6 +4,7 @@
 package apiclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,22 +12,42 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for PrincipalKind.
 const (
-	Human          PrincipalKind = "human"
-	ServiceAccount PrincipalKind = "service_account"
+	PrincipalKindHuman          PrincipalKind = "human"
+	PrincipalKindServiceAccount PrincipalKind = "service_account"
 )
 
 // Valid indicates whether the value is a known member of the PrincipalKind enum.
 func (e PrincipalKind) Valid() bool {
 	switch e {
-	case Human:
+	case PrincipalKindHuman:
 		return true
-	case ServiceAccount:
+	case PrincipalKindServiceAccount:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ServiceAccountStatus.
+const (
+	Active   ServiceAccountStatus = "active"
+	Inactive ServiceAccountStatus = "inactive"
+)
+
+// Valid indicates whether the value is a known member of the ServiceAccountStatus enum.
+func (e ServiceAccountStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Inactive:
 		return true
 	default:
 		return false
@@ -46,6 +67,57 @@ func (e VersionInfoApiVersion) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// ApiTokenMetadata defines model for ApiTokenMetadata.
+type ApiTokenMetadata struct {
+	CreatedAt   time.Time          `json:"createdAt"`
+	ExpiresAt   time.Time          `json:"expiresAt"`
+	Id          openapi_types.UUID `json:"id"`
+	LastUsedAt  *time.Time         `json:"lastUsedAt,omitempty"`
+	Name        string             `json:"name"`
+	PrincipalId openapi_types.UUID `json:"principalId"`
+	RevokedAt   *time.Time         `json:"revokedAt,omitempty"`
+	Scopes      []string           `json:"scopes"`
+	TokenPrefix string             `json:"tokenPrefix"`
+}
+
+// CreateServiceAccountRequest defines model for CreateServiceAccountRequest.
+type CreateServiceAccountRequest struct {
+	DisplayName string               `json:"displayName"`
+	Email       *openapi_types.Email `json:"email,omitempty"`
+	Roles       []string             `json:"roles"`
+}
+
+// CreateTokenRequest defines model for CreateTokenRequest.
+type CreateTokenRequest struct {
+	// ExpiresInDays Lifetime of the token in days (max 90).
+	ExpiresInDays *int `json:"expiresInDays,omitempty"`
+
+	// Name Friendly name for the token.
+	Name string `json:"name"`
+
+	// PrincipalId Optional principal ID to issue the token for (service account owned by caller or by admin).
+	PrincipalId *openapi_types.UUID `json:"principalId,omitempty"`
+
+	// Scopes The permissions granted to the token (must be subset of effective permissions).
+	Scopes []string `json:"scopes"`
+}
+
+// CreatedToken defines model for CreatedToken.
+type CreatedToken struct {
+	CreatedAt   time.Time          `json:"createdAt"`
+	ExpiresAt   time.Time          `json:"expiresAt"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        string             `json:"name"`
+	PrincipalId openapi_types.UUID `json:"principalId"`
+	Scopes      []string           `json:"scopes"`
+
+	// Token The raw plaintext API token. It is only returned once and never stored.
+	Token string `json:"token"`
+
+	// TokenPrefix The prefix of the token, useful for identification.
+	TokenPrefix string `json:"tokenPrefix"`
 }
 
 // Principal defines model for Principal.
@@ -85,6 +157,20 @@ type Problem struct {
 	Type string `json:"type"`
 }
 
+// ServiceAccount defines model for ServiceAccount.
+type ServiceAccount struct {
+	CreatedAt              time.Time            `json:"createdAt"`
+	DisplayName            string               `json:"displayName"`
+	Email                  *string              `json:"email,omitempty"`
+	Id                     openapi_types.UUID   `json:"id"`
+	ResponsiblePrincipalId openapi_types.UUID   `json:"responsiblePrincipalId"`
+	Roles                  []string             `json:"roles"`
+	Status                 ServiceAccountStatus `json:"status"`
+}
+
+// ServiceAccountStatus defines model for ServiceAccount.Status.
+type ServiceAccountStatus string
+
 // VersionInfo defines model for VersionInfo.
 type VersionInfo struct {
 	// ApiVersion Version of this API.
@@ -99,6 +185,24 @@ type VersionInfo struct {
 
 // VersionInfoApiVersion Version of this API.
 type VersionInfoApiVersion string
+
+// ListTokensParams defines parameters for ListTokens.
+type ListTokensParams struct {
+	// PrincipalId Optional principal ID to filter tokens (allowed for responsible owners and administrators).
+	PrincipalId *openapi_types.UUID `form:"principalId,omitempty" json:"principalId,omitempty"`
+}
+
+// RevokeTokenParams defines parameters for RevokeToken.
+type RevokeTokenParams struct {
+	// Reason Reason for revocation.
+	Reason *string `form:"reason,omitempty" json:"reason,omitempty"`
+}
+
+// CreateServiceAccountJSONRequestBody defines body for CreateServiceAccount for application/json ContentType.
+type CreateServiceAccountJSONRequestBody = CreateServiceAccountRequest
+
+// CreateTokenJSONRequestBody defines body for CreateToken for application/json ContentType.
+type CreateTokenJSONRequestBody = CreateTokenRequest
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -182,6 +286,65 @@ type ClientInterface interface {
 	// Corresponds with GET /me (the `GetMe` operationId).
 	GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListServiceAccounts List service accounts
+	//
+	// Lists service accounts owned by the calling principal or all service accounts for administrators.
+	//
+	// Corresponds with GET /service-accounts (the `ListServiceAccounts` operationId).
+	ListServiceAccounts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateServiceAccountWithBody Create a service account
+	//
+	// Creates a non-human service account principal with the caller as responsible principal.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /service-accounts (the `CreateServiceAccount` operationId).
+	CreateServiceAccountWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateServiceAccount Create a service account
+	//
+	// Creates a non-human service account principal with the caller as responsible principal.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /service-accounts (the `CreateServiceAccount` operationId).
+	CreateServiceAccount(ctx context.Context, body CreateServiceAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListTokens List API tokens
+	//
+	// Lists active and historical API tokens for the calling principal or a service account.
+	//
+	// Corresponds with GET /tokens (the `ListTokens` operationId).
+	ListTokens(ctx context.Context, params *ListTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateTokenWithBody Create an API token
+	//
+	// Generates a new API token. The raw token secret is returned in the response
+	// and is never retrievable again.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /tokens (the `CreateToken` operationId).
+	CreateTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateToken Create an API token
+	//
+	// Generates a new API token. The raw token secret is returned in the response
+	// and is never retrievable again.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /tokens (the `CreateToken` operationId).
+	CreateToken(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeToken Revoke an API token
+	//
+	// Revokes an active API token by its ID.
+	//
+	// Corresponds with DELETE /tokens/{id} (the `RevokeToken` operationId).
+	RevokeToken(ctx context.Context, id openapi_types.UUID, params *RevokeTokenParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetVersion Get the version of the running server
 	//
 	// Returns the release version and Git commit of the running server, and
@@ -200,6 +363,135 @@ type ClientInterface interface {
 // Corresponds with GET /me (the `GetMe` operationId).
 func (c *Client) GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMeRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListServiceAccounts List service accounts
+//
+// Lists service accounts owned by the calling principal or all service accounts for administrators.
+//
+// Corresponds with GET /service-accounts (the `ListServiceAccounts` operationId).
+func (c *Client) ListServiceAccounts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListServiceAccountsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateServiceAccountWithBody Create a service account
+//
+// Creates a non-human service account principal with the caller as responsible principal.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /service-accounts (the `CreateServiceAccount` operationId).
+func (c *Client) CreateServiceAccountWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateServiceAccountRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateServiceAccount Create a service account
+//
+// Creates a non-human service account principal with the caller as responsible principal.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /service-accounts (the `CreateServiceAccount` operationId).
+func (c *Client) CreateServiceAccount(ctx context.Context, body CreateServiceAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateServiceAccountRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListTokens List API tokens
+//
+// Lists active and historical API tokens for the calling principal or a service account.
+//
+// Corresponds with GET /tokens (the `ListTokens` operationId).
+func (c *Client) ListTokens(ctx context.Context, params *ListTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListTokensRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateTokenWithBody Create an API token
+//
+// Generates a new API token. The raw token secret is returned in the response
+// and is never retrievable again.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /tokens (the `CreateToken` operationId).
+func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTokenRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateToken Create an API token
+//
+// Generates a new API token. The raw token secret is returned in the response
+// and is never retrievable again.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /tokens (the `CreateToken` operationId).
+func (c *Client) CreateToken(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTokenRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeToken Revoke an API token
+//
+// Revokes an active API token by its ID.
+//
+// Corresponds with DELETE /tokens/{id} (the `RevokeToken` operationId).
+func (c *Client) RevokeToken(ctx context.Context, id openapi_types.UUID, params *RevokeTokenParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeTokenRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -249,6 +541,228 @@ func NewGetMeRequest(server string) (*http.Request, error) {
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListServiceAccountsRequest constructs an http.Request for the ListServiceAccounts method
+func NewListServiceAccountsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/service-accounts")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateServiceAccountRequest calls the generic CreateServiceAccount builder with application/json body
+func NewCreateServiceAccountRequest(server string, body CreateServiceAccountJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateServiceAccountRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateServiceAccountRequestWithBody constructs an http.Request for the CreateServiceAccount method, with any body, and a specified content type
+func NewCreateServiceAccountRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/service-accounts")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListTokensRequest constructs an http.Request for the ListTokens method
+func NewListTokensRequest(server string, params *ListTokensParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.PrincipalId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "principalId", *params.PrincipalId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateTokenRequest calls the generic CreateToken builder with application/json body
+func NewCreateTokenRequest(server string, body CreateTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateTokenRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateTokenRequestWithBody constructs an http.Request for the CreateToken method, with any body, and a specified content type
+func NewCreateTokenRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeTokenRequest constructs an http.Request for the RevokeToken method
+func NewRevokeTokenRequest(server string, id openapi_types.UUID, params *RevokeTokenParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/tokens/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Reason != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "reason", *params.Reason, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -337,6 +851,71 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /me (the `GetMe` operationId).
 	GetMeWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMeResponse, error)
 
+	// ListServiceAccountsWithResponse List service accounts
+	//
+	// Lists service accounts owned by the calling principal or all service accounts for administrators.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /service-accounts (the `ListServiceAccounts` operationId).
+	ListServiceAccountsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListServiceAccountsResponse, error)
+
+	// CreateServiceAccountWithBodyWithResponse Create a service account
+	//
+	// Creates a non-human service account principal with the caller as responsible principal.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /service-accounts (the `CreateServiceAccount` operationId).
+	CreateServiceAccountWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateServiceAccountResponse, error)
+
+	// CreateServiceAccountWithResponse Create a service account
+	//
+	// Creates a non-human service account principal with the caller as responsible principal.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /service-accounts (the `CreateServiceAccount` operationId).
+	CreateServiceAccountWithResponse(ctx context.Context, body CreateServiceAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateServiceAccountResponse, error)
+
+	// ListTokensWithResponse List API tokens
+	//
+	// Lists active and historical API tokens for the calling principal or a service account.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /tokens (the `ListTokens` operationId).
+	ListTokensWithResponse(ctx context.Context, params *ListTokensParams, reqEditors ...RequestEditorFn) (*ListTokensResponse, error)
+
+	// CreateTokenWithBodyWithResponse Create an API token
+	//
+	// Generates a new API token. The raw token secret is returned in the response
+	// and is never retrievable again.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /tokens (the `CreateToken` operationId).
+	CreateTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTokenResponse, error)
+
+	// CreateTokenWithResponse Create an API token
+	//
+	// Generates a new API token. The raw token secret is returned in the response
+	// and is never retrievable again.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /tokens (the `CreateToken` operationId).
+	CreateTokenWithResponse(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTokenResponse, error)
+
+	// RevokeTokenWithResponse Revoke an API token
+	//
+	// Revokes an active API token by its ID.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /tokens/{id} (the `RevokeToken` operationId).
+	RevokeTokenWithResponse(ctx context.Context, id openapi_types.UUID, params *RevokeTokenParams, reqEditors ...RequestEditorFn) (*RevokeTokenResponse, error)
+
 	// GetVersionWithResponse Get the version of the running server
 	//
 	// Returns the release version and Git commit of the running server, and
@@ -391,6 +970,239 @@ func (r GetMeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetMeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListServiceAccountsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]ServiceAccount
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListServiceAccountsResponse) GetJSON200() *[]ServiceAccount {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListServiceAccountsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListServiceAccountsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListServiceAccountsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListServiceAccountsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListServiceAccountsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateServiceAccountResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ServiceAccount
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateServiceAccountResponse) GetJSON201() *ServiceAccount {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateServiceAccountResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateServiceAccountResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateServiceAccountResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateServiceAccountResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateServiceAccountResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]ApiTokenMetadata
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListTokensResponse) GetJSON200() *[]ApiTokenMetadata {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListTokensResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListTokensResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListTokensResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CreatedToken
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateTokenResponse) GetJSON201() *CreatedToken {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateTokenResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateTokenResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RevokeTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RevokeTokenResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeTokenResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -461,6 +1273,113 @@ func (c *ClientWithResponses) GetMeWithResponse(ctx context.Context, reqEditors 
 	return ParseGetMeResponse(rsp)
 }
 
+// ListServiceAccountsWithResponse List service accounts
+//
+// Lists service accounts owned by the calling principal or all service accounts for administrators.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /service-accounts (the `ListServiceAccounts` operationId).
+func (c *ClientWithResponses) ListServiceAccountsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListServiceAccountsResponse, error) {
+	rsp, err := c.ListServiceAccounts(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListServiceAccountsResponse(rsp)
+}
+
+// CreateServiceAccountWithBodyWithResponse Create a service account
+//
+// Creates a non-human service account principal with the caller as responsible principal.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /service-accounts (the `CreateServiceAccount` operationId).
+func (c *ClientWithResponses) CreateServiceAccountWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateServiceAccountResponse, error) {
+	rsp, err := c.CreateServiceAccountWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateServiceAccountResponse(rsp)
+}
+
+// CreateServiceAccountWithResponse Create a service account
+//
+// Creates a non-human service account principal with the caller as responsible principal.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /service-accounts (the `CreateServiceAccount` operationId).
+func (c *ClientWithResponses) CreateServiceAccountWithResponse(ctx context.Context, body CreateServiceAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateServiceAccountResponse, error) {
+	rsp, err := c.CreateServiceAccount(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateServiceAccountResponse(rsp)
+}
+
+// ListTokensWithResponse List API tokens
+//
+// Lists active and historical API tokens for the calling principal or a service account.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /tokens (the `ListTokens` operationId).
+func (c *ClientWithResponses) ListTokensWithResponse(ctx context.Context, params *ListTokensParams, reqEditors ...RequestEditorFn) (*ListTokensResponse, error) {
+	rsp, err := c.ListTokens(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListTokensResponse(rsp)
+}
+
+// CreateTokenWithBodyWithResponse Create an API token
+//
+// Generates a new API token. The raw token secret is returned in the response
+// and is never retrievable again.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /tokens (the `CreateToken` operationId).
+func (c *ClientWithResponses) CreateTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTokenResponse, error) {
+	rsp, err := c.CreateTokenWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTokenResponse(rsp)
+}
+
+// CreateTokenWithResponse Create an API token
+//
+// Generates a new API token. The raw token secret is returned in the response
+// and is never retrievable again.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /tokens (the `CreateToken` operationId).
+func (c *ClientWithResponses) CreateTokenWithResponse(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTokenResponse, error) {
+	rsp, err := c.CreateToken(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTokenResponse(rsp)
+}
+
+// RevokeTokenWithResponse Revoke an API token
+//
+// Revokes an active API token by its ID.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /tokens/{id} (the `RevokeToken` operationId).
+func (c *ClientWithResponses) RevokeTokenWithResponse(ctx context.Context, id openapi_types.UUID, params *RevokeTokenParams, reqEditors ...RequestEditorFn) (*RevokeTokenResponse, error) {
+	rsp, err := c.RevokeToken(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeTokenResponse(rsp)
+}
+
 // GetVersionWithResponse Get the version of the running server
 //
 // Returns the release version and Git commit of the running server, and
@@ -498,6 +1417,167 @@ func ParseGetMeResponse(rsp *http.Response) (*GetMeResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListServiceAccountsResponse parses an HTTP response from a ListServiceAccountsWithResponse call
+func ParseListServiceAccountsResponse(rsp *http.Response) (*ListServiceAccountsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListServiceAccountsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []ServiceAccount
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateServiceAccountResponse parses an HTTP response from a CreateServiceAccountWithResponse call
+func ParseCreateServiceAccountResponse(rsp *http.Response) (*CreateServiceAccountResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateServiceAccountResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ServiceAccount
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListTokensResponse parses an HTTP response from a ListTokensWithResponse call
+func ParseListTokensResponse(rsp *http.Response) (*ListTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []ApiTokenMetadata
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateTokenResponse parses an HTTP response from a CreateTokenWithResponse call
+func ParseCreateTokenResponse(rsp *http.Response) (*CreateTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CreatedToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRevokeTokenResponse parses an HTTP response from a RevokeTokenWithResponse call
+func ParseRevokeTokenResponse(rsp *http.Response) (*RevokeTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest Problem
