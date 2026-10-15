@@ -182,7 +182,7 @@ func TestReturnURLValidation(t *testing.T) {
 func TestLoginRateLimiting(t *testing.T) {
 	idp := newMockIDP(t)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore := setupAuthn(t, clk)
+	sessionStore, principalStore, database := setupAuthn(t, clk)
 
 	// Rate limiter with capacity for 2 requests
 	limiter := ratelimit.New(1, 2)
@@ -195,7 +195,7 @@ func TestLoginRateLimiting(t *testing.T) {
 		Clock:        clk,
 		Limiter:      limiter,
 		HTTPClient:   idp.server.Client(),
-	}, nil, principalStore, sessionStore)
+	}, database, principalStore, sessionStore)
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestLoginRateLimiting(t *testing.T) {
 func TestIDTokenValidationAndSecurity(t *testing.T) {
 	idp := newMockIDP(t)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore := setupAuthn(t, clk)
+	sessionStore, principalStore, database := setupAuthn(t, clk)
 
 	const clientID = "whitetower-console"
 
@@ -259,7 +259,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		RoleMapping:       roleMapping,
 		AllowedAlgorithms: []string{"RS256"},
 		HTTPClient:        idp.server.Client(),
-	}, nil, principalStore, sessionStore)
+	}, database, principalStore, sessionStore)
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)
 	}

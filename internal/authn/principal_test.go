@@ -16,7 +16,7 @@ import (
 func TestPrincipalLifecycleAndAuditing(t *testing.T) {
 	ctx := context.Background()
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore := setupAuthn(t, clk)
+	sessionStore, principalStore, _ := setupAuthn(t, clk)
 
 	const (
 		issuer      = "https://idp.example.com"

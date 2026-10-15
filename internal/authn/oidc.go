@@ -382,12 +382,16 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	q := authndb.New(s.database)
-	localBindings, err := q.ListActiveRoleBindings(ctx, principal.ID)
-	if err != nil {
-		s.logger.Error("fetching local role bindings", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
+	var localBindings []string
+	if s.database != nil {
+		q := authndb.New(s.database)
+		var err error
+		localBindings, err = q.ListActiveRoleBindings(ctx, principal.ID)
+		if err != nil {
+			s.logger.Error("fetching local role bindings", "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	effectiveRoles := ResolveEffectiveRoles(groups, s.opts.RoleMapping, localBindings)
