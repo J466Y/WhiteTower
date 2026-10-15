@@ -214,6 +214,16 @@
       "subject": "optional",
       "schema": "schemas/whitetower.token.revoked.v1.json",
       "example": "examples/whitetower.token.revoked.v1.json"
+    },
+    {
+      "type": "whitetower.breakglass.used.v1",
+      "summary": "An emergency break-glass login was executed (HUM-06, KIL-08, ST-20).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.breakglass.used.v1.json",
+      "example": "examples/whitetower.breakglass.used.v1.json"
     }
   ]
 }

@@ -115,6 +115,16 @@ type Auth struct {
 	Session Session `yaml:"session"`
 	// OpenID Connect authentication and backend-for-frontend settings (ADR-0009).
 	OIDC OIDC `yaml:"oidc"`
+	// Emergency break-glass access settings (plan P1-03, step 9; HUM-06, KIL-08, ST-20).
+	Breakglass Breakglass `yaml:"breakglass"`
+}
+
+// Breakglass holds emergency break-glass access settings (plan P1-03, step 9; HUM-06, KIL-08, ST-20).
+type Breakglass struct {
+	// Whether break-glass emergency access is enabled: false by default.
+	Enabled bool `yaml:"enabled"`
+	// File with the break-glass credential hash ($wt$1$<salt>$<hash>). Required when break-glass is enabled.
+	CredentialHashFile string `yaml:"credential_hash_file"`
 }
 
 // OIDC holds OpenID Connect authentication and BFF settings (plan P1-03, step 1; ADR-0009).
@@ -123,6 +133,8 @@ type OIDC struct {
 	Issuer string `yaml:"issuer"`
 	// Client ID of the confidential client in the IdP.
 	ClientID string `yaml:"client_id"`
+	// Client ID of the public client used by the CLI (wtctl): wtctl by default.
+	CLIClientID string `yaml:"cli_client_id"`
 	// File with the confidential client secret: the secret never belongs in the configuration file or the environment.
 	ClientSecretFile string `yaml:"client_secret_file"`
 	// Redirect URL registered with the IdP for this server, such as https://127.0.0.1:8443/auth/callback.
@@ -269,6 +281,7 @@ func Defaults() Config {
 				AbsoluteLifetime: 12 * time.Hour,
 			},
 			OIDC: OIDC{
+				CLIClientID:       "wtctl",
 				Scopes:            []string{"openid", "profile", "email", "groups"},
 				GroupsClaim:       "groups",
 				AllowedAlgorithms: []string{"RS256", "ES256", "ES384", "ES512", "PS256"},
@@ -281,6 +294,9 @@ func Defaults() Config {
 					"wt-auditors":  "auditor",
 					"wt-admins":    "admin",
 				},
+			},
+			Breakglass: Breakglass{
+				Enabled: false,
 			},
 		},
 		Audit: Audit{
@@ -339,6 +355,9 @@ func (c Config) CheckServe() error {
 	}
 	if c.Auth.OIDC.Issuer != "" && c.Auth.OIDC.ClientSecretFile == "" {
 		errs = append(errs, errors.New("auth.oidc.client_secret_file: required when auth.oidc.issuer is set"))
+	}
+	if c.Auth.Breakglass.Enabled && c.Auth.Breakglass.CredentialHashFile == "" {
+		errs = append(errs, errors.New("auth.breakglass.credential_hash_file: required when auth.breakglass.enabled is true"))
 	}
 	return errors.Join(errs...)
 }

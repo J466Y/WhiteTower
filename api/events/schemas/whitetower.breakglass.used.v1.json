@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Break-glass credential used",
+  "description": "An emergency break-glass login was executed (HUM-06, KIL-08, ST-20).",
+  "type": "object",
+  "required": [
+    "actor",
+    "expires_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "expires_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "actor_ip": {
+      "type": "string"
+    }
+  }
+}

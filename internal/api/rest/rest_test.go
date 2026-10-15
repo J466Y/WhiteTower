@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/J466Y/WhiteTower/api/events"
 	"github.com/J466Y/WhiteTower/internal/api/rest/gen"
 	"github.com/J466Y/WhiteTower/internal/api/rest/problem"
@@ -42,6 +44,14 @@ func (testAuthenticator) Authenticate(r *http.Request) (*auth.Principal, error) 
 		return nil, nil
 	case "bad":
 		return nil, errors.New("the signature does not verify")
+	case "breakglass":
+		return &auth.Principal{
+			ID:           authn.BreakglassPrincipalID.String(),
+			Kind:         auth.Human,
+			Name:         "Custodian",
+			Roles:        []string{"custodian"},
+			IsBreakglass: true,
+		}, nil
 	default:
 		if csrf := r.Header.Get("X-Test-CSRF-Token"); csrf != "" {
 			*r = *r.WithContext(authn.ContextWithSession(r.Context(), &authn.Session{CSRFToken: csrf}))
@@ -178,6 +188,16 @@ func TestMe(t *testing.T) {
 		}
 		if me.CsrfToken == nil || *me.CsrfToken != "test-csrf-token-xyz" {
 			t.Fatalf("csrfToken %v, want test-csrf-token-xyz", me.CsrfToken)
+		}
+	})
+	t.Run("authenticated with breakglass session has isBreakglass=true", func(t *testing.T) {
+		res := call(h, http.MethodGet, "/api/v1/me", "breakglass", nil, nil)
+		var me gen.Principal
+		if err := json.Unmarshal(res.body, &me); err != nil || res.status != http.StatusOK {
+			t.Fatalf("got %d %s", res.status, res.body)
+		}
+		if me.IsBreakglass == nil || !*me.IsBreakglass {
+			t.Fatalf("expected isBreakglass=true, got %v", me.IsBreakglass)
 		}
 	})
 	t.Run("authenticated but not permitted", func(t *testing.T) {
@@ -695,5 +715,97 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 		if !found {
 			t.Errorf("revoked token not found in list")
 		}
+	})
+}
+
+type mockTokenExchanger struct {
+	token *authn.CreatedToken
+	err   error
+}
+
+func (m mockTokenExchanger) ExchangeIDToken(_ context.Context, _ string) (*authn.CreatedToken, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.token, nil
+}
+
+func TestExchangeTokenEndpoint(t *testing.T) {
+	fakeID := uuid.MustParse("0192f2c4-8d1e-7c3a-9b2f-5e1d2c3b4a59")
+	fakeToken := &authn.CreatedToken{
+		APIToken: authn.APIToken{
+			ID:          fakeID,
+			PrincipalID: fakeID,
+			Name:        "CLI session (wtctl)",
+			TokenPrefix: "wt_pat_abcd",
+			Scopes:      []string{"agent:halt", "inventory:view"},
+			CreatedAt:   time.Now().UTC(),
+			ExpiresAt:   time.Now().UTC().Add(12 * time.Hour),
+		},
+		Token: "wt_pat_abcdef1234567890",
+	}
+
+	t.Run("successful exchange", func(t *testing.T) {
+		opts := options(io.Discard)
+		opts.Exchanger = mockTokenExchanger{token: fakeToken}
+		h := Handler(opts)
+
+		body := strings.NewReader(`{"idToken":"valid-id-token"}`)
+		res := call(h, http.MethodPost, "/api/v1/tokens/exchange", "", nil, body)
+		if res.status != http.StatusOK {
+			t.Fatalf("got status %d, body %s", res.status, res.body)
+		}
+		var resp gen.CreatedToken
+		if err := json.Unmarshal(res.body, &resp); err != nil {
+			t.Fatalf("unmarshaling response: %v", err)
+		}
+		if resp.Token != fakeToken.Token {
+			t.Errorf("got token %q, want %q", resp.Token, fakeToken.Token)
+		}
+		if resp.TokenPrefix != fakeToken.TokenPrefix {
+			t.Errorf("got prefix %q, want %q", resp.TokenPrefix, fakeToken.TokenPrefix)
+		}
+		if len(resp.Scopes) != len(fakeToken.Scopes) {
+			t.Errorf("got scopes %v, want %v", resp.Scopes, fakeToken.Scopes)
+		}
+	})
+
+	t.Run("missing body or idToken", func(t *testing.T) {
+		opts := options(io.Discard)
+		opts.Exchanger = mockTokenExchanger{token: fakeToken}
+		h := Handler(opts)
+
+		res := call(h, http.MethodPost, "/api/v1/tokens/exchange", "", nil, strings.NewReader(`{"idToken":""}`))
+		problemOf(t, res, problem.BadRequest)
+	})
+
+	t.Run("deactivated principal is refused with forbidden", func(t *testing.T) {
+		opts := options(io.Discard)
+		opts.Exchanger = mockTokenExchanger{err: authn.ErrPrincipalInactive}
+		h := Handler(opts)
+
+		body := strings.NewReader(`{"idToken":"inactive-user-token"}`)
+		res := call(h, http.MethodPost, "/api/v1/tokens/exchange", "", nil, body)
+		problemOf(t, res, problem.Forbidden)
+	})
+
+	t.Run("invalid ID token is refused with unauthenticated", func(t *testing.T) {
+		opts := options(io.Discard)
+		opts.Exchanger = mockTokenExchanger{err: authn.ErrInvalidToken}
+		h := Handler(opts)
+
+		body := strings.NewReader(`{"idToken":"invalid-token"}`)
+		res := call(h, http.MethodPost, "/api/v1/tokens/exchange", "", nil, body)
+		problemOf(t, res, problem.Unauthenticated)
+	})
+
+	t.Run("unconfigured exchanger returns internal problem", func(t *testing.T) {
+		opts := options(io.Discard)
+		opts.Exchanger = nil
+		h := Handler(opts)
+
+		body := strings.NewReader(`{"idToken":"some-token"}`)
+		res := call(h, http.MethodPost, "/api/v1/tokens/exchange", "", nil, body)
+		problemOf(t, res, problem.Internal)
 	})
 }

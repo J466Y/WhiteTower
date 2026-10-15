@@ -107,6 +107,18 @@ func (az *Authorizer) Authorize(ctx context.Context, p *auth.Principal, operatio
 		return fmt.Errorf("%w: unknown operation %q", auth.ErrDenied, operation)
 	}
 
+	// Enforce break-glass restrictions (ST-20): can halt agents and the fleet and read, and nothing else.
+	if p.IsBreakglass {
+		switch perm {
+		case PermissionHaltAgentIssue, PermissionHaltFleetIssue, PermissionInventoryView, PermissionAuditEventsRead, PermissionAuditVerify, PermissionAuditExport, PermissionIdentityMeRead:
+			if operation == "createToken" || operation == "revokeToken" || operation == "createServiceAccount" {
+				return auth.ErrDenied
+			}
+		default:
+			return auth.ErrDenied
+		}
+	}
+
 	// Enforce API token scopes: a scoped token can do only what its scopes allow (ST-19).
 	if p.Scopes != nil {
 		hasScope := false
@@ -142,6 +154,13 @@ func (az *Authorizer) Authorize(ctx context.Context, p *auth.Principal, operatio
 func (az *Authorizer) AuthorizeResource(p *auth.Principal, perm Permission, rel Relationship) error {
 	if p == nil {
 		return auth.ErrDenied
+	}
+	if p.IsBreakglass {
+		switch perm {
+		case PermissionHaltAgentIssue, PermissionHaltFleetIssue, PermissionInventoryView, PermissionAuditEventsRead, PermissionAuditVerify, PermissionAuditExport, PermissionIdentityMeRead:
+		default:
+			return auth.ErrDenied
+		}
 	}
 	if !Allows(p.Roles, perm, rel) {
 		return auth.ErrDenied

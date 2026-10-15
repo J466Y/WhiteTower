@@ -93,7 +93,18 @@ func NewSessionStore(database *db.DB, clk clock.Clock, opts SessionOptions) *Ses
 
 // Create generates and stores a new session for principalID with the given method and roles.
 func (s *SessionStore) Create(ctx context.Context, principalID uuid.UUID, method string, roles []string) (*Session, error) {
-	token, err := generateRandomToken(32)
+	return s.CreateWithLifetime(ctx, principalID, method, roles, s.opts.AbsoluteLifetime)
+}
+
+// CreateWithLifetime generates and stores a new session with an explicit maximum lifetime.
+func (s *SessionStore) CreateWithLifetime(
+	ctx context.Context,
+	principalID uuid.UUID,
+	method string,
+	roles []string,
+	lifetime time.Duration,
+) (*Session, error) {
+	token, err := generateRandomToken()
 	if err != nil {
 		return nil, fmt.Errorf("generating session token: %w", err)
 	}
@@ -103,13 +114,74 @@ func (s *SessionStore) Create(ctx context.Context, principalID uuid.UUID, method
 	csrfHash := hashToken(csrfToken)
 
 	now := s.clk.Now().UTC()
+	if lifetime <= 0 {
+		lifetime = s.opts.AbsoluteLifetime
+	}
+	absoluteExpiry := now.Add(lifetime)
 	idleExpiry := now.Add(s.opts.IdleTimeout)
-	absoluteExpiry := now.Add(s.opts.AbsoluteLifetime)
 	if idleExpiry.After(absoluteExpiry) {
 		idleExpiry = absoluteExpiry
 	}
 
 	q := authndb.New(s.database)
+	err = q.CreateSession(ctx, authndb.CreateSessionParams{
+		IDHash:            idHash,
+		PrincipalID:       principalID,
+		Method:            method,
+		Roles:             roles,
+		CsrfTokenHash:     csrfHash,
+		CreatedAt:         now,
+		IdleExpiresAt:     idleExpiry,
+		AbsoluteExpiresAt: absoluteExpiry,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storing session: %w", err)
+	}
+
+	return &Session{
+		Token:             token,
+		IDHash:            idHash,
+		PrincipalID:       principalID,
+		Method:            method,
+		Roles:             append([]string{}, roles...),
+		CSRFToken:         csrfToken,
+		CSRFTokenHash:     csrfHash,
+		CreatedAt:         now,
+		LastSeenAt:        now,
+		IdleExpiresAt:     idleExpiry,
+		AbsoluteExpiresAt: absoluteExpiry,
+	}, nil
+}
+
+// CreateWithLifetimeTx generates and stores a new session inside the given transaction with an explicit maximum lifetime.
+func (s *SessionStore) CreateWithLifetimeTx(
+	ctx context.Context,
+	tx *db.Tx,
+	principalID uuid.UUID,
+	method string,
+	roles []string,
+	lifetime time.Duration,
+) (*Session, error) {
+	token, err := generateRandomToken()
+	if err != nil {
+		return nil, fmt.Errorf("generating session token: %w", err)
+	}
+
+	idHash := hashToken(token)
+	csrfToken := deriveCSRFToken(token)
+	csrfHash := hashToken(csrfToken)
+
+	now := s.clk.Now().UTC()
+	if lifetime <= 0 {
+		lifetime = s.opts.AbsoluteLifetime
+	}
+	absoluteExpiry := now.Add(lifetime)
+	idleExpiry := now.Add(s.opts.IdleTimeout)
+	if idleExpiry.After(absoluteExpiry) {
+		idleExpiry = absoluteExpiry
+	}
+
+	q := authndb.New(tx)
 	err = q.CreateSession(ctx, authndb.CreateSessionParams{
 		IDHash:            idHash,
 		PrincipalID:       principalID,
@@ -311,6 +383,31 @@ func (s *SessionStore) Cookie(sessionToken string, secure bool) *http.Cookie {
 	}
 }
 
+// CookieForSession constructs an http.Cookie scaled to the specific session's remaining lifetime.
+func (s *SessionStore) CookieForSession(session *Session, secure bool) *http.Cookie {
+	name := CookieNameSecure
+	if !secure {
+		name = CookieNameInsecure
+	}
+	maxAge := int(s.opts.AbsoluteLifetime.Seconds())
+	if session != nil && !session.AbsoluteExpiresAt.IsZero() {
+		rem := session.AbsoluteExpiresAt.Sub(s.clk.Now().UTC())
+		if rem > 0 {
+			maxAge = int(rem.Seconds())
+		}
+	}
+	//nolint:gosec // G124: secure flag is dynamic to support non-TLS in development
+	return &http.Cookie{
+		Name:     name,
+		Value:    session.Token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   maxAge,
+	}
+}
+
 // ClearCookie returns a cookie configured to delete the session from the client.
 func (s *SessionStore) ClearCookie(secure bool) *http.Cookie {
 	name := CookieNameSecure
@@ -329,8 +426,8 @@ func (s *SessionStore) ClearCookie(secure bool) *http.Cookie {
 	}
 }
 
-func generateRandomToken(bytesLen int) (string, error) {
-	b := make([]byte, bytesLen)
+func generateRandomToken() (string, error) {
+	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}

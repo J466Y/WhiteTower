@@ -86,6 +86,7 @@ func newRootCommand(environ []string, stdout io.Writer) *cobra.Command {
 		newMigrateCommand(load, stdout),
 		newConfigCommand(load),
 		newHealthcheckCommand(load),
+		newBreakglassCommand(load, stdout),
 		&cobra.Command{
 			Use:   "version",
 			Short: "Print the version",
@@ -194,15 +195,16 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	principalStore := authn.NewPrincipalStore(database, clock.System, writer, sessionStore, tokenStore)
 	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, cfg.Auth.OIDC.RoleMapping)
 
-	var authHandler http.Handler
+	var oidcSvc *authn.OIDCService
 	if cfg.Auth.OIDC.Issuer != "" {
 		clientSecret, err := os.ReadFile(cfg.Auth.OIDC.ClientSecretFile)
 		if err != nil {
 			return fmt.Errorf("auth.oidc.client_secret_file: %w", err)
 		}
-		oidcSvc, err := authn.NewOIDCService(ctx, authn.OIDCOptions{
+		oidcSvc, err = authn.NewOIDCService(ctx, authn.OIDCOptions{
 			Issuer:            cfg.Auth.OIDC.Issuer,
 			ClientID:          cfg.Auth.OIDC.ClientID,
+			CLIClientID:       cfg.Auth.OIDC.CLIClientID,
 			ClientSecret:      strings.TrimSpace(string(clientSecret)),
 			RedirectURL:       cfg.Auth.OIDC.RedirectURL,
 			Scopes:            cfg.Auth.OIDC.Scopes,
@@ -212,11 +214,36 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			SecureCookies:     !cfg.Dev.SelfSignedTLS,
 			Logger:            logger,
 			Limiter:           ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
+			Tokens:            tokenStore,
 		}, database, principalStore, sessionStore)
 		if err != nil {
 			return fmt.Errorf("oidc service: %w", err)
 		}
-		authHandler = oidcSvc
+	}
+
+	var breakglassSvc *authn.BreakglassService
+	if cfg.Auth.Breakglass.Enabled {
+		breakglassSvc = authn.NewBreakglassService(authn.BreakglassOptions{
+			Enabled:            cfg.Auth.Breakglass.Enabled,
+			CredentialHashFile: cfg.Auth.Breakglass.CredentialHashFile,
+			SecureCookies:      !cfg.Dev.SelfSignedTLS,
+			Clock:              clock.System,
+			Logger:             logger,
+		}, database, sessionStore, writer)
+	}
+
+	authMux := http.NewServeMux()
+	if oidcSvc != nil {
+		authMux.Handle("/auth/login", oidcSvc)
+		authMux.Handle("/auth/callback", oidcSvc)
+		authMux.Handle("/auth/logout", oidcSvc)
+	}
+	if breakglassSvc != nil {
+		authMux.Handle("/auth/breakglass", breakglassSvc)
+	}
+	var authHandler http.Handler
+	if oidcSvc != nil || breakglassSvc != nil {
+		authHandler = authMux
 	}
 
 	registry := metrics.NewRegistry(v)
@@ -231,6 +258,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		RateLimited:   httpMetrics.RateLimited("console").Inc,
 		Tokens:        tokenStore,
 		Principals:    principalStore,
+		Exchanger:     oidcSvc,
 	})
 	drain := server.NewDrain()
 	ready := health.NewReadiness(logger)

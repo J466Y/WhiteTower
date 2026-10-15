@@ -143,6 +143,30 @@ paths:
           description: Token successfully revoked.
         default:
           $ref: "#/components/responses/Problem"
+  /tokens/exchange:
+    post:
+      operationId: exchangeToken
+      summary: Exchange CLI ID token for an API token
+      description: |
+        Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+        API token (12 hours) bound to the same human principal.
+      tags: [tokens]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExchangeTokenRequest"
+      responses:
+        "200":
+          description: The created API token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedToken"
+        default:
+          $ref: "#/components/responses/Problem"
   /service-accounts:
     get:
       operationId: listServiceAccounts
@@ -244,6 +268,9 @@ components:
         csrfToken:
           type: string
           description: The session's CSRF token for state-changing requests, if authenticated via session.
+        isBreakglass:
+          type: boolean
+          description: True if authenticated via emergency break-glass session.
     Problem:
       type: object
       description: |
@@ -402,4 +429,12 @@ components:
         createdAt:
           type: string
           format: date-time
+    ExchangeTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [idToken]
+      properties:
+        idToken:
+          type: string
+          description: Raw OpenID Connect ID token obtained by the CLI.
 
