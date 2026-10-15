@@ -488,7 +488,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 	t.Run("inactive principal cannot log in", func(t *testing.T) {
 		// First deactivate principal
 		deactEmail := "inactive@example.com"
-		p, err := principalStore.UpsertHuman(context.Background(), idp.server.URL, "sub-inactive-123", "Inactive User", &deactEmail, nil)
+		p, err := principalStore.UpsertHuman(context.Background(), idp.server.URL, "sub-inactive-123", "Inactive User", &deactEmail, []string{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -523,7 +523,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 
 	t.Run("logout revokes session and redirects", func(t *testing.T) {
 		// Create a session to log out from
-		p, err := principalStore.UpsertHuman(context.Background(), idp.server.URL, "sub-logout-user", "Logout User", nil, nil)
+		p, err := principalStore.UpsertHuman(context.Background(), idp.server.URL, "sub-logout-user", "Logout User", nil, []string{})
 		if err != nil {
 			t.Fatal(err)
 		}
