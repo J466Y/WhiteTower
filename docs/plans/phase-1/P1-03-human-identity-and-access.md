@@ -159,8 +159,8 @@ The plan lands in six pull requests. The first builds the authorization engine a
 | 1. Roles, permissions and authorization engine | 5, ST-17, ST-18 (partial) | Done (PR #36) |
 | 2. Principals, sessions and CSRF | 2, 3, ST-13, ST-14 | Done (PR #37) |
 | 3. OIDC login, role mapping and /me | 1, 4, 11, ST-15, ST-16, ST-22 | Done (PR #38) |
-| 4. API tokens | 6, ST-19 | In progress (4 of 6 pull requests) |
-| 5. CLI token exchange and break-glass | 7, 9, ST-20 | Not started |
+| 4. API tokens | 6, ST-19 | Done (PR #39) |
+| 5. CLI token exchange and break-glass | 7, 9, ST-20 | In progress (5 of 6 pull requests) |
 | 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Not started |
 
 ### 2026-10-14: roles, permissions and authorization engine
@@ -251,6 +251,34 @@ The plan lands in six pull requests. The first builds the authorization engine a
 - Tests:
   - ST-19 in `internal/authn/tokens_test.go`: verified scope enforcement, token expiry, storage only as a hash, revocation on principal deactivation, manual revocation, service account lifecycle, and input validations.
   - REST API endpoint tests in `internal/api/rest/rest_test.go` covering creation, listing, service accounts, and revocation.
+
+### 2026-10-15: CLI token exchange and break-glass (PR 5)
+
+- CLI token exchange (`POST /tokens/exchange`, HUM-06, API-04; threat model T-12):
+  - Validates OpenID Connect ID tokens issued for the CLI audience (`wtctl`, configurable via `auth.oidc.cli_client_id`).
+  - Provisions or synchronizes the human principal record in PostgreSQL (`whitetower.principals`).
+  - Evaluates effective roles via configured role mappings and local bindings, resolving permitted scopes.
+  - Generates a short-lived (12-hour) personal access token (`wt_pat_`) bound to the principal.
+  - Emits the audited `whitetower.token.created.v1` event with `reason: "CLI token exchange (wtctl)"`.
+  - Refuses deactivated principals with 403 Forbidden (`ErrPrincipalInactive`), expired or invalid tokens with 401 Unauthorized (`ErrInvalidToken`), and missing inputs with 400 Bad Request.
+- Emergency break-glass (`internal/authn/breakglass.go`, HUM-06, KIL-08; ST-20; threat model T-71):
+  - Disabled by default. Configured via `auth.breakglass.enabled` and `auth.breakglass.credential_hash_file`.
+  - Secret protection: credential hash file path marked as sensitive in `cmd/whitetower/security_test.go` (`TestSecretsNeverLeak`).
+  - Subcommand `whitetower breakglass init`: generates 256 bits of CSPRNG entropy (`wt_bg_...`), computes salted SHA-256 hash (`$wt$1$<salt>$<hash>`), writes to hash file (`0600`), and outputs plaintext credential once.
+  - Endpoint `/auth/breakglass`: rate-limited (5 attempts/min per IP/client), verifies candidate credential using constant-time comparison against the stored salted hash file.
+  - Provisions custodian principal (`00000000-0000-0000-0000-000000000001`, `issuer: "whitetower:breakglass"`, `subject: "custodian"`), creates a 1-hour session (`method: "breakglass"`), records critical audit event `whitetower.breakglass.used.v1`, logs security alert (`SECURITY ALERT: break-glass emergency credential used`), and sets session cookie.
+  - Enforces strict operational boundaries (ST-20): can halt agents and the fleet and read inventory and audit logs (`haltAgent`, `haltFleet`, `getMe`, `listAgents`, `getAgent`, `getAuditEvents`, `getAuditCheckpoints`, `exportAudit`), and **nothing else** (release is refused, configuration/tokens/service accounts/policies are refused).
+  - Works independently of IdP availability. Session strictly expires after 1 hour.
+- Audit and contracts:
+  - Added event schema `api/events/schemas/whitetower.breakglass.used.v1.json`, complete example `api/events/examples/whitetower.breakglass.used.v1.json`, entry in `catalog.json`, facts indexing rule in `internal/audit/facts.go`, and updated `facts.json` golden file.
+  - Added OpenAPI operation `exchangeToken` (`POST /tokens/exchange`, `security: []`) and extended `Principal` with boolean `isBreakglass`.
+  - Regenerated code via `task gen:openapi`.
+- Tests:
+  - ST-20 in `internal/authn/breakglass_test.go`: verified emergency login flow, 1-hour session lifetime, rate limiting, critical audit event emission, ERROR alert logging, permitted emergency operations, refusal of all other operations, and session expiry.
+  - `internal/authn/oidc_test.go`: `TestExchangeIDToken` (happy path 12h exchange, wrong audience refusal, expired token refusal, deactivated principal refusal).
+  - `cmd/whitetower/breakglass_test.go`: `whitetower breakglass init` CLI execution, file output permissions, header output, and hash verification.
+  - `internal/api/rest/rest_test.go`: `TestExchangeTokenEndpoint` and `/api/v1/me` asserting `isBreakglass: true`.
+
 
 
 

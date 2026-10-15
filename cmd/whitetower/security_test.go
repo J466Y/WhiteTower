@@ -76,7 +76,7 @@ var (
 		"listeners.console.key_file", "listeners.machine.key_file",
 		"database.password_file", "database.migration.password_file",
 		"audit.checkpoint_key_file", "audit.export.pseudonym_key_file",
-		"auth.oidc.client_secret_file",
+		"auth.oidc.client_secret_file", "auth.breakglass.credential_hash_file",
 	}
 	otherFiles = []string{
 		"listeners.console.cert_file", "listeners.machine.cert_file",
@@ -233,14 +233,16 @@ func TestSecretsNeverLeak(t *testing.T) {
 	for i, line := range checkpointKeyFile(t, checkpointKey) {
 		canaries["checkpoint key, line "+strconv.Itoa(i+1)] = line
 	}
-	runtimeFile, migrationFile, refusedFile, pseudonymFile, oidcFile := filepath.Join(dir, "runtime"), filepath.Join(dir, "migration"), filepath.Join(dir, "refused"), filepath.Join(dir, "pseudonym"), filepath.Join(dir, "oidc-secret")
+	runtimeFile, migrationFile, refusedFile, pseudonymFile, oidcFile, breakglassFile := filepath.Join(dir, "runtime"), filepath.Join(dir, "migration"), filepath.Join(dir, "refused"), filepath.Join(dir, "pseudonym"), filepath.Join(dir, "oidc-secret"), filepath.Join(dir, "breakglass-hash")
 	canaries["pseudonym key"] = canary("pseudonym")
 	canaries["oidc client secret"] = canary("oidc-secret")
+	canaries["breakglass credential hash"] = canary("breakglass-hash")
 	writeSecret(t, runtimeFile, canaries["runtime password"]+"\n")
 	writeSecret(t, migrationFile, canaries["migration password"]+"\n")
 	writeSecret(t, refusedFile, canaries["refused password"]+"\n")
 	writeSecret(t, pseudonymFile, canaries["pseudonym key"]+"\n")
 	writeSecret(t, oidcFile, canaries["oidc client secret"]+"\n")
+	writeSecret(t, breakglassFile, canaries["breakglass credential hash"]+"\n")
 
 	c := newCollector(t)
 	env := []string{
@@ -254,6 +256,7 @@ func TestSecretsNeverLeak(t *testing.T) {
 		"WT_AUDIT_EXPORT_PSEUDONYMIZE=true",
 		"WT_AUDIT_EXPORT_PSEUDONYM_KEY_FILE=" + pseudonymFile,
 		"WT_AUTH_OIDC_CLIENT_SECRET_FILE=" + oidcFile,
+		"WT_AUTH_BREAKGLASS_CREDENTIAL_HASH_FILE=" + breakglassFile,
 	}
 	s := startServeOn(t, d, env...)
 	if status, body := s.readiness(t); status != http.StatusOK {

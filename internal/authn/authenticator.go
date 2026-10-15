@@ -97,10 +97,18 @@ func (a *Authenticator) Authenticate(r *http.Request) (*auth.Principal, error) {
 	// Mutate request pointer so inner middleware can access session and CSRF token.
 	*r = *r.WithContext(ContextWithSession(r.Context(), session))
 
+	isBreakglass := session.Method == "breakglass"
+	var scopes []string
+	if isBreakglass {
+		scopes = append([]string{}, BreakglassScopes...)
+	}
+
 	return &auth.Principal{
-		ID:    p.ID.String(),
-		Kind:  auth.Kind(p.Kind),
-		Name:  p.DisplayName,
-		Roles: append([]string{}, session.Roles...),
+		ID:           p.ID.String(),
+		Kind:         auth.Kind(p.Kind),
+		Name:         p.DisplayName,
+		Roles:        append([]string{}, session.Roles...),
+		Scopes:       scopes,
+		IsBreakglass: isBreakglass,
 	}, nil
 }

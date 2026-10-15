@@ -22,6 +22,8 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/J466Y/WhiteTower/internal/authn/authndb"
+	"github.com/J466Y/WhiteTower/internal/authz"
+	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
@@ -38,6 +40,7 @@ const (
 type OIDCOptions struct {
 	Issuer            string
 	ClientID          string
+	CLIClientID       string
 	ClientSecret      string
 	RedirectURL       string
 	Scopes            []string
@@ -49,6 +52,7 @@ type OIDCOptions struct {
 	Logger            *slog.Logger
 	Limiter           *ratelimit.Limiter
 	HTTPClient        *http.Client
+	Tokens            *TokenStore
 }
 
 type oidcState struct {
@@ -77,9 +81,11 @@ type OIDCService struct {
 	provider      *oidc.Provider
 	oauthConfig   *oauth2.Config
 	verifier      *oidc.IDTokenVerifier
+	cliVerifier   *oidc.IDTokenVerifier
 	database      *db.DB
 	principals    *PrincipalStore
 	sessions      *SessionStore
+	tokens        *TokenStore
 	stateKey      []byte
 	endSessionURL string
 	logger        *slog.Logger
@@ -122,6 +128,16 @@ func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, prin
 		Now:                  opts.Clock.Now,
 	})
 
+	cliID := opts.CLIClientID
+	if cliID == "" {
+		cliID = "wtctl"
+	}
+	cliVerifier := provider.Verifier(&oidc.Config{
+		ClientID:             cliID,
+		SupportedSigningAlgs: opts.AllowedAlgorithms,
+		Now:                  opts.Clock.Now,
+	})
+
 	oauthConfig := &oauth2.Config{
 		ClientID:     opts.ClientID,
 		ClientSecret: opts.ClientSecret,
@@ -140,9 +156,11 @@ func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, prin
 		provider:      provider,
 		oauthConfig:   oauthConfig,
 		verifier:      verifier,
+		cliVerifier:   cliVerifier,
 		database:      database,
 		principals:    principals,
 		sessions:      sessions,
+		tokens:        opts.Tokens,
 		stateKey:      stateKey,
 		endSessionURL: disc.EndSessionEndpoint,
 		logger:        opts.Logger,
@@ -188,14 +206,14 @@ func (s *OIDCService) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stateToken, err := generateRandomToken(32)
+	stateToken, err := generateRandomToken()
 	if err != nil {
 		s.logger.Error("generating state token", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	nonce, err := generateRandomToken(32)
+	nonce, err := generateRandomToken()
 	if err != nil {
 		s.logger.Error("generating nonce", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -523,4 +541,105 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// ExchangeIDToken validates an ID token obtained by the CLI, provisions the principal,
+// resolves effective roles, and returns a 12-hour API token (plan P1-03, step 7; HUM-06, API-04).
+func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*CreatedToken, error) {
+	if s.tokens == nil {
+		return nil, errors.New("token store not configured")
+	}
+
+	rawIDToken = strings.TrimSpace(rawIDToken)
+	if rawIDToken == "" {
+		return nil, fmt.Errorf("%w: empty id token", ErrInvalidToken)
+	}
+
+	vCtx := ctx
+	if s.opts.HTTPClient != nil {
+		vCtx = oidc.ClientContext(ctx, s.opts.HTTPClient)
+	}
+
+	// Verify ID token: try cliVerifier (audience wtctl), fallback to verifier (console client)
+	idToken, err := s.cliVerifier.Verify(vCtx, rawIDToken)
+	if err != nil && s.verifier != nil {
+		if fallback, fallbackErr := s.verifier.Verify(vCtx, rawIDToken); fallbackErr == nil {
+			idToken = fallback
+			err = nil
+		}
+	}
+	if err != nil {
+		s.logger.Warn("verifying exchange id_token failed", "error", err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
+
+	var claims idTokenClaims
+	if err := idToken.Claims(&claims); err != nil {
+		return nil, fmt.Errorf("reading id token claims: %w", err)
+	}
+
+	var rawClaims map[string]any
+	if err := idToken.Claims(&rawClaims); err != nil {
+		return nil, fmt.Errorf("reading raw id token claims: %w", err)
+	}
+
+	var groups []string
+	if rawGroups, ok := rawClaims[s.opts.GroupsClaim]; ok {
+		switch g := rawGroups.(type) {
+		case []any:
+			for _, item := range g {
+				if str, ok := item.(string); ok {
+					groups = append(groups, str)
+				}
+			}
+		case []string:
+			groups = append(groups, g...)
+		}
+	}
+
+	displayName := claims.Name
+	if displayName == "" {
+		displayName = claims.PreferredUsername
+	}
+	if displayName == "" {
+		displayName = claims.Email
+	}
+	if displayName == "" {
+		displayName = claims.Subject
+	}
+
+	var emailPtr *string
+	if claims.Email != "" {
+		emailPtr = &claims.Email
+	}
+
+	principal, err := s.principals.UpsertHuman(ctx, s.opts.Issuer, claims.Subject, displayName, emailPtr, groups)
+	if err != nil {
+		return nil, fmt.Errorf("upserting principal: %w", err)
+	}
+
+	if principal.Status != "active" {
+		return nil, ErrPrincipalInactive
+	}
+
+	var localBindings []string
+	if s.database != nil {
+		q := authndb.New(s.database)
+		localBindings, err = q.ListActiveRoleBindings(ctx, principal.ID)
+		if err != nil {
+			return nil, fmt.Errorf("fetching role bindings: %w", err)
+		}
+	}
+
+	effectiveRoles := ResolveEffectiveRoles(groups, s.opts.RoleMapping, localBindings)
+	permissions := authz.PermissionsList(effectiveRoles)
+
+	actor := auth.Principal{
+		ID:    principal.ID.String(),
+		Kind:  auth.Human,
+		Name:  principal.DisplayName,
+		Roles: effectiveRoles,
+	}
+
+	return s.tokens.CreateWithLifetime(ctx, principal.ID, "wtctl", permissions, 12*time.Hour, actor)
 }

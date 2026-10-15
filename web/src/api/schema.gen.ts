@@ -92,6 +92,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tokens/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange CLI ID token for an API token
+         * @description Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+         *     API token (12 hours) bound to the same human principal.
+         */
+        post: operations["exchangeToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/service-accounts": {
         parameters: {
             query?: never;
@@ -146,6 +167,8 @@ export interface components {
             permissions: string[];
             /** @description The session's CSRF token for state-changing requests, if authenticated via session. */
             csrfToken?: string;
+            /** @description True if authenticated via emergency break-glass session. */
+            isBreakglass?: boolean;
         };
         /**
          * @description RFC 9457 problem details. `type` and `code` identify the error;
@@ -233,6 +256,10 @@ export interface components {
             roles: string[];
             /** Format: date-time */
             createdAt: string;
+        };
+        ExchangeTokenRequest: {
+            /** @description Raw OpenID Connect ID token obtained by the CLI. */
+            idToken: string;
         };
     };
     responses: {
@@ -365,6 +392,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    exchangeToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExchangeTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description The created API token. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedToken"];
+                };
             };
             default: components["responses"]["Problem"];
         };

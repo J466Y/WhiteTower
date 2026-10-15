@@ -41,6 +41,13 @@
     "outcome": "success",
     "reason": "retention policy threshold elapsed"
   },
+  "whitetower.breakglass.used.v1": {
+    "action": "breakglass.used",
+    "actor_id": "00000000-0000-0000-0000-000000000001",
+    "actor_type": "breakglass",
+    "outcome": "success",
+    "reason": ""
+  },
   "whitetower.bundle.activated.v1": {
     "action": "bundle.activated",
     "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",

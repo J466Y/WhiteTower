@@ -1,0 +1,17 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000019",
+  "source": "/core",
+  "type": "whitetower.breakglass.used.v1",
+  "time": "2026-10-15T12:00:00.000Z",
+  "subject": "00000000-0000-0000-0000-000000000001",
+  "datacontenttype": "application/json",
+  "data": {
+    "actor": {
+      "type": "breakglass",
+      "id": "00000000-0000-0000-0000-000000000001"
+    },
+    "expires_at": "2026-10-15T13:00:00.000Z",
+    "actor_ip": "192.0.2.1"
+  }
+}

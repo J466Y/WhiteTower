@@ -120,6 +120,12 @@ type CreatedToken struct {
 	TokenPrefix string `json:"tokenPrefix"`
 }
 
+// ExchangeTokenRequest defines model for ExchangeTokenRequest.
+type ExchangeTokenRequest struct {
+	// IdToken Raw OpenID Connect ID token obtained by the CLI.
+	IdToken string `json:"idToken"`
+}
+
 // Principal defines model for Principal.
 type Principal struct {
 	// CsrfToken The session's CSRF token for state-changing requests, if authenticated via session.
@@ -127,8 +133,11 @@ type Principal struct {
 	DisplayName string  `json:"displayName"`
 
 	// Id The principal's identifier.
-	Id   openapi_types.UUID `json:"id"`
-	Kind PrincipalKind      `json:"kind"`
+	Id openapi_types.UUID `json:"id"`
+
+	// IsBreakglass True if authenticated via emergency break-glass session.
+	IsBreakglass *bool         `json:"isBreakglass,omitempty"`
+	Kind         PrincipalKind `json:"kind"`
 
 	// Permissions The permissions granted by the principal's roles (permission matrix).
 	Permissions []string `json:"permissions"`
@@ -204,6 +213,9 @@ type CreateServiceAccountJSONRequestBody = CreateServiceAccountRequest
 // CreateTokenJSONRequestBody defines body for CreateToken for application/json ContentType.
 type CreateTokenJSONRequestBody = CreateTokenRequest
 
+// ExchangeTokenJSONRequestBody defines body for ExchangeToken for application/json ContentType.
+type ExchangeTokenJSONRequestBody = ExchangeTokenRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetMe Get the calling principal
@@ -221,6 +233,9 @@ type ServerInterface interface {
 	// CreateToken Create an API token
 	// (POST /tokens)
 	CreateToken(w http.ResponseWriter, r *http.Request)
+	// ExchangeToken Exchange CLI ID token for an API token
+	// (POST /tokens/exchange)
+	ExchangeToken(w http.ResponseWriter, r *http.Request)
 	// RevokeToken Revoke an API token
 	// (DELETE /tokens/{id})
 	RevokeToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RevokeTokenParams)
@@ -318,6 +333,20 @@ func (siw *ServerInterfaceWrapper) CreateToken(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateToken(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExchangeToken operation middleware
+func (siw *ServerInterfaceWrapper) ExchangeToken(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExchangeToken(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -508,6 +537,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tokens", wrapper.ListTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tokens", wrapper.CreateToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/tokens/{id}", wrapper.RevokeToken)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tokens/exchange", wrapper.ExchangeToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/service-accounts", wrapper.ListServiceAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/service-accounts", wrapper.CreateServiceAccount)
 
@@ -709,6 +739,45 @@ func (response CreateTokendefaultApplicationProblemPlusJSONResponse) VisitCreate
 	return err
 }
 
+type ExchangeTokenRequestObject struct {
+	Body *ExchangeTokenJSONRequestBody
+}
+
+type ExchangeTokenResponseObject interface {
+	VisitExchangeTokenResponse(w http.ResponseWriter) error
+}
+
+type ExchangeToken200JSONResponse CreatedToken
+
+func (response ExchangeToken200JSONResponse) VisitExchangeTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExchangeTokendefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ExchangeTokendefaultApplicationProblemPlusJSONResponse) VisitExchangeTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RevokeTokenRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	Params RevokeTokenParams
@@ -798,6 +867,9 @@ type StrictServerInterface interface {
 	// CreateToken Create an API token
 	// (POST /tokens)
 	CreateToken(ctx context.Context, request CreateTokenRequestObject) (CreateTokenResponseObject, error)
+	// ExchangeToken Exchange CLI ID token for an API token
+	// (POST /tokens/exchange)
+	ExchangeToken(ctx context.Context, request ExchangeTokenRequestObject) (ExchangeTokenResponseObject, error)
 	// RevokeToken Revoke an API token
 	// (DELETE /tokens/{id})
 	RevokeToken(ctx context.Context, request RevokeTokenRequestObject) (RevokeTokenResponseObject, error)
@@ -974,6 +1046,37 @@ func (sh *strictHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateTokenResponseObject); ok {
 		if err := validResponse.VisitCreateTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExchangeToken operation middleware
+func (sh *strictHandler) ExchangeToken(w http.ResponseWriter, r *http.Request) {
+	var request ExchangeTokenRequestObject
+
+	var body ExchangeTokenJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExchangeToken(ctx, request.(ExchangeTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExchangeToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExchangeTokenResponseObject); ok {
+		if err := validResponse.VisitExchangeTokenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

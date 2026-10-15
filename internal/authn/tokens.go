@@ -100,6 +100,24 @@ func (ts *TokenStore) Create(
 	expiresInDays int,
 	actor auth.Principal,
 ) (*CreatedToken, error) {
+	if expiresInDays == 0 {
+		expiresInDays = DefaultTokenLifetimeDays
+	}
+	if expiresInDays < 1 || expiresInDays > MaxTokenLifetimeDays {
+		return nil, fmt.Errorf("token expiry must be between 1 and %d days", MaxTokenLifetimeDays)
+	}
+	return ts.CreateWithLifetime(ctx, principalID, name, scopes, time.Duration(expiresInDays)*24*time.Hour, actor)
+}
+
+// CreateWithLifetime generates and persists a new API token with an explicit lifetime duration.
+func (ts *TokenStore) CreateWithLifetime(
+	ctx context.Context,
+	principalID uuid.UUID,
+	name string,
+	scopes []string,
+	lifetime time.Duration,
+	actor auth.Principal,
+) (*CreatedToken, error) {
 	name = strings.TrimSpace(name)
 	if len(name) < 1 || len(name) > 100 {
 		return nil, errors.New("token name must be between 1 and 100 characters")
@@ -114,11 +132,8 @@ func (ts *TokenStore) Create(
 		}
 	}
 
-	if expiresInDays == 0 {
-		expiresInDays = DefaultTokenLifetimeDays
-	}
-	if expiresInDays < 1 || expiresInDays > MaxTokenLifetimeDays {
-		return nil, fmt.Errorf("token expiry must be between 1 and %d days", MaxTokenLifetimeDays)
+	if lifetime <= 0 || lifetime > time.Duration(MaxTokenLifetimeDays)*24*time.Hour {
+		return nil, fmt.Errorf("token lifetime must be between 1s and %d days", MaxTokenLifetimeDays)
 	}
 
 	rawToken, prefix, hash, err := GenerateToken()
@@ -132,7 +147,7 @@ func (ts *TokenStore) Create(
 	}
 
 	now := ts.clk.Now().UTC()
-	expiresAt := now.AddDate(0, 0, expiresInDays)
+	expiresAt := now.Add(lifetime)
 
 	creatorID := principalID
 	if actor.ID != "" {

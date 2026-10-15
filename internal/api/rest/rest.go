@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -50,19 +51,28 @@ type Options struct {
 	Tokens *authn.TokenStore
 	// Principals manages principal records and service accounts.
 	Principals *authn.PrincipalStore
+	// Exchanger handles CLI ID token exchange for API tokens.
+	Exchanger TokenExchanger
+}
+
+// TokenExchanger validates and exchanges an OpenID Connect ID token for an API token.
+type TokenExchanger interface {
+	ExchangeIDToken(ctx context.Context, rawIDToken string) (*authn.CreatedToken, error)
 }
 
 // Server implements the operations of the public API.
 type Server struct {
 	tokens     *authn.TokenStore
 	principals *authn.PrincipalStore
+	exchanger  TokenExchanger
 }
 
 // NewServer creates a new Server instance.
-func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore) Server {
+func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, exchanger TokenExchanger) Server {
 	return Server{
 		tokens:     tokens,
 		principals: principals,
+		exchanger:  exchanger,
 	}
 }
 
@@ -98,6 +108,9 @@ func (Server) GetMe(ctx context.Context, _ gen.GetMeRequestObject) (gen.GetMeRes
 	}
 	if session := authn.SessionFromContext(ctx); session != nil && session.CSRFToken != "" {
 		res.CsrfToken = &session.CSRFToken
+	}
+	if p.IsBreakglass {
+		res.IsBreakglass = &p.IsBreakglass
 	}
 	return res, nil
 }
@@ -344,12 +357,42 @@ func (s Server) ListServiceAccounts(ctx context.Context, _ gen.ListServiceAccoun
 	return res, nil
 }
 
+// ExchangeToken exchanges an IdP ID token from the CLI's login for a short-lived API token.
+func (s Server) ExchangeToken(ctx context.Context, request gen.ExchangeTokenRequestObject) (gen.ExchangeTokenResponseObject, error) {
+	if s.exchanger == nil {
+		return nil, problem.New(problem.Internal, "token exchange is not configured")
+	}
+	if request.Body == nil || strings.TrimSpace(request.Body.IdToken) == "" {
+		return nil, problem.New(problem.BadRequest, "idToken is required")
+	}
+	created, err := s.exchanger.ExchangeIDToken(ctx, request.Body.IdToken)
+	if err != nil {
+		if errors.Is(err, authn.ErrPrincipalInactive) {
+			return nil, problem.New(problem.Forbidden, "account is deactivated")
+		}
+		if errors.Is(err, authn.ErrInvalidToken) {
+			return nil, problem.New(problem.Unauthenticated, "invalid ID token: "+err.Error())
+		}
+		return nil, fmt.Errorf("exchanging id token: %w", err)
+	}
+	return gen.ExchangeToken200JSONResponse{
+		Id:          created.ID,
+		PrincipalId: created.PrincipalID,
+		Name:        created.Name,
+		TokenPrefix: created.TokenPrefix,
+		Scopes:      append([]string{}, created.Scopes...),
+		Token:       created.Token,
+		CreatedAt:   created.CreatedAt,
+		ExpiresAt:   created.ExpiresAt,
+	}, nil
+}
+
 // Handler returns the public API, which expects requests under BasePath: the
 // operations of api/openapi, and the document itself at openapi.json.
 func Handler(opts Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET "+BasePath+"/openapi.json", documentHandler())
-	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
+	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals, opts.Exchanger), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
 		gen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  requestError,
 			ResponseErrorHandlerFunc: responseError(opts.Logger),

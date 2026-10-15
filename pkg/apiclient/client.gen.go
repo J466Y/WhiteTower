@@ -120,6 +120,12 @@ type CreatedToken struct {
 	TokenPrefix string `json:"tokenPrefix"`
 }
 
+// ExchangeTokenRequest defines model for ExchangeTokenRequest.
+type ExchangeTokenRequest struct {
+	// IdToken Raw OpenID Connect ID token obtained by the CLI.
+	IdToken string `json:"idToken"`
+}
+
 // Principal defines model for Principal.
 type Principal struct {
 	// CsrfToken The session's CSRF token for state-changing requests, if authenticated via session.
@@ -127,8 +133,11 @@ type Principal struct {
 	DisplayName string  `json:"displayName"`
 
 	// Id The principal's identifier.
-	Id   openapi_types.UUID `json:"id"`
-	Kind PrincipalKind      `json:"kind"`
+	Id openapi_types.UUID `json:"id"`
+
+	// IsBreakglass True if authenticated via emergency break-glass session.
+	IsBreakglass *bool         `json:"isBreakglass,omitempty"`
+	Kind         PrincipalKind `json:"kind"`
 
 	// Permissions The permissions granted by the principal's roles (permission matrix).
 	Permissions []string `json:"permissions"`
@@ -203,6 +212,9 @@ type CreateServiceAccountJSONRequestBody = CreateServiceAccountRequest
 
 // CreateTokenJSONRequestBody defines body for CreateToken for application/json ContentType.
 type CreateTokenJSONRequestBody = CreateTokenRequest
+
+// ExchangeTokenJSONRequestBody defines body for ExchangeToken for application/json ContentType.
+type ExchangeTokenJSONRequestBody = ExchangeTokenRequest
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -337,6 +349,26 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /tokens (the `CreateToken` operationId).
 	CreateToken(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExchangeTokenWithBody Exchange CLI ID token for an API token
+	//
+	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+	// API token (12 hours) bound to the same human principal.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /tokens/exchange (the `ExchangeToken` operationId).
+	ExchangeTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExchangeToken Exchange CLI ID token for an API token
+	//
+	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+	// API token (12 hours) bound to the same human principal.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /tokens/exchange (the `ExchangeToken` operationId).
+	ExchangeToken(ctx context.Context, body ExchangeTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RevokeToken Revoke an API token
 	//
@@ -475,6 +507,46 @@ func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, bo
 // Corresponds with POST /tokens (the `CreateToken` operationId).
 func (c *Client) CreateToken(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateTokenRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExchangeTokenWithBody Exchange CLI ID token for an API token
+//
+// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+// API token (12 hours) bound to the same human principal.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /tokens/exchange (the `ExchangeToken` operationId).
+func (c *Client) ExchangeTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExchangeTokenRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExchangeToken Exchange CLI ID token for an API token
+//
+// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+// API token (12 hours) bound to the same human principal.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /tokens/exchange (the `ExchangeToken` operationId).
+func (c *Client) ExchangeToken(ctx context.Context, body ExchangeTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExchangeTokenRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -709,6 +781,46 @@ func NewCreateTokenRequestWithBody(server string, contentType string, body io.Re
 	return req, nil
 }
 
+// NewExchangeTokenRequest calls the generic ExchangeToken builder with application/json body
+func NewExchangeTokenRequest(server string, body ExchangeTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewExchangeTokenRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewExchangeTokenRequestWithBody constructs an http.Request for the ExchangeToken method, with any body, and a specified content type
+func NewExchangeTokenRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/tokens/exchange")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewRevokeTokenRequest constructs an http.Request for the RevokeToken method
 func NewRevokeTokenRequest(server string, id openapi_types.UUID, params *RevokeTokenParams) (*http.Request, error) {
 	var err error
@@ -906,6 +1018,26 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /tokens (the `CreateToken` operationId).
 	CreateTokenWithResponse(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTokenResponse, error)
+
+	// ExchangeTokenWithBodyWithResponse Exchange CLI ID token for an API token
+	//
+	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+	// API token (12 hours) bound to the same human principal.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /tokens/exchange (the `ExchangeToken` operationId).
+	ExchangeTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExchangeTokenResponse, error)
+
+	// ExchangeTokenWithResponse Exchange CLI ID token for an API token
+	//
+	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+	// API token (12 hours) bound to the same human principal.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /tokens/exchange (the `ExchangeToken` operationId).
+	ExchangeTokenWithResponse(ctx context.Context, body ExchangeTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*ExchangeTokenResponse, error)
 
 	// RevokeTokenWithResponse Revoke an API token
 	//
@@ -1168,6 +1300,54 @@ func (r CreateTokenResponse) ContentType() string {
 	return ""
 }
 
+type ExchangeTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CreatedToken
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ExchangeTokenResponse) GetJSON200() *CreatedToken {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ExchangeTokenResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ExchangeTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExchangeTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExchangeTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExchangeTokenResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type RevokeTokenResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1365,6 +1545,38 @@ func (c *ClientWithResponses) CreateTokenWithResponse(ctx context.Context, body 
 	return ParseCreateTokenResponse(rsp)
 }
 
+// ExchangeTokenWithBodyWithResponse Exchange CLI ID token for an API token
+//
+// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+// API token (12 hours) bound to the same human principal.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /tokens/exchange (the `ExchangeToken` operationId).
+func (c *ClientWithResponses) ExchangeTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExchangeTokenResponse, error) {
+	rsp, err := c.ExchangeTokenWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExchangeTokenResponse(rsp)
+}
+
+// ExchangeTokenWithResponse Exchange CLI ID token for an API token
+//
+// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
+// API token (12 hours) bound to the same human principal.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /tokens/exchange (the `ExchangeToken` operationId).
+func (c *ClientWithResponses) ExchangeTokenWithResponse(ctx context.Context, body ExchangeTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*ExchangeTokenResponse, error) {
+	rsp, err := c.ExchangeToken(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExchangeTokenResponse(rsp)
+}
+
 // RevokeTokenWithResponse Revoke an API token
 //
 // Revokes an active API token by its ID.
@@ -1549,6 +1761,39 @@ func ParseCreateTokenResponse(rsp *http.Response) (*CreateTokenResponse, error) 
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExchangeTokenResponse parses an HTTP response from a ExchangeTokenWithResponse call
+func ParseExchangeTokenResponse(rsp *http.Response) (*ExchangeTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExchangeTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreatedToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest Problem

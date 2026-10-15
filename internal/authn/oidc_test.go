@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -560,6 +561,153 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		_, err = sessionStore.Get(context.Background(), sess.Token)
 		if !strings.Contains(fmt.Sprint(err), "revoked") {
 			t.Errorf("expected session to be revoked, got %v", err)
+		}
+	})
+}
+
+func TestExchangeIDToken(t *testing.T) {
+	idp := newMockIDP(t)
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+
+	const clientID = "whitetower-console"
+	const cliClientID = "wtctl"
+
+	roleMapping := map[string]string{
+		"wt-owners":    "owner",
+		"wt-operators": "operator",
+	}
+
+	svc, err := authn.NewOIDCService(context.Background(), authn.OIDCOptions{
+		Issuer:            idp.server.URL,
+		ClientID:          clientID,
+		CLIClientID:       cliClientID,
+		ClientSecret:      "test-secret",
+		RedirectURL:       "https://127.0.0.1:8443/auth/callback",
+		Clock:             clk,
+		RoleMapping:       roleMapping,
+		AllowedAlgorithms: []string{"RS256"},
+		HTTPClient:        idp.server.Client(),
+		Tokens:            tokenStore,
+	}, database, principalStore, sessionStore)
+	if err != nil {
+		t.Fatalf("creating OIDC service: %v", err)
+	}
+
+	t.Run("successful exchange for wtctl audience returns 12-hour API token", func(t *testing.T) {
+		now := clk.Now()
+		rawToken := idp.signIDToken(
+			map[string]any{"alg": "RS256"},
+			map[string]any{
+				"iss":    idp.server.URL,
+				"aud":    cliClientID,
+				"sub":    "cli-user-123",
+				"exp":    now.Add(time.Hour).Unix(),
+				"name":   "CLI User",
+				"email":  "cli@example.com",
+				"groups": []string{"wt-owners"},
+			},
+		)
+
+		created, err := svc.ExchangeIDToken(context.Background(), rawToken)
+		if err != nil {
+			t.Fatalf("ExchangeIDToken failed: %v", err)
+		}
+
+		if !strings.HasPrefix(created.Token, authn.TokenPrefix) {
+			t.Errorf("expected token prefix %q, got %q", authn.TokenPrefix, created.Token)
+		}
+		if diff := created.ExpiresAt.Sub(now); diff != 12*time.Hour {
+			t.Errorf("expected 12 hour expiry, got %v", diff)
+		}
+		if len(created.Scopes) == 0 {
+			t.Error("expected non-empty scopes for owner role")
+		}
+
+		// Authenticate with the returned API token
+		authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, roleMapping)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+		req.Header.Set("Authorization", "Bearer "+created.Token)
+		principal, err := authenticator.Authenticate(req)
+		if err != nil {
+			t.Fatalf("authenticating with exchanged token: %v", err)
+		}
+		if principal == nil {
+			t.Fatal("expected principal, got nil")
+		}
+		if principal.ID != created.PrincipalID.String() {
+			t.Errorf("principal ID: got %q, want %q", principal.ID, created.PrincipalID.String())
+		}
+		if principal.Name != "CLI User" {
+			t.Errorf("principal Name: got %q, want %q", principal.Name, "CLI User")
+		}
+	})
+
+	t.Run("wrong audience is refused", func(t *testing.T) {
+		now := clk.Now()
+		rawToken := idp.signIDToken(
+			map[string]any{"alg": "RS256"},
+			map[string]any{
+				"iss": idp.server.URL,
+				"aud": "wrong-client-app",
+				"sub": "cli-user-456",
+				"exp": now.Add(time.Hour).Unix(),
+			},
+		)
+
+		_, err := svc.ExchangeIDToken(context.Background(), rawToken)
+		if err == nil {
+			t.Error("expected exchange to fail for wrong audience")
+		}
+	})
+
+	t.Run("expired ID token is refused", func(t *testing.T) {
+		now := clk.Now()
+		rawToken := idp.signIDToken(
+			map[string]any{"alg": "RS256"},
+			map[string]any{
+				"iss": idp.server.URL,
+				"aud": cliClientID,
+				"sub": "cli-user-789",
+				"exp": now.Add(-time.Hour).Unix(),
+			},
+		)
+
+		_, err := svc.ExchangeIDToken(context.Background(), rawToken)
+		if err == nil {
+			t.Error("expected exchange to fail for expired ID token")
+		}
+	})
+
+	t.Run("deactivated principal is refused with ErrPrincipalInactive", func(t *testing.T) {
+		now := clk.Now()
+		sub := "cli-inactive-user"
+		rawToken := idp.signIDToken(
+			map[string]any{"alg": "RS256"},
+			map[string]any{
+				"iss":    idp.server.URL,
+				"aud":    cliClientID,
+				"sub":    sub,
+				"exp":    now.Add(time.Hour).Unix(),
+				"groups": []string{"wt-owners"},
+			},
+		)
+
+		// First exchange provisions principal
+		created, err := svc.ExchangeIDToken(context.Background(), rawToken)
+		if err != nil {
+			t.Fatalf("first exchange failed: %v", err)
+		}
+
+		// Deactivate principal
+		if err := principalStore.Deactivate(context.Background(), created.PrincipalID, auth.Principal{ID: created.PrincipalID.String(), Kind: auth.Human}, "security offboarding"); err != nil {
+			t.Fatalf("deactivating principal: %v", err)
+		}
+
+		// Subsequent exchange attempt must be refused
+		_, err = svc.ExchangeIDToken(context.Background(), rawToken)
+		if !errors.Is(err, authn.ErrPrincipalInactive) {
+			t.Errorf("expected ErrPrincipalInactive, got %v", err)
 		}
 	})
 }

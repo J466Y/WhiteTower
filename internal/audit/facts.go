@@ -57,6 +57,7 @@ var rules = map[string]rule{
 	"whitetower.principal.reactivated.v1":   {actor: "actor", fixed: "success", reason: "reason"},
 	"whitetower.token.created.v1":           {actor: "actor", fixed: "success"},
 	"whitetower.token.revoked.v1":           {actor: "actor", fixed: "success", reason: "reason"},
+	"whitetower.breakglass.used.v1":         {actor: "actor", fixed: "success"},
 }
 
 // outcomes maps the outcomes that events tell to those the audit log

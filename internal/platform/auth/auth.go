@@ -33,6 +33,8 @@ type Principal struct {
 	// Scopes are the permissions allowed to the API token, if authenticated via token.
 	// When non-empty, operations are constrained to the intersection of scopes and roles.
 	Scopes []string
+	// IsBreakglass is true if authenticated via emergency break-glass access.
+	IsBreakglass bool
 }
 
 // Authenticator identifies the principal of a request from its credentials.
