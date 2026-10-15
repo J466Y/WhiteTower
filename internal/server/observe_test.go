@@ -123,7 +123,7 @@ const (
 // logs and the traces by its IDs.
 func TestARequestCanBeFollowedByItsIDs(t *testing.T) {
 	o := newObserved(t)
-	srv := httptest.NewServer(o.Wrap("console", server.ConsoleHandler(publicAPI())))
+	srv := httptest.NewServer(o.Wrap("console", server.ConsoleHandler(publicAPI(), nil)))
 	t.Cleanup(srv.Close)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/api/v1/version", nil)
@@ -207,7 +207,7 @@ func TestTheRouteSurvivesAuthentication(t *testing.T) {
 		Authorizer:    auth.DenyAll{},
 		Limiter:       ratelimit.New(1000, 1000),
 	})
-	o.Wrap("console", server.ConsoleHandler(api)).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/me", nil))
+	o.Wrap("console", server.ConsoleHandler(api, nil)).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/me", nil))
 
 	logs := o.logs.records(t, "request")
 	if len(logs) != 1 || logs[0]["route"] != "/api/v1/me" || logs[0]["status"] != float64(http.StatusForbidden) ||

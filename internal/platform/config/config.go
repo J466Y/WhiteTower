@@ -113,6 +113,28 @@ type Migration struct {
 type Auth struct {
 	// User session settings (ADR-0009).
 	Session Session `yaml:"session"`
+	// OpenID Connect authentication and backend-for-frontend settings (ADR-0009).
+	OIDC OIDC `yaml:"oidc"`
+}
+
+// OIDC holds OpenID Connect authentication and BFF settings (plan P1-03, step 1; ADR-0009).
+type OIDC struct {
+	// Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled.
+	Issuer string `yaml:"issuer"`
+	// Client ID of the confidential client in the IdP.
+	ClientID string `yaml:"client_id"`
+	// File with the confidential client secret: the secret never belongs in the configuration file or the environment.
+	ClientSecretFile string `yaml:"client_secret_file"`
+	// Redirect URL registered with the IdP for this server, such as https://127.0.0.1:8443/auth/callback.
+	RedirectURL string `yaml:"redirect_url"`
+	// Scopes requested during OIDC authorization: openid, profile, email, groups by default.
+	Scopes []string `yaml:"scopes"`
+	// Claim name in the ID token that contains group memberships: groups by default.
+	GroupsClaim string `yaml:"groups_claim"`
+	// Map from IdP group names to White Tower roles (steering, advisory, owner, user, operator, auditor, admin).
+	RoleMapping map[string]string `yaml:"role_mapping"`
+	// Allowed signature algorithms for ID tokens: RS256, ES256, ES384, ES512, PS256 by default.
+	AllowedAlgorithms []string `yaml:"allowed_algorithms"`
 }
 
 // Session holds the settings for human user sessions (ADR-0009).
@@ -246,6 +268,20 @@ func Defaults() Config {
 				IdleTimeout:      30 * time.Minute,
 				AbsoluteLifetime: 12 * time.Hour,
 			},
+			OIDC: OIDC{
+				Scopes:            []string{"openid", "profile", "email", "groups"},
+				GroupsClaim:       "groups",
+				AllowedAlgorithms: []string{"RS256", "ES256", "ES384", "ES512", "PS256"},
+				RoleMapping: map[string]string{
+					"wt-steering":  "steering",
+					"wt-advisory":  "advisory",
+					"wt-owners":    "owner",
+					"wt-users":     "user",
+					"wt-operators": "operator",
+					"wt-auditors":  "auditor",
+					"wt-admins":    "admin",
+				},
+			},
 		},
 		Audit: Audit{
 			CheckpointInterval: MaxCheckpointInterval,
@@ -300,6 +336,9 @@ func (c Config) CheckServe() error {
 	}
 	if c.Audit.Export.Pseudonymize && c.Audit.Export.PseudonymKeyFile == "" {
 		errs = append(errs, errors.New("audit.export.pseudonym_key_file: required when audit.export.pseudonymize is true"))
+	}
+	if c.Auth.OIDC.Issuer != "" && c.Auth.OIDC.ClientSecretFile == "" {
+		errs = append(errs, errors.New("auth.oidc.client_secret_file: required when auth.oidc.issuer is set"))
 	}
 	return errors.Join(errs...)
 }
@@ -378,6 +417,29 @@ func (c Config) Validate() error {
 	}
 	if c.Auth.Session.IdleTimeout > c.Auth.Session.AbsoluteLifetime {
 		add("auth.session.idle_timeout", "cannot be longer than auth.session.absolute_lifetime")
+	}
+	if c.Auth.OIDC.Issuer != "" {
+		if c.Auth.OIDC.ClientID == "" {
+			add("auth.oidc.client_id", "required when auth.oidc.issuer is set")
+		}
+		if c.Auth.OIDC.RedirectURL == "" {
+			add("auth.oidc.redirect_url", "required when auth.oidc.issuer is set")
+		}
+		for group, role := range c.Auth.OIDC.RoleMapping {
+			switch role {
+			case "steering", "advisory", "owner", "user", "operator", "auditor", "admin":
+			default:
+				add("auth.oidc.role_mapping", "%q: mapped role %q is not a valid role", group, role)
+			}
+		}
+		for _, alg := range c.Auth.OIDC.AllowedAlgorithms {
+			switch alg {
+			case "none":
+				add("auth.oidc.allowed_algorithms", "algorithm 'none' is forbidden (threat model, T-13)")
+			case "HS256", "HS384", "HS512":
+				add("auth.oidc.allowed_algorithms", "%q: symmetric HMAC algorithms are forbidden for OIDC ID tokens (threat model, T-13)", alg)
+			}
+		}
 	}
 	if u := c.Database.Migration.URL; u != "" {
 		if err := checkDatabaseURL(u); err != nil {

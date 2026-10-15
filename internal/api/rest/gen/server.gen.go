@@ -50,11 +50,16 @@ func (e VersionInfoApiVersion) Valid() bool {
 
 // Principal defines model for Principal.
 type Principal struct {
-	DisplayName string `json:"displayName"`
+	// CsrfToken The session's CSRF token for state-changing requests, if authenticated via session.
+	CsrfToken   *string `json:"csrfToken,omitempty"`
+	DisplayName string  `json:"displayName"`
 
 	// Id The principal's identifier.
 	Id   openapi_types.UUID `json:"id"`
 	Kind PrincipalKind      `json:"kind"`
+
+	// Permissions The permissions granted by the principal's roles (permission matrix).
+	Permissions []string `json:"permissions"`
 
 	// Roles The roles bound to the principal (requirements, permission matrix).
 	Roles []string `json:"roles"`

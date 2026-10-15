@@ -193,6 +193,31 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	principalStore := authn.NewPrincipalStore(database, clock.System, writer, sessionStore)
 	authenticator := authn.NewAuthenticator(sessionStore, principalStore)
 
+	var authHandler http.Handler
+	if cfg.Auth.OIDC.Issuer != "" {
+		clientSecret, err := os.ReadFile(cfg.Auth.OIDC.ClientSecretFile)
+		if err != nil {
+			return fmt.Errorf("auth.oidc.client_secret_file: %w", err)
+		}
+		oidcSvc, err := authn.NewOIDCService(ctx, authn.OIDCOptions{
+			Issuer:            cfg.Auth.OIDC.Issuer,
+			ClientID:          cfg.Auth.OIDC.ClientID,
+			ClientSecret:      strings.TrimSpace(string(clientSecret)),
+			RedirectURL:       cfg.Auth.OIDC.RedirectURL,
+			Scopes:            cfg.Auth.OIDC.Scopes,
+			GroupsClaim:       cfg.Auth.OIDC.GroupsClaim,
+			RoleMapping:       cfg.Auth.OIDC.RoleMapping,
+			AllowedAlgorithms: cfg.Auth.OIDC.AllowedAlgorithms,
+			SecureCookies:     !cfg.Dev.SelfSignedTLS,
+			Logger:            logger,
+			Limiter:           ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
+		}, database, principalStore, sessionStore)
+		if err != nil {
+			return fmt.Errorf("oidc service: %w", err)
+		}
+		authHandler = oidcSvc
+	}
+
 	registry := metrics.NewRegistry(v)
 	httpMetrics := metrics.NewHTTP(registry)
 	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
@@ -216,7 +241,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Metrics:       metrics.NewRPC(registry),
 	})
 	srv, err := server.New(cfg, server.Handlers{
-		Console:    observer.Wrap("console", server.ConsoleHandler(api)),
+		Console:    observer.Wrap("console", server.ConsoleHandler(api, authHandler)),
 		Machine:    observer.Wrap("machine", server.MachineHandler(moduleAPI)),
 		Operations: server.OperationsHandler(drain, ready, metrics.Handler(registry)),
 	}, drain, logger)

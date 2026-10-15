@@ -32,10 +32,13 @@ const (
 )
 
 // ConsoleHandler serves the console listener: the public REST API, built
-// with rest.Handler, and the web console.
-func ConsoleHandler(api http.Handler) http.Handler {
+// with rest.Handler, auth routes under /auth/, and the web console.
+func ConsoleHandler(api http.Handler, auth http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle(rest.BasePath+"/", api)
+	if auth != nil {
+		mux.Handle("/auth/", auth)
+	}
 	mux.Handle("/", webui.Handler())
 	limited := LimitBody(MaxConsoleBody,
 		problem.Handler(problem.PayloadTooLarge, "the request body is larger than 1 MiB"), mux)

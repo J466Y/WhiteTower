@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (2 of 6 pull requests) |
+| **Status** | In progress (3 of 6 pull requests) |
 | **Size** | M |
 | **Depends on** | P1-01, P1-02 (writer) |
 | **Unblocks** | P1-04, P1-10, P1-11 |
@@ -157,8 +157,8 @@ The plan lands in six pull requests. The first builds the authorization engine a
 | Pull request | Steps | Status |
 | --- | --- | --- |
 | 1. Roles, permissions and authorization engine | 5, ST-17, ST-18 (partial) | Done (PR #36) |
-| 2. Principals, sessions and CSRF | 2, 3, ST-13, ST-14 | In progress |
-| 3. OIDC login, role mapping and /me | 1, 4, 11, ST-15, ST-16, ST-22 | Not started |
+| 2. Principals, sessions and CSRF | 2, 3, ST-13, ST-14 | Done (PR #37) |
+| 3. OIDC login, role mapping and /me | 1, 4, 11, ST-15, ST-16, ST-22 | In progress |
 | 4. API tokens | 6, ST-19 | Not started |
 | 5. CLI token exchange and break-glass | 7, 9, ST-20 | Not started |
 | 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Not started |
@@ -195,7 +195,36 @@ The plan lands in six pull requests. The first builds the authorization engine a
   - Registered events in `api/events/catalog.json` and added fact rules in `internal/audit/facts.go`.
 - Tests:
   - ST-14 in `internal/authn/session_test.go`: verified cookie attributes, session rotation, idle and absolute timeout expiration, revocation at logout, revocation on principal deactivation, and background cleanup.
-  - ST-13 in `internal/api/rest/csrf_test.go`: verified GET requests bypass CSRF, state-changing requests without CSRF token or with invalid CSRF token are refused with 403 Forbidden, and valid CSRF token succeeds.
-  - Unit & integration tests in `internal/authn/principal_test.go`: tested principal upsert, retrieval, deactivation, and reactivation with audit events.
+### 2026-10-15: OIDC login, role mapping and /me (PR 3)
+
+- Backend-For-Frontend (BFF) authentication flow (`internal/authn/oidc.go`):
+  - Implemented `OIDCService` handling `/auth/login`, `/auth/callback`, and `/auth/logout`.
+  - OpenID Connect authorization code flow with PKCE (RFC 7636, S256 code challenge and verifier).
+  - State and nonce stored in ephemeral HMAC-SHA256 signed cookies (`__Host-wt_oidc` or `wt_oidc`), with 10-minute expiry, bound to the client.
+  - Return URL validation (`ValidateReturnURL`, ST-15): strictly permits console-relative paths starting with `/` and refuses external schemes, authority-relative URLs (`//`), backslashes, control characters, and CRLF injections.
+  - Login rate limiting (ST-22): applies token bucket rate limiting on `/auth/login` to thwart brute-force and amplification attempts.
+  - ID token verification (ST-16): validates issuer against IdP discovery metadata, audience against configured ClientID, token expiration against injected clock, nonce match against signed login cookie, cryptographic signature via JWKS, and verifies signing algorithm against allowed algorithm whitelist (`AllowedAlgorithms`, defaulting to `RS256`, rejecting `none` and symmetric HMAC algs).
+  - Principal provisioning: calls `PrincipalStore.UpsertHuman` on successful login to synchronize identity attributes and refuses authentication if principal status is inactive (403 Forbidden).
+  - RP-initiated logout: revokes active session in PostgreSQL and clears cookies, redirecting to the IdP's `end_session_endpoint` with `post_logout_redirect_uri` when advertised.
+- Role mapping (`internal/authn/roles.go`):
+  - `ResolveEffectiveRoles`: maps IdP claim groups (configurable via `groups_claim`, normalizing leading slashes) using configurable `role_mapping`, merges with local `role_bindings`, validates each role against the governance model via `authz.IsValidRole`, and deduplicates into sorted effective roles.
+- `/api/v1/me` and OpenAPI contracts:
+  - Extended OpenAPI schema `Principal` with `permissions` (required list of permission IDs derived via `authz.PermissionsList(roles)`) and `csrfToken` (optional session CSRF token).
+  - Updated `Server.GetMe` in `internal/api/rest/rest.go` to populate `permissions` and attach `csrfToken` from `authn.SessionFromContext(ctx)`.
+  - Regenerated REST server, API client, and web console TypeScript definitions (`task gen:openapi`).
+- Configuration:
+  - Added `Auth.OIDC` section in `internal/platform/config` (`issuer`, `client_id`, `client_secret_file`, `redirect_url`, `scopes`, `groups_claim`, `role_mapping`, `allowed_algorithms`). Updated environment overrides and configuration reference documentation.
+- Development realm:
+  - Extended `deploy/compose/dev/keycloak/whitetower-realm.json` with user `multirole` (groups `/wt-owners`, `/wt-operators`) and user `inactive` (`enabled: false`) for integration and pilot testing (step 11).
+- Server mounting:
+  - Mounted `/auth/` routes on the public console listener in `internal/server/handlers.go` (`ConsoleHandler(api, auth http.Handler)`).
+- Tests:
+  - ST-15 in `internal/authn/oidc_test.go`: table-driven tests for open redirect prevention.
+  - ST-22 in `internal/authn/oidc_test.go`: login endpoint rate limiting and recovery.
+  - ST-16 in `internal/authn/oidc_test.go`: mock IdP server testing wrong issuer, wrong audience, expired token, mismatched nonce, and algorithm `none`.
+  - Inactive principal login refusal and RP-initiated logout session revocation tests.
+  - Unit tests in `internal/authn/roles_test.go`: role resolution, prefix normalization, invalid role ignoring, and deduplication.
+  - Golden file and HTTP endpoint tests in `internal/api/rest` and `internal/api/rest/resttest` asserting `permissions` and `csrfToken`.
+
 
 

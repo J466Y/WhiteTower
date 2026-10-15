@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -146,6 +147,41 @@ func setFromString(v reflect.Value, s string) error {
 			return fmt.Errorf("%q: want a number", s)
 		}
 		v.SetFloat(f)
+	case reflect.Slice:
+		if v.Type().Elem().Kind() == reflect.String {
+			if s == "" {
+				v.Set(reflect.MakeSlice(v.Type(), 0, 0))
+				return nil
+			}
+			parts := strings.Split(s, ",")
+			slice := reflect.MakeSlice(v.Type(), len(parts), len(parts))
+			for i, p := range parts {
+				slice.Index(i).SetString(strings.TrimSpace(p))
+			}
+			v.Set(slice)
+			return nil
+		}
+		return fmt.Errorf("settings of type %s cannot be set from the environment", v.Type())
+	case reflect.Map:
+		if v.Type().Key().Kind() == reflect.String && v.Type().Elem().Kind() == reflect.String {
+			m := reflect.MakeMap(v.Type())
+			if s != "" {
+				for _, pair := range strings.Split(s, ",") {
+					k, val, ok := strings.Cut(pair, "=")
+					if !ok {
+						k, val, ok = strings.Cut(pair, ":")
+					}
+					if ok {
+						m.SetMapIndex(reflect.ValueOf(strings.TrimSpace(k)), reflect.ValueOf(strings.TrimSpace(val)))
+					} else if trimmed := strings.TrimSpace(pair); trimmed != "" {
+						m.SetMapIndex(reflect.ValueOf(trimmed), reflect.ValueOf(trimmed))
+					}
+				}
+			}
+			v.Set(m)
+			return nil
+		}
+		return fmt.Errorf("settings of type %s cannot be set from the environment", v.Type())
 	default:
 		return fmt.Errorf("settings of type %s cannot be set from the environment", v.Type())
 	}
@@ -175,6 +211,22 @@ func node(v reflect.Value) *yaml.Node {
 		for i := range v.NumField() {
 			key := strings.Split(v.Type().Field(i).Tag.Get("yaml"), ",")[0]
 			n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, node(v.Field(i)))
+		}
+		return n
+	}
+	if v.Kind() == reflect.Slice {
+		n := &yaml.Node{Kind: yaml.SequenceNode}
+		for i := range v.Len() {
+			n.Content = append(n.Content, node(v.Index(i)))
+		}
+		return n
+	}
+	if v.Kind() == reflect.Map {
+		n := &yaml.Node{Kind: yaml.MappingNode}
+		keys := v.MapKeys()
+		slices.SortFunc(keys, func(a, b reflect.Value) int { return strings.Compare(a.String(), b.String()) })
+		for _, k := range keys {
+			n.Content = append(n.Content, node(k), node(v.MapIndex(k)))
 		}
 		return n
 	}

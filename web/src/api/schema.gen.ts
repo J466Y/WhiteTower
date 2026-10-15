@@ -35,8 +35,8 @@ export interface paths {
         };
         /**
          * Get the calling principal
-         * @description Returns the principal that makes the request and its roles. Plan
-         *     P1-03 adds its permissions and the CSRF token of the session.
+         * @description Returns the calling principal, their roles, their permissions derived
+         *     from the governance matrix, and the CSRF token of the active session.
          */
         get: operations["getMe"];
         put?: never;
@@ -73,6 +73,10 @@ export interface components {
             displayName: string;
             /** @description The roles bound to the principal (requirements, permission matrix). */
             roles: string[];
+            /** @description The permissions granted by the principal's roles (permission matrix). */
+            permissions: string[];
+            /** @description The session's CSRF token for state-changing requests, if authenticated via session. */
+            csrfToken?: string;
         };
         /**
          * @description RFC 9457 problem details. `type` and `code` identify the error;

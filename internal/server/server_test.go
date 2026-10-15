@@ -35,7 +35,7 @@ import (
 )
 
 func TestConsoleHandler(t *testing.T) {
-	srv := httptest.NewServer(server.ConsoleHandler(publicAPI()))
+	srv := httptest.NewServer(server.ConsoleHandler(publicAPI(), nil))
 	t.Cleanup(srv.Close)
 
 	t.Run("public API version", func(t *testing.T) {
@@ -355,7 +355,7 @@ func defaultHandlers(drain *server.Drain) server.Handlers {
 	registry := metrics.NewRegistry(version.Get())
 	observer := server.NewObserver(discard, metrics.NewHTTP(registry), noop.NewTracerProvider())
 	return server.Handlers{
-		Console:    observer.Wrap("console", server.ConsoleHandler(publicAPI())),
+		Console:    observer.Wrap("console", server.ConsoleHandler(publicAPI(), nil)),
 		Machine:    observer.Wrap("machine", server.MachineHandler(moduleAPI(registry))),
 		Operations: server.OperationsHandler(drain, health.NewReadiness(discard), metrics.Handler(registry)),
 	}

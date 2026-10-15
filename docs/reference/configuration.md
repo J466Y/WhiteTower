@@ -87,6 +87,21 @@ User session settings (ADR-0009).
 | `auth.session.idle_timeout` | `WT_AUTH_SESSION_IDLE_TIMEOUT` | duration | `30m0s` | Inactivity duration before an idle session expires: 30m by default. |
 | `auth.session.absolute_lifetime` | `WT_AUTH_SESSION_ABSOLUTE_LIFETIME` | duration | `12h0m0s` | Maximum lifetime of a session regardless of activity: 12h by default. |
 
+### `auth.oidc`
+
+OpenID Connect authentication and backend-for-frontend settings (ADR-0009).
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `auth.oidc.issuer` | `WT_AUTH_OIDC_ISSUER` | string | none | Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled. |
+| `auth.oidc.client_id` | `WT_AUTH_OIDC_CLIENT_ID` | string | none | Client ID of the confidential client in the IdP. |
+| `auth.oidc.client_secret_file` | `WT_AUTH_OIDC_CLIENT_SECRET_FILE` | string | none | File with the confidential client secret: the secret never belongs in the configuration file or the environment. |
+| `auth.oidc.redirect_url` | `WT_AUTH_OIDC_REDIRECT_URL` | string | none | Redirect URL registered with the IdP for this server, such as https://127.0.0.1:8443/auth/callback. |
+| `auth.oidc.scopes` | `WT_AUTH_OIDC_SCOPES` | string | `[openid profile email groups]` | Scopes requested during OIDC authorization: openid, profile, email, groups by default. |
+| `auth.oidc.groups_claim` | `WT_AUTH_OIDC_GROUPS_CLAIM` | string | `groups` | Claim name in the ID token that contains group memberships: groups by default. |
+| `auth.oidc.role_mapping` | `WT_AUTH_OIDC_ROLE_MAPPING` | string | `map[wt-admins:admin wt-advisory:advisory wt-auditors:auditor wt-operators:operator wt-owners:owner wt-steering:steering wt-users:user]` | Map from IdP group names to White Tower roles (steering, advisory, owner, user, operator, auditor, admin). |
+| `auth.oidc.allowed_algorithms` | `WT_AUTH_OIDC_ALLOWED_ALGORITHMS` | string | `[RS256 ES256 ES384 ES512 PS256]` | Allowed signature algorithms for ID tokens: RS256, ES256, ES384, ES512, PS256 by default. |
+
 ## `audit`
 
 The tamper-evident audit log (ADR-0006).
