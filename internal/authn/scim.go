@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
+	"github.com/J466Y/WhiteTower/internal/platform/logging"
 )
 
 // SCIM 2.0 Schemas (RFC 7643, RFC 7644).
@@ -98,7 +99,9 @@ func (s *SCIMService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	candidateToken := strings.TrimPrefix(authHeader, "Bearer ")
 	if subtle.ConstantTimeCompare([]byte(candidateToken), []byte(s.token)) != 1 {
-		s.logger.Warn("SCIM authentication failed: invalid bearer token", "remote_addr", r.RemoteAddr)
+		safeRemoteAddr := strings.ReplaceAll(r.RemoteAddr, "\n", "")
+		safeRemoteAddr = strings.ReplaceAll(safeRemoteAddr, "\r", "")
+		s.logger.Warn("SCIM authentication failed: invalid bearer token", "remote_addr", logging.Sanitize(safeRemoteAddr))
 		s.writeError(w, http.StatusUnauthorized, "", "Unauthorized: invalid bearer token")
 		return
 	}
@@ -239,7 +242,9 @@ func (s *SCIMService) handleListUsers(w http.ResponseWriter, r *http.Request) {
 					s.writeListResponse(w, 0, 1, 0, []scimUserResource{})
 					return
 				}
-				s.logger.Error("querying principal by filter", "error", err, "filter", filter)
+				safeFilter := strings.ReplaceAll(filter, "\n", "")
+				safeFilter = strings.ReplaceAll(safeFilter, "\r", "")
+				s.logger.Error("querying principal by filter", "error", err, "filter", logging.Sanitize(safeFilter))
 				s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
 				return
 			}
@@ -333,7 +338,9 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Check for collision
 	if existing, err := s.principals.GetBySubjectOrEmail(ctx, req.UserName); err == nil && existing != nil {
-		s.writeError(w, http.StatusConflict, "uniqueness", fmt.Sprintf("User with userName %q already exists", req.UserName))
+		safeUserName := strings.ReplaceAll(req.UserName, "\n", "")
+		safeUserName = strings.ReplaceAll(safeUserName, "\r", "")
+		s.writeError(w, http.StatusConflict, "uniqueness", fmt.Sprintf("User with userName %q already exists", logging.Sanitize(safeUserName)))
 		return
 	}
 
@@ -361,7 +368,9 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	created, err := s.principals.UpsertHuman(ctx, "scim", req.UserName, displayName, email, []string{})
 	if err != nil {
-		s.logger.Error("creating human principal via SCIM", "error", err, "userName", req.UserName)
+		safeUserName := strings.ReplaceAll(req.UserName, "\n", "")
+		safeUserName = strings.ReplaceAll(safeUserName, "\r", "")
+		s.logger.Error("creating human principal via SCIM", "error", err, "userName", logging.Sanitize(safeUserName))
 		s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
 		return
 	}
@@ -396,7 +405,7 @@ func (s *SCIMService) handleGetUser(w http.ResponseWriter, r *http.Request, idSt
 			s.writeError(w, http.StatusNotFound, "", "User not found")
 			return
 		}
-		s.logger.Error("getting user by ID via SCIM", "error", err, "id", idStr)
+		s.logger.Error("getting user by ID via SCIM", "error", err, "id", id.String())
 		s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
 		return
 	}
@@ -429,7 +438,7 @@ func (s *SCIMService) handlePatchUser(w http.ResponseWriter, r *http.Request, id
 			s.writeError(w, http.StatusNotFound, "", "User not found")
 			return
 		}
-		s.logger.Error("getting user before patch via SCIM", "error", err, "id", idStr)
+		s.logger.Error("getting user before patch via SCIM", "error", err, "id", id.String())
 		s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
 		return
 	}
@@ -501,7 +510,7 @@ func (s *SCIMService) handlePatchUser(w http.ResponseWriter, r *http.Request, id
 	// Refetch and return updated user resource.
 	updated, err := s.principals.GetByID(ctx, id)
 	if err != nil {
-		s.logger.Error("fetching user after patch", "error", err, "id", idStr)
+		s.logger.Error("fetching user after patch", "error", err, "id", id.String())
 		s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
 		return
 	}
@@ -525,7 +534,7 @@ func (s *SCIMService) handleDeleteUser(w http.ResponseWriter, r *http.Request, i
 			s.writeError(w, http.StatusNotFound, "", "User not found")
 			return
 		}
-		s.logger.Error("getting user before delete via SCIM", "error", err, "id", idStr)
+		s.logger.Error("getting user before delete via SCIM", "error", err, "id", id.String())
 		s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
 		return
 	}
