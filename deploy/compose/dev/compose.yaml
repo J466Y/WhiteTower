@@ -92,6 +92,13 @@ services:
       - "127.0.0.1:${WT_CONSOLE_PORT:-8443}:8443"
       - "127.0.0.1:${WT_MACHINE_PORT:-9443}:9443"
       - "127.0.0.1:${WT_OPERATIONS_PORT:-9090}:9090"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     depends_on:
       migrate:
         condition: service_completed_successfully
