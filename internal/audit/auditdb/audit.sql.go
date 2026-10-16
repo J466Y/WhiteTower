@@ -23,6 +23,243 @@ func (q *Queries) EnsurePartitions(ctx context.Context, monthsAhead int32) error
 	return err
 }
 
+const getEventByID = `-- name: GetEventByID :one
+SELECT
+  e.id, e.event_time, e.source, e.type, e.subject_agent_id,
+  e.actor_type, e.actor_id, e.action, e.outcome, e.reason,
+  e.request_id, e.trace_id, e.ingested_at, e.canonical,
+  l.leaf_index, l.leaf_hash
+FROM whitetower.audit_events e
+LEFT JOIN whitetower.audit_leaves l ON l.audit_id = e.id AND l.ingested_at = e.ingested_at
+WHERE e.id = $1
+`
+
+type GetEventByIDRow struct {
+	ID             uuid.UUID
+	EventTime      time.Time
+	Source         string
+	Type           string
+	SubjectAgentID *uuid.UUID
+	ActorType      string
+	ActorID        *string
+	Action         string
+	Outcome        *string
+	Reason         *string
+	RequestID      *string
+	TraceID        *string
+	IngestedAt     time.Time
+	Canonical      []byte
+	LeafIndex      *int64
+	LeafHash       []byte
+}
+
+func (q *Queries) GetEventByID(ctx context.Context, id uuid.UUID) (GetEventByIDRow, error) {
+	row := q.db.QueryRow(ctx, getEventByID, id)
+	var i GetEventByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.EventTime,
+		&i.Source,
+		&i.Type,
+		&i.SubjectAgentID,
+		&i.ActorType,
+		&i.ActorID,
+		&i.Action,
+		&i.Outcome,
+		&i.Reason,
+		&i.RequestID,
+		&i.TraceID,
+		&i.IngestedAt,
+		&i.Canonical,
+		&i.LeafIndex,
+		&i.LeafHash,
+	)
+	return i, err
+}
+
+const getLatestCheckpoint = `-- name: GetLatestCheckpoint :one
+SELECT tree_size, root_hash, signed_note, key_id, created_at
+FROM whitetower.audit_checkpoints
+ORDER BY tree_size DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestCheckpoint(ctx context.Context) (WhitetowerAuditCheckpoint, error) {
+	row := q.db.QueryRow(ctx, getLatestCheckpoint)
+	var i WhitetowerAuditCheckpoint
+	err := row.Scan(
+		&i.TreeSize,
+		&i.RootHash,
+		&i.SignedNote,
+		&i.KeyID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const isAgentOwner = `-- name: IsAgentOwner :one
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.agent_owners
+  WHERE agent_id = $1
+    AND principal_id = $2
+    AND ended_at IS NULL
+)
+`
+
+type IsAgentOwnerParams struct {
+	AgentID     uuid.UUID
+	PrincipalID uuid.UUID
+}
+
+func (q *Queries) IsAgentOwner(ctx context.Context, arg IsAgentOwnerParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isAgentOwner, arg.AgentID, arg.PrincipalID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const listCheckpoints = `-- name: ListCheckpoints :many
+SELECT tree_size, root_hash, signed_note, key_id, created_at
+FROM whitetower.audit_checkpoints
+ORDER BY tree_size DESC
+`
+
+func (q *Queries) ListCheckpoints(ctx context.Context) ([]WhitetowerAuditCheckpoint, error) {
+	rows, err := q.db.Query(ctx, listCheckpoints)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhitetowerAuditCheckpoint
+	for rows.Next() {
+		var i WhitetowerAuditCheckpoint
+		if err := rows.Scan(
+			&i.TreeSize,
+			&i.RootHash,
+			&i.SignedNote,
+			&i.KeyID,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const queryEvents = `-- name: QueryEvents :many
+SELECT
+  e.id, e.event_time, e.source, e.type, e.subject_agent_id,
+  e.actor_type, e.actor_id, e.action, e.outcome, e.reason,
+  e.request_id, e.trace_id, e.ingested_at, e.canonical
+FROM whitetower.audit_events e
+WHERE
+  ($1::timestamptz IS NULL OR e.event_time >= $1)
+  AND ($2::timestamptz IS NULL OR e.event_time <= $2)
+  AND ($3::uuid IS NULL OR e.subject_agent_id = $3)
+  AND ($4::text IS NULL OR e.actor_id = $4)
+  AND ($5::text IS NULL OR e.actor_type = $5)
+  AND ($6::text IS NULL OR e.type = $6)
+  AND ($7::text IS NULL OR e.action = $7)
+  AND ($8::text IS NULL OR e.outcome = $8)
+  AND ($9::text IS NULL OR e.source = $9)
+  AND ($10::timestamptz IS NULL OR (e.event_time, e.id) < ($10::timestamptz, $11::uuid))
+  AND (
+    $12::uuid IS NULL
+    OR e.subject_agent_id IN (
+      SELECT ao.agent_id FROM whitetower.agent_owners ao
+      WHERE ao.principal_id = $12 AND ao.ended_at IS NULL
+    )
+  )
+ORDER BY e.event_time DESC, e.id DESC
+LIMIT $13
+`
+
+type QueryEventsParams struct {
+	FromTime         *time.Time
+	ToTime           *time.Time
+	SubjectAgentID   *uuid.UUID
+	ActorID          *string
+	ActorType        *string
+	EventType        *string
+	EventAction      *string
+	Outcome          *string
+	EventSource      *string
+	CursorTime       *time.Time
+	CursorID         *uuid.UUID
+	OwnerPrincipalID *uuid.UUID
+	PageLimit        int32
+}
+
+type QueryEventsRow struct {
+	ID             uuid.UUID
+	EventTime      time.Time
+	Source         string
+	Type           string
+	SubjectAgentID *uuid.UUID
+	ActorType      string
+	ActorID        *string
+	Action         string
+	Outcome        *string
+	Reason         *string
+	RequestID      *string
+	TraceID        *string
+	IngestedAt     time.Time
+	Canonical      []byte
+}
+
+func (q *Queries) QueryEvents(ctx context.Context, arg QueryEventsParams) ([]QueryEventsRow, error) {
+	rows, err := q.db.Query(ctx, queryEvents,
+		arg.FromTime,
+		arg.ToTime,
+		arg.SubjectAgentID,
+		arg.ActorID,
+		arg.ActorType,
+		arg.EventType,
+		arg.EventAction,
+		arg.Outcome,
+		arg.EventSource,
+		arg.CursorTime,
+		arg.CursorID,
+		arg.OwnerPrincipalID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []QueryEventsRow
+	for rows.Next() {
+		var i QueryEventsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EventTime,
+			&i.Source,
+			&i.Type,
+			&i.SubjectAgentID,
+			&i.ActorType,
+			&i.ActorID,
+			&i.Action,
+			&i.Outcome,
+			&i.Reason,
+			&i.RequestID,
+			&i.TraceID,
+			&i.IngestedAt,
+			&i.Canonical,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const recordEvent = `-- name: RecordEvent :exec
 WITH stored AS (
   INSERT INTO whitetower.audit_events (

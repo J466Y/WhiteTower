@@ -224,6 +224,16 @@
       "subject": "optional",
       "schema": "schemas/whitetower.breakglass.used.v1.json",
       "example": "examples/whitetower.breakglass.used.v1.json"
+    },
+    {
+      "type": "whitetower.audit.read.v1",
+      "summary": "The audit log was queried or an audit event was read (AUD-09, ST-12).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.audit.read.v1.json",
+      "example": "examples/whitetower.audit.read.v1.json"
     }
   ]
 }

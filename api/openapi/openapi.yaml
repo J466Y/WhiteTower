@@ -34,6 +34,8 @@ tags:
     description: Who is calling.
   - name: tokens
     description: API tokens for personal access and automation.
+  - name: audit
+    description: Tamper-evident audit log events, proofs, checkpoints and verification keys.
 paths:
   /version:
     get:
@@ -202,6 +204,158 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ServiceAccount"
+        default:
+          $ref: "#/components/responses/Problem"
+  /audit/events:
+    get:
+      operationId: getAuditEvents
+      summary: Query audit log events
+      description: |
+        Returns a paginated list of audit events matching the provided filters.
+        Reads of the audit log are themselves audited (AUD-09).
+      tags: [audit]
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Lower bound of the event timestamp (RFC 3339).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Upper bound of the event timestamp (RFC 3339).
+          schema:
+            type: string
+            format: date-time
+        - name: agentId
+          in: query
+          required: false
+          description: Filter events by subject agent ID.
+          schema:
+            type: string
+            format: uuid
+        - name: actorId
+          in: query
+          required: false
+          description: Filter events by actor ID.
+          schema:
+            type: string
+        - name: actorType
+          in: query
+          required: false
+          description: Filter events by actor type.
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          description: Filter events by CloudEvent type.
+          schema:
+            type: string
+        - name: action
+          in: query
+          required: false
+          description: Filter events by action.
+          schema:
+            type: string
+        - name: outcome
+          in: query
+          required: false
+          description: Filter events by outcome.
+          schema:
+            type: string
+        - name: source
+          in: query
+          required: false
+          description: Filter events by event source.
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          description: Keyset pagination cursor from nextCursor.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of events to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: A paginated page of audit events.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventList"
+        default:
+          $ref: "#/components/responses/Problem"
+  /audit/events/{id}:
+    get:
+      operationId: getAuditEvent
+      summary: Get an audit event with its Merkle inclusion proof
+      description: |
+        Retrieves a single audit event by ID with its Merkle tree inclusion proof
+        against the latest signed checkpoint. Reads are audited (AUD-09).
+      tags: [audit]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique UUID of the audit event.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The audit event and its cryptographic inclusion proof.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventDetail"
+        "404":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /audit/checkpoints:
+    get:
+      operationId: getAuditCheckpoints
+      summary: List signed checkpoints
+      description: Returns stored checkpoints signed over the audit log Merkle tree.
+      tags: [audit]
+      responses:
+        "200":
+          description: List of stored signed checkpoints.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditCheckpoint"
+        default:
+          $ref: "#/components/responses/Problem"
+  /audit/keys:
+    get:
+      operationId: getAuditKeys
+      summary: List checkpoint signing keys
+      description: Returns public halves of checkpoint signing keys as JWKs.
+      tags: [audit]
+      responses:
+        "200":
+          description: List of public checkpoint signing keys as JWKs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
         default:
           $ref: "#/components/responses/Problem"
 components:
@@ -437,4 +591,116 @@ components:
         idToken:
           type: string
           description: Raw OpenID Connect ID token obtained by the CLI.
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      required: [id, time, source, type, ingestedAt, data, canonical]
+      properties:
+        id:
+          type: string
+          format: uuid
+        time:
+          type: string
+          format: date-time
+        source:
+          type: string
+        type:
+          type: string
+        subject:
+          type: string
+          nullable: true
+        actorType:
+          type: string
+          nullable: true
+        actorId:
+          type: string
+          nullable: true
+        action:
+          type: string
+          nullable: true
+        outcome:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        requestId:
+          type: string
+          nullable: true
+        traceId:
+          type: string
+          nullable: true
+        ingestedAt:
+          type: string
+          format: date-time
+        data:
+          type: object
+          additionalProperties: true
+        canonical:
+          type: string
+          description: Canonical RFC 8785 JSON representation of the CloudEvent.
+    AuditEventList:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        nextCursor:
+          type: string
+          nullable: true
+    AuditInclusionProof:
+      type: object
+      additionalProperties: false
+      required: [leafIndex, treeSize, rootHash, hashes, checkpoint]
+      properties:
+        leafIndex:
+          type: integer
+          format: int64
+        treeSize:
+          type: integer
+          format: int64
+        rootHash:
+          type: string
+          description: Base64-encoded 32-byte Merkle root hash.
+        hashes:
+          type: array
+          items:
+            type: string
+          description: Base64-encoded 32-byte hashes forming the audit path.
+        checkpoint:
+          type: string
+          description: Signed C2SP checkpoint note against which proof holds.
+    AuditEventDetail:
+      type: object
+      additionalProperties: false
+      required: [event]
+      properties:
+        event:
+          $ref: "#/components/schemas/AuditEvent"
+        proof:
+          $ref: "#/components/schemas/AuditInclusionProof"
+          nullable: true
+    AuditCheckpoint:
+      type: object
+      additionalProperties: false
+      required: [treeSize, rootHash, keyId, note, createdAt]
+      properties:
+        treeSize:
+          type: integer
+          format: int64
+        rootHash:
+          type: string
+          description: Base64-encoded 32-byte Merkle root hash.
+        keyId:
+          type: string
+        note:
+          type: string
+          description: Complete signed note in C2SP format.
+        createdAt:
+          type: string
+          format: date-time
+
 

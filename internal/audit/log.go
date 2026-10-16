@@ -14,11 +14,18 @@ import (
 // package does not import (docs/development/internals.md). It hands over what
 // the database holds, and leaves the judging to the verifier.
 type Log struct {
-	db *db.DB
+	db     *db.DB
+	writer *Writer
 }
 
 // NewLog returns the audit log of a database.
 func NewLog(d *db.DB) *Log { return &Log{db: d} }
+
+// WithWriter attaches an audit writer to record log access events.
+func (l *Log) WithWriter(w *Writer) *Log {
+	l.writer = w
+	return l
+}
 
 // Size returns how many leaves the log has.
 func (l *Log) Size(ctx context.Context) (int64, error) {

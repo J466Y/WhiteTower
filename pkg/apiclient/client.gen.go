@@ -82,6 +82,66 @@ type ApiTokenMetadata struct {
 	TokenPrefix string             `json:"tokenPrefix"`
 }
 
+// AuditCheckpoint defines model for AuditCheckpoint.
+type AuditCheckpoint struct {
+	CreatedAt time.Time `json:"createdAt"`
+	KeyId     string    `json:"keyId"`
+
+	// Note Complete signed note in C2SP format.
+	Note string `json:"note"`
+
+	// RootHash Base64-encoded 32-byte Merkle root hash.
+	RootHash string `json:"rootHash"`
+	TreeSize int64  `json:"treeSize"`
+}
+
+// AuditEvent defines model for AuditEvent.
+type AuditEvent struct {
+	Action    *string `json:"action,omitempty"`
+	ActorId   *string `json:"actorId,omitempty"`
+	ActorType *string `json:"actorType,omitempty"`
+
+	// Canonical Canonical RFC 8785 JSON representation of the CloudEvent.
+	Canonical  string                 `json:"canonical"`
+	Data       map[string]interface{} `json:"data"`
+	Id         openapi_types.UUID     `json:"id"`
+	IngestedAt time.Time              `json:"ingestedAt"`
+	Outcome    *string                `json:"outcome,omitempty"`
+	Reason     *string                `json:"reason,omitempty"`
+	RequestId  *string                `json:"requestId,omitempty"`
+	Source     string                 `json:"source"`
+	Subject    *string                `json:"subject,omitempty"`
+	Time       time.Time              `json:"time"`
+	TraceId    *string                `json:"traceId,omitempty"`
+	Type       string                 `json:"type"`
+}
+
+// AuditEventDetail defines model for AuditEventDetail.
+type AuditEventDetail struct {
+	Event AuditEvent           `json:"event"`
+	Proof *AuditInclusionProof `json:"proof,omitempty"`
+}
+
+// AuditEventList defines model for AuditEventList.
+type AuditEventList struct {
+	Events     []AuditEvent `json:"events"`
+	NextCursor *string      `json:"nextCursor,omitempty"`
+}
+
+// AuditInclusionProof defines model for AuditInclusionProof.
+type AuditInclusionProof struct {
+	// Checkpoint Signed C2SP checkpoint note against which proof holds.
+	Checkpoint string `json:"checkpoint"`
+
+	// Hashes Base64-encoded 32-byte hashes forming the audit path.
+	Hashes    []string `json:"hashes"`
+	LeafIndex int64    `json:"leafIndex"`
+
+	// RootHash Base64-encoded 32-byte Merkle root hash.
+	RootHash string `json:"rootHash"`
+	TreeSize int64  `json:"treeSize"`
+}
+
 // CreateServiceAccountRequest defines model for CreateServiceAccountRequest.
 type CreateServiceAccountRequest struct {
 	DisplayName string               `json:"displayName"`
@@ -195,6 +255,42 @@ type VersionInfo struct {
 // VersionInfoApiVersion Version of this API.
 type VersionInfoApiVersion string
 
+// GetAuditEventsParams defines parameters for GetAuditEvents.
+type GetAuditEventsParams struct {
+	// From Lower bound of the event timestamp (RFC 3339).
+	From *time.Time `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Upper bound of the event timestamp (RFC 3339).
+	To *time.Time `form:"to,omitempty" json:"to,omitempty"`
+
+	// AgentId Filter events by subject agent ID.
+	AgentId *openapi_types.UUID `form:"agentId,omitempty" json:"agentId,omitempty"`
+
+	// ActorId Filter events by actor ID.
+	ActorId *string `form:"actorId,omitempty" json:"actorId,omitempty"`
+
+	// ActorType Filter events by actor type.
+	ActorType *string `form:"actorType,omitempty" json:"actorType,omitempty"`
+
+	// Type Filter events by CloudEvent type.
+	Type *string `form:"type,omitempty" json:"type,omitempty"`
+
+	// Action Filter events by action.
+	Action *string `form:"action,omitempty" json:"action,omitempty"`
+
+	// Outcome Filter events by outcome.
+	Outcome *string `form:"outcome,omitempty" json:"outcome,omitempty"`
+
+	// Source Filter events by event source.
+	Source *string `form:"source,omitempty" json:"source,omitempty"`
+
+	// Cursor Keyset pagination cursor from nextCursor.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of events to return.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListTokensParams defines parameters for ListTokens.
 type ListTokensParams struct {
 	// PrincipalId Optional principal ID to filter tokens (allowed for responsible owners and administrators).
@@ -289,6 +385,36 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+
+	// GetAuditCheckpoints List signed checkpoints
+	//
+	// Returns stored checkpoints signed over the audit log Merkle tree.
+	//
+	// Corresponds with GET /audit/checkpoints (the `GetAuditCheckpoints` operationId).
+	GetAuditCheckpoints(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuditEvents Query audit log events
+	//
+	// Returns a paginated list of audit events matching the provided filters.
+	// Reads of the audit log are themselves audited (AUD-09).
+	//
+	// Corresponds with GET /audit/events (the `GetAuditEvents` operationId).
+	GetAuditEvents(ctx context.Context, params *GetAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuditEvent Get an audit event with its Merkle inclusion proof
+	//
+	// Retrieves a single audit event by ID with its Merkle tree inclusion proof
+	// against the latest signed checkpoint. Reads are audited (AUD-09).
+	//
+	// Corresponds with GET /audit/events/{id} (the `GetAuditEvent` operationId).
+	GetAuditEvent(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuditKeys List checkpoint signing keys
+	//
+	// Returns public halves of checkpoint signing keys as JWKs.
+	//
+	// Corresponds with GET /audit/keys (the `GetAuditKeys` operationId).
+	GetAuditKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetMe Get the calling principal
 	//
@@ -385,6 +511,76 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /version (the `GetVersion` operationId).
 	GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// GetAuditCheckpoints List signed checkpoints
+//
+// Returns stored checkpoints signed over the audit log Merkle tree.
+//
+// Corresponds with GET /audit/checkpoints (the `GetAuditCheckpoints` operationId).
+func (c *Client) GetAuditCheckpoints(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuditCheckpointsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuditEvents Query audit log events
+//
+// Returns a paginated list of audit events matching the provided filters.
+// Reads of the audit log are themselves audited (AUD-09).
+//
+// Corresponds with GET /audit/events (the `GetAuditEvents` operationId).
+func (c *Client) GetAuditEvents(ctx context.Context, params *GetAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuditEventsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuditEvent Get an audit event with its Merkle inclusion proof
+//
+// Retrieves a single audit event by ID with its Merkle tree inclusion proof
+// against the latest signed checkpoint. Reads are audited (AUD-09).
+//
+// Corresponds with GET /audit/events/{id} (the `GetAuditEvent` operationId).
+func (c *Client) GetAuditEvent(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuditEventRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuditKeys List checkpoint signing keys
+//
+// Returns public halves of checkpoint signing keys as JWKs.
+//
+// Corresponds with GET /audit/keys (the `GetAuditKeys` operationId).
+func (c *Client) GetAuditKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuditKeysRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // GetMe Get the calling principal
@@ -591,6 +787,268 @@ func (c *Client) GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) 
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetAuditCheckpointsRequest constructs an http.Request for the GetAuditCheckpoints method
+func NewGetAuditCheckpointsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/audit/checkpoints")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAuditEventsRequest constructs an http.Request for the GetAuditEvents method
+func NewGetAuditEventsRequest(server string, params *GetAuditEventsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/audit/events")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.From != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", *params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.To != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", *params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AgentId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agentId", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ActorId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "actorId", *params.ActorId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ActorType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "actorType", *params.ActorType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Type != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "type", *params.Type, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Action != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "action", *params.Action, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Outcome != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "outcome", *params.Outcome, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Source != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "source", *params.Source, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAuditEventRequest constructs an http.Request for the GetAuditEvent method
+func NewGetAuditEventRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/audit/events/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAuditKeysRequest constructs an http.Request for the GetAuditKeys method
+func NewGetAuditKeysRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/audit/keys")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewGetMeRequest constructs an http.Request for the GetMe method
@@ -953,6 +1411,44 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// GetAuditCheckpointsWithResponse List signed checkpoints
+	//
+	// Returns stored checkpoints signed over the audit log Merkle tree.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /audit/checkpoints (the `GetAuditCheckpoints` operationId).
+	GetAuditCheckpointsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditCheckpointsResponse, error)
+
+	// GetAuditEventsWithResponse Query audit log events
+	//
+	// Returns a paginated list of audit events matching the provided filters.
+	// Reads of the audit log are themselves audited (AUD-09).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /audit/events (the `GetAuditEvents` operationId).
+	GetAuditEventsWithResponse(ctx context.Context, params *GetAuditEventsParams, reqEditors ...RequestEditorFn) (*GetAuditEventsResponse, error)
+
+	// GetAuditEventWithResponse Get an audit event with its Merkle inclusion proof
+	//
+	// Retrieves a single audit event by ID with its Merkle tree inclusion proof
+	// against the latest signed checkpoint. Reads are audited (AUD-09).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /audit/events/{id} (the `GetAuditEvent` operationId).
+	GetAuditEventWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAuditEventResponse, error)
+
+	// GetAuditKeysWithResponse List checkpoint signing keys
+	//
+	// Returns public halves of checkpoint signing keys as JWKs.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /audit/keys (the `GetAuditKeys` operationId).
+	GetAuditKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditKeysResponse, error)
+
 	// GetMeWithResponse Get the calling principal
 	//
 	// Returns the calling principal, their roles, their permissions derived
@@ -1058,6 +1554,205 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /version (the `GetVersion` operationId).
 	GetVersionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVersionResponse, error)
+}
+
+type GetAuditCheckpointsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]AuditCheckpoint
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuditCheckpointsResponse) GetJSON200() *[]AuditCheckpoint {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetAuditCheckpointsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuditCheckpointsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuditCheckpointsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuditCheckpointsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuditCheckpointsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAuditEventsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuditEventList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuditEventsResponse) GetJSON200() *AuditEventList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetAuditEventsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuditEventsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuditEventsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuditEventsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuditEventsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAuditEventResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuditEventDetail
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuditEventResponse) GetJSON200() *AuditEventDetail {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetAuditEventResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetAuditEventResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuditEventResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuditEventResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuditEventResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuditEventResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAuditKeysResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]map[string]interface{}
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuditKeysResponse) GetJSON200() *[]map[string]interface{} {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetAuditKeysResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuditKeysResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuditKeysResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuditKeysResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuditKeysResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type GetMeResponse struct {
@@ -1437,6 +2132,68 @@ func (r GetVersionResponse) ContentType() string {
 	return ""
 }
 
+// GetAuditCheckpointsWithResponse List signed checkpoints
+//
+// Returns stored checkpoints signed over the audit log Merkle tree.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /audit/checkpoints (the `GetAuditCheckpoints` operationId).
+func (c *ClientWithResponses) GetAuditCheckpointsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditCheckpointsResponse, error) {
+	rsp, err := c.GetAuditCheckpoints(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuditCheckpointsResponse(rsp)
+}
+
+// GetAuditEventsWithResponse Query audit log events
+//
+// Returns a paginated list of audit events matching the provided filters.
+// Reads of the audit log are themselves audited (AUD-09).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /audit/events (the `GetAuditEvents` operationId).
+func (c *ClientWithResponses) GetAuditEventsWithResponse(ctx context.Context, params *GetAuditEventsParams, reqEditors ...RequestEditorFn) (*GetAuditEventsResponse, error) {
+	rsp, err := c.GetAuditEvents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuditEventsResponse(rsp)
+}
+
+// GetAuditEventWithResponse Get an audit event with its Merkle inclusion proof
+//
+// Retrieves a single audit event by ID with its Merkle tree inclusion proof
+// against the latest signed checkpoint. Reads are audited (AUD-09).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /audit/events/{id} (the `GetAuditEvent` operationId).
+func (c *ClientWithResponses) GetAuditEventWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAuditEventResponse, error) {
+	rsp, err := c.GetAuditEvent(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuditEventResponse(rsp)
+}
+
+// GetAuditKeysWithResponse List checkpoint signing keys
+//
+// Returns public halves of checkpoint signing keys as JWKs.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /audit/keys (the `GetAuditKeys` operationId).
+func (c *ClientWithResponses) GetAuditKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditKeysResponse, error) {
+	rsp, err := c.GetAuditKeys(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuditKeysResponse(rsp)
+}
+
 // GetMeWithResponse Get the calling principal
 //
 // Returns the calling principal, their roles, their permissions derived
@@ -1607,6 +2364,145 @@ func (c *ClientWithResponses) GetVersionWithResponse(ctx context.Context, reqEdi
 		return nil, err
 	}
 	return ParseGetVersionResponse(rsp)
+}
+
+// ParseGetAuditCheckpointsResponse parses an HTTP response from a GetAuditCheckpointsWithResponse call
+func ParseGetAuditCheckpointsResponse(rsp *http.Response) (*GetAuditCheckpointsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuditCheckpointsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []AuditCheckpoint
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuditEventsResponse parses an HTTP response from a GetAuditEventsWithResponse call
+func ParseGetAuditEventsResponse(rsp *http.Response) (*GetAuditEventsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuditEventsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuditEventList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuditEventResponse parses an HTTP response from a GetAuditEventWithResponse call
+func ParseGetAuditEventResponse(rsp *http.Response) (*GetAuditEventResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuditEventResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuditEventDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuditKeysResponse parses an HTTP response from a GetAuditKeysWithResponse call
+func ParseGetAuditKeysResponse(rsp *http.Response) (*GetAuditKeysResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuditKeysResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseGetMeResponse parses an HTTP response from a GetMeWithResponse call

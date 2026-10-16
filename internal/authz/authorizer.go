@@ -43,7 +43,9 @@ func NewAuthorizer() *Authorizer {
 func (az *Authorizer) registerDefaults() {
 	az.operations["getMe"] = PermissionIdentityMeRead
 	az.operations["getAuditEvents"] = PermissionAuditEventsRead
+	az.operations["getAuditEvent"] = PermissionAuditEventsRead
 	az.operations["getAuditCheckpoints"] = PermissionAuditVerify
+	az.operations["getAuditKeys"] = PermissionAuditVerify
 	az.operations["exportAudit"] = PermissionAuditExport
 	az.operations["listAgents"] = PermissionInventoryView
 	az.operations["getAgent"] = PermissionInventoryView
