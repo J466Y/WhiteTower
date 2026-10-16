@@ -32,12 +32,15 @@ const (
 )
 
 // ConsoleHandler serves the console listener: the public REST API, built
-// with rest.Handler, auth routes under /auth/, and the web console.
-func ConsoleHandler(api http.Handler, auth http.Handler) http.Handler {
+// with rest.Handler, auth routes under /auth/, scim under /scim/v2/, and the web console.
+func ConsoleHandler(api http.Handler, auth http.Handler, scim ...http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle(rest.BasePath+"/", api)
 	if auth != nil {
 		mux.Handle("/auth/", auth)
+	}
+	if len(scim) > 0 && scim[0] != nil {
+		mux.Handle("/scim/v2/", scim[0])
 	}
 	mux.Handle("/", webui.Handler())
 	limited := LimitBody(MaxConsoleBody,

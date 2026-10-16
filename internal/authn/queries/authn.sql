@@ -130,3 +130,22 @@ INSERT INTO whitetower.role_bindings (
     $1, $2, $3, $4, $5, $6
 );
 
+-- name: GetHumanPrincipalByEmail :one
+SELECT * FROM whitetower.principals
+WHERE kind = 'human' AND email = $1;
+
+-- name: GetHumanPrincipalBySubjectOrEmail :one
+SELECT * FROM whitetower.principals
+WHERE kind = 'human' AND (subject = $1 OR email = $1)
+LIMIT 1;
+
+-- name: ListHumanPrincipals :many
+SELECT * FROM whitetower.principals
+WHERE kind = 'human'
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2;
+
+-- name: CountHumanPrincipals :one
+SELECT COUNT(*) FROM whitetower.principals
+WHERE kind = 'human';
+

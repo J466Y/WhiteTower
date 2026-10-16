@@ -112,6 +112,15 @@ Emergency break-glass access settings (plan P1-03, step 9; HUM-06, KIL-08, ST-20
 | `auth.breakglass.enabled` | `WT_AUTH_BREAKGLASS_ENABLED` | boolean | `false` | Whether break-glass emergency access is enabled: false by default. |
 | `auth.breakglass.credential_hash_file` | `WT_AUTH_BREAKGLASS_CREDENTIAL_HASH_FILE` | string | none | File with the break-glass credential hash ($wt$1$<salt>$<hash>). Required when break-glass is enabled. |
 
+### `auth.scim`
+
+SCIM 2.0 deprovisioning settings (plan P1-03, step 8; HUM-05, ST-21).
+
+| Key | Environment variable | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `auth.scim.enabled` | `WT_AUTH_SCIM_ENABLED` | boolean | `false` | Whether SCIM 2.0 deprovisioning endpoint is enabled: false by default. |
+| `auth.scim.token_file` | `WT_AUTH_SCIM_TOKEN_FILE` | string | none | File with the bearer token required to authenticate SCIM requests from the IdP. |
+
 ## `audit`
 
 The tamper-evident audit log (ADR-0006).

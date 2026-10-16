@@ -117,6 +117,16 @@ type Auth struct {
 	OIDC OIDC `yaml:"oidc"`
 	// Emergency break-glass access settings (plan P1-03, step 9; HUM-06, KIL-08, ST-20).
 	Breakglass Breakglass `yaml:"breakglass"`
+	// SCIM 2.0 deprovisioning settings (plan P1-03, step 8; HUM-05, ST-21).
+	SCIM SCIM `yaml:"scim"`
+}
+
+// SCIM holds SCIM 2.0 deprovisioning settings (plan P1-03, step 8; HUM-05, ST-21).
+type SCIM struct {
+	// Whether SCIM 2.0 deprovisioning endpoint is enabled: false by default.
+	Enabled bool `yaml:"enabled"`
+	// File with the bearer token required to authenticate SCIM requests from the IdP.
+	TokenFile string `yaml:"token_file"`
 }
 
 // Breakglass holds emergency break-glass access settings (plan P1-03, step 9; HUM-06, KIL-08, ST-20).
@@ -298,6 +308,9 @@ func Defaults() Config {
 			Breakglass: Breakglass{
 				Enabled: false,
 			},
+			SCIM: SCIM{
+				Enabled: false,
+			},
 		},
 		Audit: Audit{
 			CheckpointInterval: MaxCheckpointInterval,
@@ -459,6 +472,12 @@ func (c Config) Validate() error {
 				add("auth.oidc.allowed_algorithms", "%q: symmetric HMAC algorithms are forbidden for OIDC ID tokens (threat model, T-13)", alg)
 			}
 		}
+	}
+	if c.Auth.Breakglass.Enabled && c.Auth.Breakglass.CredentialHashFile == "" {
+		add("auth.breakglass.credential_hash_file", "required when auth.breakglass.enabled is true")
+	}
+	if c.Auth.SCIM.Enabled && c.Auth.SCIM.TokenFile == "" {
+		add("auth.scim.token_file", "required when auth.scim.enabled is true")
 	}
 	if u := c.Database.Migration.URL; u != "" {
 		if err := checkDatabaseURL(u); err != nil {

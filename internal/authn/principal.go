@@ -121,6 +121,53 @@ func (ps *PrincipalStore) GetByIdentity(ctx context.Context, issuer, subject str
 	return fromDBModel(row), nil
 }
 
+// GetBySubjectOrEmail returns the human principal matching the given subject or email.
+func (ps *PrincipalStore) GetBySubjectOrEmail(ctx context.Context, identifier string) (*Principal, error) {
+	q := authndb.New(ps.database)
+	row, err := q.GetHumanPrincipalBySubjectOrEmail(ctx, &identifier)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPrincipalNotFound
+		}
+		return nil, fmt.Errorf("querying principal by subject or email: %w", err)
+	}
+	return fromDBModel(row), nil
+}
+
+// GetByEmail returns the human principal matching the given email address.
+func (ps *PrincipalStore) GetByEmail(ctx context.Context, email string) (*Principal, error) {
+	q := authndb.New(ps.database)
+	row, err := q.GetHumanPrincipalByEmail(ctx, &email)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPrincipalNotFound
+		}
+		return nil, fmt.Errorf("querying principal by email: %w", err)
+	}
+	return fromDBModel(row), nil
+}
+
+// ListHumans returns a paginated list of human principals and the total count.
+func (ps *PrincipalStore) ListHumans(ctx context.Context, limit, offset int32) ([]*Principal, int64, error) {
+	q := authndb.New(ps.database)
+	count, err := q.CountHumanPrincipals(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("counting human principals: %w", err)
+	}
+	rows, err := q.ListHumanPrincipals(ctx, authndb.ListHumanPrincipalsParams{
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("listing human principals: %w", err)
+	}
+	principals := make([]*Principal, len(rows))
+	for i, r := range rows {
+		principals[i] = fromDBModel(r)
+	}
+	return principals, count, nil
+}
+
 // Deactivate sets a principal's status to inactive, revokes all of their active sessions,
 // and records an audited whitetower.principal.deactivated.v1 event (HUM-05, ST-14, ST-21).
 func (ps *PrincipalStore) Deactivate(ctx context.Context, id uuid.UUID, actor auth.Principal, reason string) error {

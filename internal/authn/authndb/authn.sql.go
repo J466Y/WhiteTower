@@ -41,6 +41,18 @@ func (q *Queries) AddRoleBinding(ctx context.Context, arg AddRoleBindingParams) 
 	return err
 }
 
+const countHumanPrincipals = `-- name: CountHumanPrincipals :one
+SELECT COUNT(*) FROM whitetower.principals
+WHERE kind = 'human'
+`
+
+func (q *Queries) CountHumanPrincipals(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countHumanPrincipals)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAPIToken = `-- name: CreateAPIToken :exec
 INSERT INTO whitetower.api_tokens (
     id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at
@@ -224,6 +236,34 @@ func (q *Queries) GetAPITokenByID(ctx context.Context, id uuid.UUID) (Whitetower
 	return i, err
 }
 
+const getHumanPrincipalByEmail = `-- name: GetHumanPrincipalByEmail :one
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+WHERE kind = 'human' AND email = $1
+`
+
+func (q *Queries) GetHumanPrincipalByEmail(ctx context.Context, email *string) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, getHumanPrincipalByEmail, email)
+	var i WhitetowerPrincipal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.Email,
+		&i.Status,
+		&i.StatusChangedAt,
+		&i.StatusReason,
+		&i.IdpGroups,
+		&i.LastLoginAt,
+		&i.ResponsiblePrincipalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const getHumanPrincipalByIdentity = `-- name: GetHumanPrincipalByIdentity :one
 SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
 WHERE issuer = $1 AND subject = $2 AND kind = 'human'
@@ -236,6 +276,35 @@ type GetHumanPrincipalByIdentityParams struct {
 
 func (q *Queries) GetHumanPrincipalByIdentity(ctx context.Context, arg GetHumanPrincipalByIdentityParams) (WhitetowerPrincipal, error) {
 	row := q.db.QueryRow(ctx, getHumanPrincipalByIdentity, arg.Issuer, arg.Subject)
+	var i WhitetowerPrincipal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.Email,
+		&i.Status,
+		&i.StatusChangedAt,
+		&i.StatusReason,
+		&i.IdpGroups,
+		&i.LastLoginAt,
+		&i.ResponsiblePrincipalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
+const getHumanPrincipalBySubjectOrEmail = `-- name: GetHumanPrincipalBySubjectOrEmail :one
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+WHERE kind = 'human' AND (subject = $1 OR email = $1)
+LIMIT 1
+`
+
+func (q *Queries) GetHumanPrincipalBySubjectOrEmail(ctx context.Context, subject *string) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, getHumanPrincipalBySubjectOrEmail, subject)
 	var i WhitetowerPrincipal
 	err := row.Scan(
 		&i.ID,
@@ -379,6 +448,54 @@ ORDER BY created_at DESC
 
 func (q *Queries) ListAllServiceAccounts(ctx context.Context) ([]WhitetowerPrincipal, error) {
 	rows, err := q.db.Query(ctx, listAllServiceAccounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhitetowerPrincipal
+	for rows.Next() {
+		var i WhitetowerPrincipal
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.Issuer,
+			&i.Subject,
+			&i.DisplayName,
+			&i.Email,
+			&i.Status,
+			&i.StatusChangedAt,
+			&i.StatusReason,
+			&i.IdpGroups,
+			&i.LastLoginAt,
+			&i.ResponsiblePrincipalID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listHumanPrincipals = `-- name: ListHumanPrincipals :many
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+WHERE kind = 'human'
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListHumanPrincipalsParams struct {
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) ListHumanPrincipals(ctx context.Context, arg ListHumanPrincipalsParams) ([]WhitetowerPrincipal, error) {
+	rows, err := q.db.Query(ctx, listHumanPrincipals, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
