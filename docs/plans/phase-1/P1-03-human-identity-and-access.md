@@ -160,8 +160,8 @@ The plan lands in six pull requests. The first builds the authorization engine a
 | 2. Principals, sessions and CSRF | 2, 3, ST-13, ST-14 | Done (PR #37) |
 | 3. OIDC login, role mapping and /me | 1, 4, 11, ST-15, ST-16, ST-22 | Done (PR #38) |
 | 4. API tokens | 6, ST-19 | Done (PR #39) |
-| 5. CLI token exchange and break-glass | 7, 9, ST-20 | In progress (5 of 6 pull requests) |
-| 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Not started |
+| 5. CLI token exchange and break-glass | 7, 9, ST-20 | Done (PR #40) |
+| 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Done (PR #41) |
 
 ### 2026-10-14: roles, permissions and authorization engine
 
@@ -278,6 +278,29 @@ The plan lands in six pull requests. The first builds the authorization engine a
   - `internal/authn/oidc_test.go`: `TestExchangeIDToken` (happy path 12h exchange, wrong audience refusal, expired token refusal, deactivated principal refusal).
   - `cmd/whitetower/breakglass_test.go`: `whitetower breakglass init` CLI execution, file output permissions, header output, and hash verification.
   - `internal/api/rest/rest_test.go`: `TestExchangeTokenEndpoint` and `/api/v1/me` asserting `isBreakglass: true`.
+
+### 2026-10-16: SCIM 2.0 deprovisioning and SAML broker guide (PR 6)
+
+- SCIM 2.0 deprovisioning (`internal/authn/scim.go`, HUM-05; ST-21; threat model T-18):
+  - Implements RFC 7643 and RFC 7644 core user endpoints under `/scim/v2/Users` and `/scim/v2/Users/{id}`.
+  - Dedicated authentication: protected by a bearer token loaded from `auth.scim.token_file` (configured under `auth.scim.enabled` and `auth.scim.token_file`). Unauthenticated or invalid requests receive 401 Unauthorized (`application/scim+json`).
+  - Secret protection: `auth.scim.token_file` covered by `cmd/whitetower/security_test.go` (`TestEverySecretFileIsCovered` and `TestSecretsNeverLeak`).
+  - User search and pagination: supports `filter=userName eq "..."`, `startIndex` (1-based), and `count` (bounded), returning standard SCIM `ListResponse`.
+  - User provisioning (`POST /scim/v2/Users`): provisions human principals with conflict detection on duplicate `userName` (409 Conflict).
+  - Deprovisioning (`PATCH /scim/v2/Users/{id}` with `active: false` or `DELETE /scim/v2/Users/{id}` as deactivation):
+    - Sets principal status to `inactive` in PostgreSQL.
+    - Revokes all active user sessions immediately in PostgreSQL (`SessionStore.RevokeAllForPrincipal`).
+    - Revokes all personal access tokens (`TokenStore.RevokeAllForPrincipal`).
+    - Emits critical audit event `whitetower.principal.deactivated.v1` attributed to SCIM service account (`00000000-0000-0000-0000-000000000002`).
+  - Reactivation: supports `PATCH /scim/v2/Users/{id}` with `active: true` setting status back to `active`.
+  - Server wiring: mounted on `/scim/v2/` via `ConsoleHandler` in `internal/server/handlers.go` and `cmd/whitetower/main.go`.
+- SAML through a broker guide and verification (`docs/guides/saml-broker.md`, HUM-08):
+  - Step-by-step enterprise guide configuring Keycloak as an identity broker to SAML 2.0 Identity Providers (Entra ID, Okta, Active Directory Federation Services).
+  - Documents IdP SAML configuration, NameID and attribute statements, SAML group claim extraction, and role mapping to White Tower governance roles (`admin`, `operator`, `owner`, `auditor`, `user`).
+  - Integration test `TestSAMLThroughBroker` in `internal/authn/saml_test.go` validating the brokered assertion ingestion, attribute/group mapping, principal provisioning, and session establishment.
+- Tests:
+  - ST-21 in `internal/authn/scim_test.go`: bearer token verification, user provisioning, filter query, deprovisioning via PATCH `active: false`, session and API token revocation, audit event verification, delete as deactivation, and reactivation via PATCH `active: true`.
+  - `internal/authn/saml_test.go`: end-to-end SAML identity brokering and role mapping test.
 
 
 

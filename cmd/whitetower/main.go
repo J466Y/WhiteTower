@@ -246,6 +246,18 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		authHandler = authMux
 	}
 
+	var scimSvc *authn.SCIMService
+	if cfg.Auth.SCIM.Enabled {
+		scimSvc, err = authn.NewSCIMService(authn.SCIMOptions{
+			Enabled:   cfg.Auth.SCIM.Enabled,
+			TokenFile: cfg.Auth.SCIM.TokenFile,
+			Logger:    logger,
+		}, principalStore)
+		if err != nil {
+			return fmt.Errorf("initializing SCIM service: %w", err)
+		}
+	}
+
 	registry := metrics.NewRegistry(v)
 	httpMetrics := metrics.NewHTTP(registry)
 	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
@@ -272,7 +284,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Metrics:       metrics.NewRPC(registry),
 	})
 	srv, err := server.New(cfg, server.Handlers{
-		Console:    observer.Wrap("console", server.ConsoleHandler(api, authHandler)),
+		Console:    observer.Wrap("console", server.ConsoleHandler(api, authHandler, scimSvc)),
 		Machine:    observer.Wrap("machine", server.MachineHandler(moduleAPI)),
 		Operations: server.OperationsHandler(drain, ready, metrics.Handler(registry)),
 	}, drain, logger)
