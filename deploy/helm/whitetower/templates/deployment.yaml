@@ -1,0 +1,192 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "whitetower.fullname" . }}
+  labels:
+    {{- include "whitetower.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: {{ .Values.strategy.type }}
+    {{- with .Values.strategy.rollingUpdate }}
+    rollingUpdate:
+      maxSurge: {{ .maxSurge }}
+      maxUnavailable: {{ .maxUnavailable }}
+    {{- end }}
+  selector:
+    matchLabels:
+      {{- include "whitetower.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "whitetower.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "whitetower.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Migrations run in an init container with the migration role's credentials (DC-3, ST-62).
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - whitetower
+            - migrate
+          env:
+            - name: WT_DATABASE_MIGRATION_URL
+              value: {{ .Values.database.migrationUrl | quote }}
+            - name: WT_DATABASE_MIGRATION_PASSWORD_FILE
+              value: /run/secrets/database-migrator/password
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: db-migrator-secret
+              mountPath: /run/secrets/database-migrator
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        # Core server runs with the runtime role's credentials only (DC-3, ST-61, ST-62).
+        - name: whitetower
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - whitetower
+            - serve
+            - --config=/etc/whitetower/config.yaml
+          env:
+            - name: WT_CONFIG
+              value: /etc/whitetower/config.yaml
+            {{- if .Values.dev.selfSignedTls }}
+            - name: WT_DEV_SELF_SIGNED_TLS
+              value: "true"
+            {{- end }}
+          ports:
+            - name: console
+              containerPort: {{ .Values.service.console.port }}
+              protocol: TCP
+            - name: machine
+              containerPort: {{ .Values.service.machine.port }}
+              protocol: TCP
+            - name: operations
+              containerPort: {{ .Values.service.operations.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: operations
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: operations
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/whitetower
+              readOnly: true
+            - name: db-app-secret
+              mountPath: /run/secrets/database-app
+              readOnly: true
+            - name: audit-checkpoint-secret
+              mountPath: /run/secrets/audit-checkpoint-key
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            {{- if or .Values.tls.console.existingSecret .Values.tls.console.cert }}
+            - name: tls-console
+              mountPath: /run/secrets/tls-console
+              readOnly: true
+            {{- end }}
+            {{- if or .Values.tls.machine.existingSecret .Values.tls.machine.cert }}
+            - name: tls-machine
+              mountPath: /run/secrets/tls-machine
+              readOnly: true
+            {{- end }}
+            {{- if or .Values.secrets.tokenSigningKey.existingSecret .Values.secrets.tokenSigningKey.key }}
+            - name: token-signing-secret
+              mountPath: /run/secrets/token-signing-key
+              readOnly: true
+            {{- end }}
+            {{- if or .Values.secrets.bundleSigningKey.existingSecret .Values.secrets.bundleSigningKey.key }}
+            - name: bundle-signing-secret
+              mountPath: /run/secrets/bundle-signing-key
+              readOnly: true
+            {{- end }}
+            {{- if or .Values.secrets.oidcClientSecret.existingSecret .Values.secrets.oidcClientSecret.secret }}
+            - name: oidc-secret
+              mountPath: /run/secrets/oidc-client-secret
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "whitetower.fullname" . }}-config
+        - name: tmp
+          emptyDir:
+            medium: Memory
+        - name: db-migrator-secret
+          secret:
+            secretName: {{ .Values.secrets.databaseMigrator.existingSecret | default (printf "%s-db-migrator" (include "whitetower.fullname" .)) }}
+            defaultMode: 0400
+        - name: db-app-secret
+          secret:
+            secretName: {{ .Values.secrets.databaseApp.existingSecret | default (printf "%s-db-app" (include "whitetower.fullname" .)) }}
+            defaultMode: 0400
+        - name: audit-checkpoint-secret
+          secret:
+            secretName: {{ .Values.secrets.auditCheckpointKey.existingSecret | default (printf "%s-audit-checkpoint" (include "whitetower.fullname" .)) }}
+            defaultMode: 0400
+        {{- if or .Values.tls.console.existingSecret .Values.tls.console.cert }}
+        - name: tls-console
+          secret:
+            secretName: {{ .Values.tls.console.existingSecret | default (printf "%s-tls-console" (include "whitetower.fullname" .)) }}
+            defaultMode: 0400
+        {{- end }}
+        {{- if or .Values.tls.machine.existingSecret .Values.tls.machine.cert }}
+        - name: tls-machine
+          secret:
+            secretName: {{ .Values.tls.machine.existingSecret | default (printf "%s-tls-machine" (include "whitetower.fullname" .)) }}
+            defaultMode: 0400
+        {{- end }}
+        {{- if or .Values.secrets.tokenSigningKey.existingSecret .Values.secrets.tokenSigningKey.key }}
+        - name: token-signing-secret
+          secret:
+            secretName: {{ .Values.secrets.tokenSigningKey.existingSecret | default (printf "%s-token-signing" (include "whitetower.fullname" .)) }}
+            defaultMode: 0400
+        {{- end }}
+        {{- if or .Values.secrets.bundleSigningKey.existingSecret .Values.secrets.bundleSigningKey.key }}
+        - name: bundle-signing-secret
+          secret:
+            secretName: {{ .Values.secrets.bundleSigningKey.existingSecret | default (printf "%s-bundle-signing" (include "whitetower.fullname" .)) }}
+            defaultMode: 0400
+        {{- end }}
+        {{- if or .Values.secrets.oidcClientSecret.existingSecret .Values.secrets.oidcClientSecret.secret }}
+        - name: oidc-secret
+          secret:
+            secretName: {{ .Values.secrets.oidcClientSecret.existingSecret | default (printf "%s-oidc-client-secret" (include "whitetower.fullname" .)) }}
+            defaultMode: 0400
+        {{- end }}

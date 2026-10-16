@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "whitetower.fullname" . }}-console
+  labels:
+    {{- include "whitetower.labels" . | nindent 4 }}
+    whitetower.io/listener: console
+  {{- with .Values.service.console.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.console.type }}
+  ports:
+    - port: {{ .Values.service.console.port }}
+      targetPort: console
+      protocol: TCP
+      name: https-console
+  selector:
+    {{- include "whitetower.selectorLabels" . | nindent 4 }}

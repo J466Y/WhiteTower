@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "whitetower.fullname" . }}-machine
+  labels:
+    {{- include "whitetower.labels" . | nindent 4 }}
+    whitetower.io/listener: machine
+  {{- with .Values.service.machine.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.machine.type }}
+  ports:
+    - port: {{ .Values.service.machine.port }}
+      targetPort: machine
+      protocol: TCP
+      name: https-machine
+  selector:
+    {{- include "whitetower.selectorLabels" . | nindent 4 }}

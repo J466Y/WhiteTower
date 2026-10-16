@@ -156,10 +156,26 @@ The plan lands in five pull requests across its two parts (P1-12.1: packaging fo
 | Pull request | Steps | Status |
 | --- | --- | --- |
 | 1. Hardened images and evaluation Compose profile | 1, 2, OPS-01 | Done |
-| 2. Production Helm chart | 3, ST-61, ST-62, ST-63 | Not started |
+| 2. Production Helm chart | 3, ST-61, ST-62, ST-63 | Done |
 | 3. PostgreSQL reference setup with CloudNativePG and pooling | 4 | Not started |
 | 4. Air-gapped bundle and egress-denied CI test | 5, 6, ST-60, NFR-14 | Not started |
 | 5. Upgrades, backup/restore and operations documentation | 7, 8, 9, 10, ST-64, OPS-06, OPS-07 | Not started |
+
+### 2026-10-16: production Helm chart (PR 2)
+
+- Production Helm chart in `deploy/helm/whitetower/` (step 3, ST-61, ST-62, ST-63):
+  - `Chart.yaml`: Helm v2 application chart for White Tower `v0.1.0`.
+  - `values.yaml` and `values.schema.json`: production-safe defaults with strict JSON Schema (draft-07) validation.
+  - High availability & resilience: `replicaCount: 2` minimum, pod anti-affinity across node hostnames, `PodDisruptionBudget` (`minAvailable: 1`), rolling updates (`maxSurge: 1, maxUnavailable: 0`), and `terminationGracePeriodSeconds: 70` (longer than the 60s drain deadline).
+  - Restricted Pod Security Standard: `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, `allowPrivilegeEscalation: false`, `capabilities: { drop: ["ALL"] }`, `seccompProfile: { type: RuntimeDefault }`, user/group/fsGroup 65532, and memory tmpfs mounted at `/tmp`.
+  - Three distinct Services and Ingress: dedicated ClusterIP services for console (`8443`), machine (`9443`), and operations (`9090`), with ingress configuration keeping console separate from machine.
+  - Credential separation (ST-62, DC-3): database migrations execute in an init container (`migrate`) with only `db-migrator-secret` mounted; the core application container (`whitetower`) mounts runtime `db-app-secret` only and has no access to migration credentials or env vars.
+  - File-based secrets (ST-61, OPS-04): key secrets mounted under `/run/secrets/` with strict `0400` permissions; no sensitive secrets or credentials passed via environment variables.
+  - Network isolation (ST-63): NetworkPolicy enforcing separate ingress rules for console (`8443` from ingress controllers), machine (`9443` from modules and enforcement points), and operations (`9090` from monitoring and Prometheus), with restricted egress (DNS, PostgreSQL).
+  - Observability & test hook: optional `ServiceMonitor` for Prometheus Operator scraping `/metrics`, and `helm test` connection hook executing native `whitetower healthcheck`.
+- Documentation & Tests:
+  - Chart documentation and installation guide in `deploy/helm/whitetower/README.md`.
+  - Automated tests in `test/packaging/helm_test.go` verifying chart metadata, values schema validation, template rendering, HA/resilience configuration, Restricted PSS compliance, distinct services, and security tests ST-61, ST-62, and ST-63.
 
 ### 2026-10-16: images and evaluation Compose profile (PR 1)
 
