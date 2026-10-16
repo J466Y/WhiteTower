@@ -1,0 +1,136 @@
+# Evaluation profile for White Tower (OPS-01, P1-12.1).
+# Starts the core, PostgreSQL, Keycloak, OpenTelemetry collector, and seeds sample data.
+# Run with: task eval (or docker compose -f deploy/compose/eval/compose.yaml up -d --wait)
+name: whitetower-eval
+
+services:
+  postgres:
+    image: postgres:${WT_POSTGRES_VERSION:-17}-alpine
+    environment:
+      POSTGRES_DB: whitetower
+      POSTGRES_USER: whitetower
+      POSTGRES_PASSWORD: whitetower-dev-only
+    ports:
+      - "127.0.0.1:${WT_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - eval-postgres-data:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whitetower -d whitetower"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin-dev-only
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${WT_KEYCLOAK_PORT:-8180}:8080"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '"status": "UP"' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:${WT_OTLP_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${WT_OTLP_HTTP_PORT:-4318}:4318"
+
+  migrate:
+    image: whitetower-eval-core
+    build: &core-build
+      context: ../../..
+      dockerfile: deploy/docker/Dockerfile
+    command: ["migrate"]
+    environment:
+      WT_DATABASE_MIGRATION_URL: postgres://whitetower_migrator@postgres:5432/whitetower?sslmode=disable
+      WT_DATABASE_MIGRATION_PASSWORD_FILE: /run/secrets/db-migrator-password
+    secrets:
+      - db-migrator-password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    image: postgres:${WT_POSTGRES_VERSION:-17}-alpine
+    environment:
+      PGPASSWORD: whitetower-migrator-dev-only
+      PGHOST: postgres
+      PGUSER: whitetower_migrator
+      PGDATABASE: whitetower
+    volumes:
+      - ./seed/seed.sql:/seed.sql:ro
+    command: ["psql", "-f", "/seed.sql"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  whitetower:
+    image: whitetower-eval-core
+    build: *core-build
+    environment:
+      WT_DEV_SELF_SIGNED_TLS: "true"
+      WT_DATABASE_URL: postgres://whitetower_app@postgres:5432/whitetower?sslmode=disable
+      WT_DATABASE_PASSWORD_FILE: /run/secrets/db-app-password
+      WT_AUDIT_ORIGIN: whitetower.localhost/audit
+      WT_AUDIT_CHECKPOINT_KEY_FILE: /run/secrets/audit-checkpoint-key
+      WT_TRACING_OTLP_ENDPOINT: http://otel-collector:4318
+      WT_AUTH_OIDC_ISSUER: http://keycloak:8080/realms/whitetower
+      WT_AUTH_OIDC_CLIENT_ID: whitetower-console
+      WT_AUTH_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc-client-secret
+      WT_AUTH_OIDC_REDIRECT_URL: https://127.0.0.1:8443/auth/callback
+    secrets:
+      - db-app-password
+      - audit-checkpoint-key
+      - oidc-client-secret
+    ports:
+      - "127.0.0.1:${WT_CONSOLE_PORT:-8443}:8443"
+      - "127.0.0.1:${WT_MACHINE_PORT:-9443}:9443"
+      - "127.0.0.1:${WT_OPERATIONS_PORT:-9090}:9090"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/whitetower", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  eval-postgres-data:
+
+secrets:
+  db-app-password:
+    file: ../dev/secrets/db-app-password
+  db-migrator-password:
+    file: ../dev/secrets/db-migrator-password
+  audit-checkpoint-key:
+    file: ../dev/secrets/audit-checkpoint-key
+  oidc-client-secret:
+    file: ../dev/secrets/oidc-client-secret

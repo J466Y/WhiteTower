@@ -22,6 +22,14 @@ RUN CGO_ENABLED=0 go build -tags embedui -trimpath \
       -o /out/whitetower ./cmd/whitetower
 
 FROM gcr.io/distroless/static-debian13:nonroot
+LABEL org.opencontainers.image.title="White Tower" \
+      org.opencontainers.image.description="Control plane for governing AI agents: inventory, identities, policies, audit log and kill switch" \
+      org.opencontainers.image.url="https://github.com/J466Y/WhiteTower" \
+      org.opencontainers.image.source="https://github.com/J466Y/WhiteTower" \
+      org.opencontainers.image.documentation="https://github.com/J466Y/WhiteTower/tree/main/docs" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="White Tower"
+
 COPY --from=core /out/whitetower /usr/local/bin/whitetower
 USER nonroot:nonroot
 # The three listeners on every interface; certificates come from the

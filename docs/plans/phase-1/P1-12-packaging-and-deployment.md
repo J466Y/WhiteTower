@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | Draft |
+| **Status** | In progress (1 of 5 pull requests) |
 | **Size** | XL, split into two parts: **P1-12.1** (steps 1 to 3, about 3 weeks, right after P1-01) and **P1-12.2** (steps 4 to 10, about 4 weeks, once the feature plans are nearly done) |
 | **Depends on** | P1-01 for P1-12.1; P1-07 and P1-08 for the high-availability and upgrade tests of P1-12.2 |
 | **Unblocks** | P1-13, P1-14 |
@@ -148,3 +148,33 @@ The three latest Kubernetes minor versions (kind, with Cilium as the CNI so the 
 
 - Keep chart defaults production-safe; development conveniences go in a separate values file.
 - Never template secrets into ConfigMaps; mount them as files, as the core expects (OPS-04).
+
+## Progress notes
+
+The plan lands in five pull requests across its two parts (P1-12.1: packaging foundations and Compose/Helm; P1-12.2: production HA, air-gap, and upgrades).
+
+| Pull request | Steps | Status |
+| --- | --- | --- |
+| 1. Hardened images and evaluation Compose profile | 1, 2, OPS-01 | Done |
+| 2. Production Helm chart | 3, ST-61, ST-62, ST-63 | Not started |
+| 3. PostgreSQL reference setup with CloudNativePG and pooling | 4 | Not started |
+| 4. Air-gapped bundle and egress-denied CI test | 5, 6, ST-60, NFR-14 | Not started |
+| 5. Upgrades, backup/restore and operations documentation | 7, 8, 9, 10, ST-64, OPS-06, OPS-07 | Not started |
+
+### 2026-10-16: images and evaluation Compose profile (PR 1)
+
+- Hardened Docker images (step 1, OPS-01):
+  - Updated `deploy/docker/Dockerfile` and `deploy/docker/goreleaser.Dockerfile` with standard OCI image annotations (`org.opencontainers.image.title`, `org.opencontainers.image.description`, `org.opencontainers.image.url`, `org.opencontainers.image.source`, `org.opencontainers.image.documentation`, `org.opencontainers.image.licenses`, `org.opencontainers.image.vendor`).
+  - Core runs as `USER nonroot:nonroot` on distroless Debian 13 with dropped capabilities (`cap_drop: [ALL]`), `no-new-privileges:true`, and a read-only root filesystem with tmpfs mounted at `/tmp`.
+  - Added `deploy/docker/mock-module.Dockerfile` (distroless, non-root) and `deploy/docker/demo-agent.Dockerfile` (minimal non-root Python base) for Step 1 multi-architecture builds.
+- Hardening of development Compose profile:
+  - Updated `deploy/compose/dev/compose.yaml` to enforce `read_only: true`, `tmpfs: [/tmp:rw,noexec,nosuid]`, `security_opt: [no-new-privileges:true]`, and `cap_drop: [ALL]`.
+- Evaluation Compose profile (step 2, OPS-01):
+  - Created `deploy/compose/eval/`: complete self-contained stack containing PostgreSQL 17, Keycloak 26 (with pre-imported realm and governance test users), OpenTelemetry collector, migration service, automated database seed service, and the White Tower core.
+  - Automated evaluation seed in `deploy/compose/eval/seed/seed.sql`: populates initial principals, role bindings, validated/submitted use cases, sample agents in multiple lifecycle states (`active`, `proposed`, `suspended`), and primary agent ownerships.
+  - Tasks in `Taskfile.yml`: `task eval` and `task eval:down`.
+- Documentation:
+  - Added "The fifteen-minute demo" walkthrough guide in `docs/guides/fifteen-minute-demo.md`.
+- Tests:
+  - Added `test/packaging/packaging_test.go` verifying Dockerfile OCI labels and non-root execution, Compose profile hardening (read-only rootfs, tmpfs, capabilities, file-based secrets), and verifying that `seed.sql` executes cleanly on a migrated PostgreSQL database without constraint violations.
+
