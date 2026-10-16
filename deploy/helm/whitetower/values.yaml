@@ -180,32 +180,28 @@ database:
   maxConnections: 10
 
 # Secret management: key secrets mounted as files under /run/secrets/ (ST-61, ST-62).
-# Provide existingSecret or enter values here for chart-managed Secrets.
+# Secrets must never be stored as plaintext in configuration files (OPS-04).
+# Reference pre-created Kubernetes Secrets with existingSecret (recommended for production),
+# or provide values at deployment time via secure values flags (--set secrets.databaseApp.password=...).
 secrets:
-  # Database runtime role password.
+  # Database runtime role credentials.
   databaseApp:
     existingSecret: ""
-    password: ""
-  # Database migration role password (mounted in init container only, ST-62).
+  # Database migration role credentials (mounted in init container only, ST-62).
   databaseMigrator:
     existingSecret: ""
-    password: ""
   # Ed25519 checkpoint signing key.
   auditCheckpointKey:
     existingSecret: ""
-    key: ""
   # Token signing key (ES256).
   tokenSigningKey:
     existingSecret: ""
-    key: ""
   # Bundle signing key.
   bundleSigningKey:
     existingSecret: ""
-    key: ""
   # OIDC confidential client secret.
   oidcClientSecret:
     existingSecret: ""
-    secret: ""
 
 # Tamper-evident audit log configuration.
 audit:
@@ -223,12 +219,8 @@ auth:
 tls:
   console:
     existingSecret: ""
-    cert: ""
-    key: ""
   machine:
     existingSecret: ""
-    cert: ""
-    key: ""
 
 # Development conveniences (must remain false in production).
 dev:
