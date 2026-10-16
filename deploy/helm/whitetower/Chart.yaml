@@ -1,0 +1,18 @@
+apiVersion: v2
+name: whitetower
+description: Production Helm chart for White Tower, the open-source control plane governing AI agents.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - ai
+  - governance
+  - control-plane
+  - security
+  - audit
+home: https://github.com/J466Y/WhiteTower
+sources:
+  - https://github.com/J466Y/WhiteTower
+maintainers:
+  - name: White Tower Maintainers
+    url: https://github.com/J466Y/WhiteTower

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "whitetower.fullname" . }}-operations
+  labels:
+    {{- include "whitetower.labels" . | nindent 4 }}
+    whitetower.io/listener: operations
+  {{- with .Values.service.operations.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.operations.type }}
+  ports:
+    - port: {{ .Values.service.operations.port }}
+      targetPort: operations
+      protocol: TCP
+      name: http-operations
+  selector:
+    {{- include "whitetower.selectorLabels" . | nindent 4 }}

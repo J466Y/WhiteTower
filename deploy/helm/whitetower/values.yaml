@@ -1,0 +1,227 @@
+# Default values for White Tower.
+# White Tower is an open-source, self-hosted control plane governing AI agents.
+# Defaults are production-safe: high availability (>= 2 replicas), pod anti-affinity,
+# restricted Pod Security Standard, separate listener services, and network isolation.
+
+# High availability: run at least 2 replicas by default.
+replicaCount: 2
+
+image:
+  repository: ghcr.io/j466y/whitetower
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a dedicated service account should be created.
+  create: true
+  # Do not automount API credentials unless explicitly needed.
+  automountServiceAccountToken: false
+  # Annotations to add to the service account.
+  annotations: {}
+  # The name of the service account to use. If not set and create is true, a name is generated using the fullname template.
+  name: ""
+
+# Pod-level security context complying with the Restricted Pod Security Standard.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container-level security context complying with the Restricted Pod Security Standard.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Rolling update strategy aligned with lease TTL (one pod at a time).
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Grace period longer than drain deadline (60s) to allow existing leases and requests to drain cleanly.
+terminationGracePeriodSeconds: 70
+
+# Pod anti-affinity ensures replicas are spread across different nodes for resilience.
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - whitetower
+          topologyKey: kubernetes.io/hostname
+
+nodeSelector: {}
+tolerations: []
+
+# Pod Disruption Budget ensures high availability during voluntary disruptions.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Three distinct services exposing White Tower's three network listeners.
+service:
+  # Console listener: web console and public REST API (HTTPS).
+  console:
+    type: ClusterIP
+    port: 8443
+    annotations: {}
+  # Machine listener: token endpoint and module API (HTTPS with HTTP/2).
+  machine:
+    type: ClusterIP
+    port: 9443
+    annotations: {}
+  # Operations listener: metrics and health checks (HTTP, cluster-internal).
+  operations:
+    type: ClusterIP
+    port: 9090
+    annotations: {}
+
+# Ingress routes for the console and machine listeners (exposed separately).
+ingress:
+  console:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - host: whitetower.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+  machine:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - host: machine.whitetower.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+
+# Resource limits and requests.
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Network policies enforcing network-level isolation per listener (ST-63).
+networkPolicy:
+  enabled: true
+  ingress:
+    # Port 8443 (console): accessible only from ingress controllers.
+    console:
+      from:
+        - namespaceSelector: {}
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: ["ingress", "controller"]
+    # Port 9443 (machine): accessible only from modules and enforcement points.
+    machine:
+      from:
+        - podSelector:
+            matchLabels:
+              whitetower.io/module: "true"
+        - podSelector:
+            matchLabels:
+              whitetower.io/enforcement-point: "true"
+    # Port 9090 (operations): accessible only from monitoring namespaces and Prometheus.
+    operations:
+      from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+  egress:
+    dns:
+      enabled: true
+      port: 53
+    database:
+      enabled: true
+      port: 5432
+    custom: []
+
+# Optional Prometheus Operator ServiceMonitor.
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+# PostgreSQL database configuration.
+# The server connects with the runtime role only; whitetower migrate alone uses the migration role (DC-3).
+database:
+  url: "postgres://whitetower_app@whitetower-postgresql:5432/whitetower?sslmode=verify-full"
+  migrationUrl: "postgres://whitetower_migrator@whitetower-postgresql:5432/whitetower?sslmode=verify-full"
+  maxConnections: 10
+
+# Secret management: key secrets mounted as files under /run/secrets/ (ST-61, ST-62).
+# Secrets must never be stored as plaintext in configuration files (OPS-04).
+# Reference pre-created Kubernetes Secrets with existingSecret (recommended for production),
+# or provide values at deployment time via secure values flags (--set secrets.databaseApp.password=...).
+secrets:
+  # Database runtime role credentials.
+  databaseApp:
+    existingSecret: ""
+  # Database migration role credentials (mounted in init container only, ST-62).
+  databaseMigrator:
+    existingSecret: ""
+  # Ed25519 checkpoint signing key.
+  auditCheckpointKey:
+    existingSecret: ""
+  # Token signing key (ES256).
+  tokenSigningKey:
+    existingSecret: ""
+  # Bundle signing key.
+  bundleSigningKey:
+    existingSecret: ""
+  # OIDC confidential client secret.
+  oidcClientSecret:
+    existingSecret: ""
+
+# Tamper-evident audit log configuration.
+audit:
+  origin: "whitetower.example.org/audit"
+  checkpointInterval: "1m"
+
+# Human identity and access (OIDC).
+auth:
+  oidc:
+    issuer: ""
+    clientId: ""
+    redirectUrl: ""
+
+# TLS certificate configuration for console and machine listeners.
+tls:
+  console:
+    existingSecret: ""
+  machine:
+    existingSecret: ""
+
+# Development conveniences (must remain false in production).
+dev:
+  selfSignedTls: false

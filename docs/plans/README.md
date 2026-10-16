@@ -41,7 +41,7 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | [P1-09](phase-1/P1-09-python-enforcement-point.md) | White Tower enforcement point (Python) | L | P0-05 (S1), P1-06, P1-07, P1-08 | MOD-06 | Draft |
 | [P1-10](phase-1/P1-10-web-console.md) | Web console | XL, split into 7 subplans | P1-10.0 needs only the requirements; P1-10.1 needs P1-03; then each backend plan | UI-01 to UI-09 | Draft |
 | [P1-11](phase-1/P1-11-cli.md) | CLI (`wtctl`) | M | P1-03 | API-04 | Draft |
-| [P1-12](phase-1/P1-12-packaging-and-deployment.md) | Packaging and deployment | XL, split into 2 parts | P1-01 (part 1); P1-07, P1-08 (part 2) | OPS-01 to OPS-07, NFR-14, NFR-15 | In progress (1 of 5 pull requests) |
+| [P1-12](phase-1/P1-12-packaging-and-deployment.md) | Packaging and deployment | XL, split into 2 parts | P1-01 (part 1); P1-07, P1-08 (part 2) | OPS-01 to OPS-07, NFR-14, NFR-15 | In progress (2 of 5 pull requests) |
 | [P1-13](phase-1/P1-13-security-hardening-and-release.md) | Security hardening and release v0.1.0 | M | all feature plans | NFR-11, NFR-12, NFR-13 | Draft |
 | [P1-14](phase-1/P1-14-pilot-and-gate.md) | Pilot and Phase 1 gate | M, plus pilot calendar | P1-13 | Charter success criteria | Draft |
 | [P1-15](phase-1/P1-15-network-quarantine.md) | Kubernetes network quarantine module | M | P0-03, P1-05, P1-07; P1-08 for the end-to-end tests | KIL-10, NFR-23 | Draft |

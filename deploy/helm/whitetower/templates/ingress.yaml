@@ -1,0 +1,73 @@
+{{- if .Values.ingress.console.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "whitetower.fullname" . }}-console
+  labels:
+    {{- include "whitetower.labels" . | nindent 4 }}
+    whitetower.io/listener: console
+  {{- with .Values.ingress.console.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.console.className }}
+  ingressClassName: {{ .Values.ingress.console.className }}
+  {{- end }}
+  {{- if .Values.ingress.console.tls }}
+  tls:
+    {{- toYaml .Values.ingress.console.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.console.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "whitetower.fullname" $ }}-console
+                port:
+                  number: {{ $.Values.service.console.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- if .Values.ingress.machine.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "whitetower.fullname" . }}-machine
+  labels:
+    {{- include "whitetower.labels" . | nindent 4 }}
+    whitetower.io/listener: machine
+  {{- with .Values.ingress.machine.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.machine.className }}
+  ingressClassName: {{ .Values.ingress.machine.className }}
+  {{- end }}
+  {{- if .Values.ingress.machine.tls }}
+  tls:
+    {{- toYaml .Values.ingress.machine.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.machine.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "whitetower.fullname" $ }}-machine
+                port:
+                  number: {{ $.Values.service.machine.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}

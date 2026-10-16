@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "whitetower.fullname" . }}-config
+  labels:
+    {{- include "whitetower.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    listeners:
+      console:
+        address: "0.0.0.0:{{ .Values.service.console.port }}"
+        {{- if or .Values.tls.console.existingSecret .Values.tls.console.cert }}
+        cert_file: "/run/secrets/tls-console/tls.crt"
+        key_file: "/run/secrets/tls-console/tls.key"
+        {{- end }}
+      machine:
+        address: "0.0.0.0:{{ .Values.service.machine.port }}"
+        {{- if or .Values.tls.machine.existingSecret .Values.tls.machine.cert }}
+        cert_file: "/run/secrets/tls-machine/tls.crt"
+        key_file: "/run/secrets/tls-machine/tls.key"
+        {{- end }}
+      operations:
+        address: "0.0.0.0:{{ .Values.service.operations.port }}"
+    tls:
+      min_version: "1.2"
+    database:
+      url: {{ .Values.database.url | quote }}
+      password_file: "/run/secrets/database-app/password"
+      max_connections: {{ .Values.database.maxConnections }}
+    audit:
+      origin: {{ .Values.audit.origin | quote }}
+      checkpoint_key_file: "/run/secrets/audit-checkpoint-key/key.pem"
+      checkpoint_interval: {{ .Values.audit.checkpointInterval | quote }}
+    {{- if .Values.auth.oidc.issuer }}
+    auth:
+      oidc:
+        issuer: {{ .Values.auth.oidc.issuer | quote }}
+        client_id: {{ .Values.auth.oidc.clientId | quote }}
+        client_secret_file: "/run/secrets/oidc-client-secret/secret"
+        redirect_url: {{ .Values.auth.oidc.redirectUrl | quote }}
+    {{- end }}
