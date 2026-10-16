@@ -179,7 +179,7 @@ The plan lands in seven pull requests. The first holds the writer, which every o
 | 2. Sealer and checkpoints | 3, 4 | Done |
 | 3. Verification library and tamper suite | 7, part of 10, ST-06 to ST-08 | Done |
 | 4. Ingestion from modules | 5, ST-10, ST-11 | Done |
-| 5. Query API | 6, the keys of step 4, ST-12 | Not started |
+| 5. Query API | 6, the keys of step 4, ST-12 | Done |
 | 6. Export | 8 | Done |
 | 7. Retention and throughput | 9, the rest of 10 | Done |
 
@@ -289,3 +289,26 @@ The sealer stored each checkpoint with the database's clock and, once it loaded 
   - `retention_test.go`: proves partition dropping, pruned range recording, leaf/hash preservation, and active partition retention.
   - `test/tamper`: `TestRetentionDroppedPartitionPassesVerificationWhileUnlawfulDeletionFails` proves that lawfully pruned partitions pass verification with intact checkpoints, while any deletion outside pruned ranges is detected and fails verification with `EventMissing`.
   - `throughput_test.go`: `TestThroughputSustainedAndBurst` verifies sustained 200 eps (NFR-07) and peak burst of 2,000 eps (NFR-09) under concurrent publishers, ensuring queue drain, zero event loss, and checkpoint generation. `BenchmarkSealerRound` benchmarks batch sealing latency.
+
+### 2026-10-16: query API (step 6, the keys of step 4, ST-12)
+
+- Public REST API endpoints implemented in `internal/api/rest/audit.go` and defined in OpenAPI (`api/openapi/openapi.yaml`):
+  - `GET /api/v1/audit/events`: filtered by time range (`from`, `to`), `agentId`, `actorId`, `actorType`, event `type`, `action`, `outcome`, and `source`; keyset cursor-based pagination with opaque URL-safe tokens; maximum page size 100.
+  - `GET /api/v1/audit/events/{id}`: single event retrieval with cryptographic Merkle inclusion proof (`leafIndex`, `treeSize`, `rootHash`, `hashes`, `checkpoint`) computed via `golang.org/x/mod/sumdb/tlog.ProveRecord` and verified against the latest signed checkpoint. Events pending sealing return null proofs.
+  - `GET /api/v1/audit/checkpoints`: list of stored checkpoints (tree size, base64 root hash, key ID, signed C2SP note, creation time).
+  - `GET /api/v1/audit/keys`: public halves of checkpoint signing keys published as JWKs.
+- Domain queries and logic in `internal/audit`:
+  - `QueryEvents`: parameterized queries across partitioned `whitetower.audit_events` with keyset ordering `(event_time DESC, id DESC)`.
+  - `GetEvent`: joins `audit_events` and `audit_leaves`, retrieves latest checkpoint, reads tree hashes via `txHashReader`, and computes `tlog.RecordProof`.
+  - `IsAgentOwner`: verifies active agent ownership in `whitetower.agent_owners`.
+- Role-based access control and scoping according to the governance matrix:
+  - Steering, advisory, operator, and auditor roles have full access across all events and checkpoints (`ScopeAll`).
+  - Owner role has scoped access (`ScopeOwn`): queries without `agentId` automatically scope to agents owned by the calling principal; querying or retrieving unowned agents or events without an agent returns 403 Forbidden.
+  - User and admin roles are denied by default (403 Forbidden). Unauthenticated requests return 401 Unauthenticated.
+- Auditing of audit log reads (AUD-09, ST-12):
+  - Emits new core audit event type `whitetower.audit.read.v1` containing actor ID, type, operation, query parameters, and results count.
+  - Schema in `api/events/schemas/whitetower.audit.read.v1.json`, example in `api/events/examples/whitetower.audit.read.v1.json`, registered in `catalog.json` and `rules` in `internal/audit/facts.go`.
+- Tests:
+  - `TestAuditQueryEndpoints`: covers filtering, keyset pagination, role scoping (steering, advisory, operator, auditor, owner, user, admin, anonymous), 404 handling, unsealed event handling, and cryptographic inclusion proof verification using `pkg/auditverify.CheckInclusion` and `pkg/auditverify.OpenCheckpoint`.
+  - Security test ST-12: verifies that query and get operations record `whitetower.audit.read.v1` events in the database with accurate actor and query details.
+

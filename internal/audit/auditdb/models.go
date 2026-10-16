@@ -10,6 +10,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type WhitetowerAuditCheckpoint struct {
+	TreeSize   int64
+	RootHash   []byte
+	SignedNote string
+	KeyID      string
+	CreatedAt  time.Time
+}
+
 type WhitetowerAuditExportCursor struct {
 	Sink          string
 	LastLeafIndex int64

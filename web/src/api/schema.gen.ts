@@ -137,6 +137,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Query audit log events
+         * @description Returns a paginated list of audit events matching the provided filters.
+         *     Reads of the audit log are themselves audited (AUD-09).
+         */
+        get: operations["getAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an audit event with its Merkle inclusion proof
+         * @description Retrieves a single audit event by ID with its Merkle tree inclusion proof
+         *     against the latest signed checkpoint. Reads are audited (AUD-09).
+         */
+        get: operations["getAuditEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit/checkpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List signed checkpoints
+         * @description Returns stored checkpoints signed over the audit log Merkle tree.
+         */
+        get: operations["getAuditCheckpoints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List checkpoint signing keys
+         * @description Returns public halves of checkpoint signing keys as JWKs.
+         */
+        get: operations["getAuditKeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -260,6 +342,60 @@ export interface components {
         ExchangeTokenRequest: {
             /** @description Raw OpenID Connect ID token obtained by the CLI. */
             idToken: string;
+        };
+        AuditEvent: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            time: string;
+            source: string;
+            type: string;
+            subject?: string | null;
+            actorType?: string | null;
+            actorId?: string | null;
+            action?: string | null;
+            outcome?: string | null;
+            reason?: string | null;
+            requestId?: string | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            ingestedAt: string;
+            data: {
+                [key: string]: unknown;
+            };
+            /** @description Canonical RFC 8785 JSON representation of the CloudEvent. */
+            canonical: string;
+        };
+        AuditEventList: {
+            events: components["schemas"]["AuditEvent"][];
+            nextCursor?: string | null;
+        };
+        AuditInclusionProof: {
+            /** Format: int64 */
+            leafIndex: number;
+            /** Format: int64 */
+            treeSize: number;
+            /** @description Base64-encoded 32-byte Merkle root hash. */
+            rootHash: string;
+            /** @description Base64-encoded 32-byte hashes forming the audit path. */
+            hashes: string[];
+            /** @description Signed C2SP checkpoint note against which proof holds. */
+            checkpoint: string;
+        };
+        AuditEventDetail: {
+            event: components["schemas"]["AuditEvent"];
+            proof?: components["schemas"]["AuditInclusionProof"];
+        };
+        AuditCheckpoint: {
+            /** Format: int64 */
+            treeSize: number;
+            /** @description Base64-encoded 32-byte Merkle root hash. */
+            rootHash: string;
+            keyId: string;
+            /** @description Complete signed note in C2SP format. */
+            note: string;
+            /** Format: date-time */
+            createdAt: string;
         };
     };
     responses: {
@@ -462,6 +598,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceAccount"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAuditEvents: {
+        parameters: {
+            query?: {
+                /** @description Lower bound of the event timestamp (RFC 3339). */
+                from?: string;
+                /** @description Upper bound of the event timestamp (RFC 3339). */
+                to?: string;
+                /** @description Filter events by subject agent ID. */
+                agentId?: string;
+                /** @description Filter events by actor ID. */
+                actorId?: string;
+                /** @description Filter events by actor type. */
+                actorType?: string;
+                /** @description Filter events by CloudEvent type. */
+                type?: string;
+                /** @description Filter events by action. */
+                action?: string;
+                /** @description Filter events by outcome. */
+                outcome?: string;
+                /** @description Filter events by event source. */
+                source?: string;
+                /** @description Keyset pagination cursor from nextCursor. */
+                cursor?: string;
+                /** @description Maximum number of events to return. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A paginated page of audit events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEventList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAuditEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The unique UUID of the audit event. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The audit event and its cryptographic inclusion proof. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEventDetail"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAuditCheckpoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of stored signed checkpoints. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditCheckpoint"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAuditKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of public checkpoint signing keys as JWKs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
                 };
             };
             default: components["responses"]["Problem"];

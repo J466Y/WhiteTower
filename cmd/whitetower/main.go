@@ -261,6 +261,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	registry := metrics.NewRegistry(v)
 	httpMetrics := metrics.NewHTTP(registry)
 	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
+	auditLog := audit.NewLog(database).WithWriter(writer)
 	api := rest.Handler(rest.Options{
 		Logger:        logger,
 		Authenticator: authenticator,
@@ -271,6 +272,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Tokens:        tokenStore,
 		Principals:    principalStore,
 		Exchanger:     oidcSvc,
+		AuditLog:      auditLog,
 	})
 	drain := server.NewDrain()
 	ready := health.NewReadiness(logger)

@@ -128,6 +128,11 @@ func (s *Sealer) Run(ctx context.Context) error {
 	}
 }
 
+// Round drains the queue, then signs a checkpoint if one is due.
+func (s *Sealer) Round(ctx context.Context) error {
+	return s.round(ctx)
+}
+
 // round drains the queue, then signs a checkpoint if one is due.
 func (s *Sealer) round(ctx context.Context) error {
 	if !s.loaded {

@@ -17,6 +17,7 @@ import (
 
 	"github.com/J466Y/WhiteTower/internal/api/rest/gen"
 	"github.com/J466Y/WhiteTower/internal/api/rest/problem"
+	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
@@ -53,6 +54,8 @@ type Options struct {
 	Principals *authn.PrincipalStore
 	// Exchanger handles CLI ID token exchange for API tokens.
 	Exchanger TokenExchanger
+	// AuditLog provides queries and verification for the audit log.
+	AuditLog *audit.Log
 }
 
 // TokenExchanger validates and exchanges an OpenID Connect ID token for an API token.
@@ -65,14 +68,16 @@ type Server struct {
 	tokens     *authn.TokenStore
 	principals *authn.PrincipalStore
 	exchanger  TokenExchanger
+	auditLog   *audit.Log
 }
 
 // NewServer creates a new Server instance.
-func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, exchanger TokenExchanger) Server {
+func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, exchanger TokenExchanger, auditLog *audit.Log) Server {
 	return Server{
 		tokens:     tokens,
 		principals: principals,
 		exchanger:  exchanger,
+		auditLog:   auditLog,
 	}
 }
 
@@ -392,7 +397,7 @@ func (s Server) ExchangeToken(ctx context.Context, request gen.ExchangeTokenRequ
 func Handler(opts Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET "+BasePath+"/openapi.json", documentHandler())
-	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals, opts.Exchanger), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
+	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals, opts.Exchanger, opts.AuditLog), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
 		gen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  requestError,
 			ResponseErrorHandlerFunc: responseError(opts.Logger),

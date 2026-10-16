@@ -82,6 +82,66 @@ type ApiTokenMetadata struct {
 	TokenPrefix string             `json:"tokenPrefix"`
 }
 
+// AuditCheckpoint defines model for AuditCheckpoint.
+type AuditCheckpoint struct {
+	CreatedAt time.Time `json:"createdAt"`
+	KeyId     string    `json:"keyId"`
+
+	// Note Complete signed note in C2SP format.
+	Note string `json:"note"`
+
+	// RootHash Base64-encoded 32-byte Merkle root hash.
+	RootHash string `json:"rootHash"`
+	TreeSize int64  `json:"treeSize"`
+}
+
+// AuditEvent defines model for AuditEvent.
+type AuditEvent struct {
+	Action    *string `json:"action,omitempty"`
+	ActorId   *string `json:"actorId,omitempty"`
+	ActorType *string `json:"actorType,omitempty"`
+
+	// Canonical Canonical RFC 8785 JSON representation of the CloudEvent.
+	Canonical  string                 `json:"canonical"`
+	Data       map[string]interface{} `json:"data"`
+	Id         openapi_types.UUID     `json:"id"`
+	IngestedAt time.Time              `json:"ingestedAt"`
+	Outcome    *string                `json:"outcome,omitempty"`
+	Reason     *string                `json:"reason,omitempty"`
+	RequestId  *string                `json:"requestId,omitempty"`
+	Source     string                 `json:"source"`
+	Subject    *string                `json:"subject,omitempty"`
+	Time       time.Time              `json:"time"`
+	TraceId    *string                `json:"traceId,omitempty"`
+	Type       string                 `json:"type"`
+}
+
+// AuditEventDetail defines model for AuditEventDetail.
+type AuditEventDetail struct {
+	Event AuditEvent           `json:"event"`
+	Proof *AuditInclusionProof `json:"proof,omitempty"`
+}
+
+// AuditEventList defines model for AuditEventList.
+type AuditEventList struct {
+	Events     []AuditEvent `json:"events"`
+	NextCursor *string      `json:"nextCursor,omitempty"`
+}
+
+// AuditInclusionProof defines model for AuditInclusionProof.
+type AuditInclusionProof struct {
+	// Checkpoint Signed C2SP checkpoint note against which proof holds.
+	Checkpoint string `json:"checkpoint"`
+
+	// Hashes Base64-encoded 32-byte hashes forming the audit path.
+	Hashes    []string `json:"hashes"`
+	LeafIndex int64    `json:"leafIndex"`
+
+	// RootHash Base64-encoded 32-byte Merkle root hash.
+	RootHash string `json:"rootHash"`
+	TreeSize int64  `json:"treeSize"`
+}
+
 // CreateServiceAccountRequest defines model for CreateServiceAccountRequest.
 type CreateServiceAccountRequest struct {
 	DisplayName string               `json:"displayName"`
@@ -195,6 +255,42 @@ type VersionInfo struct {
 // VersionInfoApiVersion Version of this API.
 type VersionInfoApiVersion string
 
+// GetAuditEventsParams defines parameters for GetAuditEvents.
+type GetAuditEventsParams struct {
+	// From Lower bound of the event timestamp (RFC 3339).
+	From *time.Time `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Upper bound of the event timestamp (RFC 3339).
+	To *time.Time `form:"to,omitempty" json:"to,omitempty"`
+
+	// AgentId Filter events by subject agent ID.
+	AgentId *openapi_types.UUID `form:"agentId,omitempty" json:"agentId,omitempty"`
+
+	// ActorId Filter events by actor ID.
+	ActorId *string `form:"actorId,omitempty" json:"actorId,omitempty"`
+
+	// ActorType Filter events by actor type.
+	ActorType *string `form:"actorType,omitempty" json:"actorType,omitempty"`
+
+	// Type Filter events by CloudEvent type.
+	Type *string `form:"type,omitempty" json:"type,omitempty"`
+
+	// Action Filter events by action.
+	Action *string `form:"action,omitempty" json:"action,omitempty"`
+
+	// Outcome Filter events by outcome.
+	Outcome *string `form:"outcome,omitempty" json:"outcome,omitempty"`
+
+	// Source Filter events by event source.
+	Source *string `form:"source,omitempty" json:"source,omitempty"`
+
+	// Cursor Keyset pagination cursor from nextCursor.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of events to return.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListTokensParams defines parameters for ListTokens.
 type ListTokensParams struct {
 	// PrincipalId Optional principal ID to filter tokens (allowed for responsible owners and administrators).
@@ -218,6 +314,18 @@ type ExchangeTokenJSONRequestBody = ExchangeTokenRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetAuditCheckpoints List signed checkpoints
+	// (GET /audit/checkpoints)
+	GetAuditCheckpoints(w http.ResponseWriter, r *http.Request)
+	// GetAuditEvents Query audit log events
+	// (GET /audit/events)
+	GetAuditEvents(w http.ResponseWriter, r *http.Request, params GetAuditEventsParams)
+	// GetAuditEvent Get an audit event with its Merkle inclusion proof
+	// (GET /audit/events/{id})
+	GetAuditEvent(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// GetAuditKeys List checkpoint signing keys
+	// (GET /audit/keys)
+	GetAuditKeys(w http.ResponseWriter, r *http.Request)
 	// GetMe Get the calling principal
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -252,6 +360,223 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetAuditCheckpoints operation middleware
+func (siw *ServerInterfaceWrapper) GetAuditCheckpoints(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuditCheckpoints(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuditEvents operation middleware
+func (siw *ServerInterfaceWrapper) GetAuditEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAuditEventsParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "agentId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "agentId", r.URL.Query(), &params.AgentId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actorId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actorId", r.URL.Query(), &params.ActorId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actorId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actorId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actorType" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actorType", r.URL.Query(), &params.ActorType, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actorType"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actorType", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "type", r.URL.Query(), &params.Type, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "type"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "type", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "action" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "action", r.URL.Query(), &params.Action, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "action"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "action", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "outcome" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "outcome", r.URL.Query(), &params.Outcome, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "outcome"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "outcome", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "source" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source", r.URL.Query(), &params.Source, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuditEvents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuditEvent operation middleware
+func (siw *ServerInterfaceWrapper) GetAuditEvent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuditEvent(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuditKeys operation middleware
+func (siw *ServerInterfaceWrapper) GetAuditKeys(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuditKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
@@ -540,11 +865,185 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tokens/exchange", wrapper.ExchangeToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/service-accounts", wrapper.ListServiceAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/service-accounts", wrapper.CreateServiceAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events", wrapper.GetAuditEvents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events/{id}", wrapper.GetAuditEvent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/checkpoints", wrapper.GetAuditCheckpoints)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/keys", wrapper.GetAuditKeys)
 
 	return m
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type GetAuditCheckpointsRequestObject struct {
+}
+
+type GetAuditCheckpointsResponseObject interface {
+	VisitGetAuditCheckpointsResponse(w http.ResponseWriter) error
+}
+
+type GetAuditCheckpoints200JSONResponse []AuditCheckpoint
+
+func (response GetAuditCheckpoints200JSONResponse) VisitGetAuditCheckpointsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuditCheckpointsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetAuditCheckpointsdefaultApplicationProblemPlusJSONResponse) VisitGetAuditCheckpointsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuditEventsRequestObject struct {
+	Params GetAuditEventsParams
+}
+
+type GetAuditEventsResponseObject interface {
+	VisitGetAuditEventsResponse(w http.ResponseWriter) error
+}
+
+type GetAuditEvents200JSONResponse AuditEventList
+
+func (response GetAuditEvents200JSONResponse) VisitGetAuditEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuditEventsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetAuditEventsdefaultApplicationProblemPlusJSONResponse) VisitGetAuditEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuditEventRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetAuditEventResponseObject interface {
+	VisitGetAuditEventResponse(w http.ResponseWriter) error
+}
+
+type GetAuditEvent200JSONResponse AuditEventDetail
+
+func (response GetAuditEvent200JSONResponse) VisitGetAuditEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuditEvent404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuditEvent404ApplicationProblemPlusJSONResponse) VisitGetAuditEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuditEventdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetAuditEventdefaultApplicationProblemPlusJSONResponse) VisitGetAuditEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuditKeysRequestObject struct {
+}
+
+type GetAuditKeysResponseObject interface {
+	VisitGetAuditKeysResponse(w http.ResponseWriter) error
+}
+
+type GetAuditKeys200JSONResponse []map[string]interface{}
+
+func (response GetAuditKeys200JSONResponse) VisitGetAuditKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuditKeysdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetAuditKeysdefaultApplicationProblemPlusJSONResponse) VisitGetAuditKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type GetMeRequestObject struct {
 }
@@ -852,6 +1351,18 @@ func (response GetVersiondefaultApplicationProblemPlusJSONResponse) VisitGetVers
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetAuditCheckpoints List signed checkpoints
+	// (GET /audit/checkpoints)
+	GetAuditCheckpoints(ctx context.Context, request GetAuditCheckpointsRequestObject) (GetAuditCheckpointsResponseObject, error)
+	// GetAuditEvents Query audit log events
+	// (GET /audit/events)
+	GetAuditEvents(ctx context.Context, request GetAuditEventsRequestObject) (GetAuditEventsResponseObject, error)
+	// GetAuditEvent Get an audit event with its Merkle inclusion proof
+	// (GET /audit/events/{id})
+	GetAuditEvent(ctx context.Context, request GetAuditEventRequestObject) (GetAuditEventResponseObject, error)
+	// GetAuditKeys List checkpoint signing keys
+	// (GET /audit/keys)
+	GetAuditKeys(ctx context.Context, request GetAuditKeysRequestObject) (GetAuditKeysResponseObject, error)
 	// GetMe Get the calling principal
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -915,6 +1426,106 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetAuditCheckpoints operation middleware
+func (sh *strictHandler) GetAuditCheckpoints(w http.ResponseWriter, r *http.Request) {
+	var request GetAuditCheckpointsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuditCheckpoints(ctx, request.(GetAuditCheckpointsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuditCheckpoints")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuditCheckpointsResponseObject); ok {
+		if err := validResponse.VisitGetAuditCheckpointsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuditEvents operation middleware
+func (sh *strictHandler) GetAuditEvents(w http.ResponseWriter, r *http.Request, params GetAuditEventsParams) {
+	var request GetAuditEventsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuditEvents(ctx, request.(GetAuditEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuditEvents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuditEventsResponseObject); ok {
+		if err := validResponse.VisitGetAuditEventsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuditEvent operation middleware
+func (sh *strictHandler) GetAuditEvent(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetAuditEventRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuditEvent(ctx, request.(GetAuditEventRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuditEvent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuditEventResponseObject); ok {
+		if err := validResponse.VisitGetAuditEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuditKeys operation middleware
+func (sh *strictHandler) GetAuditKeys(w http.ResponseWriter, r *http.Request) {
+	var request GetAuditKeysRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuditKeys(ctx, request.(GetAuditKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuditKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuditKeysResponseObject); ok {
+		if err := validResponse.VisitGetAuditKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetMe operation middleware
