@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (3 of 6 pull requests) |
+| **Status** | Done |
 | **Size** | M |
 | **Depends on** | P1-01, P1-02 (writer) |
 | **Unblocks** | P1-04, P1-10, P1-11 |
@@ -302,6 +302,17 @@ The plan lands in six pull requests. The first builds the authorization engine a
   - ST-21 in `internal/authn/scim_test.go`: bearer token verification, user provisioning, filter query, deprovisioning via PATCH `active: false`, session and API token revocation, audit event verification, delete as deactivation, and reactivation via PATCH `active: true`.
   - `internal/authn/saml_test.go`: end-to-end SAML identity brokering and role mapping test.
 
+### 2026-10-19: service accounts and token scopes (fix)
 
+A review of P1-04's API found two ways around the permission matrix, which this fix closes (the maintainer's decision of 2026-10-19).
 
-
+- **Service accounts.** Anyone could create a service account with any role, the advisory, operator and admin roles included, and then a token with that role's permissions. Now:
+  - only a person is responsible for a service account, and gives it only roles they hold (`forbidden` otherwise), as HUM-02 and DC-4 require of role grants;
+  - a service account acts with the roles bound to it that its responsible principal still holds, read when its token is used. It loses a role when that person loses it, and every role while that person is inactive (step 6: "a scoped token can do exactly what its scopes and its owner's roles allow").
+- **Token scopes.** `createToken` checked the requested scopes against the roles of the token's principal only. A token holding `identity.me.read` could therefore create a token with every permission of its principal, and an administrator could create a token for anyone's service account with that account's permissions. Now each scope must also be a permission of the caller, and one of the scopes of the caller's own token when the caller uses one (ST-19).
+- The notes of pull request 4 above say that deactivating a responsible human deactivates their service accounts and revokes their tokens: the code never did. Their tokens are now refused while the responsible principal is inactive. The service accounts and their tokens keep their state, so they work again if that principal is reactivated.
+- Tests: a service account gets no role its responsible principal lacks, and a service account creates none (ST-18); it loses a role when its responsible principal does, and every role while that principal is inactive; a token creates no token beyond its own scopes, and an administrator gives no permission through someone else's service account (ST-19).
+- Follow-ups:
+  - Creating a service account with the steering, advisory or operator role is a grant that DC-4 asks to notify to the steering committee's inbox, which P1-04 builds (its pull request 7).
+  - A person and their own service account are two principals: two-person rules of later plans (policy approvals in P1-06, halt releases in P1-08, enabling and unblocking in P1-16) must not count them as two people, as P1-04 refuses decisions on proposals to service accounts.
+  - No operation hands a service account to another person, so one whose responsible principal left stays unusable until they come back.

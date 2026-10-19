@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,6 +21,16 @@ import (
 
 // ErrPrincipalNotFound is returned when no principal matches the query.
 var ErrPrincipalNotFound = errors.New("principal not found")
+
+var (
+	// ErrResponsibleNotHuman is returned when a principal that is not a human
+	// would be responsible for a service account.
+	ErrResponsibleNotHuman = errors.New("a service account needs a human responsible for it")
+
+	// ErrRoleNotHeld is returned when a service account would get a role that
+	// its responsible principal does not hold.
+	ErrRoleNotHeld = errors.New("the responsible principal does not hold the role")
+)
 
 // Principal represents a human user or service account in White Tower.
 type Principal struct {
@@ -318,18 +329,36 @@ func fromDBModel(r authndb.WhitetowerPrincipal) *Principal {
 	}
 }
 
-// CreateServiceAccount creates a new service account principal with a designated responsible human principal.
+// CreateServiceAccount creates a service account that the responsible human
+// creates for their own automation, and binds it the roles given. Each must
+// be one that the responsible principal holds: a service account acts for its
+// responsible principal, never with more (plan P1-03, step 6), and nobody
+// gets a role through it that they do not hold (HUM-02, DC-4).
 func (ps *PrincipalStore) CreateServiceAccount(
 	ctx context.Context,
 	displayName string,
 	email *string,
-	responsiblePrincipalID uuid.UUID,
 	roles []string,
-	grantedBy uuid.UUID,
+	responsible auth.Principal,
 ) (*Principal, error) {
 	displayName = strings.TrimSpace(displayName)
 	if len(displayName) < 1 || len(displayName) > 200 {
 		return nil, errors.New("service account display name must be between 1 and 200 characters")
+	}
+	if responsible.Kind != auth.Human {
+		return nil, ErrResponsibleNotHuman
+	}
+	responsiblePrincipalID, err := uuid.Parse(responsible.ID)
+	if err != nil {
+		return nil, fmt.Errorf("responsible principal ID %q: %w", responsible.ID, err)
+	}
+	for _, rStr := range roles {
+		if !authz.IsValidRole(authz.Role(rStr)) {
+			return nil, fmt.Errorf("invalid role %q", rStr)
+		}
+		if !slices.Contains(responsible.Roles, rStr) {
+			return nil, fmt.Errorf("%w: %s", ErrRoleNotHeld, rStr)
+		}
 	}
 
 	newID, err := uuid.NewV7()
@@ -353,6 +382,9 @@ func (ps *PrincipalStore) CreateServiceAccount(
 		if resp.Status != "active" {
 			return fmt.Errorf("verifying responsible principal: %w", ErrPrincipalInactive)
 		}
+		if resp.Kind != "human" {
+			return ErrResponsibleNotHuman
+		}
 
 		row, err := q.CreateServiceAccountPrincipal(ctx, authndb.CreateServiceAccountPrincipalParams{
 			ID:                     newID,
@@ -367,9 +399,6 @@ func (ps *PrincipalStore) CreateServiceAccount(
 
 		// Bind initial roles
 		for _, rStr := range roles {
-			if !authz.IsValidRole(authz.Role(rStr)) {
-				return fmt.Errorf("invalid role %q", rStr)
-			}
 			bindingID, err := uuid.NewV7()
 			if err != nil {
 				return fmt.Errorf("generating role binding UUID: %w", err)
@@ -379,7 +408,7 @@ func (ps *PrincipalStore) CreateServiceAccount(
 				PrincipalID: newID,
 				Role:        rStr,
 				Reason:      "initial service account provisioning",
-				GrantedBy:   grantedBy,
+				GrantedBy:   responsiblePrincipalID,
 				GrantedAt:   now,
 			}); err != nil {
 				return fmt.Errorf("adding role binding %q: %w", rStr, err)

@@ -219,6 +219,16 @@ func (s Server) CreateToken(ctx context.Context, request gen.CreateTokenRequestO
 			return nil, problem.New(problem.BadRequest, fmt.Sprintf("scope %q is not granted by principal's roles", sc))
 		}
 	}
+	// A token never does more than whoever creates it: its scopes are
+	// permissions of the caller too, and scopes of the caller's own token when
+	// the caller uses one (ST-19). An administrator who creates a token for
+	// someone else's service account gets no permission through it.
+	callerPerms := authz.PermissionsList(p.Roles)
+	for _, sc := range request.Body.Scopes {
+		if !slices.Contains(callerPerms, sc) || (p.Scopes != nil && !slices.Contains(p.Scopes, sc)) {
+			return nil, problem.New(problem.Forbidden, fmt.Sprintf("scope %q is more than the caller may give", sc))
+		}
+	}
 
 	expiresInDays := 30
 	if request.Body.ExpiresInDays != nil {
@@ -280,19 +290,20 @@ func (s Server) CreateServiceAccount(ctx context.Context, request gen.CreateServ
 		return nil, problem.New(problem.BadRequest, "request body is required")
 	}
 
-	callerID, err := uuid.Parse(p.ID)
-	if err != nil {
-		return nil, problem.New(problem.BadRequest, "invalid caller principal ID")
-	}
-
 	var email *string
 	if request.Body.Email != nil {
 		e := string(*request.Body.Email)
 		email = &e
 	}
 
-	sa, err := s.principals.CreateServiceAccount(ctx, request.Body.DisplayName, email, callerID, request.Body.Roles, callerID)
+	sa, err := s.principals.CreateServiceAccount(ctx, request.Body.DisplayName, email, request.Body.Roles, *p)
 	if err != nil {
+		if errors.Is(err, authn.ErrResponsibleNotHuman) {
+			return nil, problem.New(problem.Forbidden, "only a person can be responsible for a service account")
+		}
+		if errors.Is(err, authn.ErrRoleNotHeld) {
+			return nil, problem.New(problem.Forbidden, "a service account can only get roles that you hold")
+		}
 		return nil, problem.New(problem.BadRequest, err.Error())
 	}
 

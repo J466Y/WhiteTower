@@ -107,7 +107,10 @@ paths:
       summary: Create an API token
       description: |
         Generates a new API token. The raw token secret is returned in the response
-        and is never retrievable again.
+        and is never retrievable again. A token never does more than whoever
+        creates it: each scope must be a permission of the token's principal
+        and of the caller, and one of the scopes of the caller's own token when
+        the caller uses one; otherwise the request is refused (`forbidden`).
       tags: [tokens]
       requestBody:
         required: true
@@ -193,7 +196,12 @@ paths:
     post:
       operationId: createServiceAccount
       summary: Create a service account
-      description: Creates a non-human service account principal with the caller as responsible principal.
+      description: |
+        Creates a non-human service account principal with the caller as
+        responsible principal. Only a person is responsible for one, and gives
+        it only roles they hold (`forbidden` otherwise). The service account
+        acts with the roles that its responsible principal still holds, and
+        with none while that principal is inactive.
       tags: [identity]
       requestBody:
         required: true

@@ -3,9 +3,11 @@
 package authn
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
@@ -60,7 +62,10 @@ func (a *Authenticator) Authenticate(r *http.Request) (*auth.Principal, error) {
 		if p.Kind == "human" {
 			roles = ResolveEffectiveRoles(p.IDPGroups, a.roleMapping, dbRoles)
 		} else {
-			roles = dbRoles
+			roles, err = a.serviceAccountRoles(r.Context(), p, dbRoles)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return &auth.Principal{
@@ -111,4 +116,37 @@ func (a *Authenticator) Authenticate(r *http.Request) (*auth.Principal, error) {
 		Scopes:       scopes,
 		IsBreakglass: isBreakglass,
 	}, nil
+}
+
+// serviceAccountRoles returns the roles that a service account acts with: those
+// bound to it that its responsible human holds now. A service account never
+// does more than the person it acts for, and nothing once that person is
+// inactive, even with a token issued before (plan P1-03, step 6).
+func (a *Authenticator) serviceAccountRoles(ctx context.Context, sa *Principal, bound []string) ([]string, error) {
+	if sa.ResponsiblePrincipalID == nil {
+		return nil, ErrResponsibleNotHuman
+	}
+	responsible, err := a.principals.GetByID(ctx, *sa.ResponsiblePrincipalID)
+	if err != nil {
+		return nil, fmt.Errorf("reading the service account's responsible principal: %w", err)
+	}
+	if responsible.Kind != "human" {
+		return nil, ErrResponsibleNotHuman
+	}
+	if responsible.Status != "active" {
+		return nil, ErrPrincipalInactive
+	}
+	bindings, err := a.principals.GetRoles(ctx, responsible.ID)
+	if err != nil {
+		return nil, fmt.Errorf("resolving the responsible principal's roles: %w", err)
+	}
+	// Sorted, as a human's effective roles are.
+	held := ResolveEffectiveRoles(responsible.IDPGroups, a.roleMapping, bindings)
+	roles := []string{}
+	for _, role := range held {
+		if slices.Contains(bound, role) {
+			roles = append(roles, role)
+		}
+	}
+	return roles, nil
 }
