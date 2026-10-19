@@ -5,8 +5,8 @@
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
 | **Size** | XL, split into subplans before it starts. Proposed: **P1-09.1**, the runtime core (steps 1 to 7); **P1-09.2**, the tooling that needs no framework (the references, hashes, redaction and reports of step 9, and steps 10 and 12); **P1-09.3**, the frameworks (step 8, the discovery of step 9, and step 11); **P1-09.4**, steps 13 to 16 |
-| **Depends on** | P0-05 S1 (done), P1-06, P1-07, P1-08 (only step 5 and the final measurements need P1-08; the rest can start before it); P0-03 step 12 (RFC-0002 in the contracts) for steps 9 to 12; P1-16 steps 5 and 7 for the end-to-end tests of steps 9 to 12 (step 14) |
-| **Unblocks** | P1-14 |
+| **Depends on** | P0-05 S1 (done), P1-06, P1-07, P1-08 (only step 5 and the final measurements need P1-08; the rest can start before it); P0-03 step 12 (RFC-0002 in the contracts) for steps 9 to 12 and for the RFC-0002 parts of steps 1, 2, 4 and 6; P1-16 steps 5 and 7 for the end-to-end tests of steps 9 to 12 (step 14) |
+| **Unblocks** | The catalog flows of P1-12.2, P1-13, P1-14 |
 | **Requirements** | MOD-06, KIL-01, KIL-04, KIL-07, POL-03, POL-05, AUD-02, NFR-02, NFR-04, NFR-08; CAT-01, CAT-04 (applying blocks), CAT-05 to CAT-07, CAT-10 (the enforcement point's redaction) |
 | **Decisions** | ADR-0005, ADR-0010, ADR-0011, [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) |
 
@@ -163,7 +163,7 @@ Steps 9 to 12 are the enforcement point's side of RFC-0002, which the hooks of s
 
 - **Exposure.** Before each model call, evaluate `tool.expose` for every tool the request offers, and remove the denied ones through the framework's middleware: in LangGraph 1.x agents, for example, LangChain's `wrap_model_call` middleware can replace the request's tools, and the second framework has its own equivalent. When a denied tool cannot be removed, deny the model call in every case: RFC-0002 requires it for provider-run tools and changed definitions, and recommends it otherwise.
 - **Reuse.** Exposure decisions are kept until the bundle, the agent's state, the blocks or the tool's definition change, and recomputed off the call path after each change. Only an evaluated decision is recorded (step 6).
-- **Provider-run tools.** Narrow each declared remote MCP server to the tools enabled for the agent, for example through the declaration's list of allowed tools, and deny the model call when the provider could call a tool that is not enabled (ST-82). Where the provider asks for approval of each call, decide it with `tool.invoke` and the call's arguments (CAT-07, Should). Record the provider-run calls a response reports as `action.executed` events with origin `provider`.
+- **Provider-run tools.** Narrow each declared remote MCP server to the tools enabled for the agent, for example through the declaration's list of allowed tools, and deny the model call when the provider could call a tool that is not enabled (ST-82). Where the provider asks for approval of each call, decide it with `tool.invoke` and the call's arguments (CAT-07, EP-18). Record the provider-run calls a response reports as `action.executed` events with origin `provider`.
 - **Definitions seen in responses.** The provider lists a remote server's tools itself, so the enforcement point sees their definitions only in responses. When a response lists a provider-run MCP tool whose definition differs from the pinned one, deny its exposure from then on (`catalog.definition_changed`). The model may already have seen it in that response: a residual the threat model records (T-79, A-7).
 
 **Done when:** the exposure vectors, S-21, S-22 and ST-82 pass.

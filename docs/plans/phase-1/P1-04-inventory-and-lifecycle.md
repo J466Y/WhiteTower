@@ -110,7 +110,7 @@ Compute on read, or keep a table refreshed by a job if reads get expensive. Othe
 
 ### 10. Inbox and notifications (Should)
 
-An inbox per principal for pending approvals and reviews due, at `/api/v1/inbox` (UI-09). Optionally, email through SMTP (Could) and outgoing webhooks (API-05, Could). Item kinds are open to later plans: P1-16 adds catalog entries and definitions waiting for review, requests to enable tooling and requests to unblock, with a migration (its step 3) that widens the check on `inbox_items.kind`.
+An inbox per principal for pending approvals and reviews due, at `/api/v1/inbox` (UI-09). Optionally, email through SMTP (Could) and outgoing webhooks (API-05, Could). Item kinds are open to later plans: P1-16 adds catalog entries and definitions waiting for review, requests to enable tooling and requests to unblock, with the migration of its pull request 2 (its step 3), which widens the check on `inbox_items.kind`.
 
 **Done when:** each pending item appears in the right inboxes and disappears when handled.
 

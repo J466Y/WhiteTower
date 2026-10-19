@@ -36,7 +36,7 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | [P1-04](phase-1/P1-04-inventory-and-lifecycle.md) | Inventory and lifecycle | L | P1-03 | INV-01 to INV-10; the review's part of CAT-09 | Draft |
 | [P1-05](phase-1/P1-05-agent-identity-and-credentials.md) | Agent identity and credentials | L | P1-04 | AID-01 to AID-09 | Draft |
 | [P1-06](phase-1/P1-06-policy-model-and-distribution.md) | Policy model and distribution | L | P0-03, P1-04; P0-03 step 12 for its RFC-0002 parts | POL-01 to POL-10, CAT-03, CAT-05, CAT-06 | Draft |
-| [P1-07](phase-1/P1-07-module-registry-and-api.md) | Module registry and module API | XL, split into 2 subplans | P0-03, P1-01, P1-05; P0-03 step 12 for its RFC-0002 parts, and P1-16 step 4 for the wiring of tooling reports | MOD-01 to MOD-05, MOD-07, CAT-01, CAT-04 | Draft |
+| [P1-07](phase-1/P1-07-module-registry-and-api.md) | Module registry and module API | XL, split into 2 subplans | P0-03, P1-01, P1-05; P0-03 step 12 for its RFC-0002 parts, and P1-16 step 4 for the wiring of tooling reports | MOD-01 to MOD-05, MOD-07, CAT-01, CAT-04; part of NFR-24 | Draft |
 | [P1-08](phase-1/P1-08-kill-switch.md) | Kill switch | L | P1-04, P1-05, P1-07 | KIL-01 to KIL-10, NFR-24 | Draft |
 | [P1-09](phase-1/P1-09-python-enforcement-point.md) | White Tower enforcement point (Python) | XL, split into 4 subplans | P0-05 (S1), P1-06, P1-07, P1-08; P0-03 step 12 for its tooling steps, and P1-16 for their end-to-end tests | MOD-06, CAT-01, CAT-04, CAT-05 to CAT-07, CAT-10 | Draft |
 | [P1-10](phase-1/P1-10-web-console.md) | Web console | XL, split into 8 subplans | P1-10.0 needs only the requirements; P1-10.1 needs P1-03; then each backend plan | UI-01 to UI-10 | Draft |
@@ -45,7 +45,7 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | [P1-13](phase-1/P1-13-security-hardening-and-release.md) | Security hardening and release v0.1.0 | M | all feature plans | NFR-11, NFR-12, NFR-13 | Draft |
 | [P1-14](phase-1/P1-14-pilot-and-gate.md) | Pilot and Phase 1 gate | M, plus pilot calendar | P1-13 | Charter success criteria | Draft |
 | [P1-15](phase-1/P1-15-network-quarantine.md) | Kubernetes network quarantine module | M | P0-03, P1-05, P1-07; P1-08 for the end-to-end tests | KIL-10, NFR-23 | Draft |
-| [P1-16](phase-1/P1-16-mcp-servers-tools-and-models.md) | MCP servers, tools and models | L | P1-04; P0-03 step 12 and P1-06 for its bundles and usage rules; P1-07, P1-08 and the reviewed halt-path design for its blocks | CAT-01 to CAT-10, NFR-24 | Draft |
+| [P1-16](phase-1/P1-16-mcp-servers-tools-and-models.md) | MCP servers, tools and models | L | P1-04; P0-03 step 12 and P1-06 for its bundles and usage rules; P0-03 step 12, P1-07, P1-08 and the reviewed halt-path design for its blocks | CAT-01 to CAT-10, NFR-24; backend of UI-10; the catalog part of API-04 | Draft |
 
 ## Dependencies
 
@@ -116,9 +116,9 @@ flowchart LR
     P116 --> P113
 ```
 
-The graph links plans, not steps. One link runs the other way at the level of steps: P1-07 wires tooling reports (its step 7) to P1-16's step 4, while P1-16's blocks need P1-07.
+The graph links plans, not steps. One link runs the other way at the level of steps: P1-07 wires tooling reports (its step 7, in P1-07.2) to P1-16's step 4, while P1-16's blocks need P1-07.
 
-**Critical path** (with the baseline team of the [roadmap](../roadmap.md)): since RFC-0002 joined the MVP, three tracks end in the same week and set the end date, each followed by P1-13 and P1-14: the platform track (P0-01 → P1-01 → P1-02 → P1-07 → P1-11 → P1-15 → P1-12.2), the agent track (P1-03 → P1-04 → P1-06 → P1-16's bundles and usage rules → P1-09) and the console (P1-10.1 to P1-10.5, then P1-10.7 and P1-10.6). The core domain track (P1-04 → P1-16's catalog, enablement and tooling reports → P1-05 → P1-08 → P1-16's blocks) finishes one week earlier. The contracts branch (P0-03 step 12, once RFC-0002 is accepted) runs in parallel with slack. A fifth person taking P1-16 and P1-15 brings the end about two weeks earlier, but only if the console's Should items move to v0.1.x: the console plans have no slack left, and must keep pace.
+**Critical path** (with the baseline team of the [roadmap](../roadmap.md)): since RFC-0002 joined the MVP, three tracks end in the same week and set the end date, each followed by P1-13 and P1-14: the platform track (P0-01 → P1-01 → P1-02 → P1-07 → P1-11 → P1-15 → P1-12.2), the agent track (P1-03 → P1-04 → P1-06, and P1-16's catalog, enablement and tooling reports, which end the same week → P1-16's bundles and usage rules → P1-09) and the console (P1-10.1 to P1-10.5, then P1-10.7 and P1-10.6). The rest of the core domain track (P1-05 → P1-08 → P1-16's blocks) finishes one week earlier. The contracts branch (P0-03 step 12, once RFC-0002 is accepted) runs in parallel with slack. A fifth person taking P1-16 and P1-15 brings the end about two weeks earlier, but only if the console's Should items move to v0.1.x: the console plans have no slack left, and must keep pace.
 
 ## Definition of done (every plan)
 
@@ -147,5 +147,5 @@ Every Must requirement is covered by at least one plan:
 | User interface (UI) | P1-10 |
 | API and CLI (API) | P1-01, P1-11, and every feature plan for its endpoints |
 | Operations (OPS) | P0-01, P1-01, P1-12 |
-| MCP servers, tools and models (CAT) | P0-03, P1-06, P1-07, P1-09, P1-10, P1-11, P1-16 |
+| MCP servers, tools and models (CAT) | P0-03, P1-04, P1-06, P1-07, P1-09, P1-10, P1-11, P1-16 |
 | Non-functional (NFR) | P0-05 sets targets; P1-13 and P1-14 verify them |

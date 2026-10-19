@@ -178,7 +178,7 @@ Separating the human-facing and machine-facing listeners lets operators expose t
 | `/api/v1/agents/{id}/tooling` | Observed, enabled and declared tooling; request and approve enabling (two people); disable at once; declare the tooling of an agent without an enforcement point |
 | `/api/v1/use-cases` | Create, validate, reject, request changes |
 | `/api/v1/policies`, `/api/v1/policies/{id}/versions` | Author, validate, diff, submit, approve, activate, roll back |
-| `/api/v1/catalog/servers`, `/api/v1/catalog/tools`, `/api/v1/catalog/models` | List, filter by key and read; approve an entry, a new definition or a new digest, with its classification and the arguments policies see; compile a usage rule into its Cedar statements |
+| `/api/v1/catalog/servers`, `/api/v1/catalog/tools`, `/api/v1/catalog/models` | List, filter by key and read; approve or decline an entry, a new definition or a new digest (an approval with its classification and the arguments policies see), or decline everything that waits for review from one agent; compile a usage rule into its Cedar statements |
 | `/api/v1/catalog/blocks` | Issue a block, at once and with a reason; list the active blocks and their spread |
 | `/api/v1/catalog/blocks/{id}/unblock-requests` | Request and approve unblocking (two people) |
 | `/api/v1/halts` | Issue a halt (agent, fleet or selector); list; per-instance status |
@@ -403,7 +403,7 @@ erDiagram
     CATALOG_ENTRY ||--o{ AGENT_TOOLING : "enabled as"
 ```
 
-`CATALOG_ENTRY` stands for the catalog's MCP servers, tools and models, three tables in the domain model (section 3.9). Identifiers are UUIDv7. Governance records are never deleted; they are retired. Every table that the console edits has a version column for optimistic concurrency.
+`CATALOG_ENTRY` stands for the catalog's MCP servers, tools and models, three tables in the domain model (section 3.9); only tools and models are enabled, and a server is only observed. Identifiers are UUIDv7. Governance records are never deleted; they are retired. Every table that the console edits has a version column for optimistic concurrency.
 
 ## 8. Deployment
 

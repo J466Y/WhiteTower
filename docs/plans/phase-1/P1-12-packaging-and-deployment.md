@@ -5,7 +5,7 @@
 | **Phase** | 1 Core MVP |
 | **Status** | In progress (2 of 5 pull requests) |
 | **Size** | XL, split into two parts: **P1-12.1** (steps 1 to 3, about 3 weeks, right after P1-01) and **P1-12.2** (steps 4 to 10, about 4 weeks: step 4 depends on no feature plan and can run early; steps 5 to 10 run once the feature plans are nearly done) |
-| **Depends on** | P1-01 for P1-12.1; P1-07 and P1-08 for the high-availability and upgrade tests of P1-12.2, P1-15 for its offline bundle and compatibility matrix, and P1-09 and P1-16 for its catalog flows (steps 5 to 9) |
+| **Depends on** | P1-01 for P1-12.1; P1-07 and P1-08 for the high-availability and upgrade tests of P1-12.2, P1-15 for its offline bundle and compatibility matrix, and P1-09 and P1-16 for its catalog flows (steps 5, 6 and 9), which therefore come last: steps 7, 8 and 10 run first |
 | **Unblocks** | P1-13, P1-14 |
 | **Requirements** | OPS-01 to OPS-07, NFR-06, NFR-14, NFR-15, NFR-16 |
 | **Decisions** | ADR-0001, ADR-0003, ADR-0007 |
@@ -108,7 +108,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 - A runbook covering point-in-time recovery of the database, backup of the signing keys (offline, sealed) and of the configuration.
 - A scripted restore drill.
 - After a restore, the audit log still verifies, and a consistency check against a checkpoint exported before the backup passes.
-- A restore to an earlier point loses the halts, blocks and disables issued after it. The runbook shows how to find them in the SIEM (`whitetower.halt.issued.v1`, `whitetower.catalog.blocked.v1`, `whitetower.tooling.disabled.v1`) and issue them again.
+- A restore to an earlier point loses the halts, blocks and disables issued after it. The runbook shows how to find them in the SIEM (`whitetower.halt.issued.v1`, `whitetower.catalog.blocked.v1`, `whitetower.tooling.disabled.v1`) and issue them again. A block names the key of what it covers, or its hash, which is matched against the restored catalog's references; a block of a reference the restored catalog never had cannot be rebuilt from events.
 - A key compromise procedure.
 
 **Done when:** the drill passes once and is documented.
@@ -123,7 +123,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 - A security configuration guide for what the [threat model](../../security/threat-model.md) assumes: MFA at the IdP; checkpoints exported to the SIEM, with a scheduled consistency check against its latest one that alerts on failure (DC-8); the database's own audit log sent to the SIEM; production resources that accept White Tower tokens requiring `wt_env=production` (R-14); agents' MCP clients that verify TLS, and local MCP servers launched through `npx`, `uvx`, `pipx run` or `bunx` pinned to exact versions, which the catalog flags otherwise (A-6, T-77).
 - Time synchronization: every host that runs the core, a module or an agent keeps its clock within a few seconds of the others. An enforcement point whose clock is more than 5 seconds off ignores lease renewals and fails closed (contracts section 5.3).
 - The halting runbooks of P1-08.
-- The catalog runbooks: blocking a server, a tool or models at once, following the block's spread, and lifting it with a second person; handling a tool denied as `catalog.definition_changed`.
+- The catalog runbooks: blocking a server, a tool, a model, or every model of a provider or an endpoint, effective at once, following the block's spread, and lifting it with a second person; handling a tool denied as `catalog.definition_changed`.
 - The fifteen-minute demo, finalized (step 2): onboard an agent and enable its tooling, watch decisions arrive, including one denied by a usage rule, halt the agent, verify the audit log. The seed approves the seeded `wt-catalog` policy and enables no tooling, because enablement comes only from an approved request: the demo agent's report fills the catalog, the advisory committee approves its entries, the owner requests enabling them, and the advisory committee approves the request.
 
 **Done when:** an operator from the pilot organization reviews the documentation.

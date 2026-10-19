@@ -7,7 +7,7 @@
 | **Size** | M |
 | **Depends on** | P1-03 (login); then the API of each feature plan: P1-16's for step 9, and its step 7 for the end-to-end tests of blocks |
 | **Unblocks** | P1-13, P1-14 |
-| **Requirements** | API-04, AUD-04, KIL-05, KIL-08 |
+| **Requirements** | API-04, AUD-04, KIL-05, KIL-08; the CLI side of CAT-02 to CAT-04 and CAT-08 |
 | **Decisions** | ADR-0001, ADR-0009, RFC-0002 |
 
 ## Goal

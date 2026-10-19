@@ -13,14 +13,14 @@ This roadmap puts the implementation plans in order: who does what, when, and wh
 ## 1. At a glance
 
 - **Two phases to the MVP.** Phase 0, Foundations: 8 weeks. Phase 1, Core MVP: 29 weeks, including 6 weeks of pilot.
-- **Effort.** About 102 person-weeks for the individual plans, plus joint hardening and pilot work, roughly 127 person-weeks in total.
+- **Effort.** About 101 person-weeks for the individual plans, plus joint hardening and pilot work, roughly 126 person-weeks in total.
 - **Calendar with four people: 37 weeks** from start to the Phase 1 gate, before holidays and contingency. Starting on Monday 2026-10-05, the illustrative dates are:
   - Phase 0 gate at the end of November 2026;
   - release v0.1.0 in early May 2027;
   - Phase 1 gate in mid-June 2027.
 
   With the year-end break and a 15 to 20% contingency, plan for **August 2027**.
-- **Critical path.** Since RFC-0002 brought the MCP servers, tools and models of agents into the MVP (two weeks more), three tracks end in the same week, before hardening and the pilot: the platform track (core skeleton → audit log → module API → CLI → network quarantine → air-gap and upgrades), the agent track (human identity → inventory → policies → bundles and usage rules → enforcement point) and the console. The core domain track (human identity → inventory → catalog and enablement → agent identity → kill switch → blocks) is one week shorter (section 6).
+- **Critical path.** Since RFC-0002 brought the MCP servers, tools and models of agents into the MVP (two weeks more), three tracks end in the same week, before hardening and the pilot: the platform track (core skeleton → audit log → module API → CLI → network quarantine → air-gap and upgrades), the agent track (human identity → inventory → policies, and the catalog and enablement, which end the same week → bundles and usage rules → enforcement point) and the console. Only the second half of the core domain track (agent identity → kill switch → blocks) has a week of slack (section 6).
 - **Two reviews to start now,** because they can delay everything: RFC-0001's external review and RFC-0002's review. The tag `contracts/v0.1.0` waits for both. The parts of plans that build on RFC-0002's contract changes also wait for P0-03 step 12, which lands those changes once RFC-0002 is accepted. The pilot partner is signed and the spikes are done: the AGT spike was a no-go, and White Tower builds its own enforcement point ([ADR-0011](adr/0011-own-python-enforcement-point.md)).
 - **Progress (2026-09-30).** P0-02 and P0-05 are done, and P0-01 is done but for testing the development environment on macOS and Linux. P0-04 is done too, and P0-03 waits for the external review of RFC-0001. The ten founding ADRs are accepted, the Phase 1 team is confirmed, and the pilot environment is ready. The dates are re-baselined at G0 (section 11).
 - **Progress (2026-10-19).** P1-01, P1-02 and P1-03 are done, and P1-12 has its images, Compose profile and Helm chart, well ahead of the illustrative calendar: coding agents implement the plans part by part, and a reviewer judges each part ([AGENTS.md](../AGENTS.md)). RFC-0002 brings the MCP servers, tools and models of agents into the MVP: P0-03 gains step 12, and plan P1-16 and console subplan P1-10.7 are new. Its review is not open yet, and RFC-0001's external review is pending. The dates are re-baselined at M2.
@@ -104,7 +104,7 @@ gantt
     P1-06 Policy model and distribution  :p106, 2027-01-11, 20d
     P1-16 Bundles and usage rules        :p116b, after p106 p116a p0312, 10d
     P1-09 Enforcement point (Python)     :p109, after p116b p1071, 35d
-    P1-09 Halt integration and measures  :p109b, after p108 p109, 5d
+    P1-09 Halt integration and measures  :p109b, after p108 p109 p116c, 5d
 
     section Console (C)
     P1-10.0 UX design                    :p1100, 2026-10-12, 15d
@@ -141,7 +141,7 @@ The same schedule as a table:
 | W9–W12 | P1-03 human identity (W10–W12) | P1-01 (W9); P1-02 audit log (W10–W13) | P1-10.1 foundations (W9–W11); P1-10.2 begins (W12) | Security test automation (W9); P1-12.1 images, Compose, Helm (W10–W12) |
 | W13–W16 | P1-04 inventory and lifecycle | P1-02 (W13); P1-07.1 module registry and API (W14–W18) | P1-10.2 inventory screens (to W15); P1-10.3 policies (W16–W18) | P1-12.2 PostgreSQL reference setup (W13); P1-06 policies (W15–W18) |
 | W17–W20 | P1-16 catalog, enablement and tooling reports (W17–W18); P1-05 agent identity (W19–W22) | P1-07.1 (to W18); P1-07.2 mock module, conformance kit, load test (W19–W21) | P1-10.3 (to W18); P1-10.4 audit explorer (W19–W20) | P1-06 (to W18); P1-16 bundles and usage rules (W19–W20) |
-| W21–W28 | P1-05 (to W22); P1-08 kill switch (W23–W26); P1-16 blocks and metrics (W27); P1-13 preparation (W28) | P1-07.2 (to W21); P1-11 CLI (W22–W23); P1-15 network quarantine (W24–W25); P1-12.2 air-gap, upgrades, operations (W26–W28) | P1-10.5 kill switch and modules (W21–W23); P1-10.7 MCP servers and tooling (W24–W26); P1-10.6 dashboard and inbox (W27–W28) | P1-09 enforcement point (W21–W27); halt integration and measurements (W28) |
+| W21–W28 | P1-05 (to W22); P1-08 kill switch (W23–W26); P1-16 blocks and metrics (W27); P1-13 preparation (W28) | P1-07.2 (to W21); P1-11 CLI (W22–W23); P1-15 network quarantine (W24–W25); P1-12.2 upgrades, backups and the compatibility matrix (W26–W27), then its catalog flows: air-gap, egress-denied test, operations guides (W28) | P1-10.5 kill switch and modules (W21–W23); P1-10.7 MCP servers and tooling (W24–W26); P1-10.6 dashboard and inbox (W27–W28) | P1-09 enforcement point (W21–W27); halt integration and measurements (W28) |
 | W29–W31 | P1-13 hardening and release v0.1.0 (everyone, led by D) | | | |
 | W32–W37 | P1-14 pilot: setup, onboarding, operation, drills, gate review (everyone) | | | |
 
@@ -165,13 +165,13 @@ The free week in track D (W14) is deliberate: it absorbs part of the year-end br
 >
 > Console: P1-10.1 → P1-10.2 → P1-10.3 → P1-10.4 → P1-10.5 → P1-10.7 → P1-10.6 → P1-13 → P1-14
 >
-> Agent side: P0-01 → P1-01 → P1-03 → P1-04 → P1-06 → P1-16 (bundles and usage rules) → P1-09 → P1-13 → P1-14
+> Agent side: P0-01 → P1-01 → P1-03 → P1-04 → P1-06, and P1-16 (catalog, enablement and tooling reports), both ending in week 18 → P1-16 (bundles and usage rules) → P1-09 → P1-13 → P1-14
 
-P1-07 now takes eight weeks, and so does P1-09 with its halt integration: both are XL, split into subplans. Track A (P1-03 → P1-04 → P1-16 catalog, enablement and tooling reports → P1-05 → P1-08 → P1-16 blocks and metrics) ends in week 27, one week earlier, so it is nearly critical. The contracts branch has slack: P0-03 step 12 lands RFC-0002 in the contracts in weeks 7 and 8, and the first plan that needs it, P1-07, starts in week 14. No track has more than one week of slack at the end.
+P1-07 now takes eight weeks, and so does P1-09 with its halt integration: both are XL, split into subplans. Track A (P1-03 → P1-04 → P1-16 catalog, enablement and tooling reports → P1-05 → P1-08 → P1-16 blocks and metrics) ends in week 27, one week earlier; its first part, up to P1-16's catalog, enablement and tooling reports, is on the agent side's critical path, so only P1-05 → P1-08 → P1-16 blocks has that week of slack. The contracts branch has slack: P0-03 step 12 lands RFC-0002 in the contracts in weeks 7 and 8, and the first plan that needs it, P1-07, starts in week 14. No track has more than one week of slack at the end.
 
 **Where time can be won**
 
-1. **A fifth person (Go)** can take P1-16 and P1-15. The backend tracks then end by week 26, and the console sets the pace: with P1-10.6's Should items (UI-08, UI-09) moved to v0.1.x, it ends about then too, and G1 comes about week 35. Without that move, the console still ends in week 28, and the fifth person saves no time.
+1. **A fifth person (Go)** can take P1-16 and P1-15. The backend tracks then end by week 26, and the console sets the pace: with P1-10.6's Should items (UI-08, UI-09) moved to v0.1.x, it ends about then too, since only its settings screens remain, and G1 comes about week 35 or 36. Without that move, the console still ends in week 28, and the fifth person saves no time.
 2. **Run P0-03 step 12 as soon as RFC-0002 is accepted,** before the tag `contracts/v0.1.0`. The parts of plans that build on RFC-0002's contract changes wait for it, and after the tag, the changes that are not additive would need a `v1alpha2` (RFC-0002, Compatibility and versioning).
 3. **Prepare the pilot during P1-13:** environment, IdP integration and SIEM export ready before the release.
 4. **Keep the console on generated mocks,** so it never waits for the backend.

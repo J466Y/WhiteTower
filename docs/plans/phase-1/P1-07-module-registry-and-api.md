@@ -4,7 +4,7 @@
 | --- | --- |
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
-| **Size** | XL, split into two subplans before it starts: **P1-07.1** (steps 1 to 7, about 5 weeks: generated code, authentication and authorization, registration, sessions, the governance state service with the blocks record, acknowledgements, event ingestion and tooling reports) and **P1-07.2** (steps 8 to 10, about 3 weeks: the mock module, the conformance kit with S-01 to S-24, the load test), each with its tests (step 11) |
+| **Size** | XL, split into two subplans before it starts: **P1-07.1** (steps 1 to 7, about 5 weeks: generated code, authentication and authorization, registration, sessions, the governance state service with the blocks record, acknowledgements, event ingestion) and **P1-07.2** (steps 8 to 10, about 3 weeks: the wiring of tooling reports of step 7, once P1-16's pull request 3 is merged, then the mock module, the conformance kit with S-01 to S-24, the load test), each with its tests (step 11) |
 | **Depends on** | P0-03, P1-01, P1-05 (can start with stub authentication); P0-03 step 12 (RFC-0002 in the contracts) for the parts of RFC-0002; P1-16 step 4 for the wiring of tooling reports (step 7) |
 | **Unblocks** | P1-08, P1-09, P1-10.5; P1-16 step 7, through the blocks record of step 5 and, for ST-80, the mock module of step 8 |
 | **Requirements** | MOD-01 to MOD-05, MOD-07, KIL-07, AUD-02 (ingestion wiring); the transport of CAT-01 and CAT-04, and part of NFR-24's budget |
@@ -113,7 +113,7 @@ Once P1-16 step 4 is merged, wire `RegistryService.ReportTooling` and `RegistryS
 - it verifies bundles (signature, hashes, monotonic version) and evaluates Cedar policies with `cedar-go`, using the White Tower combination semantics;
 - it simulates actions at a configurable rate and publishes events through a durable file buffer;
 - it halts and acknowledges each layer;
-- once RFC-0002 is in the contracts, its manifest declares `tool.expose`, and it plays the enforcement point's side of RFC-0002: it reports scripted tooling (servers, tools and models, with canary secrets it redacts) through `ReportTooling` and `ReportDefinitions`; applies blocks by the SHA-256 of the string forms of what they cover, and denies every tool and model call while a block of a kind it does not know is active; checks the catalog before policies; fills per-tool arguments with their transforms; evaluates `tool.expose` on scripted model requests; and narrows provider-run tools;
+- once RFC-0002 is in the contracts, its manifest declares `tool.expose`, and it plays the enforcement point's side of RFC-0002: it reports scripted, configurable tooling (servers, tools and models, with canary secrets it redacts, definitions that change on demand, and hostile reported text: markup, script, bidirectional and invisible characters, 16 KiB descriptions) through `ReportTooling` and `ReportDefinitions`; applies blocks by the SHA-256 of the string forms of what they cover, and denies every tool and model call while a block of a kind it does not know is active; checks the catalog before policies; fills per-tool arguments with their transforms; evaluates `tool.expose` on scripted model requests; and narrows provider-run tools;
 - flags inject faults: drop acknowledgements, delay them, crash, lie; and, for RFC-0002, report secrets unredacted, ignore blocks, skip the catalog check, expose a denied or changed tool, acknowledge blocks late.
 
 It serves tests, demos and load tests. It is also the reference implementation module authors can read.
@@ -169,7 +169,7 @@ Publish the results.
 - Instances and their state are visible through the API.
 - The mock module passes scenarios S-18 to S-24, and the kit fails on each fault of RFC-0002 that the mock module can inject.
 - With 500 concurrent streams on two replicas and 500 active blocks, state changes and blocks are delivered with p95 ≤ 1 second (part of the budgets of NFR-03 and NFR-24).
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-07-module-registry-and-api) pass: ST-34 to ST-39, with ST-35 and ST-38 covering `ReportTooling`, `ReportDefinitions` and the limits of reports and blocks.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-07-module-registry-and-api) pass: ST-34 to ST-39, with ST-35 and ST-38 covering `ReportTooling`, `ReportDefinitions` and the message limits of reports and definitions.
 
 ## Risks and open questions
 
@@ -186,7 +186,7 @@ Publish the results.
 - `connect-go` server streams map to plain `http.Handler`s, so TLS and middleware stay shared with the rest of the machine listener.
 - Send the snapshot and later changes through one ordered channel per stream, to avoid races between them.
 - Enforcement points start closed. The contract (and the kit) makes the "no action before state" rule testable (KIL-07).
-- An instance that does not know blocks ignores them (EP-10). That is safe because every bundle now carries a catalog file, which such an instance rejects (step V4 of the bundle verification), so it stays closed.
+- An instance that does not know blocks ignores them (EP-10). That is safe because every bundle now carries a catalog file, which such an instance rejects at step V4 (`invalid_manifest`): it keeps its last valid bundle or, with none, stays closed, and never activates a bundle built after RFC-0002 (contracts, section 7.6).
 - From spike S2, which ran this design with 1,000 enforcement points ([report](../../spikes/S2-watch-streams.md)):
   - serialize every governance state change with a transaction-level advisory lock, so versions commit in order; otherwise a replica reading "every change after V" can skip one that commits late;
   - register a stream before reading its snapshot, then skip changes the snapshot already holds;
