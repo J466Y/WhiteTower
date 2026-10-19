@@ -83,7 +83,7 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-35 | Every method, `ReportTooling` and `ReportDefinitions` included, refuses agents outside the caller's scope, on every call and not only at registration (CORE-2); only instances of modules that declare the `enforcement-point` capability can call those two | T-27, T-74 | integration |
 | ST-36 | A `Watch` stream ends when its token expires (CORE-1), and a reader that falls behind is dropped (CORE-7) | T-37 | integration |
 | ST-37 | No replica ever sends state older than the client's version, including after a failover to another replica (CORE-5) | T-31 | integration |
-| ST-38 | Message size limits and per-instance stream limits are enforced (contracts section 4.8), and so are the limits of tooling reports, definitions and blocks (RFC-0002 sections 4 and 6) | T-36, T-37, T-74, T-80 | integration |
+| ST-38 | Message size limits and per-instance stream limits are enforced (contracts section 4.8), and so are the message limits of tooling reports and definitions (RFC-0002 section 4) | T-36, T-37, T-74 | integration |
 | ST-39 | Every lease renewal carries the core's time | T-32, DC-2 | integration |
 
 ## P1-08: Kill switch

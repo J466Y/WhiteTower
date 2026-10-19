@@ -5,8 +5,8 @@
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
 | **Size** | L, in six pull requests, about five weeks (see [progress notes](#progress-notes)) |
-| **Depends on** | P1-04 for steps 1 to 4; RFC-0002 in the contracts ([P0-03](../phase-0/P0-03-module-contracts.md), step 12) and P1-06 for steps 5 and 6; the blocks record and the mock module of P1-07 (steps 5 and 8), the harness of P1-08 (step 10) and the reviewed design of the halt path for step 7 |
-| **Unblocks** | The catalog steps of P1-09, P1-10.7, the catalog commands of P1-11, P1-13, P1-14 |
+| **Depends on** | P1-04 for steps 1 to 4; RFC-0002 in the contracts ([P0-03](../phase-0/P0-03-module-contracts.md), step 12) and P1-06 for steps 5 and 6; P0-03 step 12, the blocks record and the mock module of P1-07 (steps 5 and 8), the harness of P1-08 (step 10) and the reviewed design of the halt path for step 7 |
+| **Unblocks** | The wiring of tooling reports in P1-07 (its step 7), the catalog steps of P1-09, P1-10.6 and P1-10.7, the catalog commands of P1-11, the catalog flows of P1-12.2, P1-13, P1-14 |
 | **Requirements** | CAT-01 to CAT-10, NFR-24; backend of UI-10; the catalog part of API-04 |
 | **Decisions** | [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md), ADR-0005, ADR-0011 |
 
@@ -41,7 +41,7 @@ The core knows which MCP servers, tools and models each governed agent has, incl
 - `internal/catalog`: entries, definitions, enablement, declared tooling, observations, blocks and the usage-rule compiler, with its queries in `internal/catalog/queries` and their generated code in `internal/catalog/catalogdb` (a new block in `sqlc.yaml`).
 - `internal/api/rest/catalog.go`, with the OpenAPI operations of step 1, and `Catalog` in `rest.Options`.
 - `metrics.NewCatalog`, and the wiring in `cmd/whitetower/main.go`. Its variable `catalog`, which holds the event catalog, becomes `eventCatalog`, so it no longer shadows the new package.
-- A migration with the tables of [domain model section 3.9](../../architecture/domain-model.md#39-mcp-servers-tools-and-models), and the wider check on `inbox_items.kind`.
+- New migrations, one in each pull request that needs tables, with the tables of [domain model section 3.9](../../architecture/domain-model.md#39-mcp-servers-tools-and-models): the catalog's in pull request 1; enablement, the wider check on `inbox_items.kind` and the defaults of the two settings in pull request 2; observations and definitions in pull request 3; blocks and unblock requests in pull request 6, after the halt path's design is reviewed.
 - The permissions of step 1 in `internal/authz`.
 - The core event types of RFC-0002, section 9, each with its schema, example, catalog entry, rule in `internal/audit/facts.go` and line in `internal/audit/testdata/facts.json` (AGENTS.md, "Audit events").
 - Security tests ST-75, ST-80 and ST-81.
@@ -54,7 +54,9 @@ The core knows which MCP servers, tools and models each governed agent has, incl
   - the advisory committee approves catalog entries (not the steering committee);
   - adding a usage rule follows the normal approval of policies (an urgent restriction uses a disable or a block);
   - no agent may use every approved entry without enabling each one, not even with non-production credentials;
-  - the limits stay: 256 servers, 4,096 tools and 256 models per report, references of at most 2 KiB, 500 active blocks;
+  - the limits stay: 256 servers, 4,096 tools and 256 models per report, references of at most 2 KiB, one report's worth of each agent's entries waiting for review, 500 active blocks;
+  - no context field is reserved now for stateful usage rules (Phase 2);
+  - the catalog neither imports tooling from endpoint security tools nor exports enabled tooling to coding agents' allowlists in the MVP;
   - numbers in usage rules are integers.
 - **Permissions.** Nine new permissions in `internal/authz`, named like the existing ones, with the rows of the permission matrix (requirements, section 5.2.1):
 
@@ -83,8 +85,8 @@ The core knows which MCP servers, tools and models each governed agent has, incl
   - entries, requests and blocks have UUIDv7 IDs in their paths; keys, which contain slashes, are query filters;
   - members and parameters are camelCase (`readOnly`, `openWorld`, `definitionSha256`), although bundles and events use snake_case;
   - lists are objects with a named array and `nextCursor`, with `limit` and `cursor` (`rest.PageSize`, `rest.EncodeCursor`, `rest.DecodeCursor`);
-  - updates take `If-Match` with the row's version (`rest.ETag`);
-  - refusals that come from state, such as a request already pending, an entry not approved or the cap of 500 blocks, answer with a new code, `conflict` (409), added to `problem.go` and to the [errors reference](../../reference/api-errors.md);
+  - updates take `If-Match` with the row's version (`rest.ETag`, `rest.IfMatch`, `rest.Stale`);
+  - refusals that come from state, such as a request already pending, an entry not approved or the cap of 500 blocks, answer with a new code, `conflict` (409), added to `internal/api/rest/problem/problem.go` (its constant and its `Codes` entry) and to the [errors reference](../../reference/api-errors.md), which a test keeps in step;
   - error details name nothing internal: never `err.Error()`.
 
 **Done when:** the operations are merged and agreed with the console side, the permission tests cover every new row of the matrix, and for every `own` grant an owner is refused on an agent they do not own.
@@ -98,10 +100,10 @@ The core knows which MCP servers, tools and models each governed agent has, incl
   - Approving a self-hosted model pins the digest of its weights when the runtime reported one.
   - The reviewer classifies each tool (`read_only`, `destructive`, `open_world`), starting from the MCP annotations or, without them, from the protocol's conservative defaults, and declares the arguments policies may see, with their types from the tool's input schema.
 - **Changed definitions and digests.** A reported definition or digest that differs from the approved one waits for review, while the approved one stays pinned: enforcement points deny the tool or the model, and hide the tool, until the new one is approved (RFC-0002, section 7.1).
-- **Argument declarations stay stable.** A declaration that an active policy version reads cannot be withdrawn, and a declared argument's type cannot change while a usage rule uses it (RFC-0002, section 7.5).
+- **Argument declarations stay stable.** A declaration that an active policy version reads cannot be withdrawn, and a declared argument's type cannot change while an active usage rule uses it (RFC-0002, section 7.5).
 - **Unpinned packages.** Local servers launched through `npx`, `uvx`, `pipx run` or `bunx` without an exact version are flagged for reviewers (T-77).
 - **Redaction.** Everything stored from a report is redacted again (CORE-11).
-- **Events:** `whitetower.catalog.discovered.v1`, `whitetower.catalog.approved.v1`, `whitetower.catalog.declined.v1`, `whitetower.catalog.definition_changed.v1`. They carry keys and the SHA-256 of references, never references in clear, descriptions or schemas (NFR-20). An event lists at most 100 entries, so it stays within the 64 KiB of an event; more take several events. `catalog.*` events have no subject, so owners' audit reads, which filter on the agent, never show them.
+- **Events:** `whitetower.catalog.discovered.v1`, `whitetower.catalog.approved.v1` (actor: the reviewer), `whitetower.catalog.declined.v1` (actor: the reviewer, with the reason), `whitetower.catalog.definition_changed.v1`. They carry keys and the SHA-256 of references, never references in clear, descriptions or schemas (NFR-20). An event lists at most 100 entries, so it stays within the 64 KiB of an event; more take several events. `catalog.*` events have no subject, so owners' audit reads, which filter on the agent, never show them.
 
 **Done when:** every transition and every refusal is tested, a definition or digest change keeps the approved one pinned, only the advisory committee approves or declines, a declined entry leaves the queue and stays denied, and no event carries a reference, a description or a schema.
 
@@ -111,9 +113,10 @@ The core knows which MCP servers, tools and models each governed agent has, incl
 - **Disabling** takes effect at once: the owner, the advisory committee or an operator disables, with a reason. Enabling again needs a new request.
 - **History.** A request is decided once and never changes afterwards, and each change writes its event: `whitetower.tooling.enabled.v1` (actor: the approver) and `whitetower.tooling.disabled.v1` (actor: who disabled, with the reason). `tooling.*` events have the agent as their subject.
 - **Lifecycle.** Enabling tooling is part of "policy and harness assignment", between `validated` and `ready`; it is not a guard of the lifecycle (P1-04, step 5).
-- **Reviews.** Each enabled entry keeps when it was last used (`agent_tooling.last_used_at`), filled by a job from allowed decisions, never by a write per decision. P1-04's periodic reviews read, through an interface this plan implements, the enabled tooling unused for `lifecycle.review_unused_tooling_days` (90 by default; a setting administrators edit, domain model section 5), as candidates to disable (CAT-09).
-- **Declared tooling.** Owners and operators can declare the tooling of agents without an enforcement point, so that the inventory is complete; nothing enforces it (CAT-08). It is accepted only for agents below coverage C2, read through P1-04's coverage function (step 8), or, until that lands, for agents that no enforcement point instance serves.
-- **Inbox.** The migration widens the check on `inbox_items.kind` with entries and definitions waiting for review, requests to enable tooling and requests to unblock (P1-04, step 10).
+- **Reviews.** Each enabled entry keeps when it was last used (`agent_tooling.last_used_at`), never by a write per decision: a job reads, from `audit_events` by type and ingestion time, the `decision.made` events that allowed `tool.invoke` or `model.invoke` and the `action.executed` events of provider-run calls, takes the resource's key from their canonical bytes, keeps its cursor in `job_state`, and updates each agent's entry at most once per run. P1-04's periodic reviews read, through an interface this plan implements, the enabled tooling unused for `lifecycle.review_unused_tooling_days` (90 by default), as candidates to disable (CAT-09).
+- **Settings.** `lifecycle.review_unused_tooling_days` and `catalog.pending_entries_per_agent` are rows of the `settings` table, which administrators edit at runtime (domain model section 5): pull request 2's migration inserts their defaults, and the core reads them from that table, not from `internal/platform/config`.
+- **Declared tooling.** Owners and operators can declare the tooling of agents without an enforcement point, so that the inventory is complete; nothing enforces it (CAT-08). It is accepted only for agents below coverage C2, read through P1-04's coverage function (step 8), or, until that lands, for agents that no enforcement point instance serves. Each change to declared tooling writes `whitetower.tooling.observed.v1`, with the person as its actor.
+- **Inbox.** Pull request 2's migration widens the check on `inbox_items.kind` with entries and definitions waiting for review, requests to enable tooling and requests to unblock (P1-04, step 10).
 
 **Done when:** separation of duties holds on every path, through the API and in the database (ST-81), a disable is recorded at once, and a review lists the unused enabled tooling (tests with a fake clock).
 
@@ -123,18 +126,18 @@ The logic behind `RegistryService.ReportTooling` and `RegistryService.ReportDefi
 
 - **Validation and limits.** The report's schema, its counts and sizes (RFC-0002, section 4.2), kept as constants as `audit.MaxBatchEvents` is, and a rate limit per instance and agent (`internal/platform/ratelimit`, as ingestion's).
 - **Reports never authorize** (CORE-10). New references become `discovered` entries, the agent's own tools entries of that agent, and changed definitions and digests wait for review; nothing is approved, enabled or unblocked.
-- **A bound on waiting entries** (CORE-13, DC-10). For each agent and each kind, the entries its reports brought that still wait for review are bounded: one report's worth by default (256 servers, 4,096 tools, 256 models), a setting administrators can change (`catalog.pending_entries_per_agent`, domain model section 5). Beyond it, the report is still recorded, but its new entries are left out, stay unknown and are denied, and the response says how many. Approving or declining frees room, so a compromised agent cannot make the catalog, or the reviewers' queue, grow faster than people decide.
+- **A bound on what waits for review** (CORE-13, DC-10). For each agent, what its reports brought that still waits for review is bounded: new entries of each kind, and new definitions and digests of known entries, one report's worth by default (256 servers, 4,096 tools, 256 models, and as many new definitions as tools), a setting administrators can change (`catalog.pending_entries_per_agent`). Beyond it, the report is still recorded, but what is new is left out, and the response says how much: a new entry stays unknown, and a new definition or digest is not stored, so the tool or the model stays denied. Approving or declining frees room, so a compromised agent cannot make the catalog, or the reviewers' queue, grow faster than people decide.
 - **Definitions.** The response lists the definition hashes the core lacks. `ReportDefinitions` stores each definition under the hash the core recomputes (SHA-256 of RFC 8785 canonical JSON, as RFC-0002 section 3 defines it; the vectors of P0-03 step 12 then check it on both stacks), and refuses one that matches no hash the agent's reports name. Canonical JSON reuses `github.com/gowebpki/jcs`, which the audit log and the reference bundle verifier already use. Definitions are stored as their canonical bytes, as `audit_events.canonical` is, never re-encoded (JSONB would refuse some strings and reorder members), so every stored hash can be recomputed.
-- **Observations.** For each agent, the entries observed and when each was first and last seen, so the console shows tooling waiting for a decision, and enabled tooling the agent no longer has. A report replaces its instance's previous one for that agent.
+- **Observations.** For each agent, the entries observed, with each tool's origin (`agent` or `provider`, which can differ between agents for the same remote server) and when each was first and last seen, so the console shows tooling waiting for a decision, and enabled tooling the agent no longer has. A report replaces its instance's previous one for that agent: what it leaves out is marked as no longer observed, never deleted.
 - **Events.** `whitetower.tooling.observed.v1` is written only when the observed set changes; it and the events of step 2 that a report causes carry the instance's ID in their data, and their actor is the system. A report's new entries go into `catalog.discovered.v1` events of at most 100 entries each.
 
-**Done when:** a report makes nothing usable (ST-75); oversized and too frequent reports are refused, and new entries beyond the bound are left out; a definition whose recomputed hash matches no reported one is refused; and canary secrets placed in a report never reach the database or an event.
+**Done when:** a report makes nothing usable (ST-75); oversized and too frequent reports are refused, and new entries, definitions and digests beyond the bound are left out; a definition whose recomputed hash matches no reported one is refused; and canary secrets placed in a report never reach the database or an event.
 
 ### 5. Bundles (with P1-06, once RFC-0002 is in the contracts)
 
 P1-06 builds the bundles; this plan supplies, through the interfaces P1-06 defines:
 
-- **the catalog file's content,** `catalog.json` in format `whitetower.catalog.v1`: the entries enabled for the agent and those observed for it, with their status, enablement, pinned definition and digest, classification, and the arguments policies may see. It holds no observation times, so that a report that changes nothing else rebuilds nothing;
+- **the catalog file's content,** `catalog.json` in format `whitetower.catalog.v1`: the entries enabled for the agent and those observed for it, with their status, enablement, pinned definition and digest, classification, each tool's origin as the agent's observations give it, and the arguments policies may see. It holds no observation times, so that a report that changes nothing else rebuilds nothing;
 - **the argument declarations and their types,** from which P1-06 generates each bundle's Cedar schema, with one `ToolArgs` record per tool (RFC-0002, section 7.6);
 - **the rebuild triggers,** through P1-06's chunked rebuild (step 6 of P1-06): a change to an agent's enablement or observations rebuilds its bundle, coalesced per agent, and a change to a shared entry rebuilds the bundles of the agents that observe or enable it. Blocks never rebuild bundles.
 
@@ -145,7 +148,7 @@ P1-06 builds the bundles; this plan supplies, through the interfaces P1-06 defin
 - **The form** of RFC-0002, section 8: tools, conditions on arguments, operators, transforms, and `if_absent` (missing arguments match by default).
 - **The compiler** turns a rule into one Cedar `forbid` statement per tool, annotated with the rule's canonical JSON (`@rule`). It takes argument types from the declarations, because a condition compiles differently for a string and for a set (`in` becomes `contains` on a string and `containsAny` on a set).
 - **The generator interface** that P1-06's check at submission calls (step 3 of P1-06): a version whose `@rule` statements differ from what the compiler produces from their annotations is refused, so the form the console shows is what runs.
-- **Validation.** Generated rules validate in strict mode against one Cedar schema covering the whole catalog, for global versions, and against the agent's schema for agent-specific ones.
+- **Validation.** Generated rules validate in strict mode against one Cedar schema covering the whole catalog, for global versions, and against the agent's schema for agent-specific ones. The arguments of the agent's own tools (`agent/<name>`) appear only in their agent's schema, so global versions cannot read them, and the API and the console refuse a global usage rule on such a tool (RFC-0002, section 7.5).
 
 **Done when:** generated rules validate with `cedar-go` in strict mode, a hand-edited rule statement is refused through P1-06's check, and the vectors of transforms and missing arguments, shared with P1-09 (ST-79), pass on the core's compiler.
 
@@ -157,7 +160,7 @@ Blocks travel on the halt path, which must never become a bottleneck (NFR-03). O
 - **Publication.** Blocks travel in their own record of the watch stream, never in the fleet record, through P1-07's governance state service. They take their versions from the global state sequence, and are committed without waiting for any bundle (CORE-12). They never change an entry's status and never rebuild a bundle.
 - **Propagation.** Enforcement points acknowledge the state version that carries a block as soon as they apply it (EP-15). The spread of each block comes from `instance_agents.observed_state_version`, through P1-08's tracking keyed by state version, and counts enforcement points only.
 - **Break-glass** cannot block (step 1).
-- **Events:** `whitetower.catalog.blocked.v1` (actor: the issuer, with the reason) and `whitetower.catalog.unblocked.v1` (actor: the approver), each with the block's ID and the state version.
+- **Events:** `whitetower.catalog.blocked.v1` (actor: the issuer, with the reason) and `whitetower.catalog.unblocked.v1` (actor: the approver), each with the block's ID and the state version; `blocked` also carries the block's kind, the SHA-256 of what it covers and the key of the entry it covers when the catalog has one.
 
 **Done when:** ST-80 passes with the harness of P1-08: with 500 active blocks, a block reaches every mock enforcement point within NFR-24, and halts of one agent and of the fleet still meet NFR-03. Lifting needs a second person (ST-81).
 
@@ -169,7 +172,7 @@ Blocks travel on the halt path, which must never become a bottleneck (NFR-03). O
 
 ## Acceptance criteria
 
-- A report alone never makes anything usable; an approved and enabled tool is usable; a disabled one is denied from the next bundle on (ST-75).
+- A report alone never approves, enables or unblocks anything, and beyond an agent's bound what it brings is left out (ST-75). An enabled tool is listed as enabled in the agent's catalog file, and a disabled one leaves it with the next bundle (step 5).
 - A changed tool definition is denied and hidden until its new definition is approved (with P1-09, ST-76).
 - Nobody approves their own request to enable or to unblock (ST-81).
 - Usage rules made with the form validate in strict mode, and a hand-edited rule statement is refused.
@@ -195,7 +198,7 @@ Blocks travel on the halt path, which must never become a bottleneck (NFR-03). O
 - Store every time you compare later with the injected clock (AGENTS.md, pitfalls).
 - Reported text is untrusted: it is logged only through `logging.Sanitize`, and the console and the CLI show it as plain text (T-76).
 - Do not copy these deviations of earlier plans: lists returned as bare arrays, `err.Error()` in problem details, checks of role names in handlers, and a principal's ID as an event's subject.
-- In REST tests, pass `authz.NewAuthorizer()` to `resttest`, as `audit_test.go` does, so the matrix's refusals are tested.
+- In REST tests, pass `Authorizer: authz.NewAuthorizer()` in the `rest.Options` given to `resttest.New`, which otherwise allows everything (`audit_test.go` does the same with `rest.Handler`), so the matrix's refusals are tested.
 
 ## Progress notes
 

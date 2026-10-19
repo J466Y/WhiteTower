@@ -60,7 +60,7 @@ Write the OpenAPI operations for policies, versions, validation, approvals, diff
 
 ### 3. Validation
 
-- **Cedar:** parse with `cedar-go`, and validate in strict mode against a schema generated from the catalog: the profile's schema, whose `ToolArgs` holds one record per tool with the arguments policies may see, typed as the catalog declares them (RFC-0002, sections 7.5 and 7.6). An agent-specific version validates against its agent's schema, and a global version against one schema that covers the whole catalog. This replaces the deployment-wide `ToolArgs` extension of the contracts (section 6.7).
+- **Cedar:** parse with `cedar-go`, and validate in strict mode against a schema generated from the catalog: the profile's schema, whose `ToolArgs` holds one record per tool with the arguments policies may see, typed as the catalog declares them (RFC-0002, sections 7.5 and 7.6). An agent-specific version validates against its agent's schema, and a global version against one schema that covers the whole catalog. The arguments of the agent's own tools (`agent/<name>`) are only in their agent's schema, so a global version cannot read them (RFC-0002, section 7.5). This replaces the deployment-wide `ToolArgs` extension of the contracts (section 6.7).
 - **Rego:** compile with the OPA Go library against the published input document.
 - **Policy tests (Should, POL-07):** optional test files with expected decisions run in the core. Results are attached to the version, and a version with failing tests cannot be submitted.
 - **Arguments must be visible.** A version is refused when one of its Cedar statements reads a tool argument outside the sets policies see: those a reviewer declared, and those usage rules use. Enforcement points fill only those (EP-19), so such a condition never holds, and strict validation does not report it when `has` guards the read.
@@ -93,7 +93,7 @@ Implement the interface P1-04 uses: an agent can be activated only if it has at 
 
 - The **effective set** of an agent is the active global versions plus its active agent-specific versions.
 - The **bundle** follows the P0-03 format, as RFC-0002 extends it: a manifest with a monotonic version per agent, the combination algorithm ID and the entries with their hashes, plus the policy files, the agent's Cedar schema (`schema.cedarschema`) and its catalog file (`catalog.json`, format `whitetower.catalog.v1`, in the manifest's `catalog` field). The serialization is deterministic (RFC 8785, with the catalog's entries sorted by key), and the content hash is kept apart from the version. The catalog file holds no observation times, so a report that changes only when entries were last seen changes no bundle.
-- **Every bundle carries a catalog file**, empty when nothing is observed or enabled for the agent, so `wt-catalog` never travels without one: an enforcement point that does not support catalogs rejects the bundle and stays closed, instead of applying the permit without the catalog check (T-82, ST-32).
+- **Every bundle carries a catalog file**, empty when nothing is observed or enabled for the agent, so `wt-catalog` never travels without one: an enforcement point that does not support catalogs rejects the bundle, keeping its last valid bundle or, with none, staying closed, and never applies the permit without the catalog check (T-82, ST-32).
 - **What the schema and the catalog file hold** comes through an interface defined here, which P1-16 implements (its step 5): the entries enabled for the agent and those observed for it, and, for each tool, the arguments policies may see and their types (RFC-0002, sections 5 and 7.5). Until P1-16 lands, the catalog file is empty.
 - The manifest is signed with the bundle key (Ed25519, detached JWS) and the bundle stored in PostgreSQL.
 - **Size.** The builder refuses, and alerts on, a bundle beyond the limits of step V1 (2 MiB, at most 1,000 files; contracts, section 7.4), rather than publish one that every enforcement point would reject.
@@ -153,7 +153,7 @@ Evaluate a draft version, together with the current global set, against test inp
 - Activating a global version rebuilds 1,000 bundles, each with its catalog file and schema, in under 60 seconds.
 - Validation rejects Cedar and Rego syntax errors with positions.
 - No path lets an author approve their own version (tests).
-- Every bundle carries its agent's catalog file and Cedar schema, both covered by the signed manifest; the mock enforcement point activates it, and an enforcement point without catalogs rejects it and stays closed.
+- Every bundle carries its agent's catalog file and Cedar schema, both covered by the signed manifest; the mock enforcement point activates it, and an enforcement point without catalogs rejects it, keeping its last valid bundle or, with none, staying closed.
 - A fresh installation has the seeded policies waiting for the steering committee; until they are approved, the actions they permit are denied unless another policy permits them.
 - A version whose `@rule` statements differ from the generator's output, or that reads an argument policies cannot see, cannot be submitted.
 - The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-06-policy-model-and-distribution) pass: ST-31 to ST-33.

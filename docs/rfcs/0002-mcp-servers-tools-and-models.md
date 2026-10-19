@@ -33,7 +33,7 @@ Without them, policies about tools are lists of names that any configuration cha
 
 The maintainer decided on 2026-10-13:
 
-- **What an agent can do is delimited by its MCP servers, tools and models.** They are discovered, approved or blocked, and enabled per agent.
+- **What an agent can do is delimited by its MCP servers, tools and models.** They are discovered and approved for the organization, can be blocked for it, and are enabled per agent.
 - **How it may use them is delimited by policies**, with usage rules that forbid patterns of use. Skills, which teach a model how to use its tools, cannot be enforced, so the skills repository leaves Phase 2.
 - **Both are part of the MVP.** P1-04, P1-06 and P1-09 have not started, so designing this in now costs least.
 
@@ -60,7 +60,7 @@ The maintainer decided on 2026-10-13:
 | Key | The entry's name in policies and in the console, assigned by the core: `github`, `github/create_issue`, `agent/send_email`, `provider.openai/web_search`, `gpu-01/llama3.1-8b` |
 | Definition | What the model sees of a tool: its name, description and schemas. Approval pins its hash. Built-in tools have none |
 | Observed | The entries an enforcement point reported for an agent |
-| Enabled | The entries an agent may use, approved for that agent |
+| Enabled | The tools and models an agent may use, approved for that agent; a server shows as enabled when one of its tools is |
 | Block | An organization-wide denial of a server, a tool or models, effective at once |
 | Usage rule | A forbidden pattern of use of a tool, written in a policy (section 8) |
 
@@ -132,7 +132,7 @@ A report is complete: it replaces the instance's previous report for that agent.
 
 - **CORE-10.** The core MUST treat reports as observations. A report MUST NOT approve, enable or unblock anything, and MUST NOT change an approved definition.
 - **CORE-11.** The core MUST apply the redaction of EP-14 again before storing a report, and MUST NOT copy reported descriptions, schemas or references into audit events, which name references only by their SHA-256 (section 9).
-- **CORE-13.** The core MUST bound, for each agent and each kind of entry, the entries that the agent's reports brought and that still wait for review. Beyond the bound, it still records the report but leaves out its new entries, and says how many in its response: they stay unknown, and are denied (`catalog.unknown`), until reviewers approve or decline enough of the agent's waiting entries. The bound is one report's worth by default (256 servers, 4,096 tools and 256 models), and administrators can change it. A compromised agent therefore cannot make the catalog, or the reviewers' queue, grow faster than people decide.
+- **CORE-13.** The core MUST bound, for each agent, what the agent's reports brought that still waits for review: new entries of each kind, and new definitions and digests of known entries. Beyond the bound, it still records the report but leaves out what is new, and says how much in its response. A new entry left out stays unknown (`catalog.unknown`); a new definition or digest left out is not stored, so the tool or the model stays denied (`catalog.definition_changed`, `catalog.digest_mismatch`). Both last until reviewers approve or decline enough of what the agent brought. The bound is one report's worth by default (256 servers, 4,096 tools and 256 models, and as many new definitions as tools), and administrators can change it. A compromised agent therefore cannot make the catalog, or the reviewers' queue, grow faster than people decide.
 - **New entries.** A reference the catalog does not have becomes a `discovered` entry; the agent's own tools become entries of that agent. When a tool's reported definition differs from the approved one, the approved definition stays pinned and the new one waits for review. A model's new digest is handled the same way: the pinned digest stays, and the new one waits for review.
 - **Observations.** For each agent, the core keeps the entries observed and when each was last seen. The console can then show tooling waiting for a decision, and enabled tooling the agent no longer has.
 - **Limits (contracts, section 4.8).**
@@ -174,7 +174,7 @@ Each agent's bundle carries a catalog file, `catalog.json`, listed in the bundle
 - **Arguments.** `args` lists the tool's arguments that policies may see (section 7.5).
 - **Every bundle carries one,** empty when nothing is observed or enabled for the agent. An enforcement point that supports catalogs treats a bundle without one as an empty catalog: every tool and model action is then `catalog.unknown`.
 - **Format.** The decision profile gains a JSON Schema of the file, `whitetower.catalog.v1`.
-- **Verification.** Step V4 accepts the manifest's `catalog` field, step V5 requires its file, and step V7 parses it against its schema (`parse_error`). An enforcement point that does not support catalogs rejects such a bundle (`invalid_manifest`) and stays closed.
+- **Verification.** Step V4 accepts the manifest's `catalog` field, step V5 requires its file, and step V7 parses it against its schema (`parse_error`). An enforcement point that does not support catalogs rejects such a bundle (`invalid_manifest`): it keeps its last valid bundle or, with none, stays closed, and it never activates a bundle built after this RFC (contracts, section 7.6).
 
 ### 6. Blocks
 
@@ -277,8 +277,8 @@ The provider lists a remote server's tools itself, so the enforcement point lear
 This section answers RFC-0001's open question on tool arguments.
 
 - **Which arguments.** Policies see two sets of a tool's arguments: those that the usage rules of the agent's effective policy set use, and those a reviewer declared for the tool in the catalog. The core lists them in the catalog file (`args`) and declares them in the bundle's Cedar schema. A policy version with a statement that reads any other argument is refused when it is submitted: enforcement points never fill that argument, so the condition could never hold.
-- **Declarations stay stable.** A declaration that an active policy version reads cannot be withdrawn, and a declared argument's type cannot change while a usage rule uses it. A new definition that gives the argument another type can still be approved; a value that does not fit the declared type then denies the call (EP-19).
-- **One record per tool.** `context.args` holds one record per tool, keyed by the tool's key, with the declared arguments inside: `context.args["github/create_pull_request"]["base"]`. Per-tool records keep types unambiguous: `id` can be a number for one tool and a string for another.
+- **Declarations stay stable.** A declaration that an active policy version reads cannot be withdrawn, and a declared argument's type cannot change while an active usage rule uses it. A new definition that gives the argument another type can still be approved; a value that does not fit the declared type then denies the call (EP-19).
+- **One record per tool.** `context.args` holds one record per tool, keyed by the tool's key, with the declared arguments inside: `context.args["github/create_pull_request"]["base"]`. Per-tool records keep types unambiguous: `id` can be a number for one tool and a string for another. The arguments of the agent's own tools (`agent/<name>`) are declared only in that agent's schema, because the same name can mean other arguments in another agent: global policies, and their usage rules, cannot read them.
 - **Naming.** An argument is named by its path in the call's arguments, for example `options.base` for a nested field. When a transform applies, a colon and the transform's name follow: `path:path`, `url:url_host`.
 
 | Transform | Value |
@@ -395,7 +395,7 @@ New event types emitted by the core:
 | `whitetower.catalog.approved.v1` | None | An entry, a new definition of a tool or a new digest of a model was approved, with the pinned hash or digest and the classification |
 | `whitetower.catalog.declined.v1` | None | A reviewer declined an entry, a new definition or a new digest, with the reason. It stays not approved, and leaves the queue of what waits for review |
 | `whitetower.catalog.definition_changed.v1` | None | A reported definition or digest differs from the approved one; the event carries both, and names the reporting instance |
-| `whitetower.catalog.blocked.v1` | None | A block was issued, with its ID, the state version that carries it, its reason and its issuer |
+| `whitetower.catalog.blocked.v1` | None | A block was issued, with its ID, its kind, the SHA-256 of what it covers and the key of the entry it covers when the catalog has one, the state version that carries it, its reason and its issuer |
 | `whitetower.catalog.unblocked.v1` | None | A block was lifted, with its ID, the state version, the requester and the approver |
 | `whitetower.tooling.enabled.v1` | Required | Entries were enabled for an agent, with the requester and the approver |
 | `whitetower.tooling.disabled.v1` | Required | Entries were disabled for an agent, with the person who disabled them and the reason |
@@ -485,7 +485,7 @@ New scenarios:
   - `tool.expose` among the actions an enforcement point's manifest must declare, with `tool.invoke` and `model.invoke`;
   - a `decision_id` that `action.executed` may leave out.
 
-  An enforcement point that does not support them rejects the new bundles and stays closed: incompatible, but safe.
+  An enforcement point that does not support them rejects the new bundles, and keeps its last valid bundle or, with none, stays closed: incompatible, but safe.
 - **When it lands.** No module verifies bundles or decides on tools yet (P1-09 has not started). This RFC therefore proposes to land in `v1alpha1` before `contracts/v0.1.0` is tagged (contracts, section 10: changes before the tag are free). Plan P0-03 lands it, in a step of its own (step 12), and puts the new text in new sections (4.10, 5.10, 6.9 to 6.11 and 7.7), so that no section that other documents cite changes its number. If the tag comes first, the changes that are not additive make `v1alpha2`, served next to `v1alpha1`.
 - **Vectors.** The `v1alpha1` combination vectors that use a tool or a model are rewritten with per-tool records and a catalog.
 
@@ -524,7 +524,7 @@ Threat model version 0.1.1 records these additions, together with actor TA-11 (a
 | ST-77 | Canary secrets in MCP server URLs, in the command-line arguments that EP-14 redacts and in environment variables never reach the core, its logs or events | T-76 | integration | P1-09 |
 | ST-78 | Reported names and descriptions with markup and script render as text in the console, with invisible and bidirectional characters made visible | T-76 | e2e | P1-10 |
 | ST-79 | The argument vectors (traversal, case, missing arguments, wrong types) give the expected decisions | T-78 | unit | P1-09 |
-| ST-80 | With 500 active blocks, a block reaches every mock enforcement point within NFR-24, and halts of one agent and of the fleet still meet NFR-03 | T-80 | integration | P1-16 |
+| ST-80 | With 500 active blocks, a block reaches every mock enforcement point within NFR-24, and halts of one agent and of the fleet still meet NFR-03 | T-80, DC-9 | integration | P1-16 |
 | ST-81 | Nobody approves their own request to enable or to unblock | T-81 | integration | P1-16 |
 | ST-82 | A model request that offers a provider-run tool that is not enabled, and cannot be narrowed, is denied | T-79 | unit | P1-09 |
 | ST-83 | Reported text that `wtctl` prints is escaped: no control, bidirectional or invisible character reaches the terminal | T-76 | unit | P1-11 |
