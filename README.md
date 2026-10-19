@@ -25,7 +25,7 @@ White Tower does **not** try to reimplement every capability. It provides a smal
 - **Two-level policies:** organization-wide and agent-specific.
 - **Deployment, monitoring and kill switch**, both per agent and fleet-wide.
 - **Resource control:** token quotas, cost, GPU and local inference.
-- **Control of agents' tooling:** a catalog of the MCP servers, tools and models each agent may use, approved, blocked and enabled agent by agent, with usage rules in policies.
+- **Control of agents' tooling:** a catalog of the MCP servers, tools and models each agent may use, approved or blocked for the whole organization and enabled agent by agent, with usage rules in policies.
 - **Per-agent execution harness** (sandbox).
 - **Observability, immutable audit and compliance evidence.**
 - **Unified UI, public API** and an SDK for building modules.
