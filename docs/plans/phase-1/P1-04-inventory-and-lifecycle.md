@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (1 of 8 pull requests) |
+| **Status** | In progress (2 of 8 pull requests) |
 | **Size** | L |
 | **Depends on** | P1-03 (and the P1-02 writer) |
 | **Unblocks** | P1-05, P1-06, P1-08, P1-10.2, P1-16 (steps 1 to 4) |
@@ -163,7 +163,7 @@ The plan lands in eight pull requests. The first agrees on the whole API before 
 | Pull request | Steps | Status |
 | --- | --- | --- |
 | 1. API | 1; the permission `agent.ownership.reassign` | Done |
-| 2. Use cases and agents | 2, 4; the data categories; the ownership check that P1-16 reuses; each new agent's governance state, through P1-07's interface, stubbed | Not started |
+| 2. Use cases and agents | 2, 4; the data categories; the ownership check that P1-16 reuses; each new agent's governance state, through P1-07's interface, stubbed | Done |
 | 3. Ownership | 3 | Not started |
 | 4. Lifecycle engine | 5, through P1-06's interface, stubbed; the property tests; ST-23; a token without the action's scope is refused (ST-19); `service_account` in `lifecycle_transitions.actor_type` | Not started |
 | 5. Reviews and the lifecycle guard job | 6, 7, through P1-16's interface, stubbed | Not started |
@@ -217,3 +217,19 @@ The plan lands in eight pull requests. The first agrees on the whole API before 
   - `lifecycle_transitions.actor_type` has no `service_account`, although service accounts may hold the roles that take the other transitions; a migration widens it in pull request 4.
   - Separation of duties looks at current assignments: a former delegate who holds the advisory role could decide on a proposal they helped write, and an advisory member or operator with the owner role could reassign an agent to themselves.
   - Which lifecycle notifications become inbox items (T4, T7, T8 and T11 notify people): pull requests 5 and 7, with the migration that widens `inbox_items.kind`.
+
+### 2026-10-19: use cases and agents (PR 2)
+
+- `internal/inventory`, the domain package of the plan, with its queries in `internal/inventory/queries` (sqlc package `inventorydb`, which `task verify:gen` now checks). It takes the caller of each operation and checks its permission itself, through the Authorizer, with the agent's relationship in the context, so that a token's scopes and break-glass apply. A `Refusal` says why a request is refused; the REST API maps its kinds to `bad_request`, `not_found`, `forbidden`, `conflict` and `precondition_failed`, with a detail that names nothing internal.
+- **Proposals, transition T1** (`proposeAgent`). Only a person with the owner role proposes, and becomes the primary owner (INV-02). The proposal carries the metadata of INV-01: a vendor or a framework, a deployment location, environments, a risk tier, and data categories from the setting `inventory.data_categories`. Its use case must exist and not be rejected, and its slug must be free (`conflict`). One transaction writes the agent, its primary owner, its governance state at a new version, the row of T1 in `lifecycle_transitions`, and `whitetower.agent.created.v1`.
+- **The governance state.** P1-07's interface is `inventory.StateVersions`, whose `Next` gives the version of a change, called as late in its transaction as it can be; `SequenceVersions` takes the next number of `governance_state_version_seq` until P1-07 adds its lock and its notification. The record of each agent holds its lifecycle state, its halt mode, the lease of its risk tier (setting `killswitch.lease_ttl_seconds`), and what policies see of it: slug, kind, risk tier, data categories, labels and the owner's ID.
+- **Edits** (`editAgent`) need If-Match. The agent's owners and delegates edit it, and operators any agent. The slug and the kind never change, the use case only while the agent is a draft, and never to a rejected one; a retired or rejected agent no longer changes; an edit keeps a vendor or a framework. An edit of the risk tier, the data categories, the labels or the halt mode publishes the governance state at a new version. An edit that changes nothing takes no new version.
+- **Use cases.** Only a person with the owner role creates one. Only its creator edits it, while it is a draft or changes were requested, and no agent it justifies waits for a decision. `listUseCaseDecisions` reads the decisions that pull request 4 records.
+- **Reads.** The user role sees only active agents and the use cases of active agents; the others answer `not_found`. Agents are listed by slug, use cases and decisions newest first. An agent shows its run state, from its own halts and the fleet's, and coverage C0 until step 8 computes it (pull request 6): nothing records credentials, instances or drills before P1-05, P1-07 and P1-08. `listDataCategories` serves the setting.
+- **Filters and text search** of `listAgents` and `listUseCases` answer `not_implemented` until pull request 6 builds them, rather than being ignored.
+- **`IsOwner`** tells whether a principal is an agent's primary owner or one of its delegates; P1-16 checks ownership with it.
+- Three event types of the core: `whitetower.agent.updated.v1`, with the agent as subject, and `whitetower.use_case.created.v1` and `whitetower.use_case.updated.v1`, without one, since a use case can justify several agents. An update names every member that changed, and copies the values of all but the texts that people write (an agent's description and harness, a use case's texts), as `comment_given` does for the comments of transitions.
+- Tests: proposals and their governance state, transition and event; the metadata of INV-01, one case per rule; use cases that do not exist or were rejected; taken slugs; who may propose, edit and create use cases, break-glass, scoped tokens and service accounts included; what the user role sees; pages; edits at a stale version, without changes, of what policies see; owners and delegates; a fleet halt; and the same operations through the API, with each refusal's problem.
+- Follow-ups:
+  - P1-08 folds the active selector halts into a new agent's governance state, where `Propose` says so.
+  - The agents of the evaluation seed have no governance state until their first edit, which writes it.

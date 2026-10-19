@@ -33,7 +33,7 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | [P1-01](phase-1/P1-01-core-platform-skeleton.md) | Core platform skeleton | M | P0-01, P0-02 | OPS-04, OPS-05, OPS-07 | Done |
 | [P1-02](phase-1/P1-02-audit-log.md) | Audit log | L | P1-01 | AUD-01 to AUD-10, NFR-08 to NFR-10 | Done |
 | [P1-03](phase-1/P1-03-human-identity-and-access.md) | Human identity and access | M | P1-01, P1-02 (writer) | HUM-01 to HUM-08 | Done |
-| [P1-04](phase-1/P1-04-inventory-and-lifecycle.md) | Inventory and lifecycle | L | P1-03 | INV-01 to INV-10; the review's part of CAT-09 | In progress (1 of 8 pull requests) |
+| [P1-04](phase-1/P1-04-inventory-and-lifecycle.md) | Inventory and lifecycle | L | P1-03 | INV-01 to INV-10; the review's part of CAT-09 | In progress (2 of 8 pull requests) |
 | [P1-05](phase-1/P1-05-agent-identity-and-credentials.md) | Agent identity and credentials | L | P1-04 | AID-01 to AID-09 | Draft |
 | [P1-06](phase-1/P1-06-policy-model-and-distribution.md) | Policy model and distribution | L | P0-03, P1-04; P0-03 step 12 for its RFC-0002 parts | POL-01 to POL-10, CAT-03, CAT-05, CAT-06 | Draft |
 | [P1-07](phase-1/P1-07-module-registry-and-api.md) | Module registry and module API | XL, split into 2 subplans | P0-03, P1-01, P1-05; P0-03 step 12 for its RFC-0002 parts, and P1-16 step 4 for the wiring of tooling reports | MOD-01 to MOD-05, MOD-07, CAT-01, CAT-04; part of NFR-24 | Draft |

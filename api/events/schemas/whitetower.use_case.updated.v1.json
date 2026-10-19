@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Use case updated",
+  "description": "A use case that no decision has made final changed (INV-03; plan P1-04, step 4). Its texts, which people write, are named as changed, never copied.",
+  "type": "object",
+  "required": [
+    "use_case_id",
+    "changed",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "use_case_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "changed": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "title",
+          "description",
+          "business_justification",
+          "data_categories",
+          "affected_persons",
+          "ai_act_classification",
+          "conditions"
+        ]
+      }
+    },
+    "before": {
+      "$ref": "#/$defs/values"
+    },
+    "after": {
+      "$ref": "#/$defs/values"
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    }
+  },
+  "$defs": {
+    "values": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "data_categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ai_act_classification": {
+          "enum": [
+            "prohibited",
+            "high_risk",
+            "limited",
+            "minimal",
+            "not_assessed"
+          ]
+        }
+      }
+    }
+  }
+}
