@@ -229,9 +229,15 @@ func TestAPITokenSecurity(t *testing.T) {
 	})
 
 	t.Run("service account lifecycle and tokens", func(t *testing.T) {
-		// 1. Create service account tied to Alice
+		// 1. Create service account tied to Audrey, an auditor
+		audreyEmail := "audrey@example.com"
+		audrey, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-audrey", "Audrey Auditor", &audreyEmail, []string{"auditors"})
+		if err != nil {
+			t.Fatalf("upserting audrey: %v", err)
+		}
+		audreyActor := auth.Principal{ID: audrey.ID.String(), Kind: auth.Human, Name: "Audrey Auditor", Roles: []string{"auditor"}}
 		saEmail := "pipeline@example.com"
-		sa, err := principalStore.CreateServiceAccount(ctx, "CI Pipeline", &saEmail, principal.ID, []string{"auditor"}, principal.ID)
+		sa, err := principalStore.CreateServiceAccount(ctx, "CI Pipeline", &saEmail, []string{"auditor"}, audreyActor)
 		if err != nil {
 			t.Fatalf("creating service account: %v", err)
 		}
@@ -239,8 +245,8 @@ func TestAPITokenSecurity(t *testing.T) {
 		if sa.Kind != "service_account" {
 			t.Errorf("expected service_account kind, got %s", sa.Kind)
 		}
-		if sa.ResponsiblePrincipalID == nil || *sa.ResponsiblePrincipalID != principal.ID {
-			t.Errorf("expected responsible principal %s, got %v", principal.ID, sa.ResponsiblePrincipalID)
+		if sa.ResponsiblePrincipalID == nil || *sa.ResponsiblePrincipalID != audrey.ID {
+			t.Errorf("expected responsible principal %s, got %v", audrey.ID, sa.ResponsiblePrincipalID)
 		}
 
 		// 2. Issue token for service account
@@ -266,7 +272,7 @@ func TestAPITokenSecurity(t *testing.T) {
 		}
 
 		// 4. List service accounts
-		sas, err := principalStore.ListServiceAccounts(ctx, &principal.ID)
+		sas, err := principalStore.ListServiceAccounts(ctx, &audrey.ID)
 		if err != nil {
 			t.Fatalf("listing service accounts: %v", err)
 		}
@@ -275,8 +281,8 @@ func TestAPITokenSecurity(t *testing.T) {
 		}
 
 		// 5. Service account cannot be created with nonexistent responsible principal
-		nonexistentID := uuid.New()
-		_, err = principalStore.CreateServiceAccount(ctx, "Bad SA 1", nil, nonexistentID, []string{"auditor"}, principal.ID)
+		nobody := auth.Principal{ID: uuid.New().String(), Kind: auth.Human, Roles: []string{"auditor"}}
+		_, err = principalStore.CreateServiceAccount(ctx, "Bad SA 1", nil, []string{"auditor"}, nobody)
 		if !errors.Is(err, authn.ErrPrincipalNotFound) {
 			t.Errorf("expected ErrPrincipalNotFound for nonexistent responsible principal, got %v", err)
 		}
@@ -290,9 +296,84 @@ func TestAPITokenSecurity(t *testing.T) {
 		if err := principalStore.Deactivate(ctx, inactiveUser.ID, adminActor, "test deactivation"); err != nil {
 			t.Fatalf("deactivating user: %v", err)
 		}
-		_, err = principalStore.CreateServiceAccount(ctx, "Bad SA 2", nil, inactiveUser.ID, []string{"auditor"}, principal.ID)
+		inactiveActor := auth.Principal{ID: inactiveUser.ID.String(), Kind: auth.Human, Roles: []string{"operator"}}
+		_, err = principalStore.CreateServiceAccount(ctx, "Bad SA 2", nil, []string{"operator"}, inactiveActor)
 		if !errors.Is(err, authn.ErrPrincipalInactive) {
 			t.Errorf("expected ErrPrincipalInactive for inactive responsible principal, got %v", err)
+		}
+	})
+
+	t.Run("a service account acts with no more than its responsible principal holds", func(t *testing.T) {
+		// Owen holds the operator and auditor roles through his IdP groups.
+		owenEmail := "owen@example.com"
+		owen, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-owen", "Owen Operator", &owenEmail, []string{"operators", "auditors"})
+		if err != nil {
+			t.Fatalf("upserting owen: %v", err)
+		}
+		owenActor := auth.Principal{ID: owen.ID.String(), Kind: auth.Human, Name: "Owen Operator", Roles: []string{"auditor", "operator"}}
+		sa, err := principalStore.CreateServiceAccount(ctx, "Halt Bot", nil, []string{"operator", "auditor"}, owenActor)
+		if err != nil {
+			t.Fatalf("creating service account: %v", err)
+		}
+		saActor := auth.Principal{ID: sa.ID.String(), Kind: auth.ServiceAccount, Name: "Halt Bot"}
+		saToken, err := tokenStore.Create(ctx, sa.ID, "halt-bot", []string{string(authz.PermissionAuditEventsRead)}, 30, saActor)
+		if err != nil {
+			t.Fatalf("creating service account token: %v", err)
+		}
+		rolesOf := func() ([]string, error) {
+			t.Helper()
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/audit/events", nil)
+			req.Header.Set("Authorization", "Bearer "+saToken.Token)
+			p, err := authenticator.Authenticate(req)
+			if err != nil {
+				return nil, err
+			}
+			return p.Roles, nil
+		}
+
+		if roles, err := rolesOf(); err != nil || strings.Join(roles, ",") != "auditor,operator" {
+			t.Fatalf("roles %v, %v; want auditor and operator", roles, err)
+		}
+
+		// Owen leaves the operators' group: his service account loses the role
+		// too, although it is still bound to it.
+		if _, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-owen", "Owen Operator", &owenEmail, []string{"auditors"}); err != nil {
+			t.Fatalf("updating owen's groups: %v", err)
+		}
+		if roles, err := rolesOf(); err != nil || strings.Join(roles, ",") != "auditor" {
+			t.Fatalf("roles %v, %v; want auditor only", roles, err)
+		}
+
+		// Once Owen is inactive, his service account's tokens are refused.
+		if err := principalStore.Deactivate(ctx, owen.ID, adminActor, "left the organization"); err != nil {
+			t.Fatalf("deactivating owen: %v", err)
+		}
+		if _, err := rolesOf(); !errors.Is(err, authn.ErrPrincipalInactive) {
+			t.Fatalf("got %v, want ErrPrincipalInactive", err)
+		}
+	})
+
+	// Security test ST-18: Nobody gets a role through a service account that they do not hold
+	t.Run("a service account gets only roles that its responsible principal holds", func(t *testing.T) {
+		uliEmail := "uli@example.com"
+		uli, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-uli", "Uli User", &uliEmail, nil)
+		if err != nil {
+			t.Fatalf("upserting uli: %v", err)
+		}
+		uliActor := auth.Principal{ID: uli.ID.String(), Kind: auth.Human, Name: "Uli User", Roles: []string{"user"}}
+		for _, role := range []string{"advisory", "operator", "steering", "admin"} {
+			if _, err := principalStore.CreateServiceAccount(ctx, "Escalator", nil, []string{role}, uliActor); !errors.Is(err, authn.ErrRoleNotHeld) {
+				t.Errorf("%s: got %v, want ErrRoleNotHeld", role, err)
+			}
+		}
+		if _, err := principalStore.CreateServiceAccount(ctx, "Helper", nil, []string{"user"}, uliActor); err != nil {
+			t.Errorf("a role the user holds: %v", err)
+		}
+
+		// A service account is responsible for none.
+		botActor := auth.Principal{ID: uuid.New().String(), Kind: auth.ServiceAccount, Roles: []string{"user"}}
+		if _, err := principalStore.CreateServiceAccount(ctx, "Grandchild", nil, []string{"user"}, botActor); !errors.Is(err, authn.ErrResponsibleNotHuman) {
+			t.Errorf("got %v, want ErrResponsibleNotHuman", err)
 		}
 	})
 

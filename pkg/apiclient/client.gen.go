@@ -2412,7 +2412,11 @@ type ClientInterface interface {
 
 	// CreateServiceAccountWithBody Create a service account
 	//
-	// Creates a non-human service account principal with the caller as responsible principal.
+	// Creates a non-human service account principal with the caller as
+	// responsible principal. Only a person is responsible for one, and gives
+	// it only roles they hold (`forbidden` otherwise). The service account
+	// acts with the roles that its responsible principal still holds, and
+	// with none while that principal is inactive.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2421,7 +2425,11 @@ type ClientInterface interface {
 
 	// CreateServiceAccount Create a service account
 	//
-	// Creates a non-human service account principal with the caller as responsible principal.
+	// Creates a non-human service account principal with the caller as
+	// responsible principal. Only a person is responsible for one, and gives
+	// it only roles they hold (`forbidden` otherwise). The service account
+	// acts with the roles that its responsible principal still holds, and
+	// with none while that principal is inactive.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2438,7 +2446,10 @@ type ClientInterface interface {
 	// CreateTokenWithBody Create an API token
 	//
 	// Generates a new API token. The raw token secret is returned in the response
-	// and is never retrievable again.
+	// and is never retrievable again. A token never does more than whoever
+	// creates it: each scope must be a permission of the token's principal
+	// and of the caller, and one of the scopes of the caller's own token when
+	// the caller uses one; otherwise the request is refused (`forbidden`).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2448,7 +2459,10 @@ type ClientInterface interface {
 	// CreateToken Create an API token
 	//
 	// Generates a new API token. The raw token secret is returned in the response
-	// and is never retrievable again.
+	// and is never retrievable again. A token never does more than whoever
+	// creates it: each scope must be a permission of the token's principal
+	// and of the caller, and one of the scopes of the caller's own token when
+	// the caller uses one; otherwise the request is refused (`forbidden`).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3433,7 +3447,11 @@ func (c *Client) ListServiceAccounts(ctx context.Context, reqEditors ...RequestE
 
 // CreateServiceAccountWithBody Create a service account
 //
-// Creates a non-human service account principal with the caller as responsible principal.
+// Creates a non-human service account principal with the caller as
+// responsible principal. Only a person is responsible for one, and gives
+// it only roles they hold (`forbidden` otherwise). The service account
+// acts with the roles that its responsible principal still holds, and
+// with none while that principal is inactive.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3452,7 +3470,11 @@ func (c *Client) CreateServiceAccountWithBody(ctx context.Context, contentType s
 
 // CreateServiceAccount Create a service account
 //
-// Creates a non-human service account principal with the caller as responsible principal.
+// Creates a non-human service account principal with the caller as
+// responsible principal. Only a person is responsible for one, and gives
+// it only roles they hold (`forbidden` otherwise). The service account
+// acts with the roles that its responsible principal still holds, and
+// with none while that principal is inactive.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3489,7 +3511,10 @@ func (c *Client) ListTokens(ctx context.Context, params *ListTokensParams, reqEd
 // CreateTokenWithBody Create an API token
 //
 // Generates a new API token. The raw token secret is returned in the response
-// and is never retrievable again.
+// and is never retrievable again. A token never does more than whoever
+// creates it: each scope must be a permission of the token's principal
+// and of the caller, and one of the scopes of the caller's own token when
+// the caller uses one; otherwise the request is refused (`forbidden`).
 //
 // Takes any type of body and a specified content type.
 //
@@ -3509,7 +3534,10 @@ func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, bo
 // CreateToken Create an API token
 //
 // Generates a new API token. The raw token secret is returned in the response
-// and is never retrievable again.
+// and is never retrievable again. A token never does more than whoever
+// creates it: each scope must be a permission of the token's principal
+// and of the caller, and one of the scopes of the caller's own token when
+// the caller uses one; otherwise the request is refused (`forbidden`).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6733,7 +6761,11 @@ type ClientWithResponsesInterface interface {
 
 	// CreateServiceAccountWithBodyWithResponse Create a service account
 	//
-	// Creates a non-human service account principal with the caller as responsible principal.
+	// Creates a non-human service account principal with the caller as
+	// responsible principal. Only a person is responsible for one, and gives
+	// it only roles they hold (`forbidden` otherwise). The service account
+	// acts with the roles that its responsible principal still holds, and
+	// with none while that principal is inactive.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -6742,7 +6774,11 @@ type ClientWithResponsesInterface interface {
 
 	// CreateServiceAccountWithResponse Create a service account
 	//
-	// Creates a non-human service account principal with the caller as responsible principal.
+	// Creates a non-human service account principal with the caller as
+	// responsible principal. Only a person is responsible for one, and gives
+	// it only roles they hold (`forbidden` otherwise). The service account
+	// acts with the roles that its responsible principal still holds, and
+	// with none while that principal is inactive.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -6761,7 +6797,10 @@ type ClientWithResponsesInterface interface {
 	// CreateTokenWithBodyWithResponse Create an API token
 	//
 	// Generates a new API token. The raw token secret is returned in the response
-	// and is never retrievable again.
+	// and is never retrievable again. A token never does more than whoever
+	// creates it: each scope must be a permission of the token's principal
+	// and of the caller, and one of the scopes of the caller's own token when
+	// the caller uses one; otherwise the request is refused (`forbidden`).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -6771,7 +6810,10 @@ type ClientWithResponsesInterface interface {
 	// CreateTokenWithResponse Create an API token
 	//
 	// Generates a new API token. The raw token secret is returned in the response
-	// and is never retrievable again.
+	// and is never retrievable again. A token never does more than whoever
+	// creates it: each scope must be a permission of the token's principal
+	// and of the caller, and one of the scopes of the caller's own token when
+	// the caller uses one; otherwise the request is refused (`forbidden`).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -9702,7 +9744,11 @@ func (c *ClientWithResponses) ListServiceAccountsWithResponse(ctx context.Contex
 
 // CreateServiceAccountWithBodyWithResponse Create a service account
 //
-// Creates a non-human service account principal with the caller as responsible principal.
+// Creates a non-human service account principal with the caller as
+// responsible principal. Only a person is responsible for one, and gives
+// it only roles they hold (`forbidden` otherwise). The service account
+// acts with the roles that its responsible principal still holds, and
+// with none while that principal is inactive.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -9717,7 +9763,11 @@ func (c *ClientWithResponses) CreateServiceAccountWithBodyWithResponse(ctx conte
 
 // CreateServiceAccountWithResponse Create a service account
 //
-// Creates a non-human service account principal with the caller as responsible principal.
+// Creates a non-human service account principal with the caller as
+// responsible principal. Only a person is responsible for one, and gives
+// it only roles they hold (`forbidden` otherwise). The service account
+// acts with the roles that its responsible principal still holds, and
+// with none while that principal is inactive.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -9748,7 +9798,10 @@ func (c *ClientWithResponses) ListTokensWithResponse(ctx context.Context, params
 // CreateTokenWithBodyWithResponse Create an API token
 //
 // Generates a new API token. The raw token secret is returned in the response
-// and is never retrievable again.
+// and is never retrievable again. A token never does more than whoever
+// creates it: each scope must be a permission of the token's principal
+// and of the caller, and one of the scopes of the caller's own token when
+// the caller uses one; otherwise the request is refused (`forbidden`).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -9764,7 +9817,10 @@ func (c *ClientWithResponses) CreateTokenWithBodyWithResponse(ctx context.Contex
 // CreateTokenWithResponse Create an API token
 //
 // Generates a new API token. The raw token secret is returned in the response
-// and is never retrievable again.
+// and is never retrievable again. A token never does more than whoever
+// creates it: each scope must be a permission of the token's principal
+// and of the caller, and one of the scopes of the caller's own token when
+// the caller uses one; otherwise the request is refused (`forbidden`).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

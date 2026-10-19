@@ -61,6 +61,14 @@ func (testAuthenticator) Authenticate(r *http.Request) (*auth.Principal, error) 
 	}
 }
 
+// fixedAuthenticator authenticates every request as its principal.
+type fixedAuthenticator struct{ p auth.Principal }
+
+func (f fixedAuthenticator) Authenticate(*http.Request) (*auth.Principal, error) {
+	p := f.p
+	return &p, nil
+}
+
 // allow permits the named operations only, and records what it is asked.
 type allow struct {
 	mu    sync.Mutex
@@ -662,7 +670,7 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 	}}
 	h := Handler(opts)
 
-	var tokenID string
+	var tokenID, serviceAccountID string
 
 	t.Run("createToken", func(t *testing.T) {
 		body := strings.NewReader(`{"name":"cli-key","scopes":["agent.propose"],"expiresInDays":30}`)
@@ -701,7 +709,7 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 	})
 
 	t.Run("createServiceAccount", func(t *testing.T) {
-		body := strings.NewReader(`{"displayName":"Sync Bot","roles":["operator"]}`)
+		body := strings.NewReader(`{"displayName":"Sync Bot","roles":["owner"]}`)
 		res := call(h, http.MethodPost, "/api/v1/service-accounts", callerID, nil, body)
 		if res.status != http.StatusCreated {
 			t.Fatalf("createServiceAccount status %d, body %s", res.status, res.body)
@@ -715,6 +723,46 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 		}
 		if sa.ResponsiblePrincipalId.String() != callerID {
 			t.Errorf("responsiblePrincipalId %s, want %s", sa.ResponsiblePrincipalId, callerID)
+		}
+		serviceAccountID = sa.Id.String()
+	})
+
+	// Security test ST-18: Nobody gets a role through a service account that they do not hold
+	t.Run("a service account gets only roles that its creator holds", func(t *testing.T) {
+		body := strings.NewReader(`{"displayName":"Escalator","roles":["operator"]}`)
+		problemOf(t, call(h, http.MethodPost, "/api/v1/service-accounts", callerID, nil, body), problem.Forbidden)
+
+		bot := opts
+		bot.Authenticator = fixedAuthenticator{auth.Principal{ID: uuid.NewString(), Kind: auth.ServiceAccount, Roles: []string{"owner"}}}
+		body = strings.NewReader(`{"displayName":"Grandchild","roles":["owner"]}`)
+		problemOf(t, call(Handler(bot), http.MethodPost, "/api/v1/service-accounts", "", nil, body), problem.Forbidden)
+	})
+
+	// Security test ST-19: A token gives no more than whoever creates it holds, nor more than the scopes of the token it is created with
+	t.Run("a token gives no more than its creator holds", func(t *testing.T) {
+		scoped := opts
+		scoped.Authenticator = fixedAuthenticator{auth.Principal{ID: callerID, Kind: auth.Human, Roles: []string{"owner"}, Scopes: []string{"identity.me.read"}}}
+		hs := Handler(scoped)
+		body := strings.NewReader(`{"name":"wider","scopes":["agent.propose"]}`)
+		problemOf(t, call(hs, http.MethodPost, "/api/v1/tokens", "", nil, body), problem.Forbidden)
+		body = strings.NewReader(`{"name":"narrow","scopes":["identity.me.read"]}`)
+		if res := call(hs, http.MethodPost, "/api/v1/tokens", "", nil, body); res.status != http.StatusCreated {
+			t.Fatalf("a scope the token holds: status %d, body %s", res.status, res.body)
+		}
+
+		adaEmail := "ada@example.com"
+		ada, err := principalStore.UpsertHuman(context.Background(), "https://idp.example.com", "sub-ada", "Ada Admin", &adaEmail, nil)
+		if err != nil {
+			t.Fatalf("upserting the administrator: %v", err)
+		}
+		admin := opts
+		admin.Authenticator = fixedAuthenticator{auth.Principal{ID: ada.ID.String(), Kind: auth.Human, Roles: []string{"admin"}}}
+		ha := Handler(admin)
+		body = strings.NewReader(`{"name":"borrowed","scopes":["agent.propose"],"principalId":"` + serviceAccountID + `"}`)
+		problemOf(t, call(ha, http.MethodPost, "/api/v1/tokens", "", nil, body), problem.Forbidden)
+		body = strings.NewReader(`{"name":"shared","scopes":["inventory.view"],"principalId":"` + serviceAccountID + `"}`)
+		if res := call(ha, http.MethodPost, "/api/v1/tokens", "", nil, body); res.status != http.StatusCreated {
+			t.Fatalf("a scope the administrator holds: status %d, body %s", res.status, res.body)
 		}
 	})
 
