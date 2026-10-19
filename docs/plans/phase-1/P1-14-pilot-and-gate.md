@@ -7,7 +7,7 @@
 | **Size** | M of work, plus 3 to 4 weeks of pilot calendar |
 | **Depends on** | P1-13; the pilot agreement (step 1) must start much earlier, before the Phase 0 gate |
 | **Unblocks** | Phase 2 |
-| **Requirements** | The charter's success criteria; the four MVP criteria of requirements section 1 |
+| **Requirements** | The charter's success criteria; the five MVP criteria of requirements section 1 |
 | **Decisions** | All |
 
 ## Goal
@@ -35,10 +35,10 @@ Prove, with real agents, real people and a real SIEM, that White Tower does what
 Agree with a partner organization (ASM-03) on:
 
 - scope, schedule and a support channel;
-- **two to five real agents**: at least one in-house Python agent instrumented with White Tower's enforcement point (aiming for coverage C3), and at least one third-party SaaS agent registered at C0;
+- **two to five real agents**: at least one in-house Python agent instrumented with White Tower's enforcement point (aiming for coverage C3), and at least one third-party SaaS agent registered at C0, with the MCP servers, tools and models of each, including the tools its model provider runs, listed before onboarding;
 - named owners and committee members;
 - the IdP, the SIEM and the environment: Kubernetes, preferably with a CNI that enforces deny rules so network quarantine can be shown (ASM-05), or a Docker host;
-- a data handling agreement and the success metrics.
+- a data handling agreement, which covers what tooling reports store (redacted server URLs and command lines, and tool definitions), and the success metrics.
 
 **Done when:** signed before the Phase 0 gate. Without it, the Phase 1 gate is at risk (critical path).
 
@@ -46,10 +46,11 @@ Agree with a partner organization (ASM-03) on:
 
 Success criteria:
 
-- 100% of pilot agents in the inventory with an owner, a use case and a policy;
+- 100% of pilot agents in the inventory with an owner, a use case, a policy and their tooling in the catalog: enabled for governed agents, declared for agents at C0;
+- each governed agent with at least one usage rule, whose denials name the rule;
 - halt timings within the targets, for one agent and for the fleet;
 - audit events and checkpoints received by the SIEM and verified;
-- zero fail-open incidents.
+- zero fail-open incidents, including calls allowed to tooling that is not enabled or is blocked.
 
 Define how each is measured, which data is collected, and a weekly check-in.
 
@@ -67,23 +68,23 @@ Define how each is measured, which data is collected, and a weekly check-in.
 ### 4. Onboarding with real people
 
 - Train each role in a short session.
-- Take every pilot agent through the full lifecycle: proposal, use case validation by the advisory committee, global policies from the steering committee, agent-specific policies, activation.
-- Register the third-party agents at C0.
+- Take every pilot agent through the full lifecycle: proposal, use case validation by the advisory committee, global policies from the steering committee (including the seeded `wt-catalog`), the review and enabling of its MCP servers, tools and models (P1-16), agent-specific policies with their usage rules, activation.
+- Register the third-party agents at C0, with the tooling their owners declare (CAT-08).
 
-**Done when:** every pilot agent is `active` or registered at C0, each with its owner, use case and policy.
+**Done when:** every pilot agent is `active` or registered at C0, each with its owner, use case, policy and tooling.
 
 ### 5. Instrument agents
 
 - Install `whitetower-ep` in the governed agents, with credentials created through the CLI or Kubernetes workload identity.
 - On Kubernetes, label the agents' pods with their agent ID and install the network quarantine module (P1-15).
-- Iterate policies in a non-production environment first.
+- Run each agent in a non-production environment first: its enforcement point reports its tooling for review and enabling (step 4), and its policies and usage rules are iterated there.
 - Verify coverage C2.
 
-**Done when:** decisions from every governed agent reach the audit log.
+**Done when:** decisions from every governed agent reach the audit log, each uses only its enabled tooling, and no entry it reported is left undecided: each is approved or declined.
 
 ### 6. Operate for two to four weeks
 
-Watch the dashboards, reviews and drift; collect user experience feedback; fix blocking issues through v0.1.x patch releases.
+Watch the dashboards, reviews, drift and the tooling waiting for review; collect user experience feedback; fix blocking issues through v0.1.x patch releases.
 
 **Done when:** the planned period is complete without unresolved blocking issues.
 
@@ -93,6 +94,10 @@ Watch the dashboards, reviews and drift; collect user experience feedback; fix b
 - A fleet halt drill in an agreed window.
 - A partition drill (block traffic between the enforcement points and the core) to verify fail-closed behavior.
 - On Kubernetes, check in each halt drill that the agent's pods were quarantined, and how long it took (NFR-23).
+- A block drill: the block's spread measured against NFR-24, calls denied with `catalog.blocked`, and the block lifted by a second person.
+- A changed-definition drill on a test MCP server: ST-76, live.
+- A usage-rule exercise: a forbidden call is denied, and its decision event names the rule.
+- The exercise ST-74: attack trees AT-1, AT-6 and AT-10 against one pilot agent.
 
 Measure each against the targets, and reach coverage C3.
 
@@ -117,7 +122,7 @@ ADR-0011 replaced AGT with White Tower's own enforcement point for the MVP, and 
 
 ### 10. Gate review (G1)
 
-Write a report with evidence for each charter success criterion and each Must requirement (demonstrated or not), the NFR measurements against their targets, incidents, feedback and known limitations. The maintainers and the pilot sponsor decide go or no-go for Phase 2, and set its priorities (for example, MCP gateway or LLM gateway first).
+Write a report with evidence for each charter success criterion and each Must requirement (demonstrated or not), the NFR measurements against their targets, incidents, feedback and known limitations. The maintainers and the pilot sponsor decide go or no-go for Phase 2, and set its priorities (for example, the MCP network gateway or the LLM gateway first, or stateful usage rules).
 
 **Done when:** the gate decision is recorded, and the roadmap is updated for Phase 2.
 
@@ -129,14 +134,15 @@ Hold a project retrospective. With the partner's consent, publish a write-up or 
 
 ## Acceptance criteria
 
-The gate report, approved by the maintainers and the pilot sponsor, shows the four MVP criteria of requirements section 1 met:
+The gate report, approved by the maintainers and the pilot sponsor, shows the five MVP criteria of requirements section 1 met:
 
 1. every pilot agent in the inventory with an active owner, a validated use case and an approved agent-specific policy;
 2. governed agents authenticated by White Tower and governed at runtime by White Tower's enforcement point with White Tower policies;
 3. evidence in the tamper-evident log, verified with the CLI and exported to the partner's SIEM;
-4. halts of one agent and of the fleet confirmed and measured within the Phase 0 targets and, for agents on Kubernetes, their pods quarantined at the network level (in the pilot if its cluster supports it, otherwise on the reference cluster).
+4. halts of one agent and of the fleet confirmed and measured within the Phase 0 targets and, for agents on Kubernetes, their pods quarantined at the network level (in the pilot if its cluster supports it, otherwise on the reference cluster);
+5. the pilot agents governed by White Tower's enforcement point using only the MCP servers, tools and models enabled for them: their enforcement point denies the rest, hides it from their models and applies their usage rules, as the drills of step 7 show; and the third-party agents at C0 with their tooling declared.
 
-The gate report also records the exercise this plan owns in the [security test catalog](../../security/security-tests.md#p1-14-pilot-and-gate), ST-74.
+The gate report also records the exercise this plan owns in the [security test catalog](../../security/security-tests.md#p1-14-pilot-and-gate), ST-74, on attack trees AT-1, AT-6 and AT-10.
 
 ## Risks and open questions
 
@@ -146,6 +152,9 @@ The gate report also records the exercise this plan owns in the [security test c
 | Real agents use frameworks the enforcement point does not support | Choose pilot agents with LangGraph 1.x where possible; add hooks in P1-09 if needed |
 | The pilot's cluster cannot enforce deny rules, or the pilot runs on Docker | Show network quarantine on the reference cluster, and record the limit in the gate report |
 | Committee members lack time | Short training, the personal inbox and reminders; realistic review intervals |
+| A framework cannot narrow or remove the tools a model request offers (EP-17, EP-18) | Its model calls are then denied: choose such agents knowingly, and record the limit in the gate report |
+| A remote MCP server changes its tool descriptions during the pilot, and its tools are denied until they are approved again | Expected (T-75): the inbox shows the changes, and the pilot measures the time to approval |
+| Reviewers are flooded with discovered entries | Approve a server with all its tools at once, each definition still shown (P1-16) |
 
 ## Notes for implementers
 

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md), step 4) |
-| **Date** | 2026-09-29 |
+| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)) |
 | **Normative** | Yes. The machine-readable form is [agent-lifecycle.yaml](agent-lifecycle.yaml); plan P1-04 generates the transition guards from it, and the two must never disagree |
 | **Related** | [Requirements 5.1.1](../requirements/mvp-requirements.md#511-agent-lifecycle-initial-proposal-refined-in-plan-p0-02), [domain model](domain-model.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md) |
 
@@ -15,7 +15,7 @@ The lifecycle turns the charter's governance model into rules the system enforce
 | --- | --- | --- | --- |
 | `draft` | The owner is preparing the proposal | None | Closed |
 | `proposed` | Waiting for the advisory committee to validate the use case | None | Closed |
-| `validated` | Use case validated; the owner prepares the agent-specific policy and declares the harness | Non-production only | Open |
+| `validated` | Use case validated; the owner prepares the agent-specific policy, declares the harness and requests enabling the agent's tooling | Non-production only | Open |
 | `ready` | Agent-specific policy approved and harness declared; can be activated | Non-production only | Open |
 | `active` | Running in production under monitoring | Production and non-production | Open |
 | `suspended` | Temporarily barred; remembers the state it came from | None | Closed |
@@ -110,7 +110,7 @@ Every transition:
 | --- | --- |
 | Scheduling | At activation (T9) and after each completed review. The interval depends on the risk tier (setting `lifecycle.review_interval_days`: 365, 365, 180 and 90 days for low, medium, high and critical) |
 | Reminders | 30, 7 and 1 days before the due date (setting `lifecycle.review_reminder_days`), in the owner's inbox |
-| Completion | The owner attests that the agent is still needed, the owner is still right, the data categories are current and the policy is still adequate |
+| Completion | The owner attests that the agent is still needed, the owner is still right, the data categories are current, the policy is still adequate and the enabled tooling is still needed. The review lists, as candidates to disable, the enabled tooling the agent has not used within the period (setting `lifecycle.review_unused_tooling_days`, 90 days; CAT-09) |
 | Sign-off | For high and critical risk (setting `lifecycle.review_signoff_risk_tiers`), a member of the advisory committee other than the owner signs off before the review counts as completed |
 | Overdue | Past the due date, the review is overdue and reminders escalate to the advisory committee. Past the grace period (setting `lifecycle.review_grace_days`, 14 days), the agent is suspended (T11) |
 
@@ -119,9 +119,9 @@ Every transition:
 | State | Token issuance | Policy bundles | Governance state sent to enforcement points |
 | --- | --- | --- | --- |
 | draft, proposed | Refused | Not built | Published (gate closed) |
-| validated, ready | Non-production credentials only | Built from the active global and agent-specific versions; with no agent-specific policy yet, only global policies apply, under default deny | Published (gate open) |
+| validated, ready | Non-production credentials only | Built from the active global and agent-specific versions, with the agent's catalog file; with no agent-specific policy yet, only global policies apply, under default deny | Published (gate open) |
 | active | All credentials | Built | Published (gate open) |
-| suspended | Refused, except module API tokens for its enforcement point; credentials kept for reinstatement | Kept, not rebuilt | Published (gate closed) |
+| suspended | Refused, except module API tokens for its enforcement point; credentials kept for reinstatement | Kept, and rebuilt when their inputs change (policy versions, the agent's catalog file), so reinstatement never restores a stale bundle | Published (gate closed) |
 | retired | Refused, credentials revoked | Not built | Published (gate closed) so connected instances stop |
 | rejected | Refused | Not built | Published (gate closed) |
 
@@ -135,9 +135,10 @@ The table above was walked through with three scenarios. The people are the test
 
 1. Olivia (owner) creates `invoice-triage` with its use case (T1) and submits it (T2).
 2. Alex (advisory) validates it (T6); Olivia may now register a non-production key and test.
-3. Olivia writes a Cedar policy for the agent; Alex approves it (P1-06) and it becomes active.
-4. Olivia declares the harness; the system moves the agent to `ready` (T7).
-5. Olivia activates it (T9). Its risk tier is high, so the first review is due in 180 days.
+3. The agent's enforcement point, running with that key, reports its MCP servers, tools and models. Alex approves the new catalog entries; Olivia requests enabling them for `invoice-triage`, and Alex approves her request (P1-16).
+4. Olivia writes a Cedar policy for the agent; Alex approves it (P1-06) and it becomes active.
+5. Olivia declares the harness; the system moves the agent to `ready` (T7).
+6. Olivia activates it (T9). Its risk tier is high, so the first review is due in 180 days.
 
 **The owner leaves.**
 
@@ -156,3 +157,5 @@ No gap was found. Two refinements came out of the walkthroughs and are already i
 
 - **Retiring from `proposed` (T14):** the owner can abandon a proposal without withdrawing it first.
 - **Reinstatement checks conditions, not the stored reason (section 6):** the owner-leaves scenario can combine with a halt, and both causes must be resolved.
+
+Step 3 of the onboarding was added on 2026-10-19, with RFC-0002. Enabling tooling adds no guard: an agent without an enforcement point has nothing to enable, and an agent with nothing enabled is denied every tool and model call.

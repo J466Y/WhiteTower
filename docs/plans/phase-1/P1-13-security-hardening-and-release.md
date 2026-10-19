@@ -5,7 +5,7 @@
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
 | **Size** | M |
-| **Depends on** | All feature plans (P1-01 to P1-12, and P1-15) |
+| **Depends on** | All feature plans (P1-01 to P1-12, P1-15 and P1-16) |
 | **Unblocks** | P1-14 |
 | **Requirements** | NFR-07, NFR-11, NFR-12, NFR-13, NFR-21 |
 | **Decisions** | All |
@@ -33,6 +33,8 @@ The first release, v0.1.0, is secure enough to govern real agents in a pilot: ev
 
 Compare the implementation with threat model v0.1: new trust boundaries, mitigations actually built, residual risks. Publish v0.2.
 
+Since version 0.1.1, the threat model includes RFC-0002: tooling reports and blocks across TB-2, what agents report shown to people across TB-1, the agent's MCP servers and model providers across the new TB-10 (flows F16 and F17), actor TA-11, assumption A-7, threats T-74 to T-82, attack tree AT-10, DC-9, DC-10 and R-15.
+
 **Done when:** reviewed by the security reviewer.
 
 ### 2. ASVS 5.0 level 2
@@ -43,10 +45,10 @@ Walk the checklist for the console and the API, fix gaps in the owning plans, an
 
 ### 3. Security testing
 
-- The full [security test catalog](../../security/security-tests.md) of P0-04.
+- The full [security test catalog](../../security/security-tests.md) of P0-04, with RFC-0002's ST-75 to ST-83.
 - Dynamic scans in CI against the Compose stack: OWASP ZAP baseline, plus an API scan driven by the OpenAPI document.
 - The complete permission matrix tests.
-- Longer fuzzing campaigns on the assertion, CloudEvents, manifest and bundle parsers.
+- Longer fuzzing campaigns on the assertion, CloudEvents, manifest and bundle parsers, and on what RFC-0002 parses: tooling reports and definitions (validation, the hashes the core recomputes, and the core's redaction, CAT-10), the bundle's catalog file, the usage-rule compiler and its check at submission, and the argument transforms (T-78).
 - `govulncheck`, OSV-Scanner and an image scan (Trivy or Grype).
 - A secret scan of the full history.
 
@@ -57,7 +59,9 @@ Walk the checklist for the console and the API, fix gaps in the owning plans, an
 Review, and fix in the owning plans:
 
 - security headers and CSP, rate limits, request size limits, TLS configuration, cookie flags;
-- error messages that leak nothing, and logs without secrets;
+- the limits of tooling reports and definitions (counts and sizes, at most one report per instance and agent every 10 seconds, and DC-10's bound on an agent's entries waiting for review) and of blocks (at most 500 active);
+- error messages that leak nothing, and logs without secrets, including those a tooling report could carry (CAT-10);
+- the core never fetches a reported URL, and the console never turns one into a link;
 - database privileges of the runtime role, and the container and Kubernetes security context;
 - secure defaults: development-only switches cannot be enabled in the production image.
 
@@ -75,7 +79,7 @@ Rehearse the generation, storage and rotation of the three keys, and write the c
 
 ### 6. Scale and soak
 
-- **Load test** of the full stack at MVP scale for one hour: 1,000 agents, 500 enforcement points, 200 audit events per second, 50 console users (NFR-07, NFR-11).
+- **Load test** of the full stack at MVP scale for one hour: 1,000 agents, 500 enforcement points, 200 audit events per second, 50 console users (NFR-07, NFR-11). Every agent's tooling is reported and enabled, the mock enforcement points of P1-07 repeat their reports at the rate limit, and 500 blocks are active. During the hour, the approval of a new definition of a tool that every agent uses rebuilds every bundle, while a fleet halt still meets NFR-03 (T-80).
 - **Soak test** for 24 hours, watching memory and sealing lag.
 
 **Done when:** the reports are published and the targets are met.
@@ -98,7 +102,11 @@ Ask for a review or penetration test of the core by the community, the pilot org
 
 The release checklist:
 
-- documentation complete, changelog, known limitations;
+- documentation complete, changelog, known limitations, including those of RFC-0002:
+  - usage rules judge arguments as written, so symbolic links, defaults that servers apply and forms that no transform normalizes escape them (R-15), and they hold no state until Phase 2;
+  - what model providers do with the tools they run (T-79, A-7);
+  - secrets passed to local MCP servers as positional arguments, which redaction cannot recognize (T-76);
+  - the declared tooling of agents at C0 and C1, which nothing enforces;
 - a dry run of the private vulnerability reporting process;
 - tag, then publish images, binaries, Helm charts, offline bundle and enforcement point wheel;
 - announcement.
@@ -109,7 +117,7 @@ The release checklist:
 
 - No open critical or high finding from any source.
 - The ASVS level 2 checklist is complete with evidence.
-- The load and soak results meet NFR-07 and NFR-11.
+- The load and soak results meet NFR-07 and NFR-11, with the catalog workload of step 6.
 - Every v0.1.0 artifact is signed and verifiable, with SBOMs and provenance.
 - Threat model v0.2 is published.
 

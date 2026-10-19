@@ -6,9 +6,9 @@
 | **Status** | Draft |
 | **Size** | L |
 | **Depends on** | P1-04, P1-05, P1-07 |
-| **Unblocks** | P1-09, P1-10.5, P1-15 (end-to-end tests), P1-14 |
-| **Requirements** | KIL-01 to KIL-10, NFR-03 to NFR-05 |
-| **Decisions** | ADR-0005, ADR-0010 |
+| **Unblocks** | P1-09, P1-10.5, P1-15 (end-to-end tests), P1-14; P1-16 step 7, through the reviewed design of the halt path and the harness of step 10 |
+| **Requirements** | KIL-01 to KIL-10, NFR-03 to NFR-05, NFR-24 (the harness that measures it) |
+| **Decisions** | ADR-0005, ADR-0010, [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) |
 
 ## Goal
 
@@ -16,18 +16,26 @@ Anyone with the right role can stop one agent, a selection of agents or the whol
 
 ## Scope
 
-**In:** halt domain and API, fleet and selector halts, propagation tracking, release workflow, lease policy, break-glass integration, drills, fault-injection tests, performance validation, runbooks.
+**In:** the design of the halt path, blocks included; halt domain and API, fleet and selector halts, propagation tracking, release workflow, lease policy, break-glass integration, drills, fault-injection tests, performance validation and its harness, runbooks.
 
-**Out:** the watch transport (P1-07); what the enforcement point does inside the agent (P1-09); the network quarantine module (P1-15); the console screens (P1-10.5); stopping workloads (Phase 2 harness module).
+**Out:** the watch transport (P1-07); what the enforcement point does inside the agent (P1-09); the network quarantine module (P1-15); the console screens (P1-10.5); stopping workloads (Phase 2 harness module); the blocks of [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) (P1-16) and their transport (P1-07).
 
 ## Deliverables
 
 - `internal/killswitch` with its OpenAPI operations.
 - Propagation metrics and alerts.
 - The fault-injection test suite.
+- The measurement harness of step 10, which P1-16 reuses for blocks.
 - Runbooks: halting, unconfirmed halts, releasing.
 
 ## Steps
+
+**The design comes first.** One design note of the halt path goes in this plan's progress notes, and is reviewed before any code of this plan, of P1-07 steps 5 and 6, and of P1-16 step 7. It is reserved for the reviewer ([AGENTS.md](../../../AGENTS.md)). The halt path must never become a bottleneck, not even when the whole fleet halts with every instance connected and 500 blocks active. The note covers:
+
+- the transaction, and the global lock, held only for the version bump and the commit;
+- the fan-out through the governance state hub;
+- the acknowledgements, written in batches, halt acknowledgements first;
+- the blocks of P1-16, which share the sequence, the lock, the hub and the streams, but travel in a record of their own, never in the fleet record ([threat model](../../security/threat-model.md), DC-9): a stream holds at most one pending block change, and the state acknowledgements that blocks cause (EP-15) are coalesced.
 
 ### 1. API first
 
@@ -58,6 +66,7 @@ After commit, notify the other replicas. Token issuance is blocked at once for e
 - A fleet halt is one fleet state record. It covers every agent, including agents registered or connecting later, and **does not change lifecycle states** (KIL-06).
 - A selector halt (Should) stores its selector (environment, label, risk tier) and applies it to current and future agents.
 - An agent stays halted while any halt covering it is active.
+- Blocks (RFC-0002) never enter the fleet record: a fleet halt changes `fleet_state` and never the blocks record, so it costs the same whatever the number of active blocks.
 
 **Done when:** an agent registered after a fleet halt starts halted, and releasing one of two overlapping halts leaves the agent halted.
 
@@ -68,6 +77,7 @@ After commit, notify the other replicas. Token issuance is blocked at once for e
 - **Halt status:** propagating, then confirmed (every expected instance acknowledged), partially confirmed, or unconfirmed after a timeout (10 seconds by default), which fires an alert.
 - **Metrics:** `whitetower_halt_propagation_seconds` (issued to acknowledged), `whitetower_halt_effect_seconds` (issued to in-flight interruption or termination) and `whitetower_halt_quarantine_seconds` (issued to network quarantine applied).
 - An instance is flagged as suspect when it reports an allow decision or an executed action whose time is after its acknowledged gate closing ([threat model](../../security/threat-model.md), DC-6). Denials, and evidence buffered before the halt and delivered afterwards, are expected.
+- **Reuse for blocks.** Build the tracking (expected instances, acknowledgements, status, timeout, alert, metrics) so that P1-16 tracks the spread of blocks with it, keyed by state version instead of halt ID: for a block, the expected instances are the connected enforcement points, and a state acknowledgement at or after the block's version counts (`instance_agents.observed_state_version`). A second tracker would duplicate this one.
 
 **Done when:** the status and the metrics are correct in tests with mock instances that acknowledge, delay, stay silent and lie, including a mock quarantine module.
 
@@ -116,7 +126,9 @@ The break-glass session of P1-03 can call the halt endpoints and nothing else. T
 
 With 500 mock instances, halt one agent and the whole fleet repeatedly. Measure against NFR-03 to NFR-05 and publish the results, which feed P1-13 and the pilot.
 
-**Done when:** the report is in `docs/performance/`.
+The harness drives scripted scenarios against the mock module of P1-07, and reports per-instance timings from issue to acknowledgement. P1-16 reuses it, with scenarios of its own, to measure the spread of blocks (NFR-24) and halts with 500 active blocks (ST-80), so build it to be run again with new scenarios.
+
+**Done when:** the report is in `docs/performance/`, and the harness runs from one documented command.
 
 ### 11. Runbooks
 
@@ -133,6 +145,7 @@ With 500 mock instances, halt one agent and the whole fleet repeatedly. Measure 
 - A release needs two distinct authorized people, and leaves an agent-halted agent suspended.
 - A fleet halt covers agents registered after it was issued.
 - Every step is audited, and the runbooks are reviewed.
+- The harness of step 10 runs again with new scenarios, as P1-16 needs for ST-80.
 - The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-08-kill-switch) pass: ST-40 to ST-45.
 
 ## Risks and open questions
@@ -142,10 +155,11 @@ With 500 mock instances, halt one agent and the whole fleet repeatedly. Measure 
 | Enforcement points acknowledge but do not stop | Layered acknowledgements; suspicious activity flagged; token issuance stopped for every audience but the module API; network quarantine on Kubernetes (P1-15); stopping workloads in Phase 2 |
 | Accidental fleet halt | Strong confirmation in the console and CLI (reason plus an explicit confirmation), fast two-person release, and drills that build familiarity |
 | Halt storms (many halts issued in a short time) | Idempotency keys; coalesced state changes in the governance state hub |
+| The blocks of P1-16 slow halts (T-80, DC-9) | The reviewed design: a record of their own, never in the fleet record; at most 500 active, hashed; a short lock; merged block changes; halt acknowledgements first. P1-16 measures halts with 500 active blocks with the harness of step 10 (ST-80) |
 
 ## Notes for implementers
 
-- Never make halting depend on anything slower than one database transaction: no synchronous calls to modules, and no approval.
+- Never make halting depend on anything slower than one database transaction: no synchronous calls to modules, and no approval. Nor on the number of active blocks: a halt's transaction neither reads nor writes blocks.
 - Keep the halt path free of optional dependencies (SMTP, webhooks): notifications happen after commit and may fail without affecting the halt.
 - The halt, the suspension and the state version bump must be in one transaction; test it with a failure injected between them.
 - Spike S2 measured this path with 1,000 enforcement points: a fleet halt was delivered with p99 ≤ 310 ms and acknowledged with p95 0.63 s. Most of the difference is 1,000 acknowledgements written in a burst: write them in batches ([report](../../spikes/S2-watch-streams.md)).

@@ -72,24 +72,29 @@ Take the first part that is not done.
 
 | # | Part | Notes |
 | --- | --- | --- |
-| 1 | P1-02 pull request 4: ingestion from modules (step 5; ST-10, ST-11) | Domain logic in `internal/audit`. Plan P1-07 wires `EventService.Publish` to it later, so take the instance's identity, its agents and the event types it declares as input; do not build the module registry. The new type `whitetower.audit.gap_detected.v1` follows [Audit events](#audit-events). Reuse `internal/platform/ratelimit`. Update the sequence rows of a batch in the order of their sources, or two batches deadlock (spike S3). ST-11 is a fuzz test. |
-| 2 | P1-02 pull request 6: export (step 8) | Sinks with a cursor each (`audit_export_cursors`). An OTLP log exporter would be a new dependency: justify it. Checkpoints leave as ordinary events. |
-| 3 | P1-02 pull request 7: retention and throughput (step 9, the rest of step 10) | The plan leaves the storage of pruned tree data open: propose it in the progress notes, and have it reviewed before coding. `pkg/auditverify` learns pruned ranges as an optional capability of its `Source`, found with a type assertion, and still imports nothing of White Tower. The benchmark reuses `hack/spikes/s3`. |
-| 4 | P1-03: human identity and access | Split it into parts first ([Plans in several parts](#plans-in-several-parts)). |
-| 5 | P1-02 pull request 5: query API (step 6; ST-12) | Needs P1-03's permissions. Inclusion proofs are computed from the stored tree hashes, which `audit.Log` reads, and checked with `pkg/auditverify` in the tests. |
-| 6 | P1-12.1: images, Compose, Helm | Can run alongside rows 4 and 5. Check what P1-01 already built. |
+| 1 | P1-04: inventory and lifecycle | Split it into parts first ([Plans in several parts](#plans-in-several-parts)). Its tables already exist in `00001_init.sql` (`agents`, `agent_owners`, `ownership_transfers`, `use_cases`, `use_case_decisions`, `lifecycle_transitions`, `reviews`, `inbox_items`): change them only with new migrations. Their timestamps default to `now()`, so give every time the guard job compares from `clock.Clock`. Stub the interfaces of P1-06 (an approved agent policy), P1-07 (state versions) and P1-16 (the unused tooling that reviews list). Tooling is not a lifecycle guard. ST-23, ST-24. |
+| 2 | P1-16 pull requests 1 to 3: permissions, API, catalog, enablement, declared tooling, observations and definitions (steps 1 to 4; ST-75, ST-81) | Once P1-04's agents and their API are merged. Before step 2, ask the maintainer to confirm step 1's answers to RFC-0002's open questions. No contract changes: the core event types of RFC-0002, section 9, follow [Audit events](#audit-events). Reports and definitions take the instance's identity and its agents as input; P1-07 wires `ReportTooling` and `ReportDefinitions` later. Reuse `authz.CheckApproval`, `internal/platform/ratelimit` and P1-04's ownership check. The catalog's tables, and the new kinds of `inbox_items`, go in a new migration. |
+| 3 | P1-05: agent identity and credentials | After P1-04. Split it into parts first. Its tables already exist (`signing_keys`, `machine_credentials`, `workload_issuers`, `workload_identity_bindings`, `used_assertions`). |
+| 4 | P1-06: policy model and distribution | Once P1-04's agents and their API are merged. Split it into parts first. Its RFC-0002 parts (the catalog file and the Cedar schema in each bundle, the seeded `wt-catalog`, the check of `@rule` statements) need P0-03 step 12: build the rest first, behind the interfaces that P1-16 implements. |
+| 5 | P1-11, first part: skeleton, login and audit (steps 1, 2 and 7; ST-57 to ST-59) | Can run alongside rows 1 to 4: it needs only P1-03 and P1-02. Split P1-11 into parts first. `wtctl` has only `version` today. A keychain library is a new dependency. Build on `pkg/auditverify`; the API serves no consistency proof and no JSON Lines export yet, so ask before adding an operation. |
+| 6 | P1-10.1: console foundations (ST-54, ST-56) | Can run alongside. Create `docs/plans/phase-1/P1-10-web-console/P1-10.1-foundations.md` with its pull request table. Check what P1-01 built in `web/`. Every string in English and Spanish. P1-10.0, the UX design, needs prospective users: it is the maintainer's. |
+| 7 | P1-12.2 pull request 3: PostgreSQL reference setup (step 4) | Can run alongside: it depends on no feature plan. |
+| 8 | P0-03 step 12, pull requests 2 and 3: RFC-0002 in the protobuf, the schemas and the vectors | Only after RFC-0002 is accepted and the reviewer has merged the specification text (pull request 1). The Go and Python stacks must both pass every vector. |
 
-After these rows, follow the dependencies in [`docs/plans/README.md`](docs/plans/README.md).
+After these rows, follow the dependencies in [`docs/plans/README.md`](docs/plans/README.md): P1-10.4 after P1-10.1; P1-07 after P1-05; P1-16 pull requests 4 and 5 after P0-03 step 12 and P1-06; then P1-08, P1-16 pull request 6, P1-09, P1-15 and the rest of the console and the CLI. P1-07 and P1-09 are XL: split each into its subplans first.
 
 Reserved for the reviewer:
 
-- **The follow-up of [RFC-0002](docs/rfcs/0002-mcp-servers-tools-and-models.md):** the requirements, the new plan P1-16 and the roadmap. Until it lands, do not start P1-04, P1-06, P1-07, P1-09, P1-10 or P1-11: RFC-0002 changes them.
-- **Designs on the halt path:** P1-08, the kill switch, and any change to the watch stream, leases, halts or the fleet record. Write the design in the plan's progress notes, and have it reviewed before any code. The halt path must never become a bottleneck (NFR-03), even when the whole fleet halts at once.
+- **RFC-0002 until it is accepted, then its contract text** (P0-03 step 12, pull request 1). Until then, no part changes `api/proto`, `api/policy`, `api/manifest` or the events of enforcement points for RFC-0002.
+- **Designs on the halt path:** P1-08, the kill switch, organization-wide blocks (P1-16 step 7), and any change to the watch stream, leases, halts, blocks or the fleet record (P1-07 steps 5 and 6). One design note, in P1-08's progress notes, reviewed before any code. The halt path must never become a bottleneck (NFR-03, NFR-24), even when the whole fleet halts at once with 500 blocks active.
 - **New ADRs and RFCs:** drafted only when the maintainer asks.
+- **RFC-0002's open questions:** the maintainer's answers go into the RFC and into P1-16 step 1.
 
 ### Plans in several parts
 
 If the plan has no table of pull requests in its progress notes, your first part adds one, like P1-02's: a row per pull request, with its steps and its status.
+
+An XL plan is split into subplans before it starts (the [plans index](docs/plans/README.md#how-the-plans-work)). Its first part creates the subplan files, in a folder named after the plan, each with its own table of pull requests, and the plan file becomes their overview.
 
 - Keep each part reviewable: about 800 changed lines at most, generated code aside.
 - Each part leaves `main` working.

@@ -1,11 +1,11 @@
-# Threat model v0.1
+# Threat model v0.1.1
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1, reviewed and accepted by the maintainer on 2026-09-30 |
-| **Date** | 2026-09-30 |
+| **Status** | Version 0.1.1: version 0.1, which the maintainer reviewed and accepted on 2026-09-30, and the additions of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which the RFC's review covers (section 10) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md) |
-| **Models** | The MVP as designed: [architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [module contracts v0.1](../contracts/module-contract-v0.1.md), [domain model](../architecture/domain-model.md) |
+| **Models** | The MVP as designed: [architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [module contracts v0.1](../contracts/module-contract-v0.1.md), [domain model](../architecture/domain-model.md), [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) |
 | **Related** | [Framework mapping](framework-mapping.md), [security test catalog](security-tests.md), [SECURITY.md](../../SECURITY.md) |
 
 White Tower decides which AI agents may run, what they may do and when they must stop, and keeps the evidence. An attacker who subverts it can free an agent that should be stopped, make agents run policies nobody approved, or erase what happened. This document identifies what must be protected, who might attack it and how, and what the design does about each threat. Where the design fell short, it records a change; where a risk remains, it says so and why.
@@ -14,9 +14,9 @@ Identifiers: assumptions `A-`, threats `T-`, attack trees `AT-`, design changes 
 
 ## 1. Scope and method
 
-**In scope:** the core (console and API listener, machine listener, background jobs), the web console, `wtctl`, White Tower's enforcement point for Python agents, the network quarantine module, PostgreSQL as the core uses it, the audit export, and the release pipeline and its artifacts.
+**In scope:** the core (console and API listener, machine listener, background jobs), the web console, `wtctl`, White Tower's enforcement point for Python agents, the network quarantine module, PostgreSQL as the core uses it, the audit export, the catalog of MCP servers, tools and models with the tooling reports and blocks that feed and enforce it ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)), and the release pipeline and its artifacts.
 
-**Out of scope:** the modules of Phases 2 and 3 (gateways, harness, skills repository, discovery), which get their own analysis at each phase gate; the agents' own models, prompts and tools, except where White Tower governs them; the security of the organization's IdP, SIEM, Kubernetes control plane and hosts, which the assumptions below cover.
+**Out of scope:** the modules of Phases 2 and 3 (the MCP network gateway and the other gateways, harness, discovery), which get their own analysis at each phase gate; the agents' prompts, and what their MCP servers, tools and models do once called: White Tower governs which of them each agent may use, and how (A-6, A-7); the security of the organization's IdP, SIEM, Kubernetes control plane and hosts, which the assumptions below cover.
 
 **Method.**
 
@@ -44,7 +44,8 @@ Identifiers: assumptions `A-`, threats `T-`, attack trees `AT-`, design changes 
 | A-3 | The Kubernetes control plane and the nodes that run the core are not compromised; cluster administrators are trusted in the MVP | T-60 |
 | A-4 | Operators distribute the core's TLS trust anchors and the bundle keys to modules through a channel they control | T-29, T-33 |
 | A-5 | Audit checkpoints are exported to at least one system outside the reach of White Tower's database administrators ([ADR-0006](../adr/0006-tamper-evident-audit-log.md)) | T-51, T-52 |
-| A-6 | Each agent's code, dependencies and deployment are controlled by its owner and the platform team; White Tower governs what the agent does, not how it is built | T-40, T-41 |
+| A-6 | Each agent's code, dependencies and deployment are controlled by its owner and the platform team, who also choose and check the MCP servers it launches or reaches; White Tower governs what the agent does, not how it is built. That code includes what no definition pins: the descriptions of the agent's own tools, and how its model requests configure built-in tools (RFC-0002 section 3) | T-40, T-41, T-77, T-79 |
+| A-7 | Model providers run only the tools a request declares, within the limits it sets (such as a list of allowed tools), and report in their responses the tool calls they made | T-79 |
 
 ## 2. Assets and security objectives
 
@@ -57,7 +58,9 @@ Objectives: **C** confidentiality, **I** integrity, **A** availability.
 | Checkpoint signing key (Ed25519) | `audit` | C, I | Whoever holds it can sign a false statement of the log's contents |
 | Audit log: events, leaves, tree hashes, checkpoints | `audit` | I, A, and C for its personal data | The evidence of every decision and governance action (AUD-01 to AUD-04) |
 | Policies, versions, approvals and bundles | `policy` | I | What every agent may do |
-| Governance state and the halt channel: halts, releases, run states, leases, watch streams | `killswitch`, `govstate` | I, A | The ability to stop agents within seconds |
+| The catalog: entries, stored definitions, pinned hashes and digests, classifications, declared arguments, enablement, blocks | `catalog` | I, A | What each agent may use: a changed definition or digest must stay denied until approved (CAT-02), and a block must apply at once (CAT-04) |
+| Tooling reports, definitions and observations | `catalog` | I, and C for any secret or user name they carry | What reviewers decide on. Secrets must never be stored (CAT-10), and references, whose local paths can hold user names, reach audit events only as hashes (NFR-20) |
+| Governance state and the halt channel: halts, releases, run states, leases, the blocks record, watch streams | `killswitch`, `govstate` | I, A | The ability to stop agents within seconds |
 | Agent and module credentials (public keys), issued tokens | `agentid` | I, and C for tokens | Who may act as which agent or module |
 | Human sessions, API tokens, the break-glass credential | `authn` | C, I | Who may act as which person |
 | Principals, role mappings and bindings | `authz` | I | Who may approve, halt and release |
@@ -69,9 +72,9 @@ Objectives: **C** confidentiality, **I** integrity, **A** availability.
 
 **Security objectives.**
 
-- **O-1 Integrity of governance.** Only approved policies reach agents; only authorized people change lifecycle states, policies, halts and roles; nobody approves their own work.
+- **O-1 Integrity of governance.** Only approved policies reach agents, and an agent can use only the catalog entries approved and enabled for it; only authorized people change lifecycle states, policies, the catalog, enablement, blocks, halts and roles; nobody approves their own work.
 - **O-2 Verifiable evidence.** Any change to sealed evidence is detectable, even by a database administrator, as long as checkpoints are held outside (A-5).
-- **O-3 A halt path that cannot be subverted.** A halt reaches connected enforcement points within NFR-03; one cut off from the core fails closed within its lease; a halt cannot be suppressed, or released by one person.
+- **O-3 A halt path that cannot be subverted.** A halt reaches connected enforcement points within NFR-03; one cut off from the core fails closed within its lease; a halt cannot be suppressed, or released by one person. Active blocks never slow it (NFR-24, DC-9).
 - **O-4 Protected credentials.** White Tower never holds agents' private keys; the three signing keys are separate; secrets are never logged.
 - **O-5 Minimal personal data** (NFR-20).
 
@@ -91,6 +94,7 @@ The availability of agents comes after these: when the two conflict, White Tower
 | TA-8 | Cluster administrator | Reads Secrets, runs commands in pods, changes network rules and images | Any of the above, with more reach |
 | TA-9 | Compromised IdP account or IdP administrator | Signs in as someone, or changes group membership | Act with another person's roles |
 | TA-10 | Supply-chain attacker | Publishes packages, compromises CI, images or mirrors | Code execution in the core, the enforcement point or the console |
+| TA-11 | Malicious or compromised tool provider | Controls an MCP server, its package or its address; writes the tool definitions and the results that agents receive | Steer agents' models; obtain the data and credentials that agents send to its tools |
 
 Committee members, owners and operators are also insiders. The design limits what one of them can do alone through separation of duties (HUM-04), and records what they do (AUD-01).
 
@@ -117,6 +121,7 @@ flowchart LR
             AG[Agent code] -- F15 --> EP[Enforcement point]
         end
         BUF[(Evidence buffer)]
+        LMCP[Local MCP servers]
     end
     subgraph cluster[Agents' Kubernetes cluster]
         QM[Network quarantine controller]
@@ -125,6 +130,8 @@ flowchart LR
     SIEM[SIEM or collector]
     CI[Build and release pipeline]
     PROM[Prometheus and probes]
+    RMCP[Remote MCP servers]
+    LLM[Model providers and the tools they run]
 
     BR -- F1 --> CL
     BR -- F2 --> IDP
@@ -144,14 +151,17 @@ flowchart LR
     CI -- F13 --> deploy
     CI -- F13 --> runtime
     PROM -- F14 --> OL
+    AG -- F16 --> LMCP
+    AG -- F16 --> RMCP
+    AG -- F17 --> LLM
 ```
 
 **Trust boundaries.**
 
 | ID | Boundary | Flows | What crosses it |
 | --- | --- | --- | --- |
-| TB-1 | People and the console and API listener | F1, F4, F5 | Browsers, the CLI and automation, break-glass |
-| TB-2 | Agent runtime and the machine listener | F6, F8 | Enforcement points and modules: tokens, state, bundles, acknowledgements, events |
+| TB-1 | People and the console and API listener | F1, F4, F5 | Browsers, the CLI and automation, break-glass; and, toward people, what agents report about their tooling |
+| TB-2 | Agent runtime and the machine listener | F6, F8 | Enforcement points and modules: tokens, state and blocks, bundles with their catalog files, acknowledgements, events, tooling reports and tool definitions |
 | TB-3 | The core and PostgreSQL, with its administrators | F10 | All state and evidence |
 | TB-4 | The core and the IdP | F2, F3 | Logins, identities, groups, deprovisioning |
 | TB-5 | The core and the SIEM, and third-party verifiers | F12 | Evidence and checkpoints leaving White Tower |
@@ -159,8 +169,9 @@ flowchart LR
 | TB-7 | The quarantine controller and the Kubernetes API | F9 | Deny rules, pod information |
 | TB-8 | Build and distribution, and installations | F13 | Every artifact |
 | TB-9 | The cluster network and the operations listener | F14 | Metrics and health |
+| TB-10 | The agent's process and its MCP servers and model providers | F16, F17 | Tool lists and definitions, tool calls and their results; model requests that offer tools, and responses that report the calls of provider-run tools |
 
-**Not a boundary: the agent's code and its enforcement point.** They share one process (F15). Whatever runs in that process can read the enforcement point's memory and change its code. The enforcement point protects against an agent that is misled into a call, not against a process that is fully compromised. Section 5.5 and R-01 deal with the consequences.
+**Not a boundary: the agent's code and its enforcement point.** They share one process (F15). Whatever runs in that process can read the enforcement point's memory and change its code. The enforcement point protects against an agent that is misled into a call, not against a process that is fully compromised. Section 5.5 and R-01 deal with the consequences. Local MCP servers are different: they run on the same host, with the agent's rights, but their code is a third party's, so they sit across TB-10 (section 5.12).
 
 **Data flows.**
 
@@ -171,7 +182,7 @@ flowchart LR
 | F3 | IdP to the core | SCIM 2.0 deprovisioning with a bearer token (HUM-05) |
 | F4 | CLI and automation to the core | HTTPS; short-lived CLI tokens, personal access tokens and service accounts (HUM-07) |
 | F5 | Break-glass custodian to the core | HTTPS; the sealed break-glass credential (HUM-06) |
-| F6 | Enforcement point to the machine listener | TLS; client credentials with `private_key_jwt`, then bearer tokens: registration, heartbeats, `Watch`, bundles, acknowledgements, events ([contracts section 4](../contracts/module-contract-v0.1.md#4-module-api)) |
+| F6 | Enforcement point to the machine listener | TLS; client credentials with `private_key_jwt`, then bearer tokens: registration, heartbeats, `Watch` (with blocks), bundles (with catalog files), acknowledgements, events ([contracts section 4](../contracts/module-contract-v0.1.md#4-module-api)), and the agent's tooling reports with the definitions the core lacks (`ReportTooling`, `ReportDefinitions`, RFC-0002 section 4) |
 | F7 | Enforcement point to its evidence buffer | Local disk of the agent's host |
 | F8 | Quarantine controller to the machine listener | As F6, with the module's identity |
 | F9 | Quarantine controller to the Kubernetes API | Kubernetes RBAC with the controller's service account |
@@ -180,7 +191,9 @@ flowchart LR
 | F12 | Core to the SIEM | OTLP, JSON Lines, syslog over TLS; events and signed checkpoints |
 | F13 | Release pipeline to installations | Registries and downloads; cosign signatures, SBOMs, provenance |
 | F14 | Prometheus and kubelet to the operations listener | HTTP inside the cluster, behind network policies |
-| F15 | Agent code to the enforcement point | Framework hooks inside one process |
+| F15 | Agent code to the enforcement point | Framework hooks inside one process: tool and model calls, and the tools each model request offers |
+| F16 | Agent process to its MCP servers | Local servers: `stdio` pipes to a process the agent launches. Remote servers: streamable HTTP or SSE over TLS, with the agent's own credentials; White Tower holds none |
+| F17 | Agent process to its model providers | HTTPS, or HTTP inside the network for some self-hosted runtimes, with the agent's credentials for the provider; White Tower holds none. Requests that offer tools, and responses that report the calls of provider-run tools, the remote MCP servers the provider calls for the agent included |
 
 ## 5. STRIDE analysis
 
@@ -202,6 +215,8 @@ Each table covers the flows of one boundary. The rating is likelihood / impact �
 | T-10 | I | Errors, logs or responses leak internals or secrets | M / M → M | RFC 9457 problem details without internals; secrets only from files and never logged (OPS-04, NFR-12); hardening review (P1-13 step 4) | Low |
 | T-11 | D | Flooding the login or the API makes the console unusable when a halt is needed | M / M → M | Rate and size limits (architecture section 9); the CLI and break-glass as other paths; enforcement points on a separate listener | Low |
 | T-12 | S, E | The break-glass credential is stolen or guessed | L / H → M | Disabled by default; high entropy, shown once, split between two custodians; rate-limited; the session only halts and reads, for one hour; every use raises a critical audit event, an alert and a console banner (HUM-06, P1-03 step 9) | R-12 |
+| T-76 | T, I | Text that agents report attacks the people who read it: script or markup in a tool's description, a name that imitates an approved server, invisible or bidirectional characters, or a secret left in a URL or a command line | M / H → H | The console shows it as plain text, marked as reported by the agent, with invisible and bidirectional characters made visible and with length limits (UI-10, P1-10.7), under the Content Security Policy of T-05; `wtctl` escapes it before printing it (P1-11 step 9); the enforcement point redacts it, and the core again before storing it (CAT-10; RFC-0002, EP-14 and CORE-11); audit events carry keys and the SHA-256 of references, never the text. A secret passed as a positional argument, which no flag names, escapes EP-14's rules and reaches the catalog | Low |
+| T-81 | D, E | An insider disables an agent's tooling or blocks a server to disrupt agents, or enables tooling or lifts a block alone | M / M → M | Only roles that can already halt or suspend can block or disable, with a reason, and every step is audited; a break-glass session can halt, but cannot block (HUM-06); enabling and lifting a block need a second person, checked in the database too (HUM-04, CAT-03, CAT-04, P1-16 steps 3 and 7) | R-11 |
 
 ### 5.2 TB-4: human identity and roles (F2, F3)
 
@@ -244,16 +259,20 @@ Each table covers the flows of one boundary. The rating is likelihood / impact �
 | T-37 | D | Many streams, or slow readers, exhaust a replica | M / M → M | CORE-7 ends streams that fall behind; per-instance limits; about 50 KiB per stream (spike S2) | Low |
 | T-38 | I | Governance state tells modules more than they need | L / L → L | No personal data but the owner's pseudonymous ID (CORE-9); halt reasons never leave the core | Low |
 | T-39 | T | A replayed acknowledgement confirms a newer halt | L / M → L | Acknowledgements name the halt and carry an idempotency key (contracts 4.4) | Low |
+| **T-74** | S, T, D | An agent reports tooling it does not have, or hides tooling it has, to mislead reviewers or flood the catalog | M / M → M | Reports never authorize (CAT-01, CORE-10), and only enforcement points report, for the agents in their scope (CORE-2); new entries stay inert until reviewed. The limits of a report (RFC-0002 section 4.2), a rate limit per instance and agent (P1-16 step 4) and **DC-10**, a bound on each agent's entries waiting for review, bound the catalog's growth. Hiding a tool gains nothing: the enforcement point resolves every call by its reference when it happens, and denies what is unknown (EP-16) | R-01 |
+| **T-80** | D | Blocks or catalog changes slow halts, or flood enforcement points: blocks carried in the record that fleet halts change would enlarge every fleet halt, a burst of blocks would crowd the watch stream, and a catalog change that rebuilds many bundles at once would send every enforcement point to fetch one | M / H → H | **DC-9**: blocks travel in their own record of the watch stream, as additions and removals, each named by the SHA-256 of what it covers; at most 500 are active, about 40 KB of a snapshot; a block is committed without waiting for any bundle (CORE-12), and never rebuilds one. Catalog changes rebuild bundles in chunks (P1-06 step 6). Halts are measured with 500 active blocks, with the harness of P1-08 step 10 (NFR-24) | Low |
 
 ### 5.5 Inside the agent's process (F7, F15)
 
 | ID | STRIDE | Threat | Rating | Mitigations | Residual |
 | --- | --- | --- | --- | --- | --- |
-| T-40 | E, T | A hijacked agent that gains code execution in its process, or an owner who controls its code or configuration, disables or bypasses the enforcement point: patches the hooks, reads the agent's key, points it at other trust anchors, fakes acknowledgements and evidence | M / H → H | Policies deny code-execution tools an agent does not need; network quarantine outside the process on Kubernetes (KIL-10); halts stop tokens for other audiences; DC-6 flags activity after a halt; an enforced harness in Phase 2 | R-01 |
+| T-40 | E, T | A hijacked agent that gains code execution in its process, or an owner who controls its code or configuration, disables or bypasses the enforcement point: patches the hooks, reads the agent's key, points it at other trust anchors, fakes acknowledgements and evidence | M / H → H | Code-execution tools an agent does not need are never enabled for it (CAT-03), or policies deny them; network quarantine outside the process on Kubernetes (KIL-10); halts stop tokens for other audiences; DC-6 flags activity after a halt; an enforced harness in Phase 2 | R-01 |
 | T-41 | E | A governed call bypasses the framework hooks, for example a tool called through raw HTTP | M / H → H | Hooks on the framework's tool and model paths (P1-09); the conformance kit (MOD-05); gateways as choke points in Phase 2; network quarantine for halts | R-02 |
 | T-42 | T | Unknown values in the state, from a newer core, open the gate | L / H → M | EP-10; the fail-closed vectors | Low |
 | T-43 | D | The evidence buffer, or its disk, fills up and the gate closes | L / M → L | Sized for 24 hours at 10 events per second (NFR-08); `gate.evidence_full` reported | Low |
 | T-44 | I | Decision events carry personal data | M / M → M | Argument names or an HMAC, never values; no prompts, outputs or error messages ([contracts 8.3](../contracts/module-contract-v0.1.md#83-personal-data), NFR-20) | Low |
+| T-78 | E | Usage rules bypassed through how an argument is written: `..` segments, letter case, URL parser differences, a missing argument that the server fills in, an unexpected type | M / H → H | Transforms checked by conformance vectors on both stacks (P0-03 step 12, ST-79); a missing argument matches by default; argument types come from the catalog's declarations, and a value that does not fit its declared type denies (EP-19); a statement that reads an argument policies cannot see is refused at submission; no regular expressions (CAT-06; RFC-0002 sections 7.5 and 8) | R-15 |
+| T-82 | E | The seeded `wt-catalog` permit applies without the catalog check: an enforcement point that predates catalogs, or a bundle without its catalog file | L / H → M | Every bundle carries a catalog file, empty when nothing is observed or enabled for the agent (ST-32); an enforcement point that predates catalogs rejects the manifest's `catalog` field at V4 and stays closed, and V5 requires the file; one that supports catalogs treats a bundle without one as an empty catalog, so every tool and model is `catalog.unknown` (RFC-0002 section 5) | Low |
 
 ### 5.6 TB-7: network quarantine (F8, F9)
 
@@ -309,7 +328,15 @@ Each table covers the flows of one boundary. The rating is likelihood / impact �
 | --- | --- | --- | --- | --- | --- |
 | T-68 | I | Metrics or health endpoints reveal agent IDs and counts | L / L → L | A cluster-internal listener behind network policies; no personal data in metric labels | Low |
 
-### 5.12 Availability and scope of governance (cross-cutting)
+### 5.12 TB-10: the agent's MCP servers and model providers (F16, F17)
+
+| ID | STRIDE | Threat | Rating | Mitigations | Residual |
+| --- | --- | --- | --- | --- | --- |
+| T-75 | T | Tool poisoning: a third-party MCP server's description carries instructions for the model, or changes after its approval | M / H → H | A tool is approved only once its definition is stored, and reviewers see each definition in full, with invisible and bidirectional characters made visible, even when they approve a server's tools at once (UI-10, P1-16 step 2); the core recomputes the hash that approval pins (CAT-02); a changed definition is denied, and hidden from the model, until it is approved (CAT-05; RFC-0002, EP-16 and EP-17) | Low |
+| T-77 | S | Another server answers at an approved reference: a hijacked domain, or a hijacked or unpinned package that `npx`, `uvx`, `pipx run` or `bunx` fetches each time the agent starts the server | M / H → H | References identify servers, they do not authenticate them: the agent's MCP client checks TLS; pinned definitions reveal changed tools; the catalog flags local servers launched from a package without an exact version (P1-16 step 2); MCP servers are the agent's dependencies (A-6) | R-10 |
+| T-79 | E, R | Tools that the model provider runs, its built-in tools and the remote MCP servers it calls for the agent, act outside the agent's process: the enforcement point sees their declaration and, afterwards, the calls the response reports | M / H → H | Exposure checked before every model call, declarations narrowed to the enabled tools, and the call denied when they cannot be (CAT-07; RFC-0002, EP-17 and EP-18); each call decided where the provider asks for approval; global policies can forbid tools whose origin is the provider; the calls a response reports become evidence, even those that no decision preceded (`action.executed`, origin `provider`). What remains: the provider lists a remote server's tools itself, so the model may see a changed definition once, in the response that reveals it, before its exposure is denied (`catalog.definition_changed`) | Low, given A-7 |
+
+### 5.13 Availability and scope of governance (cross-cutting)
 
 | ID | STRIDE | Threat | Rating | Mitigations | Residual |
 | --- | --- | --- | --- | --- | --- |
@@ -328,6 +355,7 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 - Stop the halt from reaching the enforcement point:
   - cut the stream: the lease expires and the enforcement point fails closed within its TTL (T-69, KIL-04);
   - delay the stream while renewals keep the lease alive (T-32): **DC-2**;
+  - slow the halt path with blocks, or with catalog changes that rebuild many bundles (T-80): **DC-9**, chunked rebuilds;
   - serve older state from a stale replica (T-31): CORE-5 and CORE-6;
   - impersonate the core (T-33): I-1.
 - Make the enforcement point ignore the halt:
@@ -391,6 +419,7 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 - Withhold events (T-35): sequence gaps.
 - Act for an agent it does not serve (T-27): CORE-2.
 - Claim a state version it has not applied: its lag shows in the console (EP-12).
+- Report tooling the agent does not have, or hide tooling it has (T-74): reports never authorize, and unknown tooling is denied; R-01.
 
 ### AT-7: turn fail-closed into a fleet-wide denial of service
 
@@ -399,6 +428,8 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 - Take the database down (T-70): high availability; R-08.
 - Fill the enforcement points' buffers through backpressure (T-36): per-instance backpressure.
 - Issue a fleet halt as an insider or break-glass holder (T-71): R-12.
+- Block servers or models widely, or disable tooling, as an insider (T-81): only roles that can already halt or suspend, with a reason, audited; break-glass cannot block.
+- Flood the catalog through tooling reports (T-74): the limits of a report, the rate limit, **DC-10**.
 - Deactivate owners in bulk through SCIM (T-18): reversible, audited.
 - Skew a host's clock so that fresh renewals look stale (DC-2): needs control of the host's time (A-2); the enforcement point reports the stale renewals.
 
@@ -409,6 +440,7 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 - Tamper with an artifact in a mirror or the offline bundle (T-65): signatures verified offline.
 - Typosquat the enforcement point's package (T-66): trusted publishing, pinned hashes.
 - Ship a malicious module (T-67): operator approval, scopes; R-10.
+- Hijack the package of an MCP server that agents launch (T-77): pinned definitions, the catalog's flag on unpinned packages; R-10.
 
 ### AT-9: abuse the break-glass credential
 
@@ -419,9 +451,25 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 - Use it unnoticed: a critical audit event, an alert and a console banner.
 - Halt the fleet with it (T-71): its purpose; R-12.
 
+### AT-10: make an agent use a tool or a model nobody enabled
+
+- Make it usable through the catalog:
+  - report it (T-74): reports never authorize (CORE-10);
+  - enable it, or lift its block, alone (T-81): a second person, checked in the database too (HUM-04);
+  - with two colluding or compromised accounts: R-11.
+- Change a tool after its approval (T-75): its definition is pinned; a changed one is denied and hidden until it is approved.
+- Serve other code at an approved reference (T-77): TLS in the agent's MCP client, pinned definitions; R-10.
+- Have the model provider run it (T-79): exposure checks, narrowing, and denial when a provider-run tool cannot be removed, given A-7.
+- Use an enabled tool in a forbidden way (T-78): transforms, missing arguments matching, types checked; R-15.
+- Outrun a block: delay the stream that carries it (T-32): **DC-2**; crowd the stream with blocks (T-80): **DC-9**.
+- Make the enforcement point skip the check:
+  - give it a bundle without its catalog file, or run one that predates catalogs (T-82): V4 and V5, and an empty catalog denies;
+  - call outside the hooks (T-41): R-02;
+  - take over the agent's process (T-40): R-01.
+
 ## 7. Design changes
 
-The analysis found eight gaps in the design. Each change is applied in the documents listed.
+The analysis found eight gaps in the design, and the analysis of RFC-0002 two more. The first eight changes are applied in the documents listed; DC-9 and DC-10 apply once RFC-0002 is accepted.
 
 | ID | Threats | Change | Where | Status |
 | --- | --- | --- | --- | --- |
@@ -433,6 +481,8 @@ The analysis found eight gaps in the design. Each change is applied in the docum
 | DC-6 | T-34, T-40 | "Activity after a halt" is defined precisely: an allow decision or an executed action whose time is after the gate was acknowledged closed. Buffered evidence delivered later (DC-1) is expected and not flagged | P1-08 step 4 | Applied |
 | DC-7 | T-46 | Quarantined pods get no DNS by default. The enforcement point reconnects to the core's last resolved addresses; a CNI with DNS-aware rules may allow the core's name only, as an option | P1-15 step 3, P1-09, contracts section 12 (the open question is closed) | Applied |
 | DC-8 | T-52 | A scheduled consistency check proves the current log extends the latest checkpoint the SIEM holds, and alerts on failure | P1-02 step 7, P1-12 step 9 | Applied |
+| DC-9 | T-80 | Organization-wide blocks travel in their own record of the watch stream, never in the fleet record that fleet halts change, nor in agents' records: a snapshot carries every active block, and changes carry those added and removed. A block carries its ID, its kind, the SHA-256 of what it covers and its issue time; references and reasons stay in the core. Blocks take their versions from the same sequence as the rest of the state, so a lease renewal still means that the state is current, and a block is committed without waiting for any bundle (CORE-12). At most 500 are active, about 40 KB of a snapshot, so a fleet halt costs the same with or without them | RFC-0002 section 6, which P0-03 step 12 brings into the contracts; conformance scenario S-20; CAT-04, NFR-24; P1-07 steps 5 and 6 (the blocks record, and acknowledgements); P1-08 (the design of the halt path, and the harness of step 10); P1-16 step 7; domain model section 3.9 | Proposed: applied once RFC-0002 is accepted |
+| DC-10 | T-74 | The core bounds, for each agent and each kind of entry, the entries that the agent's reports brought and that still wait for review: one report's worth by default, which administrators can change (CORE-13). Beyond the bound, it still records the report but leaves out its new entries, which stay unknown and are denied (`catalog.unknown`). Reviewers free room by approving or declining, all of an agent's waiting entries at once if need be. A compromised agent therefore cannot make the catalog, or the reviewers' queue, grow faster than people decide, whatever the rate of its reports | RFC-0002 section 4.2, which P0-03 step 12 brings into the contracts; P1-16 step 4; domain model section 3.9 | Proposed: applied once RFC-0002 is accepted |
 
 ## 8. Accepted risks
 
@@ -440,8 +490,8 @@ Each risk stays open knowingly: the MVP cannot remove it without a component or 
 
 | ID | Risk | Threats | Why it is accepted | Compensating controls | Revisit |
 | --- | --- | --- | --- | --- | --- |
-| R-01 | The in-process enforcement point trusts the agent's process: an agent or owner that controls the process can bypass it and fake its reports | T-34, T-40 | Enforcement has to live where the calls are made ([ADR-0011](../adr/0011-own-python-enforcement-point.md)); no in-process design survives full control of the process | Network quarantine on Kubernetes; tokens stop for other audiences; DC-6 flags activity after a halt; code-execution tools denied by policy | Phase 2: the harness module and the gateways add stops outside the process |
-| R-02 | Calls that do not go through the framework's hooks are not governed | T-41 | The hooks cover what the frameworks expose; raw network calls from agent code are outside them | Conformance kit; network quarantine; coverage levels shown per agent | Phase 2 gateways as choke points |
+| R-01 | The in-process enforcement point trusts the agent's process: an agent or owner that controls the process can bypass it, its catalog check and exposure included, and fake its reports, tooling reports included | T-34, T-40, T-74 | Enforcement has to live where the calls are made ([ADR-0011](../adr/0011-own-python-enforcement-point.md)); no in-process design survives full control of the process | Network quarantine on Kubernetes; tokens stop for other audiences; DC-6 flags activity after a halt; code-execution tools never enabled, or denied by policy | Phase 2: the harness module and the gateways add stops outside the process, and the MCP network gateway applies the same catalog to the remote servers agents reach through it |
+| R-02 | Calls that do not go through the framework's hooks are not governed, and the tools behind them are not reported (CAT-01) | T-41 | The hooks cover what the frameworks expose; raw network calls from agent code are outside them | Conformance kit; network quarantine; coverage levels shown per agent | Phase 2 gateways as choke points |
 | R-03 | Until it is ingested, evidence is only as trustworthy as the agent's host | T-35 | The buffer lives next to the agent, which could edit it | Sequence gaps detected; tamper-evident from ingestion; tools' own logs as a cross-check | When a gateway can attest events |
 | R-04 | A stolen agent key works until it is rotated or revoked | T-23 | White Tower never holds the private key, so it cannot protect it | One-agent scope; halts stop tokens for other audiences; revocation; workload identity (AID-07) | With SPIFFE SVIDs (AID-09) |
 | R-05 | Cluster administrators can read the signing keys | T-60 | Keys come from files or Secrets in the MVP | Separate keys, Secrets RBAC, Kubernetes audit logs, rehearsed rotation | KMS and HSM backends (Phase 2) |
@@ -449,11 +499,12 @@ Each risk stays open knowingly: the MVP cannot remove it without a component or 
 | R-07 | White Tower trusts the IdP for identities and group membership | T-14, T-15 | HUM-01: humans authenticate only through the organization's IdP | MFA at the IdP; separation of duties; audit; role holders visible | At each gate |
 | R-08 | Fail-closed turns a long outage of the core, the database or the network into a fleet outage | T-69, T-70 | Chosen in ADR-0005: agents must not act ungoverned | High availability; TTLs per risk tier; alerts on lease health | With the strict mode of Phase 2 |
 | R-09 | Network quarantine has gaps: pods without the label, CNIs that cannot deny, connections opened before the rule, a controller cut off from the core | T-45, T-47, T-49, T-50 | It depends on the cluster (ASM-05) | Pods found per agent; the layer shown as unavailable; the in-process gate; optional quarantine on lease expiry | Phase 2 harness module |
-| R-10 | Dependencies and approved modules are trusted code | T-63, T-67 | Every system runs code it did not write | Pinning, review, scanning, SBOMs; module approval and scopes | Continuous |
-| R-11 | Two colluding or compromised people can pass any two-person control | T-16, AT-1, AT-2 | Separation of duties raises the bar to two people; it cannot remove it | Audit of every step; approval-role grants notified (DC-4) | At each gate |
+| R-10 | Dependencies, approved modules and the MCP servers agents run are trusted code | T-63, T-67, T-77 | Every system runs code it did not write | Pinning, review, scanning, SBOMs; module approval and scopes; for MCP servers, pinned tool definitions and the catalog's flag on unpinned packages | Continuous |
+| R-11 | Two colluding or compromised people can pass any two-person control | T-16, T-81, AT-1, AT-2, AT-10 | Separation of duties raises the bar to two people; it cannot remove it | Audit of every step; approval-role grants notified (DC-4) | At each gate |
 | R-12 | A break-glass holder can halt the fleet | T-12, T-71 | That is its purpose, for when the IdP is down | Split custody; one-hour sessions; loud audit and alerts; two-person release | At each gate |
 | R-13 | Without SCIM, a role removed at the IdP stays in open sessions for up to 12 hours | T-19 | Roles are read at login | Local changes revoke sessions at once; SCIM deprovisioning | If pilots ask for shorter sessions |
 | R-14 | Non-production credentials can be used in production until something checks the environment | T-73 | In the MVP, nothing between agents and their tools checks tokens | `wt_env` in every token; the deployment guide asks production resources to require it | Phase 2 gateways |
+| R-15 | Usage rules judge a call's arguments as written: a tool that follows symbolic links, fills in defaults on the server, or reads a value in a form no transform normalizes can do what a rule meant to forbid | T-78 | Rules are stateless and lexical by design (RFC-0002 section 8): the enforcement point cannot see how each tool interprets its arguments | Transforms with conformance vectors; missing arguments match by default; wrong types deny; only enabled tools can be called; the reviewer's classification; least-privilege credentials for MCP servers | At each gate; stateful rules in Phase 2 |
 
 ## 9. Security tests
 
@@ -461,9 +512,10 @@ The abuse cases above become tests in the [security test catalog](security-tests
 
 ## 10. Review and upkeep
 
-- **Review.** The maintainer, who did not write it, reviewed and accepted this version on 2026-09-30. An external security review is still planned before the pilot, with the release review of P1-13.
+- **Review.** The maintainer, who did not write it, reviewed and accepted version 0.1 on 2026-09-30. The review of RFC-0002, by its external reviewer as well, covers the additions of version 0.1.1. An external security review is still planned before the pilot, with the release review of P1-13.
 - **Upkeep.** As [GOVERNANCE.md](../../GOVERNANCE.md) sets out, the threat model is reviewed at every phase gate, whenever a trust boundary changes, and in the security section of every RFC. Plan P1-13 publishes version 0.2, checked against the implementation.
 
 | Version | Date | Change |
 | --- | --- | --- |
 | 0.1 | 2026-09-30 | First version (P0-04) |
+| 0.1.1 | 2026-10-19 | RFC-0002, MCP servers, tools and models (plan P1-16). Added: boundary TB-10 and flows F16 and F17, actor TA-11, assumption A-7, two assets, threats T-74 to T-82 and section 5.12 (the cross-cutting section becomes 5.13), attack tree AT-10, design changes DC-9 and DC-10, accepted risk R-15, and tests ST-75 to ST-83. Changed: the scope, A-6, the governance state asset, O-1, O-3, TB-1, TB-2, F6, F15, T-40, attack trees AT-1, AT-6, AT-7 and AT-8, and accepted risks R-01, R-02, R-10 and R-11 |

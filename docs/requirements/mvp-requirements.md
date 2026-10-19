@@ -2,8 +2,8 @@
 
 | | |
 | --- | --- |
-| **Status** | Version 0.2, for the Phase 0 gate (2026-09-30): targets set from measurements, open questions Q1 to Q6 closed |
-| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine) and 2026-09-30 ([threat model](../security/threat-model.md)) |
+| **Status** | Version 0.3: the MCP servers, tools and models of agents join the MVP ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), decision of the maintainer of 2026-10-13). Version 0.2 was the Phase 0 gate's (2026-09-30): targets set from measurements, open questions Q1 to Q6 closed |
+| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)) and 2026-10-19 (RFC-0002) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
 
@@ -21,8 +21,9 @@ The MVP is the end of **Phase 1 (Core MVP)** of the charter, and it includes all
 2. Pilot agents authenticate with identities issued by White Tower and are governed at runtime by White Tower's enforcement point ([ADR-0011](../adr/0011-own-python-enforcement-point.md)), using policies distributed by White Tower.
 3. Every policy decision and every governance action of the pilot is in the tamper-evident audit log, can be verified with the CLI, and is exported to at least one external system (SIEM or log collector).
 4. The kill switch stops a running pilot agent, per agent and fleet-wide, within the target set in Phase 0, and the stop is confirmed and measured. Agents running on Kubernetes are also isolated at the network level while halted.
+5. Pilot agents governed by White Tower's enforcement point use only the MCP servers, tools and models enabled for them: the enforcement point denies the rest, hides it from their models, and applies the usage rules of their policies ([section 5.11](#511-mcp-servers-tools-and-models-cat)).
 
-The following are **not** part of the MVP (they belong to Phases 2 and 3): LLM gateway and quotas, MCP gateway, skills repository, enforced harness/sandbox, shadow AI discovery, compliance module and the public third-party SDK. The MVP must not block them: the data model and the contracts account for them from v0.1 (see [section 9](#9-out-of-scope-for-the-mvp)).
+The following are **not** part of the MVP (they belong to Phases 2 and 3): LLM gateway and quotas, the MCP network gateway, enforced harness/sandbox, shadow AI discovery, compliance module and the public third-party SDK. The MVP must not block them: the data model and the contracts account for them from v0.1 (see [section 9](#9-out-of-scope-for-the-mvp)). In the MVP, the enforcement point governs the MCP servers, tools and models of the agents it serves (section 5.11); the MCP network gateway will enforce the same catalog for agents without White Tower's enforcement point in their process. The skills repository is no longer planned: usage rules in policies take its place (decision of 2026-10-13, RFC-0002).
 
 ## 2. Actors
 
@@ -30,11 +31,11 @@ The following are **not** part of the MVP (they belong to Phases 2 and 3): LLM g
 
 | Role | Source | Responsibility | Main MVP interactions |
 | --- | --- | --- | --- |
-| AI steering committee | Charter | Approves global policies and accepted providers and jurisdictions | Approve global policies; halt the fleet |
-| AI advisory committee (incl. security) | Charter | Validates use cases and reviews each agent's specific policy | Validate use cases; approve agent-specific policies; suspend and reinstate agents |
-| Agent owner | Charter | Accountable for the agent's behavior, resources and periodic reviews | Propose agents; register credentials; activate; complete reviews; halt own agents |
-| User | Charter | Uses authorized agents within the scope their policy allows | Read the catalog of active agents (runtime use arrives with the gateways in Phase 2) |
-| Platform operator | Charter | Runs modules and integrations; can trigger the kill switch | Register modules; activate agents; halt agents and the fleet |
+| AI steering committee | Charter | Approves global policies and accepted providers and jurisdictions | Approve global policies; halt the fleet; block tooling and approve unblocking |
+| AI advisory committee (incl. security) | Charter | Validates use cases and reviews each agent's specific policy | Validate use cases; approve agent-specific policies; suspend and reinstate agents; approve catalog entries and the enabling of tooling |
+| Agent owner | Charter | Accountable for the agent's behavior, resources and periodic reviews | Propose agents; register credentials; activate; complete reviews; halt own agents; request enabling and disable tooling for own agents |
+| User | Charter | Uses authorized agents within the scope their policy allows | View the active agents in the inventory (runtime use arrives with the gateways in Phase 2) |
+| Platform operator | Charter | Runs modules and integrations; can trigger the kill switch | Register modules; activate agents; halt agents and the fleet; block and disable tooling |
 | Auditor | New | Read-only access to inventory, policies and audit evidence | Search, verify and export the audit log |
 | Platform administrator | New | Manages role mappings, settings and break-glass custody | Configure the platform; holds no approval rights by default |
 
@@ -55,14 +56,19 @@ The following are **not** part of the MVP (they belong to Phases 2 and 3): LLM g
 | Adapter | Code that translates a product's API (for example Microsoft AGT) into the White Tower module contract. |
 | Capability | A function a module declares in its manifest, for example `policy-engine` or `runtime-control`. |
 | Coverage level | How deeply an agent is governed. **C0 Declared**: in the inventory with owner, use case and policy, no runtime integration. **C1 Identified**: authenticates with White Tower credentials. **C2 Governed**: an EP enforces White Tower policies and reports decisions to the audit log. **C3 Stoppable**: a halt or kill-switch drill on this agent was confirmed within the configured period (default 90 days). |
-| Effective policy set | The global policies plus the agent-specific policies that apply to one agent, distributed as a signed **policy bundle**. |
-| Governance state | What the core tells EPs about an agent: lifecycle state, run state (running or halted), effective bundle reference and lease. |
+| Effective policy set | The global policies plus the agent-specific policies that apply to one agent, distributed as a signed **policy bundle**, which also carries the agent's catalog file. |
+| Governance state | What the core tells EPs: for each agent, its lifecycle state, run state (running or halted), effective bundle reference and lease; for the whole organization, its active blocks. |
 | Halt | The action of the kill switch: stop an agent (or the fleet) that is running. |
 | Lease | A time-bounded permission to keep operating that an EP must renew with the core. When it expires, the EP fails closed. |
 | Network quarantine | Isolation of a halted agent's workloads at the network level, applied from outside the agent's process (KIL-10). |
 | Lifecycle state | Where an agent is in the governance process (draft, proposed, validated, ready, active, suspended, retired, rejected). |
 | Run state | Whether an agent is allowed to act right now (running) or stopped by the kill switch (halted). Orthogonal to the lifecycle state. |
 | Checkpoint | A signed statement of the size and root hash of the audit log at a point in time. |
+| Tooling | The MCP servers, tools and models an agent uses, including the tools its model provider runs for it. |
+| Catalog | The organization's list of MCP servers, tools and models (CAT). Each entry is discovered or approved, and shows as blocked while a block covers it; approved entries are enabled agent by agent. |
+| Definition | What the model sees of a tool: its name, description and schemas. Approving a tool pins the hash of its definition. A model provider's built-in tools have none. |
+| Block | An organization-wide denial of an MCP server, a tool or models, effective at once on every enforcement point. |
+| Usage rule | A forbidden pattern of use of a tool's arguments, written in a policy. |
 
 ## 4. Priorities
 
@@ -116,6 +122,7 @@ stateDiagram-v2
 - The **run state** (running or halted) is separate: a halt can hit any agent that has running instances, whatever its lifecycle state. A halt of one agent also moves it to `suspended`; a fleet halt does not change lifecycle states (KIL-06).
 - **Invariant:** an `active` agent always has an active owner, a validated use case and at least one approved agent-specific policy.
 - The **harness** is declared in the MVP (a descriptive record assigned during "policy and harness assignment"); enforcing it arrives with the harness module in Phase 2.
+- **Tooling** is enabled during "policy and harness assignment" as well: from `validated` on, the enforcement point reports the agent's tooling, and the owner requests enabling it (CAT-01, CAT-03). Enabling is not a guard of any transition: agents without an enforcement point have nothing to enable (INV-07), and an agent with nothing enabled is denied every tool and model call anyway.
 
 ### 5.2 Human identity and access (HUM)
 
@@ -124,7 +131,7 @@ stateDiagram-v2
 | HUM-01 | Humans authenticate only through the organization's IdP using OIDC (authorization code with PKCE). White Tower stores no human passwords. | M | Non-functional requirements |
 | HUM-02 | Roles are derived from IdP group claims through a configurable mapping; the platform administrator can also grant role bindings inside White Tower. | M | Non-functional requirements |
 | HUM-03 | Authorization is deny-by-default on every API operation and follows the permission matrix (5.2.1). | M | Principles |
-| HUM-04 | Separation of duties: nobody approves their own proposal, use case or policy version, nobody grants a role to themselves, and releasing a halt needs a second person. | M | New |
+| HUM-04 | Separation of duties: nobody approves their own proposal, use case, policy version, request to enable tooling or request to unblock, nobody grants a role to themselves, and releasing a halt needs a second person. | M | New |
 | HUM-05 | Principal status is kept current: administrators can deactivate principals (M), and the system accepts deprovisioning from the IdP through SCIM 2.0 Users (S). | M/S | Governance model |
 | HUM-06 | Break-glass: a sealed emergency credential allows halting agents and the fleet while the IdP is unavailable. Every use raises a critical audit event. | S | New |
 | HUM-07 | Service accounts and personal access tokens for automation, with scopes and expiry. | S | New |
@@ -132,7 +139,7 @@ stateDiagram-v2
 
 #### 5.2.1 Permission matrix (initial, refined in plan P1-03)
 
-`own` means only for agents the person owns or is a delegate for. Every approval excludes the author (HUM-04).
+`own` means only for agents the person owns or is a delegate for. Every approval excludes the author (HUM-04). The rows on the catalog and agents' tooling come from RFC-0002, and plan P1-16 implements them; a break-glass session gets none of them (HUM-06).
 
 | Action | Steering | Advisory | Owner | User | Operator | Auditor | Admin |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
@@ -153,6 +160,13 @@ stateDiagram-v2
 | Halt the fleet | ✔ | | | | ✔ | | |
 | Request or approve a halt release (two different people; a fleet release is approved by steering or an operator) | ✔ | ✔ | request own | | ✔ | | |
 | Register and manage modules | | | | | ✔ | | |
+| View the catalog and agents' tooling | ✔ | ✔ | ✔ | | ✔ | ✔ | ✔ |
+| Approve or decline a catalog entry, a new tool definition or a new model digest, classify it, and declare the arguments policies see | | ✔ | | | | | |
+| Block a catalog entry, at once, with a reason | ✔ | ✔ | | | ✔ | | |
+| Request or approve unblocking (two different people; steering or advisory approves) | ✔ | ✔ | | | request | | |
+| Request or approve enabling tooling for an agent (two different people; advisory approves) | | ✔ | request own | | | | |
+| Disable tooling for an agent, at once, with a reason | | ✔ | own | | ✔ | | |
+| Declare the tooling of an agent without an enforcement point | | | own | | ✔ | | |
 | View the audit log | ✔ | ✔ | own | | ✔ | ✔ | |
 | Verify and export audit evidence | ✔ | ✔ | | | ✔ | ✔ | |
 | Manage role mappings and settings | | | | | | | ✔ |
@@ -179,12 +193,12 @@ stateDiagram-v2
 | POL-02 | Approval workflow: global policies are approved by the steering committee and agent-specific policies by the advisory committee; the author cannot approve. | M | Governance model |
 | POL-03 | The combination semantics (5.4.1) are part of the contract, and every policy engine adapter must pass the conformance tests for them. | M | Principles |
 | POL-04 | An agent cannot become active without at least one approved agent-specific policy. | M | Governance model |
-| POL-05 | The effective policy set of each agent is distributed to enforcement points as a signed, versioned bundle. EPs report which bundle is active, so drift is visible. | M | Scope |
+| POL-05 | The effective policy set of each agent is distributed to enforcement points as a signed, versioned bundle, which also carries the agent's catalog file (CAT-03). EPs report which bundle is active, so drift is visible. | M | Scope |
 | POL-06 | The decision input model (subject, action, resource, context, aligned with OpenID AuthZEN) is published and versioned as part of the contracts. | M | Standards |
 | POL-07 | Policies are validated (syntax, plus tests when provided) before they can be submitted for approval. | S | New |
 | POL-08 | Versions can be compared (diff) and rolled back; a rollback approves an earlier content as a new version. | S | New |
 | POL-09 | Dry run of a policy version against recorded or hand-written requests. | C | New |
-| POL-10 | Catalog of accepted providers and jurisdictions, approved by the steering committee and referenceable from policies. Must in Phase 2, with the LLM gateway. | C | Governance model |
+| POL-10 | List of accepted providers and jurisdictions, approved by the steering committee and referenceable from policies. Must in Phase 2, with the LLM gateway. | C | Governance model |
 
 #### 5.4.1 Combination semantics (deny-overrides, default deny)
 
@@ -194,6 +208,8 @@ For every decision request, the engine evaluates the applicable global policies 
 2. Otherwise, if at least one applicable policy returns **allow**, the decision is **allow**.
 3. Otherwise the decision is **deny** (default deny).
 4. Any error, timeout, missing or unverifiable bundle, unknown agent, expired lease or halted run state results in **deny**.
+
+For `tool.expose`, `tool.invoke` and `model.invoke`, the enforcement point applies the catalog check (CAT-05) before it evaluates any policy. What the check denies stays denied: policies can forbid more, but never permit tooling that is not enabled for the agent.
 
 The decision records the policy versions and rules that produced it, so the audit log can explain every allow and every deny.
 
@@ -234,9 +250,9 @@ The decision records the policy versions and rules that produced it, so the audi
 | MOD-01 | Each module declares a manifest: capabilities, supported contract versions, events emitted and consumed, endpoints, required permissions and a configuration schema. Manifests are validated against a published JSON Schema. | M | Architecture |
 | MOD-02 | Registering a module requires operator approval. Instances authenticate, send heartbeats and report health and version, and the UI shows them. | M | New |
 | MOD-03 | Contracts are versioned (`v1alpha1` in the MVP), versions are negotiated when a module connects, and CI detects breaking changes. Contract changes go through the RFC process. | M | Charter governance |
-| MOD-04 | Governance state is delivered to enforcement points through a watch stream with leases (ADR-0005). | M | Non-functional requirements |
-| MOD-05 | A conformance kit lets module authors check an implementation against the contract, including leases, fail-closed behavior, halts, combination semantics and event schemas. | M | Scope |
-| MOD-06 | White Tower's enforcement point for Python agents provides the governance gate, policy enforcement with Cedar, runtime control (halt) and decision and action events. It is a Python package loaded inside the agent's process, with hooks for the pilot's frameworks (LangGraph 1.x first). It fails closed, records every decision before acting on it, and reports honestly what each halt layer achieved. It replaces the Microsoft AGT adapter of the charter's Phase 1 ([ADR-0011](../adr/0011-own-python-enforcement-point.md)); an AGT interoperability adapter is a Phase 2 candidate. | M | Roadmap (Phase 1), ADR-0011 |
+| MOD-04 | Governance state, the organization's active blocks included (CAT-04), is delivered to enforcement points through a watch stream with leases (ADR-0005). | M | Non-functional requirements |
+| MOD-05 | A conformance kit lets module authors check an implementation against the contract, including leases, fail-closed behavior, halts, combination semantics, event schemas, and the handling of tooling: references and redaction, the catalog check, blocks, exposure and argument transforms (RFC-0002, scenarios S-18 to S-24). | M | Scope |
+| MOD-06 | White Tower's enforcement point for Python agents provides the governance gate, policy enforcement with Cedar, runtime control (halt) and decision and action events. It is a Python package loaded inside the agent's process, with hooks for the pilot's frameworks (LangGraph 1.x first). It fails closed, records every decision before acting on it, and reports honestly what each halt layer achieved. It also reports the agent's tooling, without secrets, and applies the catalog and its blocks (CAT-01, CAT-04 to CAT-07, CAT-10). It replaces the Microsoft AGT adapter of the charter's Phase 1 ([ADR-0011](../adr/0011-own-python-enforcement-point.md)); an AGT interoperability adapter is a Phase 2 candidate. | M | Roadmap (Phase 1), ADR-0011 |
 | MOD-07 | A mock reference module is available for tests and demos. | M | New |
 | MOD-08 | Replacing a module implementation requires no change in the core. The MVP designs for it; Phase 2 demonstrates it with a second policy engine. | M | Success criteria |
 
@@ -245,14 +261,15 @@ The decision records the policy versions and rules that produced it, so the audi
 | ID | Requirement | Pri | Source |
 | --- | --- | --- | --- |
 | UI-01 | Web console with SSO; navigation and actions adapt to the user's roles. | M | Scope |
-| UI-02 | Inventory: list with filters, and agent detail (owner, use case, state and history, policies, credentials, instances, coverage, recent audit events). | M | Scope |
+| UI-02 | Inventory: list with filters, and agent detail (owner, use case, state and history, policies, credentials, instances, coverage, "MCP and Tools" (UI-10), recent audit events). | M | Scope |
 | UI-03 | Workflows: propose an agent, validate or reject a use case, submit and approve policies, activate, review, suspend and reinstate, retire. | M | Governance model |
 | UI-04 | Policies: list, versions, diff, editor with syntax highlighting, approvals. | M | Scope |
 | UI-05 | Audit explorer with filters, event detail and verification status. | M | Scope |
 | UI-06 | Kill switch console: halt an agent or the fleet with confirmation and reason, follow propagation live, and release with a second approval. | M | Scope |
 | UI-07 | Modules and instances: health, versions, contract versions and active bundle versions. | M | Scope |
-| UI-08 | Home dashboard: agents by state, overdue reviews, coverage, active halts, module health. | S | New |
+| UI-08 | Home dashboard: agents by state, overdue reviews, coverage, active halts and blocks, tooling waiting for review, module health. | S | New |
 | UI-09 | Personal inbox with pending approvals and reviews due. | S | New |
+| UI-10 | MCP servers and models: the catalog's entries, with their status, the agents that use them, and the actions to approve, block and unblock; each tool's definition in full, its changes as diffs and its classification; each model's endpoint and digest; the active blocks, with each block's spread across enforcement points. On each agent, an "MCP and Tools" tab: its observed and enabled tooling, switches to request enabling and to disable, and the usage rules that apply to each tool. On each model, the tools its provider runs. Usage rules are edited as forms in the policy editor (UI-04). Text that agents report is shown as plain text, marked as reported by the agent, with invisible and bidirectional characters made visible and long text collapsed. | M | New (RFC-0002) |
 
 ### 5.9 API and CLI (API)
 
@@ -261,7 +278,7 @@ The decision records the policy versions and rules that produced it, so the audi
 | API-01 | Every UI function is available through the public REST API; the UI uses no private endpoints. | M | Scope |
 | API-02 | The public API is described by an OpenAPI 3.1 document, versioned under `/api/v1`, and CI rejects unintended breaking changes. | M | Scope |
 | API-03 | Errors use RFC 9457 problem details, list endpoints paginate, and updates use optimistic concurrency (ETag and If-Match). | M | New |
-| API-04 | The `wtctl` CLI covers login, agents, credentials, policies, halts, audit verification and export, and modules. | M | New |
+| API-04 | The `wtctl` CLI covers login, agents, credentials, policies, halts, audit verification and export, modules, and the catalog and agents' tooling. | M | New |
 | API-05 | Outgoing webhooks for selected events (review due, halt issued, agent suspended). | C | New |
 
 ### 5.10 Operations (OPS)
@@ -276,14 +293,31 @@ The decision records the policy versions and rules that produced it, so the audi
 | OPS-06 | Backup and restore procedure for PostgreSQL and signing keys, documented and tested at least once. | S | New |
 | OPS-07 | Database migrations run automatically, in their own step with their own credentials, so the serving process never holds the right to change the schema (threat model, DC-3); they are forward-only, and the upgrade procedure is documented. | M | New |
 
+### 5.11 MCP servers, tools and models (CAT)
+
+What an agent can do is delimited by its MCP servers, tools and models; how it may use them, by usage rules in its policies (decision of the maintainer of 2026-10-13). The design is in [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md). Plan P1-16 builds the core's side, and P1-09 the enforcement point's.
+
+| ID | Requirement | Pri | Source |
+| --- | --- | --- | --- |
+| CAT-01 | Enforcement points report the tooling of each agent they serve, as it is configured and not only as it is called: its MCP servers, tools and models, including the tools its model provider runs for it, when it starts and whenever it changes. Reports fill the catalog, and never approve, enable or unblock anything. Their size and rate are limited, and so are each agent's entries waiting for review: beyond one report's worth, which administrators can change, new entries are left out and stay denied (threat model, DC-10). | M | New (RFC-0002) |
+| CAT-02 | A catalog holds every reported or declared MCP server, tool and model. Each entry is discovered or approved, and shows as blocked while a block covers it. Reviewers see each tool's definition in full, and approve or decline each entry; a declined entry stays denied, and can still be approved later. Approving a tool pins its definition, classifies it (read-only, destructive, open world) and declares the arguments policies may see; approving a self-hosted model pins the digest of its weights, when its runtime reports one. A changed definition or digest is denied until it is approved, and a changed tool is hidden from the model. | M | New (RFC-0002) |
+| CAT-03 | An agent may use only the approved tools and models enabled for it, as listed in the catalog file of its signed bundle; enabling an MCP server enables its approved tools. Enabling needs the approval of someone other than the requester; disabling takes effect at once, with a reason. | M | New (RFC-0002) |
+| CAT-04 | Organization-wide blocks of an MCP server and its tools, a tool, a model, or every model of a provider or an endpoint are issued with a reason, and take effect at once on every connected enforcement point, without a new bundle. Enforcement points acknowledge each block once they apply it, and one that connects receives the active blocks before it allows any tool or model call. Blocks travel apart from halts and never slow them (NFR-24); at most 500 are active. Lifting a block needs a second person, and leaves the entry as it was. | M | New (RFC-0002) |
+| CAT-05 | Before evaluating policies, enforcement points check each tool call, each tool offered to a model and each model call against the bundle's catalog and the active blocks. They resolve the tool or the model by its reference at the time of the call, never by its name alone. They deny tooling that is blocked, unknown, not approved or not enabled, a tool whose definition has changed, and a model whose digest differs from the pinned one or is unknown, each with its reason, and offer the model only the tools it may use. | M | New (RFC-0002) |
+| CAT-06 | Usage rules forbid patterns of use of a tool's arguments: values, sets, `*` patterns (Cedar `like`) and integer comparisons, after transforms (clean paths, URL hosts, email domains, lowercase). A missing argument matches by default, and a value of the wrong type denies the call. Rules are statements of ordinary policies, approved like any policy; the console edits them as forms, and a policy version whose rule statements differ from what their forms generate is refused. Policies see only the arguments that a reviewer declared or a usage rule uses, and a version that reads any other is refused. Argument values never reach evidence. Decisions name the rule that denied. | M | New (RFC-0002) |
+| CAT-07 | A model call that would let the model provider run a tool, or call an MCP server, not enabled for the agent is narrowed to the enabled ones where the provider allows it, and denied otherwise. Where the provider asks the agent to approve each call, the enforcement point decides it. The calls the provider reports having run are recorded in the audit log. | M | New (RFC-0002) |
+| CAT-08 | Owners and operators can declare the tooling of agents without an enforcement point (coverage C0 and C1), so that the inventory is complete. Nothing enforces it. | S | New (RFC-0002) |
+| CAT-09 | Periodic reviews list the enabled tooling an agent has not used recently, as candidates to disable. | S | New (RFC-0002) |
+| CAT-10 | Tooling reports carry no secrets. The enforcement point leaves out credentials, environment variables and headers, removes the user information, query and fragment of URLs, and redacts the values of command-line flags whose names suggest a secret; the core redacts again before it stores a report. Audit events name tooling by its key and the hash of its reference, never by the reference itself, and carry no reported description or schema (NFR-20). | M | New (RFC-0002) |
+
 ## 6. Non-functional requirements
 
-The charter leaves the decision latency and kill switch targets "to be set in phase 0". Plan P0-05 measured them with five spikes, and the maintainer confirmed the targets below on 2026-09-30, each with the measurement that backs it. NFR-01, NFR-08, NFR-11 and NFR-23 are verified by the Phase 1 plans in the last column.
+The charter leaves the decision latency and kill switch targets "to be set in phase 0". Plan P0-05 measured them with five spikes, and the maintainer confirmed the targets below on 2026-09-30, each with the measurement that backs it. NFR-01, NFR-08, NFR-11 and NFR-23 are verified by the Phase 1 plans in the last column. NFR-24 came later, with RFC-0002 (decision of 2026-10-13): blocks reach enforcement points as halts do, so it takes the targets of NFR-03, and P1-16 verifies it with the harness of P1-08 (ST-80).
 
 | ID | Requirement | Target | Pri | Set or verified by |
 | --- | --- | --- | --- | --- |
-| NFR-01 | **Fail-closed.** EPs deny every action when the lease has expired, the bundle is missing, invalid or unsigned, the agent state is unknown or the agent is halted. The core API denies on any authorization error. | 100% of fault-injection tests | M | P0-03, P1-08 |
-| NFR-02 | **Decision latency.** The core is never in the synchronous path of an agent action; policy evaluation at the EP adds bounded latency. | p99 ≤ 5 ms in-process; p99 ≤ 20 ms for a remote PDP in the same cluster. Measured in spikes S1 and S4, with 100 policies: in-process p99 ≤ 0.12 ms in Go (`cedar-go`), ≤ 1.02 ms in Python (`cedarpy`), ≤ 1.2 ms with OPA embedded; ≤ 0.53 ms through an AuthZEN decision point on the same host. The durable evidence write before each action is measured in P1-09 | M | P0-05 |
+| NFR-01 | **Fail-closed.** EPs deny every action when the lease has expired, the bundle is missing, invalid or unsigned, the agent state is unknown or the agent is halted, and every tool or model call that the bundle's catalog cannot resolve. The core API denies on any authorization error. | 100% of fault-injection tests | M | P0-03, P1-08 |
+| NFR-02 | **Decision latency.** The core is never in the synchronous path of an agent action; policy evaluation at the EP adds bounded latency. | p99 ≤ 5 ms in-process; p99 ≤ 20 ms for a remote PDP in the same cluster. Measured in spikes S1 and S4, with 100 policies: in-process p99 ≤ 0.12 ms in Go (`cedar-go`), ≤ 1.02 ms in Python (`cedarpy`), ≤ 1.2 ms with OPA embedded; ≤ 0.53 ms through an AuthZEN decision point on the same host. The durable evidence write before each action, and the catalog check and exposure before each tool or model call, are measured in P1-09 | M | P0-05 |
 | NFR-03 | **Halt propagation to connected EPs**, from halt issued to acknowledgement. | p95 ≤ 2 s; max ≤ 5 s at MVP scale. Measured in spike S2 with 1,000 EPs on two replicas: fleet halts p95 0.63 s, max 0.74 s; agent halts max 19 ms | M | P0-05, P1-08 |
 | NFR-04 | **Halt effect.** No new governed action can start once the EP has received the halt (within the NFR-03 time). Interrupting the action in flight is best effort and always reported; the process is terminated only in the `terminate` halt mode. | Gate closed within milliseconds of receipt (spike S1: under 0.02 ms). In-flight asynchronous work interrupted: p95 ≤ 10 s (S1: 1 to 3 ms); blocking work reported as not interrupted unless the halt mode is `terminate` | M | P0-05, P1-09 |
 | NFR-05 | **Lease backstop.** An EP without contact with the core halts within its lease TTL. | Default TTL 60 s; configurable 10 to 300 s, per risk tier (60, 60, 30 and 15 s for low, medium, high and critical). Measured in spike S2: expiry within 10 ms of the TTL | M | P0-05 |
@@ -305,6 +339,7 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 | NFR-21 | **Security of the project itself.** Published threat model, updated each phase; SECURITY.md with coordinated vulnerability disclosure; private vulnerability reporting enabled. | Published at the Phase 0 gate | M | P0-01, P0-04 |
 | NFR-22 | **Framework mapping.** Features mapped to the OWASP Top 10 for Agentic Applications 2026 (ASI01 to ASI10) and to the EU AI Act obligations on logging (Article 12), human oversight including the ability to halt the system (Article 14(4)(e)), and log retention and monitoring (Articles 19 and 26). | Mapping document | S | P0-04 |
 | NFR-23 | **Network quarantine.** Time from a halt issued to the agent's workloads isolated, on the reference CNI (Cilium), for workloads running when the halt is issued. | p95 ≤ 5 s; max ≤ 10 s | S | P1-15 |
+| NFR-24 | **Block propagation to connected EPs**, from block issued to acknowledgement, without a new bundle (CAT-04); and halt propagation while blocks are active. | As halts (NFR-03): p95 ≤ 2 s; max ≤ 5 s at MVP scale, with 500 active blocks. Halts with 500 active blocks still meet NFR-03. Set by RFC-0002, not measured yet | M | P1-16 (ST-80), with the harness of P1-08 |
 
 ## 7. Constraints
 
@@ -314,7 +349,7 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 | CON-02 | Self-hosted, with no mandatory cloud service and no outbound telemetry. | Principles |
 | CON-03 | Standards over custom formats: OpenTelemetry, OPA/Rego or Cedar, MCP, OIDC and SPIFFE. | Principles |
 | CON-04 | Deployable on containers and Kubernetes, suitable for environments without Internet access. | Non-functional requirements |
-| CON-05 | The core is limited to five functions (inventory, agent identity, policy model, audit and kill switch); everything else is a module. | Principles, risks |
+| CON-05 | The core is limited to five functions (inventory, agent identity, policy model, audit and kill switch); everything else is a module. The catalog of MCP servers, tools and models (section 5.11) belongs to the inventory and the policy model; the MCP network gateway of Phase 2 will be a module. | Principles, risks |
 | CON-06 | Backend in Go, frontend in TypeScript with React. | [ADR-0001](../adr/0001-backend-language-go.md), [ADR-0002](../adr/0002-frontend-typescript-react.md) |
 | CON-07 | PostgreSQL is the only stateful dependency of the MVP core. | [ADR-0003](../adr/0003-postgresql-only-stateful-dependency.md) |
 
@@ -327,19 +362,21 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 | ASM-03 | A pilot organization provides an OIDC IdP (or accepts the bundled Keycloak), a Kubernetes cluster or a Docker host, two to five real agents that can be instrumented with White Tower's enforcement point, named owners and committee members, and a SIEM or log collector. | The Phase 1 gate cannot be passed. Securing the pilot early is on the critical path. |
 | ASM-04 | Hosts are time-synchronized (NTP). | Audit timestamps and token validation become unreliable, and an enforcement point whose clock is more than 5 seconds off ignores lease renewals and fails closed (module contracts, section 5.3). |
 | ASM-05 | Kubernetes clusters that run governed agents use a CNI that enforces deny rules (Cilium, Calico, Antrea, or one implementing AdminNetworkPolicy), and agents' pods can be labeled with their White Tower agent ID. | Network quarantine (KIL-10) is not available in that cluster: halts there rely on the in-process gate and on token issuance, and the console shows the quarantine layer as unavailable. It is demonstrated on the reference cluster instead. |
+| ASM-06 | The pilot's frameworks let the enforcement point see the MCP servers, tools and models an agent is configured with, and change the tools a model request offers (RFC-0002, EP-13 and EP-17). | Calls to tooling the enforcement point cannot see are denied as unknown, and a model call that offers a tool the agent may not use, which the enforcement point cannot remove, is denied (EP-17). Such agents need more hooks (P1-09), or run with fewer tools. |
 
 ## 9. Out of scope for the MVP
 
 | Capability | Phase | What the MVP does to prepare |
 | --- | --- | --- |
-| LLM gateway, token quotas, cost, GPU and local inference | 2 | Capability defined in the contract taxonomy; decision input model covers model calls |
-| MCP and tool gateway | 2 | Decision input model covers tool calls; agent tokens carry an audience |
-| Skills repository with review and signing | 2 | Capability defined in the taxonomy; the audit log and signing keys are reusable |
+| LLM gateway, token quotas, cost, GPU and local inference | 2 | Capability defined in the contract taxonomy; decision input model covers model calls; the catalog already approves, blocks and enables models, self-hosted ones by the digest of their weights (CAT-02 to CAT-04) |
+| MCP network gateway | 2 | The MVP governs tooling in the enforcement point (section 5.11); the gateway will be another enforcement point on the same catalog, blocks and usage rules, for agents without one, and will discover the servers agents reach through it; agent tokens carry an audience |
+| Stateful usage rules (sequences of calls, counts per task, data flowing between tools) | 2 | Usage rules are stateless in the MVP (CAT-06); no context field is reserved for them, because adding one is additive (RFC-0002, unresolved question 4) |
+| Skills repository | Not planned | Skills teach a model how to use its tools, but nothing can enforce them: usage rules, checked on every call, take their place (CAT-06; decision of 2026-10-13, RFC-0002). The `skills-repository` capability and the `skill` resource type stay reserved |
 | Enforced per-agent harness (sandbox), including stopping workloads | 2 | Harness declared per agent during the lifecycle; halted agents on Kubernetes are already isolated at the network level (KIL-10) |
 | Per-task delegated credentials (token exchange) | 2 | Token endpoint designed to add the grant (AID-08) |
 | Second policy engine (module replacement demonstrated) | 2 | Contracts validated on paper against more than one engine (P0-03) |
 | Microsoft AGT interoperability adapter | 2 | Contracts mapped onto AGT (P0-03); AGT re-tested live in the pilot (P1-14, ADR-0011) |
-| Shadow AI discovery | 3 | Inventory accepts C0 agents and a `discovered` source flag is reserved |
+| Shadow AI discovery | 3 | Inventory accepts C0 agents and a `discovered` source flag is reserved; owners and operators can declare the tooling of agents without an enforcement point (CAT-08), which discovery could later import from endpoint security tools |
 | Compliance module and GRC export | 3 | Evidence bundles (AUD-10) and framework mapping (NFR-22) |
 | Public third-party module SDK | 3 | Internal Go SDK and conformance kit built in the MVP |
 | Multi-tenancy | Not planned | Single organization per deployment (decision in P0-02) |
@@ -350,7 +387,7 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 These must exist before feature code starts. They are the Phase 0 plans and the first steps of Phase 1.
 
 1. **Accepted decisions.** ADR-0001 to ADR-0010 accepted or amended by the maintainers. ADR-0011 is already accepted.
-2. **Phase 0 outputs.** Data model v0.1 (P0-02), module contracts v0.1 reviewed through an RFC (P0-03), threat model v0.1 (P0-04), and the NFR targets of section 6 confirmed by measurements (P0-05).
+2. **Phase 0 outputs.** Data model v0.1 (P0-02), module contracts v0.1 reviewed through RFC-0001, with RFC-0002 folded in before their tag (P0-03), threat model v0.1 (P0-04), and the NFR targets of section 6 confirmed by measurements (P0-05).
 3. **Project infrastructure.** Repository settings (branch protection, required reviews, private vulnerability reporting, secret scanning), CI, container registry, and the Go module path decision, which depends on whether the project will own a domain (P0-01).
 4. **People.** Maintainers, reviewers for contract RFCs and a security reviewer. A **pilot organization and its agents identified by the Phase 0 gate**, because the Phase 1 gate depends on them (ASM-03).
 5. **Environments.** Local development with Docker Compose, a disposable Kubernetes cluster in CI (kind or k3d), and the pilot environment.
@@ -364,6 +401,8 @@ These must exist before feature code starts. They are the Phase 0 plans and the 
 | At least one module is replaced by another vendor's module without changes to the core | MOD-03, MOD-05, MOD-08 | Designed in P0-03, demonstrated in Phase 2 |
 | Audit evidence is consumed from an external SIEM | AUD-03, AUD-04, AUD-06 | P1-02, P1-14 |
 
+MVP criterion 5 (section 1) comes from the decision of 2026-10-13 (RFC-0002), not from a success criterion of the charter: CAT-01 to CAT-07, CAT-10 and NFR-24 trace to it, and P1-16, P1-09 and P1-14 verify it.
+
 ## 12. Open questions
 
 | # | Question | Proposal | Decided in |
@@ -375,3 +414,6 @@ These must exist before feature code starts. They are the Phase 0 plans and the 
 | Q5 | Which policy languages does the MVP support? | **Cedar as the primary language:** its semantics ("forbid overrides permit", default deny) are exactly POL-03, it is a standard named in the charter, and the official Go implementation lets the core validate and simulate policies. Rego as the second language. **Spike S1 confirmed:** Cedar runs in-process in Python (`cedarpy`) with exactly these semantics; Rego does not (it needs the `opa` binary or a server). Cedar is primary; Rego stays for engines that run it natively. See [S1](../spikes/S1-agt.md). | P0-05, P0-03 |
 | Q6 | Go module path and domain? | **Decided (maintainer, 2026-09-30):** the module path stays `github.com/J466Y/WhiteTower`. A vanity path is reconsidered only if the project gets its own domain, for example when it moves to a foundation. | P0-01 |
 | Q7 | Who is the pilot organization, and which agents take part? | **Decided (maintainer, 2026-09-30):** the maintainer has the pilot environment ready: a virtual machine in a monitored network segment, or the data center. Which agents take part, and how sites, subnets and the identification of agents fit in, is settled in P1-14, once the console exists. | Maintainers, P1-14 |
+| Q8 | Who approves catalog entries: the advisory committee, or the steering committee, as for accepted providers (POL-10)? (RFC-0002, unresolved question 1) | **Proposed (RFC-0002):** the advisory committee, which already validates use cases. The permission matrix (5.2.1) encodes this answer. | Maintainer, P1-16 step 1 |
+| Q9 | Should a usage rule, which only restricts, take effect without approval, as blocks do? (RFC-0002, unresolved question 2) | **Proposed (RFC-0002):** no. Usage rules are policy text and follow the approval of their policy (CAT-06); an urgent restriction uses a disable or a block, which take effect at once. | Maintainer, P1-16 step 1 |
+| Q10 | Should an agent with non-production credentials use every approved entry without enabling each one, to make onboarding easier? (RFC-0002, unresolved question 3) | **Proposed (RFC-0002):** no. Every agent uses only the entries enabled for it, whatever its credentials (CAT-03); one request can enable several entries. | Maintainer, P1-16 step 1 |

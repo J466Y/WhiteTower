@@ -3,12 +3,12 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: everything but the RFC review is done (see [progress notes](#progress-notes)) |
+| **Status** | In progress: the review of RFC-0001 and, once RFC-0002 is accepted, step 12 remain (see [progress notes](#progress-notes)) |
 | **Size** | L |
-| **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts) |
-| **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate |
-| **Requirements** | MOD-01 to MOD-05, MOD-08, POL-03, POL-05, POL-06, KIL-03, KIL-04, KIL-07, KIL-10, AUD-02 |
-| **Decisions** | ADR-0004, ADR-0005, ADR-0006, ADR-0011 |
+| **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
+| **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
+| **Requirements** | MOD-01 to MOD-05, MOD-08, POL-03, POL-05, POL-06, KIL-03, KIL-04, KIL-07, KIL-10, AUD-02; through step 12, the contract side of CAT-01, CAT-04 to CAT-07 and CAT-10 |
+| **Decisions** | ADR-0004, ADR-0005, ADR-0006, ADR-0011, [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) |
 
 ## Goal
 
@@ -16,7 +16,7 @@ Versioned contracts that let any product be wrapped as a White Tower module: a m
 
 ## Scope
 
-**In:** capability taxonomy, manifest schema, module API (protobuf), governance state and lease semantics, decision profile and combination semantics, bundle format and signatures, event catalog, the design and skeleton of the conformance kit, the versioning policy, RFC-0001.
+**In:** capability taxonomy, manifest schema, module API (protobuf), governance state and lease semantics, decision profile and combination semantics, bundle format and signatures, event catalog, the design and skeleton of the conformance kit, the versioning policy, RFC-0001, and RFC-0002 folded into the contracts before the tag (step 12).
 
 **Out:** the core implementation of the module API (P1-07), the full conformance kit (P1-07), the Python enforcement point (P1-09), the network quarantine module (P1-15), detailed contracts of Phase 2 and 3 capabilities (only their identifiers are reserved).
 
@@ -28,7 +28,7 @@ Versioned contracts that let any product be wrapped as a White Tower module: a m
 - `api/events/`: the catalog and one JSON Schema per event type.
 - `test/conformance/vectors/`: language-neutral test vectors for combination semantics and fail-closed behavior.
 - The conformance kit design, and a skeleton able to run one scenario.
-- RFC-0001 accepted, and the tag `contracts/v0.1.0`.
+- RFC-0001 accepted, RFC-0002 folded in (step 12), and the tag `contracts/v0.1.0`.
 
 ## Steps
 
@@ -145,13 +145,29 @@ Rules for `v1alpha1`, `v1beta1` and `v1`: deprecation windows, the `buf breaking
 
 ### 11. RFC-0001, "Module contracts v0.1"
 
-Write the RFC and circulate it to the maintainers and at least one external reviewer, ideally someone who runs AGT or builds a gateway. Hold a review period of at least two weeks, resolve every comment, accept it and tag `contracts/v0.1.0`.
+Write the RFC and circulate it to the maintainers and at least one external reviewer, ideally someone who runs AGT or builds a gateway. Hold a review period of at least two weeks, resolve every comment, and accept it. The tag `contracts/v0.1.0` waits for step 12.
 
-**Done when:** RFC-0001 is accepted; this closes the main criterion of gate G0.
+**Done when:** RFC-0001 is accepted; with step 12 and the tag, this closes the main criterion of gate G0.
+
+### 12. RFC-0002 in the contracts (once RFC-0002 is accepted, before the tag)
+
+[RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) lands in `v1alpha1` before `contracts/v0.1.0` is tagged, so its changes that are not additive need no `v1alpha2` (specification, section 10). P1-06, P1-07, P1-09 and P1-16 build on it, so it comes first.
+
+- **Specification:** the text of RFC-0002 goes into new sections (4.10, 5.10, 6.9 to 6.11 and 7.7), so that no section other documents cite changes its number, together with the changes it makes to sections 2, 4.3, 4.4, 4.8, 5.1, 5.2, 5.4, 5.7, 5.9, 6.3, 6.4, 6.6, 6.7, 7.1, 7.4, 8.5 and 9 to 12, and to the appendices. It supersedes the `ToolArgs` extension point of section 6.7, and closes the question of section 12 on tool arguments.
+- **Protobuf:** `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions`, and the blocks record of the watch stream (`Block`, in snapshots and in changes). Schemas and annotations travel as JSON text, never as `google.protobuf.Struct`, whose numbers would change definition hashes. The kit's fake core gains the new methods in the same pull request, because it embeds no unimplemented handler; P1-07 gives them the behavior its scenarios need.
+- **Decision profile (`api/policy`):** the action `tool.expose`, the `catalog.*` reasons, the kind `builtin`, the properties and context fields, per-tool argument records, the Cedar schema of RFC-0002 section 7.6, the manifest's `catalog` field, and a JSON Schema of the catalog file (`whitetower.catalog.v1`).
+- **Manifest (`api/manifest`):** `tool.expose` among the actions an enforcement point must declare, with `tool.invoke` and `model.invoke`, and the examples updated.
+- **Events (`api/events`):** `tool.expose` and the `catalog.*` reasons in `common.schema.json`; the usage rules that decided, named by policy and rule, and the resource's origin in `decision.made`; the origin in `action.executed`, whose `decision_id` becomes optional for provider-run calls. Without them, ingestion refuses the enforcement point's new events. The new core event types of RFC-0002, section 9, are P1-16's.
+- **Vectors:** references and their string forms, redaction, definition hashes, the catalog check (blocks included), arguments and transforms, exposure, and bundles with a catalog file; the combination vectors that use a tool or a model gain a catalog and per-tool records. Both stacks pass them: the Go profile (`test/conformance/profile`) and the Python checker (`test/conformance/python/check_vectors.py`). The reference bundle verifier (`test/conformance/bundle`) learns the catalog file.
+
+The specification text is reserved for the reviewer ([AGENTS.md](../../../AGENTS.md)); the protobuf, the schemas and the vectors follow it.
+
+**Done when:** `task verify:gen` passes, both stacks pass every vector, the specification, `api/` and the vectors agree with RFC-0002 as accepted, and `contracts/v0.1.0` is tagged.
 
 ## Acceptance criteria
 
 - RFC-0001 accepted by the maintainers, with at least one external review.
+- RFC-0002, once accepted, is in the specification, `api/` and the vectors before the tag, and both stacks pass its vectors.
 - `buf lint` passes; manifest and event examples validate against their schemas in CI.
 - The test vectors cover every combination rule and every fail-closed condition.
 - Mapping tables for AGT and two other engines show no unresolved blocking gap.
@@ -206,3 +222,13 @@ The draft changed after the spikes and the [threat model](../../security/threat-
 ### 2026-09-30: approved by the maintainer
 
 The maintainer reviewed the specification and approved RFC-0001, and agreed to settle each open question of section 12 when the work that needs it starts. While the project has a single maintainer, acceptance also needs an external reviewer, after a review of at least two weeks from the day the RFC is announced ([GOVERNANCE.md](../../../GOVERNANCE.md)). Then the RFC is accepted and `contracts/v0.1.0` is tagged. Only P1-07 needs the accepted contracts; the other Phase 1 plans can start before.
+
+### 2026-10-19: RFC-0002 joins the contracts before the tag
+
+The maintainer brought the MCP servers, tools and models of agents into the MVP (decision of 2026-10-13), and [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) proposes the contract changes. Its follow-up added step 12: RFC-0002 lands in `v1alpha1` before the tag, and the tag waits for it. With it, P1-06, P1-09 and P1-16 also build on the contracts: their parts that need RFC-0002 wait for step 12.
+
+| Pull request | Content | Status |
+| --- | --- | --- |
+| 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Waits for RFC-0002's acceptance |
+| 2. Protobuf, schemas and examples | `api/proto`, `api/policy`, `api/manifest`, `api/events`, and the kit's fake core | Not started |
+| 3. Vectors on both stacks | The new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier | Not started |

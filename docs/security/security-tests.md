@@ -2,8 +2,8 @@
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1, with [threat model v0.1](threat-model.md) |
-| **Date** | 2026-09-30 |
+| **Status** | Version 0.1.1, with [threat model v0.1.1](threat-model.md) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 8 |
 
 Each test turns an abuse case of the threat model into a check that fails if the control it covers is missing. Each has one owner plan: its acceptance criteria require the test to pass, and it runs in CI from then on. Plan [P1-13](../plans/phase-1/P1-13-security-hardening-and-release.md) runs the whole catalog before the first release.
@@ -72,7 +72,7 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ID | Test | Covers | Kind |
 | --- | --- | --- | --- |
 | ST-31 | The author of a policy version can never approve it, through the API or directly in the database | T-04 | integration |
-| ST-32 | The core never builds a bundle containing a policy version that is not approved | T-29 | integration |
+| ST-32 | The core never builds a bundle containing a policy version that is not approved, nor a bundle without its catalog file | T-29, T-82 | integration |
 | ST-33 | Bundles verify only with the bundle key, never with the token or checkpoint key | T-29 | unit |
 
 ## P1-07: Module registry and API
@@ -80,10 +80,10 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ID | Test | Covers | Kind |
 | --- | --- | --- | --- |
 | ST-34 | Registration is refused for an unapproved module or a different manifest hash; revoking a module ends its streams and refuses its calls (MAN-1 to MAN-4) | T-28 | integration |
-| ST-35 | Every method refuses agents outside the caller's scope, on every call and not only at registration (CORE-2) | T-27 | integration |
+| ST-35 | Every method, `ReportTooling` and `ReportDefinitions` included, refuses agents outside the caller's scope, on every call and not only at registration (CORE-2); only instances of modules that declare the `enforcement-point` capability can call those two | T-27, T-74 | integration |
 | ST-36 | A `Watch` stream ends when its token expires (CORE-1), and a reader that falls behind is dropped (CORE-7) | T-37 | integration |
 | ST-37 | No replica ever sends state older than the client's version, including after a failover to another replica (CORE-5) | T-31 | integration |
-| ST-38 | Message size limits and per-instance stream limits are enforced (contracts section 4.8) | T-36, T-37 | integration |
+| ST-38 | Message size limits and per-instance stream limits are enforced (contracts section 4.8), and so are the limits of tooling reports, definitions and blocks (RFC-0002 sections 4 and 6) | T-36, T-37, T-74, T-80 | integration |
 | ST-39 | Every lease renewal carries the core's time | T-32, DC-2 | integration |
 
 ## P1-08: Kill switch
@@ -109,6 +109,10 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-51 | With DNS blocked, the enforcement point reconnects to the core's last resolved addresses | T-46, DC-7 | integration |
 | ST-52 | The enforcement point refuses to start with a private key file that other users can read | T-23 | unit |
 | ST-53 | The package is published with trusted publishing and attestations, and the installation guide pins exact versions and hashes | T-66 | review |
+| ST-76 | A server changes a tool's description: the tool is denied, and hidden from the model, until its new definition is approved | T-75 | e2e |
+| ST-77 | Canary secrets placed in MCP server URLs, in the command-line arguments that EP-14 redacts and in environment variables never reach the core, its logs or its events | T-76 | integration |
+| ST-79 | The argument vectors (path traversal, letter case, URL tricks, missing arguments, wrong types) give the decisions they expect | T-78 | unit |
+| ST-82 | A model request that offers a provider-run tool not enabled for the agent, and that cannot be narrowed, is denied | T-79 | unit |
 
 ## P1-10: Web console
 
@@ -117,6 +121,7 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-54 | The Content Security Policy forbids inline scripts, external sources and framing, and the other security headers are set | T-05 | integration |
 | ST-55 | Stored XSS payloads in every field an attacker can influence (agent metadata, policy text, manifests, event fields, tool names) render as inert text | T-05 | e2e |
 | ST-56 | No token or session secret is readable from JavaScript or kept in web storage | T-01 | e2e |
+| ST-78 | Names, descriptions and command lines that agents report render as inert text, marked as reported by the agent, even with markup and script, and their invisible and bidirectional characters are made visible | T-76 | e2e |
 
 ## P1-11: CLI
 
@@ -125,6 +130,7 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-57 | `wtctl audit verify` rejects a tampered export, and checkpoints with an unknown key or a bad signature | T-58, T-59 | integration |
 | ST-58 | `wtctl audit consistency` fails against a rolled-back log | T-52, DC-8 | integration |
 | ST-59 | Tokens the CLI stores are readable only by their user, and never printed | T-17 | unit |
+| ST-83 | Reported text that `wtctl` prints is escaped: no control, bidirectional or invisible character reaches the terminal | T-76 | unit |
 
 ## P1-12: Packaging and deployment
 
@@ -155,8 +161,16 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-72 | A deleted rule is re-created by reconciliation, and a lift without a release shows in the audit log | T-48 | e2e |
 | ST-73 | Restarting the controller, or cutting it off from the core, never lifts a quarantine (RC-2) | T-49 | e2e |
 
+## P1-16: MCP servers, tools and models
+
+| ID | Test | Covers | Kind |
+| --- | --- | --- | --- |
+| ST-75 | A tooling report never approves, enables or unblocks anything: new entries stay discovered, a changed definition or digest stays unapproved, and nothing becomes usable; beyond the bound on an agent's entries waiting for review, a report's new entries are left out and stay denied | T-74, DC-10 | integration |
+| ST-80 | With 500 active blocks, a block reaches every mock enforcement point within NFR-24, and halts of one agent and of the fleet still meet NFR-03, measured with the harness of P1-08 | T-80, DC-9 | integration |
+| ST-81 | Nobody approves their own request to enable tooling or to unblock, through the API or directly in the database | T-81 | integration |
+
 ## P1-14: Pilot and gate
 
 | ID | Test | Covers | Kind |
 | --- | --- | --- | --- |
-| ST-74 | An exercise of attack trees AT-1 and AT-6 against one pilot agent: every branch ends where the threat model says | AT-1, AT-6 | exercise |
+| ST-74 | An exercise of attack trees AT-1, AT-6 and AT-10 against one pilot agent: every branch ends where the threat model says | AT-1, AT-6, AT-10 | exercise |
