@@ -49,3 +49,11 @@ sql:
         <<: *go
         package: authndb
         out: internal/authn/authndb
+  - engine: postgresql
+    schema: *schema
+    queries: internal/inventory/queries
+    gen:
+      go:
+        <<: *go
+        package: inventorydb
+        out: internal/inventory/inventorydb

@@ -1,0 +1,26 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000020",
+  "source": "/core",
+  "type": "whitetower.agent.updated.v1",
+  "time": "2026-10-19T09:30:12.204Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "datacontenttype": "application/json",
+  "data": {
+    "changed": [
+      "description",
+      "risk_tier"
+    ],
+    "before": {
+      "risk_tier": "medium"
+    },
+    "after": {
+      "risk_tier": "high"
+    },
+    "actor": {
+      "type": "human",
+      "id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1"
+    },
+    "state_version": 815
+  }
+}

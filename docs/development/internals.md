@@ -81,12 +81,15 @@ The test harness (plan P1-01, step 10):
 | `test/e2e` | The smoke test of a running deployment; CI runs it against the Compose stack |
 | `test/tamper` | The tamper suite of the audit log: a database administrator changes the sealed log, and `pkg/auditverify` finds it (ST-06 to ST-08) |
 
-A domain package's integration test takes a few lines. Once plan P1-04 adds the agents, for example:
+A domain package's integration test takes a few lines, for example for the agents of plan P1-04:
 
 ```go
 func TestProposeAnAgent(t *testing.T) {
 	pool := dbtest.New(t).Open(t)
-	api := resttest.New(t, rest.Options{Inventory: inventory.New(pool)})
+	inv := inventory.New(inventory.Options{
+		DB: pool, Clock: clk, Writer: writer, Authorizer: authz.NewAuthorizer(), Versions: inventory.SequenceVersions{},
+	})
+	api := resttest.New(t, rest.Options{Inventory: inv})
 	resp, err := api.Client.ProposeAgentWithResponse(context.Background(), agent, resttest.As(owner))
 	if err != nil || resp.StatusCode() != http.StatusCreated {
 		t.Fatalf("%v %s", err, resp.Body)

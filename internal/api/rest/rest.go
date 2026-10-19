@@ -20,6 +20,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/authz"
+	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
@@ -56,6 +57,8 @@ type Options struct {
 	Exchanger TokenExchanger
 	// AuditLog provides queries and verification for the audit log.
 	AuditLog *audit.Log
+	// Inventory keeps the agents and their use cases (plan P1-04).
+	Inventory *inventory.Inventory
 }
 
 // TokenExchanger validates and exchanges an OpenID Connect ID token for an API token.
@@ -69,15 +72,17 @@ type Server struct {
 	principals *authn.PrincipalStore
 	exchanger  TokenExchanger
 	auditLog   *audit.Log
+	inventory  *inventory.Inventory
 }
 
 // NewServer creates a new Server instance.
-func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, exchanger TokenExchanger, auditLog *audit.Log) Server {
+func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, exchanger TokenExchanger, auditLog *audit.Log, inv *inventory.Inventory) Server {
 	return Server{
 		tokens:     tokens,
 		principals: principals,
 		exchanger:  exchanger,
 		auditLog:   auditLog,
+		inventory:  inv,
 	}
 }
 
@@ -408,7 +413,7 @@ func (s Server) ExchangeToken(ctx context.Context, request gen.ExchangeTokenRequ
 func Handler(opts Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET "+BasePath+"/openapi.json", documentHandler())
-	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals, opts.Exchanger, opts.AuditLog), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
+	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals, opts.Exchanger, opts.AuditLog, opts.Inventory), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
 		gen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  requestError,
 			ResponseErrorHandlerFunc: responseError(opts.Logger),

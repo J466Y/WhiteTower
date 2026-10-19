@@ -25,6 +25,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/authz"
+	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
@@ -262,10 +263,11 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	httpMetrics := metrics.NewHTTP(registry)
 	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
 	auditLog := audit.NewLog(database).WithWriter(writer)
+	authorizer := authz.NewAuthorizer()
 	api := rest.Handler(rest.Options{
 		Logger:        logger,
 		Authenticator: authenticator,
-		Authorizer:    authz.NewAuthorizer(),
+		Authorizer:    authorizer,
 		CSRF:          sessionStore,
 		Limiter:       ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
 		RateLimited:   httpMetrics.RateLimited("console").Inc,
@@ -273,6 +275,14 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Principals:    principalStore,
 		Exchanger:     oidcSvc,
 		AuditLog:      auditLog,
+		Inventory: inventory.New(inventory.Options{
+			DB:         database,
+			Clock:      clock.System,
+			Writer:     writer,
+			Authorizer: authorizer,
+			// P1-07 replaces it with the governance state's own versions.
+			Versions: inventory.SequenceVersions{},
+		}),
 	})
 	drain := server.NewDrain()
 	ready := health.NewReadiness(logger)

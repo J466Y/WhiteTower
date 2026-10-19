@@ -20,6 +20,13 @@
     "outcome": "",
     "reason": ""
   },
+  "whitetower.agent.updated.v1": {
+    "action": "agent.updated",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+    "actor_type": "human",
+    "outcome": "",
+    "reason": ""
+  },
   "whitetower.audit.checkpoint.v1": {
     "action": "audit.checkpoint",
     "actor_id": "",
@@ -159,5 +166,19 @@
     "actor_type": "human",
     "outcome": "success",
     "reason": "Token rotated for automation script"
+  },
+  "whitetower.use_case.created.v1": {
+    "action": "use_case.created",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+    "actor_type": "human",
+    "outcome": "",
+    "reason": ""
+  },
+  "whitetower.use_case.updated.v1": {
+    "action": "use_case.updated",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+    "actor_type": "human",
+    "outcome": "",
+    "reason": ""
   }
 }

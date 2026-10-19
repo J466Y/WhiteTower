@@ -116,6 +116,36 @@
       "example": "examples/whitetower.agent.lifecycle_changed.v1.json"
     },
     {
+      "type": "whitetower.agent.updated.v1",
+      "summary": "An agent's metadata changed (INV-01).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.agent.updated.v1.json",
+      "example": "examples/whitetower.agent.updated.v1.json"
+    },
+    {
+      "type": "whitetower.use_case.created.v1",
+      "summary": "A use case was created (INV-03).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "none",
+      "schema": "schemas/whitetower.use_case.created.v1.json",
+      "example": "examples/whitetower.use_case.created.v1.json"
+    },
+    {
+      "type": "whitetower.use_case.updated.v1",
+      "summary": "A use case changed before a decision made it final (INV-03).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "none",
+      "schema": "schemas/whitetower.use_case.updated.v1.json",
+      "example": "examples/whitetower.use_case.updated.v1.json"
+    },
+    {
       "type": "whitetower.policy.version_approved.v1",
       "summary": "A committee approved a policy version. The subject is the agent for agent-specific policies.",
       "emitters": [

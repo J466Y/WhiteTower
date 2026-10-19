@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Use case created",
+  "description": "A use case was created as a draft (INV-03; plan P1-04, step 4). Its texts, which people write, stay in the inventory.",
+  "type": "object",
+  "required": [
+    "use_case_id",
+    "ai_act_classification",
+    "data_categories",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "use_case_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "ai_act_classification": {
+      "enum": [
+        "prohibited",
+        "high_risk",
+        "limited",
+        "minimal",
+        "not_assessed"
+      ]
+    },
+    "data_categories": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    }
+  }
+}
