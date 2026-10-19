@@ -20,6 +20,13 @@
     "outcome": "",
     "reason": ""
   },
+  "whitetower.agent.ownership_changed.v1": {
+    "action": "owner_reassigned",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a3",
+    "actor_type": "human",
+    "outcome": "",
+    "reason": ""
+  },
   "whitetower.agent.updated.v1": {
     "action": "agent.updated",
     "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",

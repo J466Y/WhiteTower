@@ -41,6 +41,29 @@ type WhitetowerAgent struct {
 	Version             int64
 }
 
+type WhitetowerAgentOwner struct {
+	ID          uuid.UUID
+	AgentID     uuid.UUID
+	PrincipalID uuid.UUID
+	Role        string
+	AssignedBy  uuid.UUID
+	AssignedAt  time.Time
+	EndedBy     *uuid.UUID
+	EndedAt     *time.Time
+	EndReason   *string
+}
+
+type WhitetowerOwnershipTransfer struct {
+	ID              uuid.UUID
+	AgentID         uuid.UUID
+	FromPrincipalID uuid.UUID
+	ToPrincipalID   uuid.UUID
+	RequestedBy     uuid.UUID
+	RequestedAt     time.Time
+	Status          string
+	DecidedAt       *time.Time
+}
+
 type WhitetowerUseCase struct {
 	ID                    uuid.UUID
 	Title                 string

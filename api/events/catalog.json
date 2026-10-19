@@ -126,6 +126,16 @@
       "example": "examples/whitetower.agent.updated.v1.json"
     },
     {
+      "type": "whitetower.agent.ownership_changed.v1",
+      "summary": "An agent's owners or one of its ownership transfers changed (INV-02).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.agent.ownership_changed.v1.json",
+      "example": "examples/whitetower.agent.ownership_changed.v1.json"
+    },
+    {
       "type": "whitetower.use_case.created.v1",
       "summary": "A use case was created (INV-03).",
       "emitters": [

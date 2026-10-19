@@ -442,7 +442,8 @@ export interface paths {
         /**
          * List an agent's owners and their history
          * @description Lists the agent's primary owner and delegates (INV-02): the current
-         *     assignments first, then those that ended, newest first.
+         *     assignments first, then those that ended, each the latest assigned
+         *     first.
          */
         get: operations["listAgentOwners"];
         put?: never;
@@ -1386,8 +1387,9 @@ export interface components {
             endedAt?: string;
             /**
              * @description Why the assignment ended: the reason of a reassignment or of a
-             *     delegate's removal, or `ownership transferred` when the new owner
-             *     accepted a transfer.
+             *     delegate's removal; `ownership transferred` when the new owner
+             *     accepted a transfer; or `became the primary owner` for a delegate
+             *     who did.
              */
             endReason?: string;
         };

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent ownership changed",
+  "description": "The agent's primary owner or delegates changed, or one of its ownership transfers did (INV-02; plan P1-04, step 3). A change of the primary owner carries its governance state version, since policies see the owner. The reasons that people write stay in the inventory.",
+  "type": "object",
+  "required": [
+    "change",
+    "principal_id",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "change": {
+      "enum": [
+        "owner_reassigned",
+        "delegate_added",
+        "delegate_removed",
+        "transfer_requested",
+        "transfer_cancelled",
+        "transfer_accepted",
+        "transfer_declined"
+      ]
+    },
+    "principal_id": {
+      "description": "The principal the change is about: the new primary owner, the delegate, or the recipient of the transfer.",
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "former_owner": {
+      "description": "The former primary owner, when the primary owner changed.",
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "transfer_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "state_version": {
+      "$ref": "common.schema.json#/$defs/stateVersion"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "change": {
+            "enum": [
+              "owner_reassigned",
+              "transfer_accepted"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "former_owner",
+          "state_version"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "change": {
+            "enum": [
+              "transfer_requested",
+              "transfer_cancelled",
+              "transfer_accepted",
+              "transfer_declined"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "transfer_id"
+        ]
+      }
+    }
+  ]
+}

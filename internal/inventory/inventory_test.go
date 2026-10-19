@@ -49,6 +49,9 @@ func setup(t *testing.T) *fixture {
 			Writer:     audit.NewWriter(catalog, clk),
 			Authorizer: authz.NewAuthorizer(),
 			Versions:   inventory.SequenceVersions{},
+			RoleMapping: map[string]string{
+				"wt-owner": "owner", "wt-advisory": "advisory", "wt-operator": "operator", "wt-user": "user",
+			},
 		}),
 	}
 	f.olivia = f.person(t, "Olivia Owner", "owner")
@@ -59,14 +62,14 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// person stores a human principal, and returns it as an API caller with the
-// role given.
+// person stores a human principal in the IdP group of the role given, and
+// returns it as an API caller with that role.
 func (f *fixture) person(t *testing.T, name, role string) auth.Principal {
 	t.Helper()
 	id := uuid.Must(uuid.NewV7())
 	if _, err := f.pool.Exec(context.Background(),
-		`INSERT INTO whitetower.principals (id, kind, issuer, subject, display_name)
-		 VALUES ($1, 'human', 'https://idp.example.com', $2, $3)`, id, id.String(), name); err != nil {
+		`INSERT INTO whitetower.principals (id, kind, issuer, subject, display_name, idp_groups)
+		 VALUES ($1, 'human', 'https://idp.example.com', $2, $3, $4)`, id, id.String(), name, []string{"wt-" + role}); err != nil {
 		t.Fatal(err)
 	}
 	return auth.Principal{ID: id.String(), Kind: auth.Human, Name: name, Roles: []string{role}}

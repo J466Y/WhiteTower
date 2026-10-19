@@ -281,7 +281,8 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			Writer:     writer,
 			Authorizer: authorizer,
 			// P1-07 replaces it with the governance state's own versions.
-			Versions: inventory.SequenceVersions{},
+			Versions:    inventory.SequenceVersions{},
+			RoleMapping: cfg.Auth.OIDC.RoleMapping,
 		}),
 	})
 	drain := server.NewDrain()

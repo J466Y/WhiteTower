@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (2 of 8 pull requests) |
+| **Status** | In progress (3 of 8 pull requests) |
 | **Size** | L |
 | **Depends on** | P1-03 (and the P1-02 writer) |
 | **Unblocks** | P1-05, P1-06, P1-08, P1-10.2, P1-16 (steps 1 to 4) |
@@ -164,7 +164,7 @@ The plan lands in eight pull requests. The first agrees on the whole API before 
 | --- | --- | --- |
 | 1. API | 1; the permission `agent.ownership.reassign` | Done |
 | 2. Use cases and agents | 2, 4; the data categories; the ownership check that P1-16 reuses; each new agent's governance state, through P1-07's interface, stubbed | Done |
-| 3. Ownership | 3 | Not started |
+| 3. Ownership | 3; the inbox items of transfers | Done |
 | 4. Lifecycle engine | 5, through P1-06's interface, stubbed; the property tests; ST-23; a token without the action's scope is refused (ST-19); `service_account` in `lifecycle_transitions.actor_type` | Not started |
 | 5. Reviews and the lifecycle guard job | 6, 7, through P1-16's interface, stubbed | Not started |
 | 6. Coverage, instances, search and export | 8, 9; ST-24, with cells that start after a `;` or with a tab or a carriage return | Not started |
@@ -233,3 +233,20 @@ The plan lands in eight pull requests. The first agrees on the whole API before 
 - Follow-ups:
   - P1-08 folds the active selector halts into a new agent's governance state, where `Propose` says so.
   - The agents of the evaluation seed have no governance state until their first edit, which writes it.
+
+### 2026-10-19: ownership (PR 3)
+
+- **Owners** (`listAgentOwners`): the agent's assignments, the current ones first, then those that ended, each the latest assigned first, with who made and who ended each one, and why. Whoever sees the agent sees its owners.
+- **Reassignments** (`reassignAgentOwner`) by the advisory committee and operators (`agent.ownership.reassign`), for a reason, with If-Match. The former primary owner's assignment ends with that reason, the new owner's assignment as a delegate ends if they had one (`became the primary owner`), and a pending transfer is cancelled. The agent takes a new governance state version, since policies see the owner.
+- **Delegates** (`addAgentDelegate`, `removeAgentDelegate`): the agent's owners, delegates included, and operators manage them; a removal needs a reason.
+- **Transfers.** Only the primary owner offers one, to someone else (`requestOwnershipTransfer`). It waits in its recipient's inbox, as an item of kind `ownership_transfer` that pull request 7 lists, and the agent shows it (`pendingOwnershipTransfer`). An agent has one pending transfer at most (`conflict`). Its requester or an operator cancels it, and its recipient accepts or declines it; once closed, it answers `conflict`, and it leaves the inbox. Accepting needs the owner role: the former owner's assignment ends (`ownership transferred`), and the agent takes a new governance state version. A transfer whose giver no longer owns the agent is refused (`conflict`), should a later change of the primary owner forget to cancel it.
+- **Who may own.** A new owner, a delegate and the recipient of a transfer must be an active person who holds the owner role, from IdP groups through the role mapping or from local role bindings, as authentication resolves them (`inventory.Options.RoleMapping`); anyone else is `bad_request`. The owners of a retired or rejected agent no longer change.
+- **One change at a time.** Transactions run at read committed, so two reassignments at the same version both passed their checks, and the second failed on the unique index of primary owners: an internal error instead of `precondition_failed`. Every change of an agent's owners or transfers now locks the agent's row first. `TestReassignmentsUnderWayTogetherHappenOneAfterTheOther` holds the row of the governance state until both reassignments wait, and fails without the lock.
+- **Exactly one primary owner.** The database enforces at most one (`agent_owners_one_primary`), and the inventory at least one, by ending the former owner's assignment and adding the new one in the same transaction, as the data model's table of invariants says. Step 3 said that the database enforces both: it would take a deferred constraint trigger, which the data model did not choose.
+- **The agent's ETag** changes with its owners and its transfers, so that an edit made on what the caller read before is refused.
+- One event type of the core: `whitetower.agent.ownership_changed.v1`, with the agent as subject and the change as the action of its facts: `owner_reassigned`, `delegate_added`, `delegate_removed`, `transfer_requested`, `transfer_cancelled`, `transfer_accepted` or `transfer_declined`. A change of the primary owner carries the former owner and the governance state version; the reasons that people write stay in the inventory.
+- Tests: reassignments by the advisory committee and operators, refused to owners, at a stale version, to the same owner and without a reason; targets that are users, inactive, service accounts or no principal at all; delegates added twice, removed without a reason or when they are not one, and acting for the owner; every path of a transfer: declined, cancelled by its requester and by an operator, refused to an inactive recipient, accepted by its recipient, offered by anyone but the primary owner or to oneself, accepted after a reassignment or after its giver lost the agent; delegates who become the primary owner; the history's order and pages; retired agents; concurrent reassignments; and the same operations through the API, with each refusal's problem.
+- Follow-ups:
+  - A pending transfer has no deadline: `ownership_transfers.status` allows `expired`, which nothing sets. A transfer whose recipient becomes inactive, or loses the owner role, waits until its requester or an operator cancels it. The lifecycle guard job (pull request 5) could expire both.
+  - Retiring or rejecting an agent (pull request 4) should cancel its pending transfer, which can no longer be accepted.
+  - Reassigning an agent to oneself is allowed, so that an operator or an advisory member who also holds the owner role can take over an agent whose owner left. The separation of duties of pull request 4 should therefore look at who owned the agent when it was submitted, not only at its current owners (open question of pull request 1).

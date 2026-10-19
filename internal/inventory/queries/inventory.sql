@@ -165,3 +165,82 @@ INSERT INTO whitetower.lifecycle_transitions (
   sqlc.arg(actor_type), sqlc.narg(actor_id), sqlc.narg(reason), sqlc.narg(comment),
   sqlc.arg(state_version), sqlc.arg(occurred_at)
 );
+
+-- name: LockAgent :one
+-- Locks the agent's row until the transaction ends, so that the changes of
+-- its owners and of its transfers happen one after the other.
+SELECT id FROM whitetower.agents WHERE id = $1 FOR UPDATE;
+
+-- name: TouchAgent :execrows
+-- Gives the agent a new version, for a change of its owners or of an
+-- ownership transfer, at the version the caller read when it names one.
+UPDATE whitetower.agents SET updated_at = sqlc.arg(updated_at), version = version + 1
+WHERE id = sqlc.arg(id) AND (sqlc.narg(version)::bigint IS NULL OR version = sqlc.narg(version)::bigint);
+
+-- name: PrincipalForOwnership :one
+-- What decides whether a principal may own an agent: its kind, its status,
+-- its IdP groups and its local role bindings.
+SELECT p.kind, p.status, p.idp_groups,
+  ARRAY(SELECT b.role FROM whitetower.role_bindings b
+        WHERE b.principal_id = p.id AND b.revoked_at IS NULL)::text[] AS bound_roles
+FROM whitetower.principals p WHERE p.id = $1;
+
+-- name: CurrentAssignment :one
+-- The principal's current assignment as the agent's primary owner or delegate.
+SELECT * FROM whitetower.agent_owners
+WHERE agent_id = sqlc.arg(agent_id) AND principal_id = sqlc.arg(principal_id) AND ended_at IS NULL;
+
+-- name: PrimaryAssignment :one
+SELECT * FROM whitetower.agent_owners
+WHERE agent_id = $1 AND role = 'primary' AND ended_at IS NULL;
+
+-- name: EndAssignment :exec
+UPDATE whitetower.agent_owners
+SET ended_by = sqlc.arg(ended_by), ended_at = sqlc.arg(ended_at), end_reason = sqlc.arg(end_reason)
+WHERE id = sqlc.arg(id) AND ended_at IS NULL;
+
+-- name: ListAssignments :many
+-- A page of the agent's owner assignments: the current ones first, then
+-- those that ended, each the latest assigned first.
+SELECT o.*, p.display_name, p.status
+FROM whitetower.agent_owners o
+JOIN whitetower.principals p ON p.id = o.principal_id
+WHERE o.agent_id = sqlc.arg(agent_id)
+  AND (sqlc.narg(after_id)::uuid IS NULL
+       OR (o.ended_at IS NOT NULL) > sqlc.arg(after_ended)::boolean
+       OR ((o.ended_at IS NOT NULL) = sqlc.arg(after_ended)::boolean AND o.id < sqlc.narg(after_id)::uuid))
+ORDER BY (o.ended_at IS NOT NULL), o.id DESC
+LIMIT sqlc.arg(page_limit);
+
+-- name: CreateTransfer :exec
+INSERT INTO whitetower.ownership_transfers (id, agent_id, from_principal_id, to_principal_id, requested_by, requested_at)
+VALUES (sqlc.arg(id), sqlc.arg(agent_id), sqlc.arg(from_principal_id), sqlc.arg(to_principal_id),
+  sqlc.arg(requested_by), sqlc.arg(requested_at));
+
+-- name: GetTransfer :one
+SELECT * FROM whitetower.ownership_transfers WHERE id = $1 AND agent_id = $2;
+
+-- name: PendingTransfers :many
+-- The pending ownership transfers of the agents.
+SELECT * FROM whitetower.ownership_transfers
+WHERE agent_id = ANY(sqlc.arg(agent_ids)::uuid[]) AND status = 'pending';
+
+-- name: DecideTransfer :execrows
+-- Closes a pending transfer.
+UPDATE whitetower.ownership_transfers SET status = sqlc.arg(status), decided_at = sqlc.arg(decided_at)
+WHERE id = sqlc.arg(id) AND status = 'pending';
+
+-- name: CancelPendingTransfers :many
+-- Cancels the agent's pending transfer, if it has one, and returns its ID.
+UPDATE whitetower.ownership_transfers SET status = 'cancelled', decided_at = sqlc.arg(decided_at)
+WHERE agent_id = sqlc.arg(agent_id) AND status = 'pending'
+RETURNING id;
+
+-- name: AddInboxItem :exec
+INSERT INTO whitetower.inbox_items (id, principal_id, kind, subject_type, subject_id, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(principal_id), sqlc.arg(kind), sqlc.arg(subject_type), sqlc.arg(subject_id), sqlc.arg(created_at));
+
+-- name: ResolveInboxItems :exec
+-- Takes the items about a subject out of every inbox.
+UPDATE whitetower.inbox_items SET resolved_at = sqlc.arg(resolved_at)
+WHERE subject_type = sqlc.arg(subject_type) AND subject_id = sqlc.arg(subject_id) AND resolved_at IS NULL;
