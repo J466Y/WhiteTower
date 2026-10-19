@@ -1089,8 +1089,9 @@ type OwnerAssignment struct {
 	AssignedBy PrincipalRef `json:"assignedBy"`
 
 	// EndReason Why the assignment ended: the reason of a reassignment or of a
-	// delegate's removal, or `ownership transferred` when the new owner
-	// accepted a transfer.
+	// delegate's removal; `ownership transferred` when the new owner
+	// accepted a transfer; or `became the primary owner` for a delegate
+	// who did.
 	EndReason *string    `json:"endReason,omitempty"`
 	EndedAt   *time.Time `json:"endedAt,omitempty"`
 

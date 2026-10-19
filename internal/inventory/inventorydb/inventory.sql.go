@@ -12,6 +12,32 @@ import (
 	"github.com/google/uuid"
 )
 
+const addInboxItem = `-- name: AddInboxItem :exec
+INSERT INTO whitetower.inbox_items (id, principal_id, kind, subject_type, subject_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type AddInboxItemParams struct {
+	ID          uuid.UUID
+	PrincipalID *uuid.UUID
+	Kind        string
+	SubjectType string
+	SubjectID   uuid.UUID
+	CreatedAt   time.Time
+}
+
+func (q *Queries) AddInboxItem(ctx context.Context, arg AddInboxItemParams) error {
+	_, err := q.db.Exec(ctx, addInboxItem,
+		arg.ID,
+		arg.PrincipalID,
+		arg.Kind,
+		arg.SubjectType,
+		arg.SubjectID,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const addOwner = `-- name: AddOwner :exec
 INSERT INTO whitetower.agent_owners (id, agent_id, principal_id, role, assigned_by, assigned_at)
 VALUES ($1, $2, $3, $4,
@@ -37,6 +63,38 @@ func (q *Queries) AddOwner(ctx context.Context, arg AddOwnerParams) error {
 		arg.AssignedAt,
 	)
 	return err
+}
+
+const cancelPendingTransfers = `-- name: CancelPendingTransfers :many
+UPDATE whitetower.ownership_transfers SET status = 'cancelled', decided_at = $1
+WHERE agent_id = $2 AND status = 'pending'
+RETURNING id
+`
+
+type CancelPendingTransfersParams struct {
+	DecidedAt *time.Time
+	AgentID   uuid.UUID
+}
+
+// Cancels the agent's pending transfer, if it has one, and returns its ID.
+func (q *Queries) CancelPendingTransfers(ctx context.Context, arg CancelPendingTransfersParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, cancelPendingTransfers, arg.DecidedAt, arg.AgentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const createAgent = `-- name: CreateAgent :exec
@@ -100,6 +158,33 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) error 
 	return err
 }
 
+const createTransfer = `-- name: CreateTransfer :exec
+INSERT INTO whitetower.ownership_transfers (id, agent_id, from_principal_id, to_principal_id, requested_by, requested_at)
+VALUES ($1, $2, $3, $4,
+  $5, $6)
+`
+
+type CreateTransferParams struct {
+	ID              uuid.UUID
+	AgentID         uuid.UUID
+	FromPrincipalID uuid.UUID
+	ToPrincipalID   uuid.UUID
+	RequestedBy     uuid.UUID
+	RequestedAt     time.Time
+}
+
+func (q *Queries) CreateTransfer(ctx context.Context, arg CreateTransferParams) error {
+	_, err := q.db.Exec(ctx, createTransfer,
+		arg.ID,
+		arg.AgentID,
+		arg.FromPrincipalID,
+		arg.ToPrincipalID,
+		arg.RequestedBy,
+		arg.RequestedAt,
+	)
+	return err
+}
+
 const createUseCase = `-- name: CreateUseCase :exec
 INSERT INTO whitetower.use_cases (
   id, title, description, business_justification, data_categories, affected_persons,
@@ -138,6 +223,34 @@ func (q *Queries) CreateUseCase(ctx context.Context, arg CreateUseCaseParams) er
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const currentAssignment = `-- name: CurrentAssignment :one
+SELECT id, agent_id, principal_id, role, assigned_by, assigned_at, ended_by, ended_at, end_reason FROM whitetower.agent_owners
+WHERE agent_id = $1 AND principal_id = $2 AND ended_at IS NULL
+`
+
+type CurrentAssignmentParams struct {
+	AgentID     uuid.UUID
+	PrincipalID uuid.UUID
+}
+
+// The principal's current assignment as the agent's primary owner or delegate.
+func (q *Queries) CurrentAssignment(ctx context.Context, arg CurrentAssignmentParams) (WhitetowerAgentOwner, error) {
+	row := q.db.QueryRow(ctx, currentAssignment, arg.AgentID, arg.PrincipalID)
+	var i WhitetowerAgentOwner
+	err := row.Scan(
+		&i.ID,
+		&i.AgentID,
+		&i.PrincipalID,
+		&i.Role,
+		&i.AssignedBy,
+		&i.AssignedAt,
+		&i.EndedBy,
+		&i.EndedAt,
+		&i.EndReason,
+	)
+	return i, err
 }
 
 const currentOwners = `-- name: CurrentOwners :many
@@ -181,6 +294,49 @@ func (q *Queries) CurrentOwners(ctx context.Context, agentIds []uuid.UUID) ([]Cu
 		return nil, err
 	}
 	return items, nil
+}
+
+const decideTransfer = `-- name: DecideTransfer :execrows
+UPDATE whitetower.ownership_transfers SET status = $1, decided_at = $2
+WHERE id = $3 AND status = 'pending'
+`
+
+type DecideTransferParams struct {
+	Status    string
+	DecidedAt *time.Time
+	ID        uuid.UUID
+}
+
+// Closes a pending transfer.
+func (q *Queries) DecideTransfer(ctx context.Context, arg DecideTransferParams) (int64, error) {
+	result, err := q.db.Exec(ctx, decideTransfer, arg.Status, arg.DecidedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const endAssignment = `-- name: EndAssignment :exec
+UPDATE whitetower.agent_owners
+SET ended_by = $1, ended_at = $2, end_reason = $3
+WHERE id = $4 AND ended_at IS NULL
+`
+
+type EndAssignmentParams struct {
+	EndedBy   *uuid.UUID
+	EndedAt   *time.Time
+	EndReason *string
+	ID        uuid.UUID
+}
+
+func (q *Queries) EndAssignment(ctx context.Context, arg EndAssignmentParams) error {
+	_, err := q.db.Exec(ctx, endAssignment,
+		arg.EndedBy,
+		arg.EndedAt,
+		arg.EndReason,
+		arg.ID,
+	)
+	return err
 }
 
 const fleetHalted = `-- name: FleetHalted :one
@@ -244,6 +400,31 @@ func (q *Queries) GetSetting(ctx context.Context, key string) ([]byte, error) {
 	var value []byte
 	err := row.Scan(&value)
 	return value, err
+}
+
+const getTransfer = `-- name: GetTransfer :one
+SELECT id, agent_id, from_principal_id, to_principal_id, requested_by, requested_at, status, decided_at FROM whitetower.ownership_transfers WHERE id = $1 AND agent_id = $2
+`
+
+type GetTransferParams struct {
+	ID      uuid.UUID
+	AgentID uuid.UUID
+}
+
+func (q *Queries) GetTransfer(ctx context.Context, arg GetTransferParams) (WhitetowerOwnershipTransfer, error) {
+	row := q.db.QueryRow(ctx, getTransfer, arg.ID, arg.AgentID)
+	var i WhitetowerOwnershipTransfer
+	err := row.Scan(
+		&i.ID,
+		&i.AgentID,
+		&i.FromPrincipalID,
+		&i.ToPrincipalID,
+		&i.RequestedBy,
+		&i.RequestedAt,
+		&i.Status,
+		&i.DecidedAt,
+	)
+	return i, err
 }
 
 const getUseCase = `-- name: GetUseCase :one
@@ -381,6 +562,78 @@ func (q *Queries) ListAgents(ctx context.Context, arg ListAgentsParams) ([]White
 	return items, nil
 }
 
+const listAssignments = `-- name: ListAssignments :many
+SELECT o.id, o.agent_id, o.principal_id, o.role, o.assigned_by, o.assigned_at, o.ended_by, o.ended_at, o.end_reason, p.display_name, p.status
+FROM whitetower.agent_owners o
+JOIN whitetower.principals p ON p.id = o.principal_id
+WHERE o.agent_id = $1
+  AND ($2::uuid IS NULL
+       OR (o.ended_at IS NOT NULL) > $3::boolean
+       OR ((o.ended_at IS NOT NULL) = $3::boolean AND o.id < $2::uuid))
+ORDER BY (o.ended_at IS NOT NULL), o.id DESC
+LIMIT $4
+`
+
+type ListAssignmentsParams struct {
+	AgentID    uuid.UUID
+	AfterID    *uuid.UUID
+	AfterEnded bool
+	PageLimit  int32
+}
+
+type ListAssignmentsRow struct {
+	ID          uuid.UUID
+	AgentID     uuid.UUID
+	PrincipalID uuid.UUID
+	Role        string
+	AssignedBy  uuid.UUID
+	AssignedAt  time.Time
+	EndedBy     *uuid.UUID
+	EndedAt     *time.Time
+	EndReason   *string
+	DisplayName string
+	Status      string
+}
+
+// A page of the agent's owner assignments: the current ones first, then
+// those that ended, each the latest assigned first.
+func (q *Queries) ListAssignments(ctx context.Context, arg ListAssignmentsParams) ([]ListAssignmentsRow, error) {
+	rows, err := q.db.Query(ctx, listAssignments,
+		arg.AgentID,
+		arg.AfterID,
+		arg.AfterEnded,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAssignmentsRow
+	for rows.Next() {
+		var i ListAssignmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AgentID,
+			&i.PrincipalID,
+			&i.Role,
+			&i.AssignedBy,
+			&i.AssignedAt,
+			&i.EndedBy,
+			&i.EndedAt,
+			&i.EndReason,
+			&i.DisplayName,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUseCaseDecisions = `-- name: ListUseCaseDecisions :many
 SELECT id, use_case_id, agent_id, decision, comment, decided_by, decided_at FROM whitetower.use_case_decisions
 WHERE use_case_id = $1
@@ -475,6 +728,19 @@ func (q *Queries) ListUseCases(ctx context.Context, arg ListUseCasesParams) ([]W
 	return items, nil
 }
 
+const lockAgent = `-- name: LockAgent :one
+SELECT id FROM whitetower.agents WHERE id = $1 FOR UPDATE
+`
+
+// Locks the agent's row until the transaction ends, so that the changes of
+// its owners and of its transfers happen one after the other.
+func (q *Queries) LockAgent(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockAgent, id)
+	var id_2 uuid.UUID
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
 const nextStateVersion = `-- name: NextStateVersion :one
 SELECT nextval('whitetower.governance_state_version_seq')::bigint
 `
@@ -486,6 +752,91 @@ func (q *Queries) NextStateVersion(ctx context.Context) (int64, error) {
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const pendingTransfers = `-- name: PendingTransfers :many
+SELECT id, agent_id, from_principal_id, to_principal_id, requested_by, requested_at, status, decided_at FROM whitetower.ownership_transfers
+WHERE agent_id = ANY($1::uuid[]) AND status = 'pending'
+`
+
+// The pending ownership transfers of the agents.
+func (q *Queries) PendingTransfers(ctx context.Context, agentIds []uuid.UUID) ([]WhitetowerOwnershipTransfer, error) {
+	rows, err := q.db.Query(ctx, pendingTransfers, agentIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhitetowerOwnershipTransfer
+	for rows.Next() {
+		var i WhitetowerOwnershipTransfer
+		if err := rows.Scan(
+			&i.ID,
+			&i.AgentID,
+			&i.FromPrincipalID,
+			&i.ToPrincipalID,
+			&i.RequestedBy,
+			&i.RequestedAt,
+			&i.Status,
+			&i.DecidedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const primaryAssignment = `-- name: PrimaryAssignment :one
+SELECT id, agent_id, principal_id, role, assigned_by, assigned_at, ended_by, ended_at, end_reason FROM whitetower.agent_owners
+WHERE agent_id = $1 AND role = 'primary' AND ended_at IS NULL
+`
+
+func (q *Queries) PrimaryAssignment(ctx context.Context, agentID uuid.UUID) (WhitetowerAgentOwner, error) {
+	row := q.db.QueryRow(ctx, primaryAssignment, agentID)
+	var i WhitetowerAgentOwner
+	err := row.Scan(
+		&i.ID,
+		&i.AgentID,
+		&i.PrincipalID,
+		&i.Role,
+		&i.AssignedBy,
+		&i.AssignedAt,
+		&i.EndedBy,
+		&i.EndedAt,
+		&i.EndReason,
+	)
+	return i, err
+}
+
+const principalForOwnership = `-- name: PrincipalForOwnership :one
+SELECT p.kind, p.status, p.idp_groups,
+  ARRAY(SELECT b.role FROM whitetower.role_bindings b
+        WHERE b.principal_id = p.id AND b.revoked_at IS NULL)::text[] AS bound_roles
+FROM whitetower.principals p WHERE p.id = $1
+`
+
+type PrincipalForOwnershipRow struct {
+	Kind       string
+	Status     string
+	IdpGroups  []string
+	BoundRoles []string
+}
+
+// What decides whether a principal may own an agent: its kind, its status,
+// its IdP groups and its local role bindings.
+func (q *Queries) PrincipalForOwnership(ctx context.Context, id uuid.UUID) (PrincipalForOwnershipRow, error) {
+	row := q.db.QueryRow(ctx, principalForOwnership, id)
+	var i PrincipalForOwnershipRow
+	err := row.Scan(
+		&i.Kind,
+		&i.Status,
+		&i.IdpGroups,
+		&i.BoundRoles,
+	)
+	return i, err
 }
 
 const principalRefs = `-- name: PrincipalRefs :many
@@ -598,6 +949,44 @@ func (q *Queries) RecordTransition(ctx context.Context, arg RecordTransitionPara
 		arg.OccurredAt,
 	)
 	return err
+}
+
+const resolveInboxItems = `-- name: ResolveInboxItems :exec
+UPDATE whitetower.inbox_items SET resolved_at = $1
+WHERE subject_type = $2 AND subject_id = $3 AND resolved_at IS NULL
+`
+
+type ResolveInboxItemsParams struct {
+	ResolvedAt  *time.Time
+	SubjectType string
+	SubjectID   uuid.UUID
+}
+
+// Takes the items about a subject out of every inbox.
+func (q *Queries) ResolveInboxItems(ctx context.Context, arg ResolveInboxItemsParams) error {
+	_, err := q.db.Exec(ctx, resolveInboxItems, arg.ResolvedAt, arg.SubjectType, arg.SubjectID)
+	return err
+}
+
+const touchAgent = `-- name: TouchAgent :execrows
+UPDATE whitetower.agents SET updated_at = $1, version = version + 1
+WHERE id = $2 AND ($3::bigint IS NULL OR version = $3::bigint)
+`
+
+type TouchAgentParams struct {
+	UpdatedAt time.Time
+	ID        uuid.UUID
+	Version   *int64
+}
+
+// Gives the agent a new version, for a change of its owners or of an
+// ownership transfer, at the version the caller read when it names one.
+func (q *Queries) TouchAgent(ctx context.Context, arg TouchAgentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, touchAgent, arg.UpdatedAt, arg.ID, arg.Version)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateAgent = `-- name: UpdateAgent :execrows

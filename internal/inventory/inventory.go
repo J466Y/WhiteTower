@@ -35,25 +35,30 @@ type Options struct {
 	Authorizer auth.Authorizer
 	// Versions numbers the changes of the governance state.
 	Versions StateVersions
+	// RoleMapping maps IdP groups to roles, as the authentication does: it
+	// tells who holds the owner role, which owning an agent needs.
+	RoleMapping map[string]string
 }
 
 // Inventory keeps the agents and the use cases that justify them.
 type Inventory struct {
-	db         *db.DB
-	clk        clock.Clock
-	writer     *audit.Writer
-	authorizer auth.Authorizer
-	versions   StateVersions
+	db          *db.DB
+	clk         clock.Clock
+	writer      *audit.Writer
+	authorizer  auth.Authorizer
+	versions    StateVersions
+	roleMapping map[string]string
 }
 
 // New returns the inventory.
 func New(opts Options) *Inventory {
 	return &Inventory{
-		db:         opts.DB,
-		clk:        opts.Clock,
-		writer:     opts.Writer,
-		authorizer: opts.Authorizer,
-		versions:   opts.Versions,
+		db:          opts.DB,
+		clk:         opts.Clock,
+		writer:      opts.Writer,
+		authorizer:  opts.Authorizer,
+		versions:    opts.Versions,
+		roleMapping: opts.RoleMapping,
 	}
 }
 

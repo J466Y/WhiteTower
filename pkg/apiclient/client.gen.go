@@ -1088,8 +1088,9 @@ type OwnerAssignment struct {
 	AssignedBy PrincipalRef `json:"assignedBy"`
 
 	// EndReason Why the assignment ended: the reason of a reassignment or of a
-	// delegate's removal, or `ownership transferred` when the new owner
-	// accepted a transfer.
+	// delegate's removal; `ownership transferred` when the new owner
+	// accepted a transfer; or `became the primary owner` for a delegate
+	// who did.
 	EndReason *string    `json:"endReason,omitempty"`
 	EndedAt   *time.Time `json:"endedAt,omitempty"`
 
@@ -2091,7 +2092,8 @@ type ClientInterface interface {
 	// ListAgentOwners List an agent's owners and their history
 	//
 	// Lists the agent's primary owner and delegates (INV-02): the current
-	// assignments first, then those that ended, newest first.
+	// assignments first, then those that ended, each the latest assigned
+	// first.
 	//
 	// Corresponds with GET /agents/{id}/owners (the `ListAgentOwners` operationId).
 	ListAgentOwners(ctx context.Context, id AgentId, params *ListAgentOwnersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2876,7 +2878,8 @@ func (c *Client) ListAgentInstances(ctx context.Context, id AgentId, params *Lis
 // ListAgentOwners List an agent's owners and their history
 //
 // Lists the agent's primary owner and delegates (INV-02): the current
-// assignments first, then those that ended, newest first.
+// assignments first, then those that ended, each the latest assigned
+// first.
 //
 // Corresponds with GET /agents/{id}/owners (the `ListAgentOwners` operationId).
 func (c *Client) ListAgentOwners(ctx context.Context, id AgentId, params *ListAgentOwnersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6406,7 +6409,8 @@ type ClientWithResponsesInterface interface {
 	// ListAgentOwnersWithResponse List an agent's owners and their history
 	//
 	// Lists the agent's primary owner and delegates (INV-02): the current
-	// assignments first, then those that ended, newest first.
+	// assignments first, then those that ended, each the latest assigned
+	// first.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -9239,7 +9243,8 @@ func (c *ClientWithResponses) ListAgentInstancesWithResponse(ctx context.Context
 // ListAgentOwnersWithResponse List an agent's owners and their history
 //
 // Lists the agent's primary owner and delegates (INV-02): the current
-// assignments first, then those that ended, newest first.
+// assignments first, then those that ended, each the latest assigned
+// first.
 //
 // Returns a wrapper object for the known response body format(s).
 //

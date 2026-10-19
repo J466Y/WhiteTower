@@ -30,6 +30,10 @@ type (
 	idPosition struct {
 		Before uuid.UUID `json:"before"`
 	}
+	assignmentPosition struct {
+		After uuid.UUID `json:"after"`
+		Ended bool      `json:"ended"`
+	}
 )
 
 // inventoryCaller returns the principal that the middleware authenticated,
@@ -237,49 +241,142 @@ func (Server) ListAgentInstances(context.Context, gen.ListAgentInstancesRequestO
 	return nil, notBuilt()
 }
 
-// ListAgentOwners lists an agent's owner assignments, current and ended
-// (P1-04, step 3).
-func (Server) ListAgentOwners(context.Context, gen.ListAgentOwnersRequestObject) (gen.ListAgentOwnersResponseObject, error) {
-	return nil, notBuilt()
+// ListAgentOwners lists an agent's owner assignments, current ones first,
+// each the latest assigned first (P1-04, step 3).
+func (s Server) ListAgentOwners(ctx context.Context, request gen.ListAgentOwnersRequestObject) (gen.ListAgentOwnersResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	size, err := PageSize(request.Params.Limit)
+	if err != nil {
+		return nil, err
+	}
+	var pos assignmentPosition
+	if request.Params.Cursor != nil {
+		if err := DecodeCursor(*request.Params.Cursor, &pos); err != nil {
+			return nil, err
+		}
+	}
+	var after *uuid.UUID
+	if pos.After != uuid.Nil {
+		after = &pos.After
+	}
+	owners, more, err := s.inventory.Owners(ctx, *p, request.Id, after, pos.Ended, size)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	res := gen.ListAgentOwners200JSONResponse{Owners: make([]gen.OwnerAssignment, len(owners))}
+	for i := range owners {
+		res.Owners[i] = assignmentOf(&owners[i])
+	}
+	if more {
+		last := owners[len(owners)-1]
+		next, err := EncodeCursor(assignmentPosition{After: last.ID, Ended: last.EndedAt != nil})
+		if err != nil {
+			return nil, err
+		}
+		res.NextCursor = &next
+	}
+	return res, nil
 }
 
-// ReassignAgentOwner makes another principal an agent's primary owner at once
-// (P1-04, step 3).
-func (Server) ReassignAgentOwner(context.Context, gen.ReassignAgentOwnerRequestObject) (gen.ReassignAgentOwnerResponseObject, error) {
-	return nil, notBuilt()
+// ReassignAgentOwner makes another principal an agent's primary owner at
+// once, at the version that If-Match names (P1-04, step 3).
+func (s Server) ReassignAgentOwner(ctx context.Context, request gen.ReassignAgentOwnerRequestObject) (gen.ReassignAgentOwnerResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	version, err := IfMatch(value(request.Params.IfMatch))
+	if err != nil {
+		return nil, err
+	}
+	a, err := s.inventory.Reassign(ctx, *p, request.Id, version, request.Body.PrincipalId, request.Body.Reason)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.ReassignAgentOwner200JSONResponse{Body: agentOf(a), Headers: gen.ReassignAgentOwner200ResponseHeaders{ETag: ETag(a.Version)}}, nil
 }
 
 // AddAgentDelegate makes a principal a delegate of an agent (P1-04, step 3).
-func (Server) AddAgentDelegate(context.Context, gen.AddAgentDelegateRequestObject) (gen.AddAgentDelegateResponseObject, error) {
-	return nil, notBuilt()
+func (s Server) AddAgentDelegate(ctx context.Context, request gen.AddAgentDelegateRequestObject) (gen.AddAgentDelegateResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	assignment, err := s.inventory.AddDelegate(ctx, *p, request.Id, request.Body.PrincipalId)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.AddAgentDelegate201JSONResponse(assignmentOf(assignment)), nil
 }
 
-// RemoveAgentDelegate ends a delegate's assignment (P1-04, step 3).
-func (Server) RemoveAgentDelegate(context.Context, gen.RemoveAgentDelegateRequestObject) (gen.RemoveAgentDelegateResponseObject, error) {
-	return nil, notBuilt()
+// RemoveAgentDelegate ends a delegate's assignment, for a reason (P1-04,
+// step 3).
+func (s Server) RemoveAgentDelegate(ctx context.Context, request gen.RemoveAgentDelegateRequestObject) (gen.RemoveAgentDelegateResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.inventory.RemoveDelegate(ctx, *p, request.Id, request.PrincipalId, value(request.Params.Reason)); err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.RemoveAgentDelegate204Response{}, nil
 }
 
 // RequestOwnershipTransfer offers an agent's ownership to another principal
 // (P1-04, step 3).
-func (Server) RequestOwnershipTransfer(context.Context, gen.RequestOwnershipTransferRequestObject) (gen.RequestOwnershipTransferResponseObject, error) {
-	return nil, notBuilt()
+func (s Server) RequestOwnershipTransfer(ctx context.Context, request gen.RequestOwnershipTransferRequestObject) (gen.RequestOwnershipTransferResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	t, err := s.inventory.RequestTransfer(ctx, *p, request.Id, request.Body.PrincipalId)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.RequestOwnershipTransfer201JSONResponse(transferOf(t)), nil
 }
 
 // CancelOwnershipTransfer cancels a pending ownership transfer (P1-04, step 3).
-func (Server) CancelOwnershipTransfer(context.Context, gen.CancelOwnershipTransferRequestObject) (gen.CancelOwnershipTransferResponseObject, error) {
-	return nil, notBuilt()
+func (s Server) CancelOwnershipTransfer(ctx context.Context, request gen.CancelOwnershipTransferRequestObject) (gen.CancelOwnershipTransferResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.inventory.CancelTransfer(ctx, *p, request.Id, request.TransferId); err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.CancelOwnershipTransfer204Response{}, nil
 }
 
 // AcceptOwnershipTransfer makes the principal a transfer names the agent's
 // primary owner (P1-04, step 3).
-func (Server) AcceptOwnershipTransfer(context.Context, gen.AcceptOwnershipTransferRequestObject) (gen.AcceptOwnershipTransferResponseObject, error) {
-	return nil, notBuilt()
+func (s Server) AcceptOwnershipTransfer(ctx context.Context, request gen.AcceptOwnershipTransferRequestObject) (gen.AcceptOwnershipTransferResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	t, err := s.inventory.AcceptTransfer(ctx, *p, request.Id, request.TransferId)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.AcceptOwnershipTransfer200JSONResponse(transferOf(t)), nil
 }
 
 // DeclineOwnershipTransfer declines a pending ownership transfer (P1-04,
 // step 3).
-func (Server) DeclineOwnershipTransfer(context.Context, gen.DeclineOwnershipTransferRequestObject) (gen.DeclineOwnershipTransferResponseObject, error) {
-	return nil, notBuilt()
+func (s Server) DeclineOwnershipTransfer(ctx context.Context, request gen.DeclineOwnershipTransferRequestObject) (gen.DeclineOwnershipTransferResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	t, err := s.inventory.DeclineTransfer(ctx, *p, request.Id, request.TransferId)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.DeclineOwnershipTransfer200JSONResponse(transferOf(t)), nil
 }
 
 // ListUseCases lists a page of use cases, newest first (P1-04, step 4). Its
@@ -529,7 +626,43 @@ func agentOf(a *inventory.Agent) gen.Agent {
 	if a.Harness != nil {
 		out.Harness = &gen.Harness{Description: a.Harness.Description}
 	}
+	if a.PendingTransfer != nil {
+		t := transferOf(a.PendingTransfer)
+		out.PendingOwnershipTransfer = &t
+	}
 	return out
+}
+
+// assignmentOf is how the API shows an owner assignment.
+func assignmentOf(a *inventory.Assignment) gen.OwnerAssignment {
+	out := gen.OwnerAssignment{
+		Id:         a.ID,
+		Principal:  personOf(a.Principal),
+		Role:       gen.OwnerAssignmentRole(a.Role),
+		AssignedBy: personOf(a.AssignedBy),
+		AssignedAt: a.AssignedAt,
+		EndedAt:    a.EndedAt,
+		EndReason:  optionalText(a.EndReason),
+	}
+	if a.EndedBy != nil {
+		p := personOf(*a.EndedBy)
+		out.EndedBy = &p
+	}
+	return out
+}
+
+// transferOf is how the API shows an ownership transfer.
+func transferOf(t *inventory.Transfer) gen.OwnershipTransfer {
+	return gen.OwnershipTransfer{
+		Id:          t.ID,
+		AgentId:     t.AgentID,
+		From:        personOf(t.From),
+		To:          personOf(t.To),
+		RequestedBy: personOf(t.RequestedBy),
+		RequestedAt: t.RequestedAt,
+		Status:      gen.OwnershipTransferStatus(t.Status),
+		DecidedAt:   t.DecidedAt,
+	}
 }
 
 // useCaseOf is how the API shows a use case.

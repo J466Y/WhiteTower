@@ -48,6 +48,7 @@ var rules = map[string]rule{
 	"whitetower.agent.created.v1":           {actor: "actor"},
 	"whitetower.agent.lifecycle_changed.v1": {actor: "actor", action: "action"},
 	"whitetower.agent.updated.v1":           {actor: "actor"},
+	"whitetower.agent.ownership_changed.v1": {actor: "actor", action: "change"},
 	"whitetower.use_case.created.v1":        {actor: "actor"},
 	"whitetower.use_case.updated.v1":        {actor: "actor"},
 	"whitetower.policy.version_approved.v1": {actor: "approver"},

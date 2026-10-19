@@ -50,11 +50,14 @@ type Agent struct {
 	DrillEligible bool
 	PrimaryOwner  Person
 	Delegates     []Person
-	CreatedBy     Person
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	ActivatedAt   *time.Time
-	RetiredAt     *time.Time
+	// PendingTransfer is the agent's ownership transfer that waits for its
+	// recipient, if there is one.
+	PendingTransfer *Transfer
+	CreatedBy       Person
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	ActivatedAt     *time.Time
+	RetiredAt       *time.Time
 	// Version is the version of the agent's row, which its ETag carries
 	// (API-03).
 	Version int64
@@ -593,6 +596,14 @@ func (inv *Inventory) assemble(ctx context.Context, q *inventorydb.Queries, rows
 	if err != nil {
 		return nil, err
 	}
+	pendingRows, err := q.PendingTransfers(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("reading the agents' pending transfers: %w", err)
+	}
+	pending, err := assembleTransfers(ctx, q, pendingRows)
+	if err != nil {
+		return nil, err
+	}
 	agents := make([]Agent, len(rows))
 	for i, r := range rows {
 		a := Agent{
@@ -619,6 +630,11 @@ func (inv *Inventory) assemble(ctx context.Context, q *inventorydb.Queries, rows
 			a.Harness = &Harness{}
 			if err := json.Unmarshal(r.Harness, a.Harness); err != nil {
 				return nil, fmt.Errorf("decoding the harness of agent %s: %w", r.ID, err)
+			}
+		}
+		for j := range pending {
+			if pending[j].AgentID == r.ID {
+				a.PendingTransfer = &pending[j]
 			}
 		}
 		for _, o := range owners {
