@@ -3,9 +3,9 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md)) |
-| **Date** | 2026-09-29 |
+| **Date** | 2026-09-29; updated 2026-10-19 for RFC-0002 (section 3.9 and the rows that refer to it) |
 | **Schema** | [`internal/platform/db/migrations/00001_init.sql`](../../internal/platform/db/migrations/00001_init.sql) |
-| **Related** | [Agent lifecycle](lifecycle.md), [architecture](mvp-architecture.md), [requirements](../requirements/mvp-requirements.md), [ADR-0003](../adr/0003-postgresql-only-stateful-dependency.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md) |
+| **Related** | [Agent lifecycle](lifecycle.md), [architecture](mvp-architecture.md), [requirements](../requirements/mvp-requirements.md), [ADR-0003](../adr/0003-postgresql-only-stateful-dependency.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md), [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) |
 
 This document defines the vocabulary, the entities and their invariants, and the physical schema of the White Tower core. Every Phase 1 plan builds on it. It covers the MVP and shows where Phase 2 and 3 capabilities attach.
 
@@ -23,6 +23,7 @@ This document defines the vocabulary, the entities and their invariants, and the
 | **JSONB** | Only for extensible, unqueried structures: labels, manifests, harness declarations, attestations, settings values, bundle manifests | Everything queried or constrained is a real column |
 | **Where invariants live** | In the domain services first (P1 plans), and again in the database for the critical ones (append-only audit, separation of duties, two-person release, no private keys) | Defense in depth: a bug in the core must not be enough to break a governance rule |
 | **Privileges** | The core runs as a member of `whitetower_runtime`, which receives table-by-table grants; nothing is granted by default | Least privilege; audit tables are append-only even for the core |
+| **MCP servers, tools and models** ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)) | One organization-wide catalog of servers, tools and models, reviewed once and enabled per agent. The agent's own tools are entries of their agent. Definitions are stored by their hash. What each agent has is kept as observations, per source. Blocks name references, in a record of their own | Review is shared and use is per agent; the same function name in two agents is different code; a definition that many agents report is stored once; blocks must apply without any bundle, and never enlarge the fleet record that fleet halts change (threat model, DC-9) |
 
 ## 2. Glossary
 
@@ -49,6 +50,13 @@ One name per concept, used identically in code, API, console and documentation.
 | Lease | The time an enforcement point may keep deciding without hearing from the core | `governance_state.lease_ttl_seconds` |
 | Audit event / checkpoint | A record of evidence, and a signed statement of the audit log's state | `audit_events`, `audit_checkpoints` |
 | Coverage level | C0 to C3, computed from credentials, instances, decisions and drills (requirements, section 3) | Computed, not stored |
+| Tooling | The MCP servers, tools and models an agent uses, including the tools its model provider runs for it | `tooling_observations`, `agent_tooling` |
+| Catalog entry | An MCP server, a tool or a model, `discovered` or `approved`; it shows as blocked while a block covers it | `catalog_servers`, `catalog_tools`, `catalog_models` |
+| Reference / key | How an enforcement point identifies an entry at runtime / the entry's name in policies and in the console, assigned by the core | Columns of the catalog's tables |
+| Definition | What the model sees of a tool: its name, description and schemas. It is stored by its hash, which approval pins. Built-in tools have none | `catalog_tool_definitions`, `catalog_tools` |
+| Observed / enabled | Reported for an agent by an enforcement point, or declared by a person for an agent without one / approved for the agent's use by someone other than the requester | `tooling_observations` / `tooling_requests`, `agent_tooling` |
+| Block / unblock request | An organization-wide denial of a server, a tool or models, effective at once / its lifting, which needs two people | `catalog_blocks`, `catalog_unblock_requests` |
+| Usage rule | A forbidden pattern of use of a tool's arguments, written in a policy | `policy_versions` (statements annotated `@rule`) |
 
 ## 3. Entities
 
@@ -73,9 +81,23 @@ erDiagram
     HALT ||--o{ HALT_RELEASE_REQUEST : "released through"
     AUDIT_EVENT ||--o| AUDIT_LEAF : "sealed as"
     AUDIT_CHECKPOINT }o--|| SIGNING_KEY : "signed with"
+    CATALOG_SERVER |o--o{ CATALOG_TOOL : offers
+    AGENT |o--o{ CATALOG_TOOL : defines
+    CATALOG_TOOL_DEFINITION |o--o{ CATALOG_TOOL : "pinned by"
+    AGENT ||--o{ TOOLING_OBSERVATION : "known to have"
+    CATALOG_SERVER |o--o{ TOOLING_OBSERVATION : "observed as"
+    CATALOG_TOOL |o--o{ TOOLING_OBSERVATION : "observed as"
+    CATALOG_MODEL |o--o{ TOOLING_OBSERVATION : "observed as"
+    AGENT ||--o{ TOOLING_REQUEST : "asked for"
+    TOOLING_REQUEST ||--o{ AGENT_TOOLING : enables
+    AGENT ||--o{ AGENT_TOOLING : "may use"
+    CATALOG_SERVER |o--o{ AGENT_TOOLING : "enabled as"
+    CATALOG_TOOL |o--o{ AGENT_TOOLING : "enabled as"
+    CATALOG_MODEL |o--o{ AGENT_TOOLING : "enabled as"
+    CATALOG_BLOCK ||--o{ CATALOG_UNBLOCK_REQUEST : "lifted through"
 ```
 
-The full list of columns and constraints is in the schema file. The sections below give each entity's purpose and invariants; **(DB)** marks an invariant the database enforces as well.
+The full list of columns and constraints is in the schema file; the tables of section 3.9 arrive with plan P1-16's migration. The sections below give each entity's purpose and invariants; **(DB)** marks an invariant the database enforces as well.
 
 ### 3.1 People and access
 
@@ -112,9 +134,9 @@ The full list of columns and constraints is in the schema file. The sections bel
 | Entity | Purpose | Invariants |
 | --- | --- | --- |
 | `policies` | A named rule set, global or agent-specific, in Cedar or Rego | Agent scope if and only if an agent is referenced (DB) |
-| `policy_versions` | Immutable content, hash, tests, validation results, status | Content, hash, tests and author cannot change after submission (DB trigger); versions are never deleted (DB); one active version per policy (DB) |
+| `policy_versions` | Immutable content, hash, tests, validation results, status | Content, hash, tests and author cannot change after submission (DB trigger); versions are never deleted (DB); one active version per policy (DB). A statement annotated `@rule` is exactly what the generator produces from its annotation, and no statement reads a tool argument that is neither declared in the catalog nor used by a usage rule (domain, checked at submission; RFC-0002, sections 7.5 and 8) |
 | `policy_approvals` | Decisions of the steering or advisory committee | The author can never decide on their own version (DB trigger, HUM-04); rejections need a comment (DB); append-only (DB) |
-| `policy_bundles` | Signed effective policy sets, versioned per agent | Monotonic version per agent (DB unique); append-only (DB) |
+| `policy_bundles` | Signed effective policy sets, versioned per agent | Monotonic version per agent (DB unique); append-only (DB); every bundle carries its agent's catalog file, empty when nothing is observed or enabled for the agent (domain, RFC-0002 section 5) |
 
 ### 3.5 Runtime
 
@@ -123,11 +145,11 @@ The full list of columns and constraints is in the schema file. The sections bel
 | `modules` | Registered modules and their manifests | Slug format (DB); approval and revocation recorded consistently (DB) |
 | `module_agent_bindings` | Which agents a standalone module may serve: named agents, or all agents, as the network quarantine module of a cluster is (KIL-10) | One active binding per module and agent, and at most one active binding to all agents per module (DB) |
 | `module_instances` | Connected, disconnected and lost instances, with lease TTL and contract version | An instance authenticated as an agent names that agent (DB); lease TTL between 10 and 300 seconds (DB) |
-| `instance_agents` | Per instance and agent: active bundle version, last observed state version | Drives drift detection (P1-06) and halt tracking (P1-08) |
+| `instance_agents` | Per instance and agent: active bundle version, last observed state version | Drives drift detection (P1-06), halt tracking (P1-08) and the spread of blocks (P1-16) |
 | `governance_state` | One record per agent: lifecycle state, run state, agent-level halts, bundle, lease TTL, halt mode, policy attributes, state version | `halted` if and only if at least one halt covers the agent (DB); lease TTL bounds (DB); halt mode values (DB) |
-| `fleet_state` | The single fleet-wide record | Exactly one row (DB); `halted` if and only if a fleet halt is active (DB) |
+| `fleet_state` | The single fleet-wide record | Exactly one row (DB); `halted` if and only if a fleet halt is active (DB); never carries blocks (domain, DC-9) |
 
-A fleet halt changes one row (`fleet_state`), not one row per agent. Selector halts are folded into each matching agent's `agent_halt_ids` when issued, and into agents registered later.
+A fleet halt changes one row (`fleet_state`), not one row per agent, and blocks never add to that row (section 3.9). Selector halts are folded into each matching agent's `agent_halt_ids` when issued, and into agents registered later.
 
 ### 3.6 Kill switch
 
@@ -155,7 +177,29 @@ A fleet halt changes one row (`fleet_state`), not one row per agent. Selector ha
 | `settings` | Configurable defaults (section 5), edited by administrators, versioned |
 | `outbox` | Events to publish after commit (notifications, webhooks) |
 | `job_state` | Last run of each background job, for health and metrics |
-| `inbox_items` | Pending work per person or per role (UI-09): validations, approvals, reviews, releases |
+| `inbox_items` | Pending work per person or per role (UI-09): validations, approvals, reviews, releases, and the catalog's reviews and requests (section 3.9) |
+
+### 3.9 MCP servers, tools and models
+
+The catalog of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): what an agent can do is delimited by the entries enabled for it, and how it may use them by the usage rules of its policies. Usage rules are not entities: they are statements of policy versions (section 3.4). Plan P1-16 creates these tables in one migration.
+
+References and keys are those of the RFC, section 3; P1-16 step 2 fixes the key grammar, which P0-03 step 12 uses in the schema of the catalog file. Every entry records when it was first and last seen; the agent that first brought it, so that the bound on each agent's entries waiting for review can count them (threat model, DC-10); and, once a reviewer declines it, who declined it, when and why. A declined entry stays `discovered`, so it stays denied, but it no longer waits for review.
+
+| Entity | Purpose | Invariants |
+| --- | --- | --- |
+| `catalog_servers` | MCP servers: key, reference, transport, the name and version they announce, a redacted display form, status, and a flag for local servers launched from unpinned packages | Key and reference unique in the catalog (DB); the key never changes once the server is approved (DB trigger). Status is `discovered` or `approved` (DB); reports create only `discovered` entries and never change a status (domain, CORE-10). References and display forms are redacted again before they are stored (domain, CORE-11, CAT-10). A local server launched through `npx`, `uvx`, `pipx run` or `bunx` without an exact version is flagged (domain, T-77) |
+| `catalog_tools` | Tools: key, kind, origin; their server (MCP tools), their agent (the agent's own tools) or their provider and type (built-in tools); status, pinned definition hash, classification (`read_only`, `destructive`, `open_world`), and the arguments policies may see, with their types | An MCP tool names its server; the agent's own tools (kinds `function`, `http` and `other`) name their agent; a built-in tool names its provider and type (DB). One tool per server and name, per agent and name, or per provider and type (DB). Keys are unique in the catalog, except those of the agent's own tools (`agent/<name>`), which are unique within their agent, because the same name in two agents is different code (DB); a key never changes once the tool is approved (DB trigger). Status is `discovered` or `approved` (DB), and an MCP tool can be approved only once its server is (domain). An approved tool pins a stored definition, except a built-in tool, which has none (DB); the pin changes only through an approval, so a new definition waits for review (domain, CORE-10). A declaration that an active policy version reads cannot be withdrawn, and a declared argument's type cannot change while an active usage rule uses it (domain) |
+| `catalog_tool_definitions` | Each distinct definition reported, stored as the bytes of the RFC 8785 canonical JSON of its members, under the SHA-256 that the core computed from them, for review and diffs | One row per hash (DB); append-only: content and hash never change (DB). The canonical bytes are kept as received, never re-encoded, so every hash can be recomputed (domain). Stored only when one of the agent's reports names its hash (domain, RFC-0002 section 4.1). Descriptions at most 16 KiB and schemas at most 64 KiB (domain, RFC-0002 section 4.2). No description or schema reaches an audit event (domain, CORE-11) |
+| `catalog_models` | Models: key, provider, endpoint, name, status, the pinned digest of their weights, and a new digest waiting for review | Key unique in the catalog, and one model per provider, endpoint and name (DB); the key never changes once the model is approved (DB trigger). Status is `discovered` or `approved` (DB). Approving a self-hosted model pins the digest its runtime reported, if any; a new digest waits for review while the pinned one stays (domain, CORE-10) |
+| `catalog_blocks` | Organization-wide blocks of a server and its tools, a tool, a model, or every model of a provider or an endpoint: the kind, what the block covers in clear and the SHA-256 of its string form, the reason, the issuer, and the state versions that issued and lifted the block | Kind is `server`, `tool`, `model`, `provider` or `endpoint` (DB); an issuer and a reason are mandatory (DB); one active block per kind and reference (DB); at most 500 active (domain). The issuing and lifting versions come from `governance_state_version_seq`, in the transaction that issues or lifts the block (domain). **Lifted only through an approved unblock request** (DB trigger); never reopened once lifted (DB trigger). A block never changes an entry's status and never rebuilds a bundle (domain) |
+| `catalog_unblock_requests` | Two-person lifting of a block | Requester and approver are different people (DB, HUM-04); a reason is mandatory (DB); one pending request per block (DB); approved by the steering or advisory committee (domain) |
+| `agent_tooling` | The entries enabled for an agent, each from an approved request; disables, with their actor, reason and time; when each entry was last used (`last_used_at`, CAT-09) | Each row names exactly one tool or one model, since an agent is enabled to use tools and models (DB), and comes from an approved request (DB trigger); one enabled row per agent and entry (DB). Only approved entries are enabled, and never for a retired or rejected agent (domain). A disable takes effect at once and records its actor, reason and time (DB); a disabled row is never enabled again, so enabling again needs a new request (DB trigger). `last_used_at` is kept by a job from allowed decisions, never by a write per decision (domain). Enabled does not mean usable: the catalog check still denies what a block covers, and a definition or digest that changed since approval (RFC-0002, section 7.1) |
+| `tooling_requests` | Requests to enable tools and models for an agent, and their decisions | Decided once, and never changed afterwards (DB trigger); the approver is never the requester (DB trigger, HUM-04); a reason is mandatory (DB); at most one pending request per agent and entry (DB); only approved entries can be requested, and the advisory committee approves (domain). A request can name an MCP server, to enable its approved tools at once (domain) |
+| `tooling_observations` | What each agent is known to have, per entry and source: an instance's reports, or a person's declaration for an agent at coverage C0 or C1; for a reported tool, the hash of its definition; first and last seen | One row per agent, entry and source, and the source is exactly one instance or one person (DB). Reports come only from instances of modules that declare the `enforcement-point` capability, for agents in their scope (domain, CORE-2), and each replaces its instance's previous report for that agent (domain). Declarations only for agents below coverage C2 (domain, CAT-08). An observation never approves, enables or unblocks anything (domain, CORE-10) |
+
+Blocks name references, not entries, so an enforcement point applies them without any bundle, and they also cover what the catalog has not seen yet. They travel in a record of their own in the watch stream, never in `fleet_state`, so a fleet halt costs the same with blocks active (section 4; threat model, DC-9). An enforcement point acknowledges the state version that carries a block once it applies it (EP-15), so `instance_agents.observed_state_version` gives each block's spread, through the tracking that P1-08 keys by state version: blocks need no table of acknowledgements.
+
+P1-16's migration also widens the check on `inbox_items.kind` with entries and definitions waiting for review, requests to enable tooling and requests to unblock (P1-16, step 3).
 
 ## 4. The governance state record
 
@@ -167,13 +211,14 @@ What the core publishes to enforcement points for each agent (ADR-0005). Its wir
 | Lifecycle state, which decides whether the gate may open ([lifecycle](lifecycle.md), section 1) | `governance_state.lifecycle_state` |
 | Effective run state | `halted` if `agent_halt_ids` is not empty or the fleet is halted |
 | Halt IDs, scopes and issue times; reasons stay in the core | `agent_halt_ids`, `fleet_state.halt_ids` → `halts` |
+| Organization-wide blocks: IDs, kinds, the SHA-256 of what each covers, and issue times; references and reasons stay in the core. A record of its own, outside every agent's record and the fleet record (DC-9) | `catalog_blocks` (active blocks), versions from `governance_state_version_seq` |
 | Bundle reference: version, SHA-256, signature | `governance_state.bundle_id` → `policy_bundles` |
 | Lease TTL | `governance_state.lease_ttl_seconds`, from the risk tier (setting `killswitch.lease_ttl_seconds`) |
 | Halt mode chosen by the owner | `governance_state.halt_mode`, copied from `agents.halt_mode` |
 | Attributes for policies: slug, kind, risk tier, data categories, labels, owner ID. The environment is not here: it comes from each enforcement point's credential | `governance_state.attributes` |
 | State version | `governance_state.state_version`, from the global sequence `governance_state_version_seq` |
 
-Every change takes a new number from the global sequence in the transaction that makes it. Watch streams resume from the last version an instance saw, and fall back to a snapshot when the gap is too large.
+Every change takes a new number from the global sequence in the transaction that makes it, issuing and lifting a block included. Watch streams resume from the last version an instance saw, and fall back to a snapshot when the gap is too large.
 
 ## 5. Defaults
 
@@ -185,6 +230,8 @@ Initial values of `settings`, all editable by administrators:
 | `lifecycle.review_grace_days` | 14 |
 | `lifecycle.review_reminder_days` | 30, 7 and 1 days before the due date |
 | `lifecycle.review_signoff_risk_tiers` | high, critical |
+| `lifecycle.review_unused_tooling_days` | 90; a review lists the enabled tooling unused for longer as candidates to disable (CAT-09) |
+| `catalog.pending_entries_per_agent` | servers 256, tools 4,096, models 256: the entries of one agent that may wait for review at once; beyond them, its reports' new entries are left out (DC-10) |
 | `killswitch.lease_ttl_seconds` | low 60, medium 60, high 30, critical 15 (confirmed by spike S2) |
 | `killswitch.unconfirmed_after_seconds` | 10 |
 | `audit.retention_months` | 6, the EU AI Act minimum (NFR-10) |
@@ -194,7 +241,7 @@ Risk tiers are `low`, `medium`, `high` and `critical`. The EU AI Act classificat
 
 ## 6. Traceability
 
-Every Must requirement of the inventory, identity, policy, audit and kill switch areas maps to the model:
+Every Must requirement of the inventory, identity, policy, audit and kill switch areas, and of the MCP servers, tools and models area (CAT), maps to the model:
 
 | Requirement | Entities and fields |
 | --- | --- |
@@ -229,6 +276,16 @@ Every Must requirement of the inventory, identity, policy, audit and kill switch
 | KIL-06 halt suspends the agent | Transition T12 in [lifecycle](lifecycle.md) |
 | KIL-07 reconnecting instances start halted | `governance_state` snapshot sent before any action is allowed |
 | KIL-10 network quarantine | `module_agent_bindings` (scope `all`), `halt_acks.quarantined_at` and `quarantined_workloads` |
+| CAT-01 reports never authorize | `tooling_observations` (source: an instance); new references as `discovered` rows of `catalog_servers`, `catalog_tools` and `catalog_models`; the agent that first brought each entry, for the bound on its entries waiting for review (DC-10) |
+| CAT-02 catalog, pinned definitions and digests | `catalog_servers`, `catalog_tools` (status, pinned definition hash), `catalog_tool_definitions` (append-only, DB), `catalog_models` (pinned digest, digest waiting for review) |
+| CAT-03 enablement by a second person | `tooling_requests` (DB trigger: the approver is never the requester), `agent_tooling` (DB trigger: only from an approved request) |
+| CAT-04 blocks at once, apart from halts | `catalog_blocks` (versions from `governance_state_version_seq`, never in `fleet_state`), `catalog_unblock_requests` (DB), `instance_agents.observed_state_version` |
+| CAT-05 catalog check before policies | Contract (RFC-0002, through P0-03 step 12); each bundle's catalog file, in `policy_bundles` |
+| CAT-06 usage rules | Statements annotated `@rule` in `policy_versions`; argument declarations in `catalog_tools` |
+| CAT-07 provider-run tools | Contract (RFC-0002); `catalog_tools.origin` (`provider`) |
+| CAT-08 declared tooling | `tooling_observations` with a person as source, for agents below coverage C2 |
+| CAT-09 unused enabled tooling in reviews | `agent_tooling.last_used_at`, setting `lifecycle.review_unused_tooling_days` |
+| CAT-10 no secrets in reports or events | Reports redacted again before they are stored (domain, CORE-11); events name references only by their SHA-256 (section 7) |
 
 ## 7. Personal data
 
@@ -237,8 +294,9 @@ White Tower processes personal data about the people who govern agents. The rule
 | Data | Where | Purpose | Retention | On export |
 | --- | --- | --- | --- | --- |
 | Name, email, IdP subject, groups, last login | `principals` | Authentication, accountability, notifications | While referenced by governance records. An erasure request replaces name and email with placeholders and keeps the ID, so the history stays consistent | Pseudonymized on request |
-| Principal IDs in history and evidence | `lifecycle_transitions`, `agent_owners`, approvals, `audit_events.actor_id` | Accountability | With the record; audit follows its retention (six months minimum) | Principal IDs are already pseudonymous |
+| Principal IDs in history and evidence | `lifecycle_transitions`, `agent_owners`, approvals, the catalog's requests, blocks and declarations (section 3.9), `audit_events.actor_id` | Accountability | With the record; audit follows its retention (six months minimum) | Principal IDs are already pseudonymous |
 | Arguments of governed actions | Decision and action events from enforcement points | Evidence of what the agent did | Audit retention | The event catalog (P0-03) must require redaction or hashing of arguments that can contain personal data |
+| User names inside the paths and arguments of local MCP servers' command lines | `catalog_servers` (reference and display form), `catalog_blocks`, the catalog files of bundles | Reviewing the server, and matching it at runtime | With the entry, which is never deleted | Audit events and the watch stream carry only the SHA-256 of references (RFC-0002, sections 6 and 9) |
 
 Audit events identify people by pseudonymous principal ID, never by name or email.
 
@@ -248,13 +306,13 @@ Later capabilities attach without redesigning the MVP schema. Their tables are n
 
 | Capability | Where it attaches |
 | --- | --- |
-| LLM gateway, quotas and cost (Phase 2) | Gateway processes are module instances with the `llm-gateway` capability; quotas and usage in new tables keyed by agent, usage partitioned like the audit log |
-| MCP gateway (Phase 2) | Tools and MCP servers become catalog tables, referenced as resources by policies; gateways are enforcement points |
-| Skills repository (Phase 2) | Skills, signed versions, reviews and agent bindings in new tables; signatures reuse the key model |
+| LLM gateway, quotas and cost (Phase 2) | Gateway processes are module instances with the `llm-gateway` capability; quotas and usage in new tables keyed by agent, usage partitioned like the audit log; gateways apply the model entries and blocks of section 3.9 |
+| MCP network gateway (Phase 2) | Another enforcement point on the catalog of section 3.9: the same entries, enablement, blocks and usage rules. It reports what agents reach through it as observations of its own instances. No new table |
+| Skills repository (not planned) | Usage rules in policies take its place (RFC-0002). The `skills-repository` capability and the `skill` resource type stay reserved, so a return needs no rename; no table |
 | Enforced harness (Phase 2) | Harness profiles in a table; `agents.harness` moves from a declaration to a reference |
 | Per-task tokens (Phase 2) | Token exchange is stateless; evidence goes to the audit log |
-| Accepted providers and jurisdictions (Phase 2) | A catalog approved by the steering committee, referenced by policies |
-| Discovery (Phase 3) | Findings in a new table linked to agents; `agents.source = 'discovered'` is already allowed |
+| Accepted providers and jurisdictions (Phase 2) | Attributes of the providers and endpoints of the model entries of section 3.9, approved by the steering committee and referenced by policies (POL-10) |
+| Discovery (Phase 3) | Findings in a new table linked to agents; `agents.source = 'discovered'` is already allowed; tooling imported from endpoint security tools would become observations with a source of its own (RFC-0002, question 6) |
 | Multi-tenancy (not planned) | A tenant key added to every table and to `settings`, in one migration |
 
 ## 9. Physical schema
@@ -269,7 +327,7 @@ Later capabilities attach without redesigning the MVP schema. Their tables are n
 
 | Tables | Runtime role may |
 | --- | --- |
-| Audit tables, lifecycle history, use case decisions, policy approvals, bundles | SELECT and INSERT only (append-only) |
+| Audit tables, lifecycle history, use case decisions, policy approvals, bundles, tool definitions | SELECT and INSERT only (append-only) |
 | Sessions, used assertions, outbox | SELECT, INSERT, UPDATE and DELETE (short-lived data cleaned by jobs) |
 | Every other governance table | SELECT, INSERT and UPDATE, never DELETE |
 
@@ -298,3 +356,7 @@ Later capabilities attach without redesigning the MVP schema. Their tables are n
 | Lifecycle guards generated from `agent-lifecycle.yaml` | P1-04 |
 | Bundle content size and storage by hash | P1-06 |
 | Redaction of personal data in event arguments | P0-03 (event catalog) |
+| A system author for the policies the core seeds, such as `wt-catalog` (a forward migration) | P1-06 |
+| The tables of section 3.9, their constraints and triggers, and the wider check on `inbox_items.kind` | P1-16 |
+| Removing `discovered` entries that no agent observes any more: not planned for the MVP, since reviewers can decline them and the runtime role cannot delete (section 9) | Later |
+| The job that keeps `agent_tooling.last_used_at`, and the reviews' list of unused enabled tooling (CAT-09) | P1-16, P1-04 |

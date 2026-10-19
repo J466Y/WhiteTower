@@ -25,7 +25,7 @@ White Tower does **not** try to reimplement every capability. It provides a smal
 - **Two-level policies:** organization-wide and agent-specific.
 - **Deployment, monitoring and kill switch**, both per agent and fleet-wide.
 - **Resource control:** token quotas, cost, GPU and local inference.
-- **Skills repository:** centralized, versioned, reviewed and signed.
+- **Control of agents' tooling:** a catalog of the MCP servers, tools and models each agent may use, approved, blocked and enabled agent by agent, with usage rules in policies.
 - **Per-agent execution harness** (sandbox).
 - **Observability, immutable audit and compliance evidence.**
 - **Unified UI, public API** and an SDK for building modules.
@@ -45,7 +45,7 @@ White Tower does **not** try to reimplement every capability. It provides a smal
 └──────────────────────────────┬───────────────────────────────┘
 ┌──────────────────────────────▼───────────────────────────────┐
 │   Interchangeable modules (open source, commercial, custom)  │
-│  Policy engine · MCP gateway · LLM gateway · Skills repo     │
+│  Policy engine · MCP gateway · LLM gateway                   │
 │  Harness/sandbox · Observability · Compliance · Discovery    │
 └──────────────────────────────┬───────────────────────────────┘
 ┌──────────────────────────────▼───────────────────────────────┐
@@ -82,7 +82,7 @@ These are the first modules we plan to integrate. None of them is final.
 | Sandbox / harness | gVisor, Firecracker, containers with seccomp |
 | LLM gateway, quotas, cost | LiteLLM |
 | MCP and tool gateway | Obot, open MCP gateways |
-| Skills repository | Built in this project (Git + signing) |
+| MCP servers, tools and models | Built in this project: a catalog in the core, applied by the enforcement point ([RFC-0002](docs/rfcs/0002-mcp-servers-tools-and-models.md)) |
 | Observability | OpenTelemetry |
 
 ## Roadmap
@@ -90,8 +90,8 @@ These are the first modules we plan to integrate. None of them is final.
 | Phase | Focus | Exit gate |
 | --- | --- | --- |
 | **0: Foundations** | Module contracts, data model, threat model | Contracts v0.1 reviewed |
-| **1: Core MVP** | Inventory and identity, audit and basic UI, kill switch through White Tower's enforcement point and network quarantine | Pilot with real agents |
-| **2: Key modules** | LLM gateway and quotas, MCP gateway, skills repository, per-agent harness | One use case in production |
+| **1: Core MVP** | Inventory and identity, audit and basic UI, control of the MCP servers, tools and models of agents, kill switch through White Tower's enforcement point and network quarantine | Pilot with real agents |
+| **2: Key modules** | LLM gateway and quotas, MCP gateway, per-agent harness | One use case in production |
 | **3: Ecosystem** | Shadow AI discovery, compliance, third-party module SDK, public release | First third-party module |
 
 Phases are not dated yet. The implementation roadmap to the MVP, with its milestones and an illustrative calendar, is in [docs/roadmap.md](docs/roadmap.md).

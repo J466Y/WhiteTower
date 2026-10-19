@@ -5,10 +5,10 @@
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
 | **Size** | M |
-| **Depends on** | P1-03 (login); then the API of each feature plan |
+| **Depends on** | P1-03 (login); then the API of each feature plan: P1-16's for step 9, and its step 7 for the end-to-end tests of blocks |
 | **Unblocks** | P1-13, P1-14 |
 | **Requirements** | API-04, AUD-04, KIL-05, KIL-08 |
-| **Decisions** | ADR-0001, ADR-0009 |
+| **Decisions** | ADR-0001, ADR-0009, RFC-0002 |
 
 ## Goal
 
@@ -16,7 +16,7 @@ A command-line tool for operators, owners and auditors that covers the day-to-da
 
 ## Scope
 
-**In:** login, profiles, agents, credentials, policies, halts, audit (query, export, verification), modules, documentation and packaging.
+**In:** login, profiles, agents, credentials, policies, halts, audit (query, export, verification), modules, the catalog and agents' tooling, documentation and packaging.
 
 **Out:** anything the public API does not offer (the CLI is a pure API client), except local key generation and offline audit verification.
 
@@ -95,13 +95,27 @@ All are built on `pkg/auditverify` (P1-02).
 
 **Done when:** an operator registers and approves the mock module from the CLI.
 
-### 9. Documentation
+### 9. Catalog and tooling (with P1-16)
 
-Generate the command reference from `cobra`, and add task-oriented examples: onboarding, policy as code, halting, verifying evidence, break-glass.
+- `wtctl catalog servers|tools|models list` (by status) and `get <key>`; `wtctl catalog diff <tool key>` between the pinned and the reported definition.
+- `wtctl catalog approve <key>` approves an entry, or its new definition or digest, with the classification (`--read-only`, `--destructive`, `--open-world`) and the arguments policies may see (`--arg base`, `--arg path:path`). `wtctl catalog decline <key> --reason` declines one; `--agent <agent>` declines every entry that waits for review from that agent.
+- `wtctl catalog block --server|--tool|--model|--provider|--endpoint <reference> --reason`, which asks for confirmation unless `--yes` is given; `wtctl catalog blocks --watch`, with each block's spread; `wtctl catalog unblock request` and `approve`.
+- `wtctl agent tooling list <agent>` (observed, enabled and declared; `--unused` for review candidates), `enable request --reason`, `enable approve`, `disable --reason`, and `declare -f` for agents at C0 and C1. Enabling names tools and models; naming a server enables its approved tools.
+- `wtctl policy rule compile -f rule.yaml` prints the Cedar statements that the catalog's API compiles from a usage rule (P1-16, step 1), for policy-as-code repositories. The CLI never compiles rules itself.
+- The keys of an agent's own tools (`agent/<name>`) are unique only within their agent, so the commands that take one also take `--agent`.
+- A break-glass session cannot block: it may only halt and read (HUM-06, P1-03 step 9).
+
+**Reported text** (names, descriptions, schemas, and the display forms of URLs and command lines) is escaped in every output format, JSON and YAML included, before it reaches the terminal: no control, bidirectional or invisible character gets through (ST-83). Tables pass it through `logging.Sanitize`; `get` and `diff` show definitions in full, with the same escaping and no length cut.
+
+**Done when:** with the console down, an operator blocks a server, watches the block spread and requests lifting it, which someone else approves; an owner's request to enable tooling is approved by someone else; a CI pipeline applies a policy with a usage rule; and ST-83 passes. The block commands are tested against the API's mocks until P1-16 step 7 lands, and end to end from then on.
+
+### 10. Documentation
+
+Generate the command reference from `cobra`, and add task-oriented examples: onboarding, enabling tooling, policy as code with usage rules, halting, blocking a server, verifying evidence, break-glass.
 
 **Done when:** the reference is published with the documentation and the examples run in CI.
 
-### 10. Packaging
+### 11. Packaging
 
 Build through GoReleaser (P0-01): signed binaries for Linux, macOS and Windows on amd64 and arm64. Package managers (Homebrew, Scoop, winget) come later.
 
@@ -112,7 +126,8 @@ Build through GoReleaser (P0-01): signed binaries for Linux, macOS and Windows o
 - End-to-end tests cover the main flows using a personal access token in CI; interactive login is tested manually on the three operating systems.
 - `wtctl audit verify` detects the P1-02 tamper suite.
 - Halting through the CLI works while the console is down, and with a break-glass session while the IdP is down.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-11-cli) pass: ST-57 to ST-59.
+- Blocking a catalog entry through the CLI works while the console is down.
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-11-cli) pass: ST-57 to ST-59, and ST-83.
 
 ## Risks and open questions
 

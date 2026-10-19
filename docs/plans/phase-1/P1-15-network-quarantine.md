@@ -18,7 +18,7 @@ When an agent running on Kubernetes is halted, its pods lose network access with
 
 **In:** a Go controller deployed once per cluster, deny rule templates for Cilium (the reference), Calico, Antrea and AdminNetworkPolicy, reconciliation, acknowledgements and events, protection of the quarantine against tampering, the image and Helm chart, end-to-end tests on kind with Cilium, measurements, a runbook.
 
-**Out:** stopping, scaling down or restarting workloads (Phase 2 harness module); agents on Docker hosts or virtual machines (a documented manual procedure only); finding agent pods that carry no agent label (Phase 3 discovery); the halt domain and its status (P1-08).
+**Out:** stopping, scaling down or restarting workloads (Phase 2 harness module); agents on Docker hosts or virtual machines (a documented manual procedure only); finding agent pods that carry no agent label (Phase 3 discovery); the halt domain and its status (P1-08); enforcing catalog blocks on the network (the Phase 2 MCP network gateway, RFC-0002).
 
 ## Deliverables
 
@@ -72,8 +72,9 @@ Each rule denies all ingress and egress, with two exceptions:
 - Create and delete rules to match, idempotently; on startup, adopt the rules that already exist.
 - **Never lift a quarantine without fresh state from the core.** While disconnected, or after its lease expires, the controller keeps every existing rule and raises an alert; it applies no new rule until it reconnects, because it no longer knows the state. An option, off by default, quarantines every covered agent when the lease expires, for sites that prefer isolation to availability.
 - Watch pods to count, per agent, the pods each rule covers.
+- Blocks ([RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md)) arrive in their own record of the watch stream. They are not halts: the controller ignores them, and the spread of blocks counts enforcement points only (P1-16, step 7).
 
-**Done when:** unit tests cover halts, releases, overlapping halts, a fleet halt, a controller restart and a lost connection.
+**Done when:** unit tests cover halts, releases, overlapping halts, a fleet halt, a controller restart and a lost connection, and a change that carries only blocks leaves every rule as it is.
 
 ### 5. Acknowledgements, events and coverage
 

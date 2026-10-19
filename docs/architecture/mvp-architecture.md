@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft v0.1, open for review |
-| **Date** | 2026-09-28; updated 2026-09-29 (ADR-0011, network quarantine) and 2026-09-30 (threat model) |
+| **Date** | 2026-09-28; updated 2026-09-29 (ADR-0011, network quarantine), 2026-09-30 (threat model) and 2026-10-19 ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): MCP servers, tools and models) |
 | **Related** | [Requirements](../requirements/mvp-requirements.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md), [Threat model](../security/threat-model.md) |
 
 This document describes how the MVP is built: its components, the interfaces between them, the flows that matter most, and how it is deployed. The reasons behind each choice are in the ADRs; this document only links to them. Normative details (exact schemas, messages and states) are produced by the Phase 0 plans and will replace the sketches marked as such here.
@@ -18,9 +18,10 @@ This document describes how the MVP is built: its components, the interfaces bet
 | Stop running agents within seconds, with a bounded worst case | KIL-01 to KIL-07, KIL-10, NFR-03 to NFR-05 | Halts are pushed state changes, acknowledged per instance; lease expiry is the backstop ([ADR-0005](../adr/0005-edge-enforcement-with-leases.md)); on Kubernetes, network quarantine does not depend on the agent's process (section 6.2) |
 | Evidence that holds up even against a privileged insider | AUD-01 to AUD-06 | Merkle tree log with signed checkpoints anchored outside ([ADR-0006](../adr/0006-tamper-evident-audit-log.md)) |
 | Governance rules that are enforced, not just documented | AID-04, KIL-06, POL-04 | Token issuance gated by lifecycle and run state in the same transaction ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)) |
+| Delimit what each agent can do with its MCP servers, tools and models, without slowing halts | CAT-01 to CAT-10, NFR-24 | A catalog that people review and enable per agent, signed into each bundle and checked by the enforcement point before policies; blocks pushed in their own record of the watch stream (sections 5.6 and 6; [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)) |
 | Self-hosted, air-gapped, few moving parts | CON-02, NFR-14 | One Go binary with the console embedded, plus PostgreSQL ([ADR-0001](../adr/0001-backend-language-go.md), [ADR-0002](../adr/0002-frontend-typescript-react.md), [ADR-0003](../adr/0003-postgresql-only-stateful-dependency.md)) |
 | Interchangeable modules | MOD-01 to MOD-08 | Versioned contracts in standard formats, conformance kit ([ADR-0004](../adr/0004-api-and-contract-formats.md)) |
-| A small core | CON-05 | Five functions in the core; everything else behind the module contract |
+| A small core | CON-05 | Five functions in the core; the catalog of MCP servers, tools and models extends the inventory and the policy model, and adds no sixth; everything else behind the module contract |
 
 ## 2. System context
 
@@ -51,6 +52,9 @@ flowchart TB
         AG[AI agent] --- EP[White Tower enforcement point, in the agent's process]
     end
 
+    MCPS[MCP servers, local and remote]
+    LLM[Model providers]
+
     QM[Network quarantine module, one per Kubernetes cluster]
     CNI[Cluster network, CNI with deny rules]
 
@@ -61,7 +65,10 @@ flowchart TB
     UI --> API
     CLI --> API
     API -- login --> IDP
-    EP -- token, watch, events --> MAPI
+    EP -- token, watch, tooling reports, events --> MAPI
+    AG -- tool calls --> MCPS
+    AG -- model calls --> LLM
+    LLM -. tools it runs for the agent .-> MCPS
     QM -- token, watch, acknowledgements --> MAPI
     QM -- isolates halted agents --> CNI
     core --> PG
@@ -69,7 +76,7 @@ flowchart TB
     OW -. registers .-> TP
 ```
 
-Third-party agents that cannot be integrated at runtime still get an inventory record, an owner, a use case and a policy (coverage C0). Governed agents run with an enforcement point in their process that talks to the core. On Kubernetes, the network quarantine module isolates halted agents without relying on that process.
+Third-party agents that cannot be integrated at runtime still get an inventory record, an owner, a use case and a policy (coverage C0); their owners or operators can also declare their tooling, which nothing enforces. Governed agents run with an enforcement point in their process that talks to the core. It reports the agent's MCP servers, tools and models, and lets the agent use only those enabled for it (section 5.6). On Kubernetes, the network quarantine module isolates halted agents without relying on that process.
 
 ## 3. The core
 
@@ -90,6 +97,7 @@ flowchart LR
         INV[inventory: agents, owners, use cases, lifecycle, reviews]
         AID[agentid: credentials, tokens, signing keys]
         POL[policy: versions, approvals, bundles]
+        CAT[catalog: MCP servers, tools, models, enablement, blocks]
         KS[killswitch: halts, releases, acknowledgements, drills]
         GS[govstate: state versions, leases, watch fan-out]
         MOD[modules: manifests, instances, capabilities]
@@ -115,6 +123,7 @@ flowchart LR
 | `internal/inventory` | Agents, owners, use cases, reviews, lifecycle state machine, coverage | INV-01 to INV-10 |
 | `internal/agentid` | Agent and module credentials, token endpoint, JWKS, key rotation | AID-01 to AID-07 |
 | `internal/policy` | Policies, versions, approvals, effective sets, signed bundles | POL-01 to POL-08 |
+| `internal/catalog` | MCP servers, tools and models, their definitions, review and blocks; per-agent enablement; observations from tooling reports and declarations; the content of each bundle's catalog file; the usage-rule compiler | CAT-01 to CAT-10 |
 | `internal/killswitch` | Halts, releases, acknowledgements, propagation metrics, drills | KIL-01 to KIL-09 |
 | `internal/govstate` | Governance state per agent, versions, leases, watch fan-out | MOD-04, NFR-03, NFR-05 |
 | `internal/modules` | Manifests, registrations, instances, capability index | MOD-01 to MOD-03 |
@@ -137,6 +146,8 @@ Jobs run on every replica but acquire a PostgreSQL advisory lock, so only one re
 | Audit sealer | Appends ingested events to the Merkle tree and signs checkpoints | AUD-03, NFR-09 |
 | Audit exporter | Streams sealed events and checkpoints to OTLP, JSON Lines and syslog, with a persisted cursor | AUD-06, AUD-07 |
 | Lifecycle guard | Suspends agents whose owner is inactive or whose review is overdue; sends reminders | INV-05, INV-06 |
+| Bundle rebuilder | Rebuilds, in chunks, the bundles that an activated global policy version, a changed catalog entry or a change to an agent's tooling affects, coalesced per agent; blocks never rebuild bundles | POL-05, CAT-03 |
+| Tooling last use | Keeps when each enabled entry was last used, from the allowed decisions that enforcement points report, never with a write per decision | CAT-09 |
 | Lease watchdog | Marks instances as lost when their lease expires; raises alerts for unconfirmed halts | KIL-03, KIL-04 |
 | Retention | Drops expired audit partitions while keeping tree hashes | AUD-08 |
 | Key rotation | Rotates token, bundle and checkpoint signing keys on schedule | AID-05 |
@@ -164,8 +175,12 @@ Separating the human-facing and machine-facing listeners lets operators expose t
 | `/api/v1/agents/{id}/credentials` | Register, rotate and revoke public keys |
 | `/api/v1/agents/{id}/instances` | Running instances reported by enforcement points |
 | `/api/v1/agents/{id}/reviews` | Periodic reviews |
+| `/api/v1/agents/{id}/tooling` | Observed, enabled and declared tooling; request and approve enabling (two people); disable at once; declare the tooling of an agent without an enforcement point |
 | `/api/v1/use-cases` | Create, validate, reject, request changes |
 | `/api/v1/policies`, `/api/v1/policies/{id}/versions` | Author, validate, diff, submit, approve, activate, roll back |
+| `/api/v1/catalog/servers`, `/api/v1/catalog/tools`, `/api/v1/catalog/models` | List, filter by key and read; approve an entry, a new definition or a new digest, with its classification and the arguments policies see; compile a usage rule into its Cedar statements |
+| `/api/v1/catalog/blocks` | Issue a block, at once and with a reason; list the active blocks and their spread |
+| `/api/v1/catalog/blocks/{id}/unblock-requests` | Request and approve unblocking (two people) |
 | `/api/v1/halts` | Issue a halt (agent, fleet or selector); list; per-instance status |
 | `/api/v1/halts/{id}/release-requests` | Request and approve a release (two people) |
 | `/api/v1/audit/events`, `/api/v1/audit/checkpoints` | Search; event detail with inclusion proof; checkpoints and keys |
@@ -180,11 +195,15 @@ Defined in `api/proto`, package `whitetower.module.v1alpha1`, and specified in t
 | --- | --- | --- |
 | `RegistryService.RegisterInstance` | Module → core | Announce an instance: module, manifest hash, version, supported contract versions, agents served |
 | `RegistryService.Heartbeat`, `DeregisterInstance` | Module → core | Report health and the agents served; leave cleanly |
-| `GovernanceService.Watch` | Core → module (server stream) | Snapshot, then changes: agent state, halts, bundle reference, fleet state, lease renewals |
+| `RegistryService.ReportTooling` | Module → core | Report an agent's MCP servers, tools and models, with each tool's definition hash: complete, idempotent, never authorizing. The response lists the definitions the core lacks |
+| `RegistryService.ReportDefinitions` | Module → core | Send those definitions, which the core stores under the hash it recomputes |
+| `GovernanceService.Watch` | Core → module (server stream) | Snapshot, then changes: agent state, halts, bundle reference, fleet state, blocks, lease renewals |
 | `GovernanceService.Acknowledge` | Module → core | Report halt layers, bundle activations and the state version applied |
 | `PolicyService.GetBundle`, `GetBundleKeys` | Module → core | Download a signed policy bundle by reference; list the bundle signing keys |
 | `EventService.Publish` | Module → core | Send a batch of CloudEvents: decisions, actions, instance events |
 | `MetaService.GetServerInfo` | Module → core | The core's version and supported contract versions |
+
+The two tooling methods and the blocks record come from RFC-0002, and enter the contracts with step 12 of plan P0-03, before `contracts/v0.1.0` is tagged. Only instances of modules that declare the `enforcement-point` capability call the two methods, and only for agents in their scope.
 
 ### 4.4 Events
 
@@ -194,9 +213,11 @@ The catalog is in `api/events`, specified in the [module contracts](../contracts
 | --- | --- |
 | Enforcement points | `whitetower.decision.made.v1`, `whitetower.action.executed.v1`, `whitetower.instance.started.v1`, `whitetower.instance.halted.v1`, `whitetower.bundle.activated.v1`, `whitetower.bundle.rejected.v1`, `whitetower.lease.expired.v1` |
 | Network quarantine module | `whitetower.quarantine.applied.v1`, `whitetower.quarantine.lifted.v1` |
-| Core | `whitetower.agent.created.v1`, `whitetower.agent.lifecycle_changed.v1`, `whitetower.policy.version_approved.v1`, `whitetower.halt.issued.v1`, `whitetower.halt.released.v1`, `whitetower.audit.checkpoint.v1`, and one type for every other state change (AUD-01) |
+| Core | `whitetower.agent.created.v1`, `whitetower.agent.lifecycle_changed.v1`, `whitetower.policy.version_approved.v1`, `whitetower.halt.issued.v1`, `whitetower.halt.released.v1`, `whitetower.audit.checkpoint.v1`, the `whitetower.catalog.*` and `whitetower.tooling.*` types of RFC-0002 (section 9), and one type for every other state change (AUD-01) |
 
 Every event carries the W3C trace context (CloudEvents distributed tracing extension), so a decision can be followed from the agent to the audit log.
+
+With RFC-0002, the events of enforcement points gain optional fields: `decision.made` names the usage rules that decided, and `action.executed` gains the tool's origin, so the calls a model provider runs for the agent are recorded too. The new core events name references only by their SHA-256, and carry no description or schema.
 
 ## 5. Key flows
 
@@ -204,9 +225,9 @@ Every event carries the W3C trace context (CloudEvents distributed tracing exten
 
 1. An owner proposes the agent with its metadata and use case (`draft`, then `proposed`).
 2. The advisory committee validates the use case (`validated`). The owner may now register non-production credentials and test.
-3. The agent-specific policy is written, validated and approved by the advisory committee; the harness is declared (`ready`).
+3. The agent-specific policy is written, validated and approved by the advisory committee; the harness is declared (`ready`). In the same stage, the owner requests enabling the agent's tooling, and someone else approves (section 5.6). Tooling is not a condition of `ready`: an agent may use none.
 4. The owner or an operator activates the agent (`active`). The core checks the invariant: active owner, validated use case, approved agent-specific policy.
-5. The core builds and signs the agent's bundle and publishes its governance state. Production tokens can now be issued.
+5. The core builds and signs the agent's bundle, with its catalog file, and publishes its governance state. Production tokens can now be issued.
 6. Reviews come due by risk tier; overdue reviews and inactive owners lead to automatic suspension.
 
 ### 5.2 A governed agent action
@@ -216,12 +237,13 @@ sequenceDiagram
     participant A as Agent
     participant EP as Enforcement point
     participant C as White Tower core
-    Note over EP,C: Beforehand: valid lease, run state RUNNING, verified bundle
+    Note over EP,C: Beforehand: valid lease, run state RUNNING, verified bundle with its catalog file
     A->>EP: tool call or other action
+    EP->>EP: tool and model calls: check the catalog after the gate
     EP->>EP: evaluate global and agent-specific policies locally
     alt allowed
         EP-->>A: proceed
-    else denied, lease expired, no valid bundle or halted
+    else denied by the catalog or a policy, lease expired, no valid bundle or halted
         EP-->>A: blocked
     end
     EP-)C: Publish decision event (asynchronous, buffered on disk)
@@ -229,6 +251,8 @@ sequenceDiagram
 ```
 
 The core is not in the synchronous path. If it is unreachable, the EP keeps deciding with its last state until the lease expires, then fails closed.
+
+For tool and model calls, the catalog check comes after the gate and before the policies, and denies with the first reason that applies: a block covers the server, the tool or the model; the bundle's catalog does not list it; it is not approved; it is not enabled for the agent; its definition or its digest differs from the pinned one ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), section 7.1). Before each model call, the EP also evaluates `tool.expose` for every tool the request offers, and removes those the agent may not use, so a tool whose definition changed never reaches the model (EP-17). Section 5.6 shows how the catalog gets there.
 
 ### 5.3 Halting an agent
 
@@ -257,6 +281,8 @@ sequenceDiagram
 
 In the same transaction, token issuance for the agent stops, except for the module API tokens its enforcement point needs to acknowledge, deliver its evidence and learn of the release (DC-1 of the [threat model](../security/threat-model.md)). A fleet halt works the same way through a fleet-wide state, which also covers agents registered afterwards and leaves individual lifecycle states unchanged. Releasing a halt needs a request and an approval by two different people.
 
+Blocks (section 5.6) take the same path without enlarging it. A block is committed with its state version and streamed without waiting for any bundle (CORE-12), in a record of its own, never in the fleet state, so a fleet halt costs the same with 500 blocks active ([threat model](../security/threat-model.md), DC-9). Enforcement points acknowledge the state version that carries a block once they apply it (EP-15), and the console shows its spread as for halts (NFR-24). Lifting a block, like releasing a halt, needs two people.
+
 ### 5.4 Publishing a policy change
 
 1. A new policy version is written and validated (syntax, and tests if provided).
@@ -271,22 +297,40 @@ In the same transaction, token issuance for the agent stops, except for the modu
 3. The exporter streams events and checkpoints to the SIEM. Checkpoints stored outside are later used to prove that the log was not rewritten.
 4. `wtctl audit verify` recomputes the tree and checks signatures; `wtctl audit prove` checks single events and consistency between checkpoints.
 
+### 5.6 Governing an agent's tools and models
+
+[RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) delimits what an agent can do by the MCP servers, tools and models enabled for it, and how it may use them by the usage rules of its policies. Plan P1-16 builds the core's side, and P1-09 the enforcement point's.
+
+1. The EP reports the agent's MCP servers, tools and models, redacted, when the agent starts and whenever they change (`ReportTooling`), then sends the tool definitions the core does not have yet (`ReportDefinitions`). Unknown references become `discovered` entries of the catalog, and nothing becomes usable (CORE-10).
+2. The advisory committee reviews each definition in full and approves the entry, which pins the definition's hash, or a self-hosted model's digest. It also classifies each tool and declares the arguments policies may see. What it does not want, it declines: the entry stays denied, and leaves the queue of what waits for review.
+3. The owner or the advisory committee requests enabling tools and models for the agent, or all the approved tools of a server at once, and someone other than the requester approves (HUM-04). Disabling takes effect at once.
+4. The core rebuilds the agent's bundle with its catalog file, which the EP activates with the policies, atomically (section 5.4).
+5. Every tool and model call passes the gate, the catalog check and the policies, usage rules included (section 5.2). Before each model call, the EP hides the tools the agent may not use, and narrows the tools the model provider would run for it (EP-17, EP-18).
+6. A changed definition or digest waits for review while the pinned one stays. Until someone approves it, the tool or the model is denied, and the tool hidden.
+7. Blocks reach every EP at once through the watch stream (section 5.3), and never rebuild a bundle.
+
+The owners or operators of agents without an enforcement point (coverage C0 and C1) declare their tooling, so the inventory is complete; nothing enforces it (CAT-08).
+
 ## 6. Governance state and leases
 
-For every agent, the core maintains a governance state record: lifecycle state, halts, the effective bundle reference (version, manifest hash and size), the lease TTL, the halt mode, the attributes policies may use, and a version number taken from a global sequence. The fleet state, with its active fleet halts, is one more record.
+For every agent, the core maintains a governance state record: lifecycle state, halts, the effective bundle reference (version, manifest hash and size), the lease TTL, the halt mode, the attributes policies may use, and a version number taken from a global sequence. The fleet state, with its active fleet halts, is one more record. The active blocks of RFC-0002 are a third record, apart from the fleet state: each block carries its ID, its kind, the SHA-256 of what it covers and its issue time, and changes carry the blocks added and the IDs of those removed. At most 500 are active, about 40 KB in a snapshot, and they never enlarge the fleet record that fleet halts change ([threat model](../security/threat-model.md), DC-9).
 
 - **Watch protocol.** An EP opens `Watch` with the last version it applied. The core replies with a snapshot if the EP is new or too far behind, then streams changes in version order. Lease renewals come at a third of the TTL, and at least every 30 seconds, only when the stream is current. The [module contracts](../contracts/module-contract-v0.1.md#5-governance-state-leases-and-halts) specify it.
 - **Lease expiry is computed by the EP** from its own monotonic clock at the moment it receives a renewal. Only a fresh renewal counts: one the core stamped more than a few seconds earlier, by the EP's clock, renews nothing, so a stream held back on its way lets leases run out instead of delaying halts ([threat model](../security/threat-model.md), DC-2). That check needs synchronized clocks, as token expiry does; the length of the lease does not.
-- **Obligations of an EP**, numbered EP-1 to EP-12 in the [contracts](../contracts/module-contract-v0.1.md#57-obligations-of-enforcement-points):
+- **Obligations of an EP**, numbered EP-1 to EP-12 in the [contracts](../contracts/module-contract-v0.1.md#57-obligations-of-enforcement-points), and EP-13 to EP-19 once RFC-0002 is in them (P0-03 step 12):
   - allow nothing until it has a current state, a lease and a verified bundle;
   - deny everything and halt the agent when the lease expires or the agent is halted;
   - acknowledge halts, layer by layer, and bundle activations;
   - record every decision durably before the action proceeds, and fail closed when the buffer is full;
-  - reconnect with jittered exponential backoff.
+  - reconnect with jittered exponential backoff;
+  - report the agent's tooling without credentials, and send the definitions the core asks for (EP-13, EP-14);
+  - apply blocks as soon as they arrive, and check the catalog after the gate and before the policies (EP-15, EP-16);
+  - offer the model only the tools the agent may use, and narrow the tools the provider runs (EP-17, EP-18);
+  - fill only the declared arguments of a tool call, with their transforms (EP-19).
 
 ### 6.1 The MVP enforcement point: White Tower's package in the agent's process
 
-Agent frameworks run tool and model calls inside the agent's process, so that is where an enforcement point sees every action. The MVP's enforcement point is a **Python package**, `whitetower-ep` (`modules/ep-python/`), loaded in the agent's process ([ADR-0011](../adr/0011-own-python-enforcement-point.md)). Spike S1 evaluated Microsoft AGT as its foundation, and found that White Tower had to build the gate, the halt, the Cedar evaluation and the evidence buffer anyway, with weaker guarantees ([S1](../spikes/S1-agt.md)).
+Agent frameworks run tool and model calls inside the agent's process, so that is where an enforcement point sees every action: calls to local MCP servers and to the agent's own functions, and the tools a model request asks its provider to run, which a network gateway cannot see. The MVP's enforcement point is a **Python package**, `whitetower-ep` (`modules/ep-python/`), loaded in the agent's process ([ADR-0011](../adr/0011-own-python-enforcement-point.md)). Spike S1 evaluated Microsoft AGT as its foundation, and found that White Tower had to build the gate, the halt, the Cedar evaluation and the evidence buffer anyway, with weaker guarantees ([S1](../spikes/S1-agt.md)).
 
 ```mermaid
 flowchart LR
@@ -295,14 +339,18 @@ flowchart LR
         EP --- CEDAR[Cedar evaluation, cedarpy]
         EP --- BUF[(Durable evidence buffer)]
     end
-    EP -- token, Watch, GetBundle, Acknowledge, Publish --> CORE[White Tower core]
+    EP -- token, Watch, GetBundle, Acknowledge, Publish, ReportTooling, ReportDefinitions --> CORE[White Tower core]
+    FW -- tool and model calls, once allowed --> EXT[MCP servers and model providers]
 ```
 
 | Part | What it does |
 | --- | --- |
-| Framework hooks | Route every governed call and interaction (tool calls, model calls, inputs and outputs) through the gate and the policies. LangGraph 1.x first; other frameworks as the pilot needs them |
+| Framework hooks | Route every governed call and interaction (tool calls, model calls, inputs and outputs) through the gate, the catalog check and the policies. LangGraph 1.x first; other frameworks as the pilot needs them |
 | Gate | Evaluated before the policies; denies everything while there is no current state, the lease has expired, the bundle is missing or invalid, the agent is halted, or the evidence buffer is full |
-| Policy evaluation | Verifies the signed bundle, parses its Cedar policy set once, and swaps it atomically. Global and agent-specific policies form one set, so Cedar's "forbid overrides permit" gives the combination semantics of POL-03 |
+| Catalog check | For tool and model calls, after the gate and before the policies: denies what a block covers, tooling the bundle's catalog does not list, has not approved or has not enabled, a tool whose definition changed and a model whose digest differs from the pinned one. A block of a kind it does not know denies every tool and model call (EP-15, EP-16) |
+| Exposure | Before each model call, removes from the request the tools the agent may not use, narrows the declarations of the tools the provider runs, and denies the call when it cannot (EP-17, EP-18) |
+| Tooling reports | Reports the agent's servers, tools and models, with their references and definition hashes, redacted, and sends the definitions the core asks for (EP-13, EP-14) |
+| Policy evaluation | Verifies the signed bundle, parses its Cedar policy set and its catalog file once, and swaps both atomically. Global and agent-specific policies, usage rules included, form one set, so Cedar's "forbid overrides permit" gives the combination semantics of POL-03 |
 | Evidence | Writes each decision to a durable local buffer before the action proceeds, then ships the buffer in batches; no governed action without evidence |
 | Halt | Applies the halt layers below and acknowledges each one |
 
@@ -349,9 +397,13 @@ erDiagram
     HALT ||--o{ HALT_ACK : "confirmed by"
     MODULE_INSTANCE ||--o{ HALT_ACK : sends
     AUDIT_EVENT }o--|| CHECKPOINT : "covered by"
+    AGENT ||--o{ TOOLING_OBSERVATION : "known to have"
+    CATALOG_ENTRY ||--o{ TOOLING_OBSERVATION : "observed as"
+    AGENT ||--o{ AGENT_TOOLING : "may use"
+    CATALOG_ENTRY ||--o{ AGENT_TOOLING : "enabled as"
 ```
 
-Identifiers are UUIDv7. Governance records are never deleted; they are retired. Every table that the console edits has a version column for optimistic concurrency.
+`CATALOG_ENTRY` stands for the catalog's MCP servers, tools and models, three tables in the domain model (section 3.9). Identifiers are UUIDv7. Governance records are never deleted; they are retired. Every table that the console edits has a version column for optimistic concurrency.
 
 ## 8. Deployment
 
@@ -387,8 +439,8 @@ An offline bundle contains the images as OCI archives, the Helm chart, SBOMs, si
 | --- | --- |
 | Transport security | TLS 1.2 or later on every listener except the cluster-internal operations one; HTTP Strict Transport Security; mutual TLS optional on the machine listener |
 | Keys | Three separate signing keys: tokens (ES256), bundles (Ed25519), audit checkpoints (Ed25519). Read from files, rotated with overlap, public halves published. KMS and HSM backends later. |
-| Console security | Strict Content Security Policy, `__Host-` session cookie, CSRF token, no tokens in JavaScript ([ADR-0009](../adr/0009-human-auth-bff-sessions.md)) |
-| Abuse protection | Rate limits on login, token endpoint and event ingestion; request size limits; backpressure on ingestion |
+| Console security | Strict Content Security Policy, `__Host-` session cookie, CSRF token, no tokens in JavaScript ([ADR-0009](../adr/0009-human-auth-bff-sessions.md)); text that agents report is shown as plain text, marked as reported, with invisible and bidirectional characters made visible (threat model, T-76) |
+| Abuse protection | Rate limits on login, token endpoint, event ingestion and tooling reports; a bound on each agent's catalog entries waiting for review (threat model, DC-10); request size limits; backpressure on ingestion |
 | Observability | Prometheus metrics prefixed `whitetower_`; OpenTelemetry traces, exported only if configured; JSON logs with request and trace IDs |
 | Configuration | One YAML file plus `WT_`-prefixed environment variables; secrets always from files |
 | High availability | Stateless replicas; jobs elected through advisory locks; watch streams served by any replica and fed through `LISTEN/NOTIFY` |
@@ -452,14 +504,15 @@ Anything added to the "builds" tables needs an ADR explaining why integration wa
 
 | Later capability | Hook in the MVP |
 | --- | --- |
-| MCP and LLM gateways (Phase 2) | They become enforcement points using the same watch contract, and call a decision point through AuthZEN; agent tokens are already audience-bound |
+| MCP network gateway (Phase 2) | Another enforcement point on the same watch contract, catalog, blocks and usage rules (RFC-0002), for agents without White Tower's enforcement point; it reports the servers agents reach through it, and agent tokens are already audience-bound. It cannot see local servers, in-process functions or the tools a provider runs, so the in-process enforcement point stays the MVP's control point |
+| LLM gateway (Phase 2) | An enforcement point on the same watch contract that calls a decision point through AuthZEN, and applies the catalog's model entries and blocks; agent tokens are already audience-bound |
 | Second policy engine (Phase 2) | Combination semantics and test vectors are part of the contract, not of any engine |
 | Harness module (Phase 2) | Stopping or restarting workloads (scale to zero, container kill), on top of the MVP's network quarantine; both act outside the agent's process |
 | Microsoft AGT and other toolkits (Phase 2) | Interoperability adapters that plug into the same contracts ([ADR-0011](../adr/0011-own-python-enforcement-point.md)) |
 | Strict mode for critical agents (Phase 2) | Synchronous decision per action, as an option of the watch contract |
 | Message broker (if needed) | Events and notifications sit behind interfaces |
 | External identity sources | SPIRE, Kubernetes workload identity and external issuers plug into the token endpoint |
-| Discovery (Phase 3) | Inventory accepts agents with a `discovered` source |
+| Discovery (Phase 3) | Inventory accepts agents with a `discovered` source; the catalog already accepts declared tooling, and could import tooling from endpoint security tools (RFC-0002, question 6) |
 
 ## 13. Architecture risks
 
@@ -472,4 +525,8 @@ Anything added to the "builds" tables needs an ADR explaining why integration wa
 | Network quarantine depends on the cluster's CNI | Cilium as the reference, tested in CI; templates for Calico, Antrea and AdminNetworkPolicy; the console shows the layer as unavailable where the CNI cannot deny |
 | The sealer limits audit throughput | Spike S3: at 2,000 events per second the sealer was busy 18% of the time, with a p99 sealing delay of 341 ms, and it kept up at 10,000 per second ([S3](../spikes/S3-audit-throughput.md)) |
 | Fail-closed turns core outages into fleet outages | High availability, TTL tuned per risk tier, alerting on lease health; documented as an accepted trade-off (ADR-0005) |
+| Blocks or catalog changes slow halts | Blocks travel in their own record of the watch stream, as hashes, at most 500, and never rebuild bundles (DC-9); bundle rebuilds run in chunks (P1-06); halts are measured with 500 active blocks (ST-80, NFR-24) |
+| Frameworks and model providers differ in what an enforcement point can see or change in a model request | Exposure fails closed where a tool cannot be removed (EP-17, EP-18); conformance scenarios S-18 to S-24; what a provider does with the tools it runs stays a residual risk (threat model, T-79 and A-7) |
+| Reports flood the catalog or its reviewers | Limits, and a rate limit per instance and agent; a bound on each agent's entries waiting for review (DC-10); discovered entries stay inert until reviewed (T-74) |
+| The Go core and the Python enforcement point compute references or definition hashes differently | Vectors for string forms and definition hashes run on both stacks (P0-03 step 12); the core recomputes every hash it stores |
 | Contracts change often during the alpha | `v1alpha1` label, RFC process, breaking-change checks in CI |
