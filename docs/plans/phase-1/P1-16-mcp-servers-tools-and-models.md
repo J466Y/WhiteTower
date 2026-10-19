@@ -73,7 +73,7 @@ The core knows which MCP servers, tools and models each governed agent has, incl
   | `tooling.declare` | Owner: own; operator: all |
 
   - Each is mapped to its operations in `Authorizer.registerDefaults`; an operation missing there is refused.
-  - The permission matrix test (ST-17) grows from 24 to 33 permissions, so it checks 7 × 33 = 231 pairs, and `resttest/testdata/me.json` is regenerated.
+  - The permission matrix test (ST-17) grows from 25 to 34 permissions, so it checks 7 × 34 = 238 pairs, and `resttest/testdata/me.json` is regenerated.
   - **Separation of duties.** Nobody approves their own request to enable or to unblock: `authz.CheckApproval`, with the requester as the author, and the same check again in the database, as `reject_self_approval` and `halt_release_two_people` do.
   - **Break-glass** gets none of them, not even `catalog.view`: it halts, and reads only what P1-03 lets it read (HUM-06, ST-20).
   - **`own`** passes the middleware, so each handler checks ownership, with P1-04's ownership check rather than another copy of `IsAgentOwner`.
@@ -86,7 +86,7 @@ The core knows which MCP servers, tools and models each governed agent has, incl
   - members and parameters are camelCase (`readOnly`, `openWorld`, `definitionSha256`), although bundles and events use snake_case;
   - lists are objects with a named array and `nextCursor`, with `limit` and `cursor` (`rest.PageSize`, `rest.EncodeCursor`, `rest.DecodeCursor`);
   - updates take `If-Match` with the row's version (`rest.ETag`, `rest.IfMatch`, `rest.Stale`);
-  - refusals that come from state, such as a request already pending, an entry not approved or the cap of 500 blocks, answer with a new code, `conflict` (409), added to `internal/api/rest/problem/problem.go` (its constant and its `Codes` entry) and to the [errors reference](../../reference/api-errors.md), which a test keeps in step;
+  - refusals that come from state, such as a request already pending, an entry not approved or the cap of 500 blocks, answer with the code `conflict` (409), which P1-04 added to `internal/api/rest/problem/problem.go` and to the [errors reference](../../reference/api-errors.md);
   - error details name nothing internal: never `err.Error()`.
 
 **Done when:** the operations are merged and agreed with the console side, the permission tests cover every new row of the matrix, and for every `own` grant an owner is refused on an agent they do not own.

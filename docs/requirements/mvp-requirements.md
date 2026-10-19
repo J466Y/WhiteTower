@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Version 0.3: the MCP servers, tools and models of agents join the MVP ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), decision of the maintainer of 2026-10-13). Version 0.2 was the Phase 0 gate's (2026-09-30): targets set from measurements, open questions Q1 to Q6 closed |
-| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)) and 2026-10-19 (RFC-0002) |
+| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)) and 2026-10-19 (RFC-0002; the permission matrix's row on reassigning an owner, plan P1-04) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
 
@@ -146,6 +146,7 @@ stateDiagram-v2
 | View inventory | ✔ | ✔ | ✔ | active only | ✔ | ✔ | ✔ |
 | Propose an agent (becomes its owner) | | | ✔ | | | | |
 | Edit agent metadata | | | own | | ✔ | | |
+| Reassign an agent's primary owner at once (plan P1-04) | | ✔ | | | ✔ | | |
 | Validate or reject a use case | | ✔ | | | | | |
 | Author a global policy | ✔ | ✔ | | | | | |
 | Approve a global policy | ✔ | | | | | | |

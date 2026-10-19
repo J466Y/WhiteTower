@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md), step 4) |
-| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)) |
+| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)); sections 3 and 4 updated on 2026-10-19 for shared use cases and the decisions on proposals (the maintainer's decisions, plan P1-04) |
 | **Normative** | Yes. The machine-readable form is [agent-lifecycle.yaml](agent-lifecycle.yaml); plan P1-04 generates the transition guards from it, and the two must never disagree |
 | **Related** | [Requirements 5.1.1](../requirements/mvp-requirements.md#511-agent-lifecycle-initial-proposal-refined-in-plan-p0-02), [domain model](domain-model.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md) |
 
@@ -41,11 +41,11 @@ The actors are the roles of the [permission matrix](../requirements/mvp-requirem
 | ID | Action | From | To | Who | Guards | Effects |
 | --- | --- | --- | --- | --- | --- | --- |
 | T1 | create | none | draft | owner role (becomes the primary owner) | metadata complete, use case linked | Assigns the primary owner; creates the governance state |
-| T2 | submit | draft | proposed | primary owner, delegate | metadata complete, owner active | Submits the use case; notifies the advisory committee |
+| T2 | submit | draft | proposed | primary owner, delegate | metadata complete, owner active, use case not rejected | Submits the use case; notifies the advisory committee |
 | T3 | withdraw | proposed | draft | primary owner, delegate | none | Withdraws the use case |
 | T4 | request_changes | proposed | draft | advisory | not owner or creator, comment given | Use case: changes requested; notifies the owner |
 | T5 | reject | proposed | rejected | advisory | not owner or creator, comment given | Use case rejected; notifies the owner |
-| T6 | validate | proposed | validated | advisory | not owner or creator, use case not prohibited, owner active | Use case validated; notifies the owner |
+| T6 | validate | proposed | validated | advisory | not owner or creator, use case not prohibited, use case not rejected, owner active, comment given | Use case validated; notifies the owner |
 | T7 | mark_ready | validated | ready | system | agent policy active, harness declared | Notifies the owner |
 | T8 | unmark_ready | ready | validated | system | agent policy or harness missing | Notifies the owner |
 | T9 | activate | ready | active | primary owner, delegate, operator | owner active, use case validated, agent policy active, harness declared, not halted | Sets `activated_at`; schedules the first review |
@@ -54,6 +54,10 @@ The actors are the roles of the [permission matrix](../requirements/mvp-requirem
 | T12 | halt_suspend | validated, ready, active | suspended | system | an agent halt was issued for this agent | Remembers the previous state; reason `halt` |
 | T13 | reinstate | suspended | previous state | advisory, operator | comment given, owner active, review not overdue, not halted, the previous state's invariants hold | Clears the suspension |
 | T14 | retire | draft, proposed, validated, ready, active, suspended | retired | primary owner, delegate, advisory, operator | comment given | Revokes every credential; retires the agent-specific policies; cancels the open review; sets `retired_at` |
+
+**Use cases shared by several agents.** The effects of T2 to T6 on the use case apply only while the use case is neither validated nor rejected. A validated or rejected use case never changes, because other agents may rely on it: a later decision is recorded with its agent, and only the agent changes state. An agent whose use case is rejected is neither submitted nor validated: its owner links another use case while the agent is a draft.
+
+**People decide on proposals.** The decisions on a proposal (T4, T5 and T6) are taken by people: a service account that holds the advisory role is refused (HUM-04). Every decision records its comment, the validation included.
 
 Every transition:
 
@@ -71,6 +75,7 @@ Every transition:
 | `not_owner_or_creator` | The actor is neither the primary owner, a delegate, nor the creator of the agent or its use case (separation of duties, HUM-04) |
 | `comment_given` | The request carries a non-empty comment |
 | `use_case_not_prohibited` | The use case's EU AI Act classification is not `prohibited` |
+| `use_case_not_rejected` | The use case's status is not `rejected` |
 | `use_case_validated` | The use case's status is `validated` |
 | `agent_policy_active` | At least one agent-specific policy of this agent has an active version (POL-04) |
 | `harness_declared` | The agent has a harness declaration |

@@ -84,10 +84,10 @@ The test harness (plan P1-01, step 10):
 A domain package's integration test takes a few lines. Once plan P1-04 adds the agents, for example:
 
 ```go
-func TestRegisterAnAgent(t *testing.T) {
+func TestProposeAnAgent(t *testing.T) {
 	pool := dbtest.New(t).Open(t)
 	api := resttest.New(t, rest.Options{Inventory: inventory.New(pool)})
-	resp, err := api.Client.RegisterAgentWithResponse(context.Background(), agent, resttest.As(owner))
+	resp, err := api.Client.ProposeAgentWithResponse(context.Background(), agent, resttest.As(owner))
 	if err != nil || resp.StatusCode() != http.StatusCreated {
 		t.Fatalf("%v %s", err, resp.Body)
 	}

@@ -16,6 +16,10 @@ const (
 	// PermissionAgentMetadataEdit allows editing metadata of an existing agent.
 	PermissionAgentMetadataEdit Permission = "agent.metadata.edit"
 
+	// PermissionAgentOwnershipReassign allows making another principal an
+	// agent's primary owner at once, without their acceptance.
+	PermissionAgentOwnershipReassign Permission = "agent.ownership.reassign"
+
 	// PermissionUsecaseValidate allows validating or rejecting an agent use case.
 	PermissionUsecaseValidate Permission = "usecase.validate"
 
@@ -86,6 +90,7 @@ var allPermissions = []Permission{
 	PermissionInventoryView,
 	PermissionAgentPropose,
 	PermissionAgentMetadataEdit,
+	PermissionAgentOwnershipReassign,
 	PermissionUsecaseValidate,
 	PermissionPolicyGlobalAuthor,
 	PermissionPolicyGlobalApprove,

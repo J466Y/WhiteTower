@@ -28,7 +28,7 @@ transitions:
     from: [draft]
     to: proposed
     actors: [primary_owner, delegate]
-    guards: [metadata_complete, owner_active]
+    guards: [metadata_complete, owner_active, use_case_not_rejected]
     effects: [submit_use_case, notify_advisory]
     audit: whitetower.agent.lifecycle_changed.v1
 
@@ -64,7 +64,7 @@ transitions:
     from: [proposed]
     to: validated
     actors: [advisory]
-    guards: [not_owner_or_creator, use_case_not_prohibited, owner_active]
+    guards: [not_owner_or_creator, use_case_not_prohibited, use_case_not_rejected, owner_active, comment_given]
     effects: [use_case_validated, notify_owner]
     audit: whitetower.agent.lifecycle_changed.v1
 

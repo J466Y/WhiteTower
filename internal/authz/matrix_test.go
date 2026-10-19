@@ -27,22 +27,23 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 			PermissionIdentityMeRead:      ScopeAll,
 		},
 		RoleAdvisory: {
-			PermissionInventoryView:      ScopeAll,
-			PermissionUsecaseValidate:    ScopeAll,
-			PermissionPolicyGlobalAuthor: ScopeAll,
-			PermissionPolicyAgentAuthor:  ScopeAll,
-			PermissionPolicyAgentApprove: ScopeAll,
-			PermissionAgentReview:        ScopeSignOff,
-			PermissionAgentSuspend:       ScopeAll,
-			PermissionAgentReinstate:     ScopeAll,
-			PermissionAgentRetire:        ScopeAll,
-			PermissionHaltAgentIssue:     ScopeAll,
-			PermissionHaltReleaseRequest: ScopeAll,
-			PermissionHaltReleaseApprove: ScopeAll,
-			PermissionAuditEventsRead:    ScopeAll,
-			PermissionAuditVerify:        ScopeAll,
-			PermissionAuditExport:        ScopeAll,
-			PermissionIdentityMeRead:     ScopeAll,
+			PermissionInventoryView:          ScopeAll,
+			PermissionAgentOwnershipReassign: ScopeAll,
+			PermissionUsecaseValidate:        ScopeAll,
+			PermissionPolicyGlobalAuthor:     ScopeAll,
+			PermissionPolicyAgentAuthor:      ScopeAll,
+			PermissionPolicyAgentApprove:     ScopeAll,
+			PermissionAgentReview:            ScopeSignOff,
+			PermissionAgentSuspend:           ScopeAll,
+			PermissionAgentReinstate:         ScopeAll,
+			PermissionAgentRetire:            ScopeAll,
+			PermissionHaltAgentIssue:         ScopeAll,
+			PermissionHaltReleaseRequest:     ScopeAll,
+			PermissionHaltReleaseApprove:     ScopeAll,
+			PermissionAuditEventsRead:        ScopeAll,
+			PermissionAuditVerify:            ScopeAll,
+			PermissionAuditExport:            ScopeAll,
+			PermissionIdentityMeRead:         ScopeAll,
 		},
 		RoleOwner: {
 			PermissionInventoryView:          ScopeAll,
@@ -66,6 +67,7 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 		RoleOperator: {
 			PermissionInventoryView:          ScopeAll,
 			PermissionAgentMetadataEdit:      ScopeAll,
+			PermissionAgentOwnershipReassign: ScopeAll,
 			PermissionAgentActivate:          ScopeAll,
 			PermissionAgentSuspend:           ScopeAll,
 			PermissionAgentReinstate:         ScopeAll,
@@ -101,8 +103,8 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 	if len(roles) != 7 {
 		t.Fatalf("expected 7 roles, got %d", len(roles))
 	}
-	if len(permissions) != 24 {
-		t.Fatalf("expected 24 permissions, got %d", len(permissions))
+	if len(permissions) != 25 {
+		t.Fatalf("expected 25 permissions, got %d", len(permissions))
 	}
 
 	totalChecked := 0
@@ -124,8 +126,8 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 		}
 	}
 
-	if totalChecked != 7*24 {
-		t.Fatalf("expected 168 checks, got %d", totalChecked)
+	if totalChecked != 7*25 {
+		t.Fatalf("expected 175 checks, got %d", totalChecked)
 	}
 }
 
@@ -262,6 +264,93 @@ func TestAuthorizer(t *testing.T) {
 			t.Errorf("owner must NOT edit other's agent, got %v", err)
 		}
 	})
+}
+
+// The operations of the inventory reach the roles that the matrix grants
+// their permission to, before their handlers check its scope on the agent.
+func TestInventoryOperationsFollowTheMatrix(t *testing.T) {
+	az := NewAuthorizer()
+	everyone := AllRoles()
+	owners := []Role{RoleOwner}
+	editors := []Role{RoleOwner, RoleOperator}
+	cases := map[string][]Role{
+		"listAgents":               everyone,
+		"proposeAgent":             owners,
+		"exportAgents":             everyone,
+		"getAgent":                 everyone,
+		"editAgent":                editors,
+		"getAgentActions":          everyone,
+		"listAgentTransitions":     everyone,
+		"transitionAgent":          everyone,
+		"listAgentInstances":       everyone,
+		"listAgentOwners":          everyone,
+		"reassignAgentOwner":       {RoleAdvisory, RoleOperator},
+		"addAgentDelegate":         editors,
+		"removeAgentDelegate":      editors,
+		"requestOwnershipTransfer": editors,
+		"cancelOwnershipTransfer":  editors,
+		"acceptOwnershipTransfer":  owners,
+		"declineOwnershipTransfer": everyone,
+		"listUseCases":             everyone,
+		"createUseCase":            owners,
+		"getUseCase":               everyone,
+		"editUseCase":              owners,
+		"listUseCaseDecisions":     everyone,
+		"listDataCategories":       everyone,
+		"listAgentReviews":         everyone,
+		"listReviews":              everyone,
+		"getReview":                everyone,
+		"completeReview":           {RoleAdvisory, RoleOwner},
+		"signOffReview":            {RoleAdvisory, RoleOwner},
+		"listInboxItems":           everyone,
+	}
+	for op, allowed := range cases {
+		for _, role := range everyone {
+			p := &auth.Principal{ID: "p1", Roles: []string{string(role)}}
+			err := az.Authorize(context.Background(), p, op)
+			if want := slices.Contains(allowed, role); want != (err == nil) {
+				t.Errorf("%s as %s: got %v, want allowed=%v", op, role, err, want)
+			}
+		}
+	}
+}
+
+// Security test ST-20: A break-glass session reads the inventory, but changes
+// nothing in it, not even through the operations whose permission only reads.
+func TestBreakglassReadsTheInventoryAndChangesNothing(t *testing.T) {
+	az := NewAuthorizer()
+	// A break-glass session holds the operator role, narrowed by its scopes
+	// to halting and reading (internal/authn, BreakglassScopes).
+	custodian := &auth.Principal{
+		ID:    "custodian",
+		Roles: []string{string(RoleOperator)},
+		Scopes: []string{
+			string(PermissionHaltAgentIssue), string(PermissionHaltFleetIssue), string(PermissionInventoryView),
+			string(PermissionAuditEventsRead), string(PermissionAuditVerify), string(PermissionAuditExport),
+			string(PermissionIdentityMeRead),
+		},
+		IsBreakglass: true,
+	}
+	for _, op := range []string{"listAgents", "getAgent", "exportAgents", "getAgentActions", "listAgentTransitions", "listUseCases", "listDataCategories", "getReview", "listInboxItems"} {
+		if err := az.Authorize(context.Background(), custodian, op); err != nil {
+			t.Errorf("%s: got %v, want allowed", op, err)
+		}
+	}
+	for _, op := range []string{
+		"proposeAgent", "editAgent", "transitionAgent", "reassignAgentOwner", "addAgentDelegate",
+		"removeAgentDelegate", "requestOwnershipTransfer", "cancelOwnershipTransfer",
+		"acceptOwnershipTransfer", "declineOwnershipTransfer", "createUseCase", "editUseCase",
+		"completeReview", "signOffReview",
+	} {
+		// An operation the authorizer does not know is refused too: make sure
+		// the refusal comes from break-glass.
+		if _, ok := az.ResolveOperation(op); !ok {
+			t.Errorf("%s maps to no permission", op)
+		}
+		if err := az.Authorize(context.Background(), custodian, op); !errors.Is(err, auth.ErrDenied) {
+			t.Errorf("%s: got %v, want refused", op, err)
+		}
+	}
 }
 
 func TestPermissionsList(t *testing.T) {

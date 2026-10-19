@@ -11,12 +11,337 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for ActorType.
+const (
+	ActorTypeBreakglass     ActorType = "breakglass"
+	ActorTypeHuman          ActorType = "human"
+	ActorTypeServiceAccount ActorType = "service_account"
+	ActorTypeSystem         ActorType = "system"
+)
+
+// Valid indicates whether the value is a known member of the ActorType enum.
+func (e ActorType) Valid() bool {
+	switch e {
+	case ActorTypeBreakglass:
+		return true
+	case ActorTypeHuman:
+		return true
+	case ActorTypeServiceAccount:
+		return true
+	case ActorTypeSystem:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentSource.
+const (
+	Discovered AgentSource = "discovered"
+	Imported   AgentSource = "imported"
+	Registered AgentSource = "registered"
+)
+
+// Valid indicates whether the value is a known member of the AgentSource enum.
+func (e AgentSource) Valid() bool {
+	switch e {
+	case Discovered:
+		return true
+	case Imported:
+		return true
+	case Registered:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentKind.
+const (
+	InHouse    AgentKind = "in_house"
+	ThirdParty AgentKind = "third_party"
+)
+
+// Valid indicates whether the value is a known member of the AgentKind enum.
+func (e AgentKind) Valid() bool {
+	switch e {
+	case InHouse:
+		return true
+	case ThirdParty:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AiActClassification.
+const (
+	HighRisk    AiActClassification = "high_risk"
+	Limited     AiActClassification = "limited"
+	Minimal     AiActClassification = "minimal"
+	NotAssessed AiActClassification = "not_assessed"
+	Prohibited  AiActClassification = "prohibited"
+)
+
+// Valid indicates whether the value is a known member of the AiActClassification enum.
+func (e AiActClassification) Valid() bool {
+	switch e {
+	case HighRisk:
+		return true
+	case Limited:
+		return true
+	case Minimal:
+		return true
+	case NotAssessed:
+		return true
+	case Prohibited:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CoverageLevel.
+const (
+	C0 CoverageLevel = "C0"
+	C1 CoverageLevel = "C1"
+	C2 CoverageLevel = "C2"
+	C3 CoverageLevel = "C3"
+)
+
+// Valid indicates whether the value is a known member of the CoverageLevel enum.
+func (e CoverageLevel) Valid() bool {
+	switch e {
+	case C0:
+		return true
+	case C1:
+		return true
+	case C2:
+		return true
+	case C3:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HaltMode.
+const (
+	Block     HaltMode = "block"
+	Interrupt HaltMode = "interrupt"
+	Terminate HaltMode = "terminate"
+)
+
+// Valid indicates whether the value is a known member of the HaltMode enum.
+func (e HaltMode) Valid() bool {
+	switch e {
+	case Block:
+		return true
+	case Interrupt:
+		return true
+	case Terminate:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InboxItemRole.
+const (
+	Admin    InboxItemRole = "admin"
+	Advisory InboxItemRole = "advisory"
+	Auditor  InboxItemRole = "auditor"
+	Operator InboxItemRole = "operator"
+	Owner    InboxItemRole = "owner"
+	Steering InboxItemRole = "steering"
+	User     InboxItemRole = "user"
+)
+
+// Valid indicates whether the value is a known member of the InboxItemRole enum.
+func (e InboxItemRole) Valid() bool {
+	switch e {
+	case Admin:
+		return true
+	case Advisory:
+		return true
+	case Auditor:
+		return true
+	case Operator:
+		return true
+	case Owner:
+		return true
+	case Steering:
+		return true
+	case User:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InstanceStatus.
+const (
+	Connected    InstanceStatus = "connected"
+	Disconnected InstanceStatus = "disconnected"
+	Lost         InstanceStatus = "lost"
+)
+
+// Valid indicates whether the value is a known member of the InstanceStatus enum.
+func (e InstanceStatus) Valid() bool {
+	switch e {
+	case Connected:
+		return true
+	case Disconnected:
+		return true
+	case Lost:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LifecycleAction.
+const (
+	LifecycleActionActivate       LifecycleAction = "activate"
+	LifecycleActionAutoSuspend    LifecycleAction = "auto_suspend"
+	LifecycleActionCreate         LifecycleAction = "create"
+	LifecycleActionHaltSuspend    LifecycleAction = "halt_suspend"
+	LifecycleActionMarkReady      LifecycleAction = "mark_ready"
+	LifecycleActionReinstate      LifecycleAction = "reinstate"
+	LifecycleActionReject         LifecycleAction = "reject"
+	LifecycleActionRequestChanges LifecycleAction = "request_changes"
+	LifecycleActionRetire         LifecycleAction = "retire"
+	LifecycleActionSubmit         LifecycleAction = "submit"
+	LifecycleActionSuspend        LifecycleAction = "suspend"
+	LifecycleActionUnmarkReady    LifecycleAction = "unmark_ready"
+	LifecycleActionValidate       LifecycleAction = "validate"
+	LifecycleActionWithdraw       LifecycleAction = "withdraw"
+)
+
+// Valid indicates whether the value is a known member of the LifecycleAction enum.
+func (e LifecycleAction) Valid() bool {
+	switch e {
+	case LifecycleActionActivate:
+		return true
+	case LifecycleActionAutoSuspend:
+		return true
+	case LifecycleActionCreate:
+		return true
+	case LifecycleActionHaltSuspend:
+		return true
+	case LifecycleActionMarkReady:
+		return true
+	case LifecycleActionReinstate:
+		return true
+	case LifecycleActionReject:
+		return true
+	case LifecycleActionRequestChanges:
+		return true
+	case LifecycleActionRetire:
+		return true
+	case LifecycleActionSubmit:
+		return true
+	case LifecycleActionSuspend:
+		return true
+	case LifecycleActionUnmarkReady:
+		return true
+	case LifecycleActionValidate:
+		return true
+	case LifecycleActionWithdraw:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LifecycleState.
+const (
+	LifecycleStateActive    LifecycleState = "active"
+	LifecycleStateDraft     LifecycleState = "draft"
+	LifecycleStateProposed  LifecycleState = "proposed"
+	LifecycleStateReady     LifecycleState = "ready"
+	LifecycleStateRejected  LifecycleState = "rejected"
+	LifecycleStateRetired   LifecycleState = "retired"
+	LifecycleStateSuspended LifecycleState = "suspended"
+	LifecycleStateValidated LifecycleState = "validated"
+)
+
+// Valid indicates whether the value is a known member of the LifecycleState enum.
+func (e LifecycleState) Valid() bool {
+	switch e {
+	case LifecycleStateActive:
+		return true
+	case LifecycleStateDraft:
+		return true
+	case LifecycleStateProposed:
+		return true
+	case LifecycleStateReady:
+		return true
+	case LifecycleStateRejected:
+		return true
+	case LifecycleStateRetired:
+		return true
+	case LifecycleStateSuspended:
+		return true
+	case LifecycleStateValidated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OwnerAssignmentRole.
+const (
+	Delegate OwnerAssignmentRole = "delegate"
+	Primary  OwnerAssignmentRole = "primary"
+)
+
+// Valid indicates whether the value is a known member of the OwnerAssignmentRole enum.
+func (e OwnerAssignmentRole) Valid() bool {
+	switch e {
+	case Delegate:
+		return true
+	case Primary:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OwnershipTransferStatus.
+const (
+	OwnershipTransferStatusAccepted  OwnershipTransferStatus = "accepted"
+	OwnershipTransferStatusCancelled OwnershipTransferStatus = "cancelled"
+	OwnershipTransferStatusDeclined  OwnershipTransferStatus = "declined"
+	OwnershipTransferStatusExpired   OwnershipTransferStatus = "expired"
+	OwnershipTransferStatusPending   OwnershipTransferStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the OwnershipTransferStatus enum.
+func (e OwnershipTransferStatus) Valid() bool {
+	switch e {
+	case OwnershipTransferStatusAccepted:
+		return true
+	case OwnershipTransferStatusCancelled:
+		return true
+	case OwnershipTransferStatusDeclined:
+		return true
+	case OwnershipTransferStatusExpired:
+		return true
+	case OwnershipTransferStatusPending:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for PrincipalKind.
 const (
@@ -36,18 +361,252 @@ func (e PrincipalKind) Valid() bool {
 	}
 }
 
+// Defines values for PrincipalRefStatus.
+const (
+	PrincipalRefStatusActive   PrincipalRefStatus = "active"
+	PrincipalRefStatusInactive PrincipalRefStatus = "inactive"
+)
+
+// Valid indicates whether the value is a known member of the PrincipalRefStatus enum.
+func (e PrincipalRefStatus) Valid() bool {
+	switch e {
+	case PrincipalRefStatusActive:
+		return true
+	case PrincipalRefStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RequestedAction.
+const (
+	RequestedActionActivate       RequestedAction = "activate"
+	RequestedActionReinstate      RequestedAction = "reinstate"
+	RequestedActionReject         RequestedAction = "reject"
+	RequestedActionRequestChanges RequestedAction = "request_changes"
+	RequestedActionRetire         RequestedAction = "retire"
+	RequestedActionSubmit         RequestedAction = "submit"
+	RequestedActionSuspend        RequestedAction = "suspend"
+	RequestedActionValidate       RequestedAction = "validate"
+	RequestedActionWithdraw       RequestedAction = "withdraw"
+)
+
+// Valid indicates whether the value is a known member of the RequestedAction enum.
+func (e RequestedAction) Valid() bool {
+	switch e {
+	case RequestedActionActivate:
+		return true
+	case RequestedActionReinstate:
+		return true
+	case RequestedActionReject:
+		return true
+	case RequestedActionRequestChanges:
+		return true
+	case RequestedActionRetire:
+		return true
+	case RequestedActionSubmit:
+		return true
+	case RequestedActionSuspend:
+		return true
+	case RequestedActionValidate:
+		return true
+	case RequestedActionWithdraw:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReviewStatus.
+const (
+	ReviewStatusAwaitingSignoff ReviewStatus = "awaiting_signoff"
+	ReviewStatusCancelled       ReviewStatus = "cancelled"
+	ReviewStatusCompleted       ReviewStatus = "completed"
+	ReviewStatusScheduled       ReviewStatus = "scheduled"
+)
+
+// Valid indicates whether the value is a known member of the ReviewStatus enum.
+func (e ReviewStatus) Valid() bool {
+	switch e {
+	case ReviewStatusAwaitingSignoff:
+		return true
+	case ReviewStatusCancelled:
+		return true
+	case ReviewStatusCompleted:
+		return true
+	case ReviewStatusScheduled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RiskTier.
+const (
+	Critical RiskTier = "critical"
+	High     RiskTier = "high"
+	Low      RiskTier = "low"
+	Medium   RiskTier = "medium"
+)
+
+// Valid indicates whether the value is a known member of the RiskTier enum.
+func (e RiskTier) Valid() bool {
+	switch e {
+	case Critical:
+		return true
+	case High:
+		return true
+	case Low:
+		return true
+	case Medium:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunState.
+const (
+	Halted  RunState = "halted"
+	Running RunState = "running"
+)
+
+// Valid indicates whether the value is a known member of the RunState enum.
+func (e RunState) Valid() bool {
+	switch e {
+	case Halted:
+		return true
+	case Running:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ServiceAccountStatus.
 const (
-	Active   ServiceAccountStatus = "active"
-	Inactive ServiceAccountStatus = "inactive"
+	ServiceAccountStatusActive   ServiceAccountStatus = "active"
+	ServiceAccountStatusInactive ServiceAccountStatus = "inactive"
 )
 
 // Valid indicates whether the value is a known member of the ServiceAccountStatus enum.
 func (e ServiceAccountStatus) Valid() bool {
 	switch e {
-	case Active:
+	case ServiceAccountStatusActive:
 		return true
-	case Inactive:
+	case ServiceAccountStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SuspensionFrom.
+const (
+	SuspensionFromActive    SuspensionFrom = "active"
+	SuspensionFromReady     SuspensionFrom = "ready"
+	SuspensionFromValidated SuspensionFrom = "validated"
+)
+
+// Valid indicates whether the value is a known member of the SuspensionFrom enum.
+func (e SuspensionFrom) Valid() bool {
+	switch e {
+	case SuspensionFromActive:
+		return true
+	case SuspensionFromReady:
+		return true
+	case SuspensionFromValidated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SuspensionReason.
+const (
+	Halt          SuspensionReason = "halt"
+	Manual        SuspensionReason = "manual"
+	OwnerInactive SuspensionReason = "owner_inactive"
+	ReviewOverdue SuspensionReason = "review_overdue"
+)
+
+// Valid indicates whether the value is a known member of the SuspensionReason enum.
+func (e SuspensionReason) Valid() bool {
+	switch e {
+	case Halt:
+		return true
+	case Manual:
+		return true
+	case OwnerInactive:
+		return true
+	case ReviewOverdue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UnusedToolingKind.
+const (
+	Model UnusedToolingKind = "model"
+	Tool  UnusedToolingKind = "tool"
+)
+
+// Valid indicates whether the value is a known member of the UnusedToolingKind enum.
+func (e UnusedToolingKind) Valid() bool {
+	switch e {
+	case Model:
+		return true
+	case Tool:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UseCaseDecisionDecision.
+const (
+	UseCaseDecisionDecisionChangesRequested UseCaseDecisionDecision = "changes_requested"
+	UseCaseDecisionDecisionRejected         UseCaseDecisionDecision = "rejected"
+	UseCaseDecisionDecisionValidated        UseCaseDecisionDecision = "validated"
+)
+
+// Valid indicates whether the value is a known member of the UseCaseDecisionDecision enum.
+func (e UseCaseDecisionDecision) Valid() bool {
+	switch e {
+	case UseCaseDecisionDecisionChangesRequested:
+		return true
+	case UseCaseDecisionDecisionRejected:
+		return true
+	case UseCaseDecisionDecisionValidated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UseCaseStatus.
+const (
+	UseCaseStatusChangesRequested UseCaseStatus = "changes_requested"
+	UseCaseStatusDraft            UseCaseStatus = "draft"
+	UseCaseStatusRejected         UseCaseStatus = "rejected"
+	UseCaseStatusSubmitted        UseCaseStatus = "submitted"
+	UseCaseStatusValidated        UseCaseStatus = "validated"
+)
+
+// Valid indicates whether the value is a known member of the UseCaseStatus enum.
+func (e UseCaseStatus) Valid() bool {
+	switch e {
+	case UseCaseStatusChangesRequested:
+		return true
+	case UseCaseStatusDraft:
+		return true
+	case UseCaseStatusRejected:
+		return true
+	case UseCaseStatusSubmitted:
+		return true
+	case UseCaseStatusValidated:
 		return true
 	default:
 		return false
@@ -68,6 +627,180 @@ func (e VersionInfoApiVersion) Valid() bool {
 		return false
 	}
 }
+
+// Defines values for ExportAgentsParamsFormat.
+const (
+	Csv  ExportAgentsParamsFormat = "csv"
+	Json ExportAgentsParamsFormat = "json"
+)
+
+// Valid indicates whether the value is a known member of the ExportAgentsParamsFormat enum.
+func (e ExportAgentsParamsFormat) Valid() bool {
+	switch e {
+	case Csv:
+		return true
+	case Json:
+		return true
+	default:
+		return false
+	}
+}
+
+// Actor Who made a change, by pseudonymous principal ID. The system is White Tower itself.
+type Actor struct {
+	// DisplayName The principal's display name; the system has none.
+	DisplayName *string `json:"displayName,omitempty"`
+
+	// Id The principal's ID; the system has none.
+	Id   *openapi_types.UUID `json:"id,omitempty"`
+	Type ActorType           `json:"type"`
+}
+
+// ActorType defines model for Actor.Type.
+type ActorType string
+
+// AddDelegateRequest defines model for AddDelegateRequest.
+type AddDelegateRequest struct {
+	PrincipalId openapi_types.UUID `json:"principalId"`
+}
+
+// Agent An agent of the inventory, in-house or third-party (INV-01). The
+// suspension is present while the agent is suspended, and the harness
+// once it is declared. Its ETag changes with every change to the agent,
+// its delegates or its ownership transfers.
+type Agent struct {
+	ActivatedAt *time.Time `json:"activatedAt,omitempty"`
+
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification AiActClassification `json:"aiActClassification"`
+
+	// Coverage How deeply White Tower governs the agent (INV-08): C0, declared in the
+	// inventory; C1, it authenticates with White Tower credentials; C2, an
+	// enforcement point governs it and reports its decisions; C3, a halt or
+	// a drill of it was confirmed within the configured period.
+	Coverage  CoverageLevel `json:"coverage"`
+	CreatedAt time.Time     `json:"createdAt"`
+
+	// CreatedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	CreatedBy PrincipalRef `json:"createdBy"`
+
+	// DataCategories The categories of data the agent accesses, from the setting `inventory.data_categories`.
+	DataCategories     []string       `json:"dataCategories"`
+	Delegates          []PrincipalRef `json:"delegates"`
+	DeploymentLocation *string        `json:"deploymentLocation,omitempty"`
+	Description        string         `json:"description"`
+
+	// DrillEligible Whether the agent's owner lets kill-switch drills halt it (KIL-09).
+	DrillEligible bool     `json:"drillEligible"`
+	Environments  []string `json:"environments"`
+	Framework     *string  `json:"framework,omitempty"`
+
+	// HaltMode How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+	HaltMode HaltMode `json:"haltMode"`
+
+	// Harness The declaration of what confines the agent where it runs. White Tower
+	// records it in the MVP, and enforces it from Phase 2 (requirements,
+	// section 5.1.1).
+	Harness *Harness           `json:"harness,omitempty"`
+	Id      openapi_types.UUID `json:"id"`
+
+	// Kind Whether the organization builds the agent, or uses a third party's (INV-01).
+	Kind AgentKind `json:"kind"`
+
+	// Labels Labels, which filters, selector halts and policies use; policies see
+	// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+	// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+	// Enforcement points receive them with the agent's governance state, so
+	// they never hold personal data (CORE-9).
+	Labels Labels `json:"labels"`
+
+	// LifecycleState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+	LifecycleState LifecycleState `json:"lifecycleState"`
+	Name           string         `json:"name"`
+
+	// PendingOwnershipTransfer An offer of an agent's primary ownership, from its primary owner to another principal, who accepts or declines it.
+	PendingOwnershipTransfer *OwnershipTransfer `json:"pendingOwnershipTransfer,omitempty"`
+
+	// PrimaryOwner A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	PrimaryOwner PrincipalRef `json:"primaryOwner"`
+	RetiredAt    *time.Time   `json:"retiredAt,omitempty"`
+
+	// RiskTier The agent's risk tier. It sets how often the agent is reviewed,
+	// whether its reviews need a sign-off, and the lease of its enforcement
+	// points.
+	RiskTier RiskTier `json:"riskTier"`
+
+	// RunState Whether the agent may act now, or a halt of the agent or of the fleet
+	// stops it, whatever its lifecycle state (lifecycle, section 2).
+	RunState RunState `json:"runState"`
+
+	// Slug The agent's unique, readable key, which never changes.
+	Slug string `json:"slug"`
+
+	// Source How the agent entered the inventory; `discovered` is reserved for Phase 3.
+	Source AgentSource `json:"source"`
+
+	// Suspension Why and since when the agent is suspended, and the state that reinstating it returns to (`from`).
+	Suspension *Suspension `json:"suspension,omitempty"`
+	UpdatedAt  time.Time   `json:"updatedAt"`
+
+	// UseCaseId The use case that justifies the agent (INV-03).
+	UseCaseId openapi_types.UUID `json:"useCaseId"`
+	Vendor    *string            `json:"vendor,omitempty"`
+}
+
+// AgentSource How the agent entered the inventory; `discovered` is reserved for Phase 3.
+type AgentSource string
+
+// AgentAction defines model for AgentAction.
+type AgentAction struct {
+	// Action A lifecycle action that people take; White Tower takes the others itself.
+	Action RequestedAction `json:"action"`
+
+	// Available Whether the caller may take the action now.
+	Available       bool `json:"available"`
+	CommentRequired bool `json:"commentRequired"`
+
+	// RefusedBy What refuses the action, empty when it is available: `permission`
+	// when the caller's roles, the scope of their grant (own, active
+	// only, sign-off) or their kind (people take decisions) do not allow
+	// it; `not_owner_or_creator` when separation of duties does (HUM-04);
+	// otherwise the guards of the lifecycle that do not hold, as
+	// agent-lifecycle.yaml names them: `metadata_complete`,
+	// `owner_active`, `use_case_not_prohibited`, `use_case_not_rejected`,
+	// `use_case_validated`, `agent_policy_active`, `harness_declared`,
+	// `not_halted`, `review_not_overdue` and
+	// `previous_state_invariants_hold`. A client shows a value it does
+	// not know as a generic refusal.
+	RefusedBy []string `json:"refusedBy"`
+
+	// Transition The transition's ID in the lifecycle specification.
+	Transition string `json:"transition"`
+}
+
+// AgentActions defines model for AgentActions.
+type AgentActions struct {
+	Actions []AgentAction `json:"actions"`
+
+	// LifecycleState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+	LifecycleState LifecycleState `json:"lifecycleState"`
+}
+
+// AgentKind Whether the organization builds the agent, or uses a third party's (INV-01).
+type AgentKind string
+
+// AgentList defines model for AgentList.
+type AgentList struct {
+	Agents     []Agent `json:"agents"`
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+type AiActClassification string
 
 // ApiTokenMetadata defines model for ApiTokenMetadata.
 type ApiTokenMetadata struct {
@@ -142,6 +875,12 @@ type AuditInclusionProof struct {
 	TreeSize int64  `json:"treeSize"`
 }
 
+// CoverageLevel How deeply White Tower governs the agent (INV-08): C0, declared in the
+// inventory; C1, it authenticates with White Tower credentials; C2, an
+// enforcement point governs it and reports its decisions; C3, a halt or
+// a drill of it was confirmed within the configured period.
+type CoverageLevel string
+
 // CreateServiceAccountRequest defines model for CreateServiceAccountRequest.
 type CreateServiceAccountRequest struct {
 	DisplayName string               `json:"displayName"`
@@ -164,6 +903,21 @@ type CreateTokenRequest struct {
 	Scopes []string `json:"scopes"`
 }
 
+// CreateUseCaseRequest A new use case. Its AI Act classification is `not_assessed` unless the request says otherwise.
+type CreateUseCaseRequest struct {
+	AffectedPersons *string `json:"affectedPersons,omitempty"`
+
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification   *AiActClassification `json:"aiActClassification,omitempty"`
+	BusinessJustification string               `json:"businessJustification"`
+	Conditions            *string              `json:"conditions,omitempty"`
+
+	// DataCategories Categories from the setting `inventory.data_categories`.
+	DataCategories []string `json:"dataCategories"`
+	Description    string   `json:"description"`
+	Title          string   `json:"title"`
+}
+
 // CreatedToken defines model for CreatedToken.
 type CreatedToken struct {
 	CreatedAt   time.Time          `json:"createdAt"`
@@ -180,11 +934,216 @@ type CreatedToken struct {
 	TokenPrefix string `json:"tokenPrefix"`
 }
 
+// DataCategoryList defines model for DataCategoryList.
+type DataCategoryList struct {
+	DataCategories []string `json:"dataCategories"`
+}
+
+// EditAgentRequest The members to change; the others keep their values (editAgent).
+type EditAgentRequest struct {
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification *AiActClassification `json:"aiActClassification,omitempty"`
+	DataCategories      *[]string            `json:"dataCategories,omitempty"`
+	DeploymentLocation  *string              `json:"deploymentLocation,omitempty"`
+	Description         *string              `json:"description,omitempty"`
+	DrillEligible       *bool                `json:"drillEligible,omitempty"`
+	Environments        *[]string            `json:"environments,omitempty"`
+	Framework           *string              `json:"framework,omitempty"`
+
+	// HaltMode How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+	HaltMode *HaltMode `json:"haltMode,omitempty"`
+
+	// Harness The declaration of what confines the agent where it runs. White Tower
+	// records it in the MVP, and enforces it from Phase 2 (requirements,
+	// section 5.1.1).
+	Harness *Harness `json:"harness,omitempty"`
+
+	// Labels Labels, which filters, selector halts and policies use; policies see
+	// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+	// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+	// Enforcement points receive them with the agent's governance state, so
+	// they never hold personal data (CORE-9).
+	Labels *Labels `json:"labels,omitempty"`
+	Name   *string `json:"name,omitempty"`
+
+	// RiskTier The agent's risk tier. It sets how often the agent is reviewed,
+	// whether its reviews need a sign-off, and the lease of its enforcement
+	// points.
+	RiskTier  *RiskTier           `json:"riskTier,omitempty"`
+	UseCaseId *openapi_types.UUID `json:"useCaseId,omitempty"`
+	Vendor    *string             `json:"vendor,omitempty"`
+}
+
+// EditUseCaseRequest The members to change; the others keep their values (editUseCase).
+type EditUseCaseRequest struct {
+	AffectedPersons *string `json:"affectedPersons,omitempty"`
+
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification   *AiActClassification `json:"aiActClassification,omitempty"`
+	BusinessJustification *string              `json:"businessJustification,omitempty"`
+	Conditions            *string              `json:"conditions,omitempty"`
+	DataCategories        *[]string            `json:"dataCategories,omitempty"`
+	Description           *string              `json:"description,omitempty"`
+	Title                 *string              `json:"title,omitempty"`
+}
+
 // ExchangeTokenRequest defines model for ExchangeTokenRequest.
 type ExchangeTokenRequest struct {
 	// IdToken Raw OpenID Connect ID token obtained by the CLI.
 	IdToken string `json:"idToken"`
 }
+
+// HaltMode How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+type HaltMode string
+
+// Harness The declaration of what confines the agent where it runs. White Tower
+// records it in the MVP, and enforces it from Phase 2 (requirements,
+// section 5.1.1).
+type Harness struct {
+	Description string `json:"description"`
+}
+
+// InboxItem Work that waits for the caller, addressed to them or to one of their roles.
+type InboxItem struct {
+	// AgentId The agent the item is about, when there is one.
+	AgentId   *openapi_types.UUID `json:"agentId,omitempty"`
+	CreatedAt time.Time           `json:"createdAt"`
+	Id        openapi_types.UUID  `json:"id"`
+
+	// Kind What waits: `use_case_validation`, `policy_approval`,
+	// `review_due`, `review_signoff`, `halt_release`,
+	// `ownership_transfer` or `module_approval`. Later plans add kinds,
+	// and a client shows a kind it does not know generically.
+	Kind string `json:"kind"`
+
+	// Role The caller's role that the item is addressed to; absent when it is addressed to the caller.
+	Role      *InboxItemRole     `json:"role,omitempty"`
+	SubjectId openapi_types.UUID `json:"subjectId"`
+
+	// SubjectType The kind of resource the item is about, such as `agent`, `review` or `ownership_transfer`.
+	SubjectType string `json:"subjectType"`
+}
+
+// InboxItemRole The caller's role that the item is addressed to; absent when it is addressed to the caller.
+type InboxItemRole string
+
+// InboxItemList defines model for InboxItemList.
+type InboxItemList struct {
+	Items      []InboxItem `json:"items"`
+	NextCursor *string     `json:"nextCursor,omitempty"`
+}
+
+// Instance An instance of a module, such as an enforcement point, that serves the agent.
+type Instance struct {
+	// ActiveBundleVersion The version of the agent's policy bundle that the instance applies.
+	ActiveBundleVersion *int64    `json:"activeBundleVersion,omitempty"`
+	ConnectedAt         time.Time `json:"connectedAt"`
+
+	// ContractVersion The version of the module contracts that the instance speaks.
+	ContractVersion string             `json:"contractVersion"`
+	DisconnectedAt  *time.Time         `json:"disconnectedAt,omitempty"`
+	Host            *string            `json:"host,omitempty"`
+	Id              openapi_types.UUID `json:"id"`
+
+	// InstanceKey The instance's key, unique within its module.
+	InstanceKey   string             `json:"instanceKey"`
+	LastSeenAt    time.Time          `json:"lastSeenAt"`
+	ModuleId      openapi_types.UUID `json:"moduleId"`
+	ModuleSlug    string             `json:"moduleSlug"`
+	ModuleVersion string             `json:"moduleVersion"`
+
+	// ObservedStateVersion The last governance state version of the agent that the instance applied.
+	ObservedStateVersion *int64         `json:"observedStateVersion,omitempty"`
+	Status               InstanceStatus `json:"status"`
+}
+
+// InstanceStatus defines model for Instance.Status.
+type InstanceStatus string
+
+// InstanceList defines model for InstanceList.
+type InstanceList struct {
+	Instances  []Instance `json:"instances"`
+	NextCursor *string    `json:"nextCursor,omitempty"`
+}
+
+// Labels Labels, which filters, selector halts and policies use; policies see
+// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+// Enforcement points receive them with the agent's governance state, so
+// they never hold personal data (CORE-9).
+type Labels map[string]string
+
+// LifecycleAction An action of the lifecycle, as agent-lifecycle.yaml names it.
+type LifecycleAction string
+
+// LifecycleState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+type LifecycleState string
+
+// OwnerAssignment A principal's assignment as an agent's primary owner or delegate; an ended one records who ended it, and why.
+type OwnerAssignment struct {
+	AssignedAt time.Time `json:"assignedAt"`
+
+	// AssignedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	AssignedBy PrincipalRef `json:"assignedBy"`
+
+	// EndReason Why the assignment ended: the reason of a reassignment or of a
+	// delegate's removal, or `ownership transferred` when the new owner
+	// accepted a transfer.
+	EndReason *string    `json:"endReason,omitempty"`
+	EndedAt   *time.Time `json:"endedAt,omitempty"`
+
+	// EndedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	EndedBy *PrincipalRef      `json:"endedBy,omitempty"`
+	Id      openapi_types.UUID `json:"id"`
+
+	// Principal A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	Principal PrincipalRef        `json:"principal"`
+	Role      OwnerAssignmentRole `json:"role"`
+}
+
+// OwnerAssignmentRole defines model for OwnerAssignment.Role.
+type OwnerAssignmentRole string
+
+// OwnerAssignmentList defines model for OwnerAssignmentList.
+type OwnerAssignmentList struct {
+	NextCursor *string           `json:"nextCursor,omitempty"`
+	Owners     []OwnerAssignment `json:"owners"`
+}
+
+// OwnershipTransfer An offer of an agent's primary ownership, from its primary owner to another principal, who accepts or declines it.
+type OwnershipTransfer struct {
+	AgentId   openapi_types.UUID `json:"agentId"`
+	DecidedAt *time.Time         `json:"decidedAt,omitempty"`
+
+	// From A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	From        PrincipalRef       `json:"from"`
+	Id          openapi_types.UUID `json:"id"`
+	RequestedAt time.Time          `json:"requestedAt"`
+
+	// RequestedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	RequestedBy PrincipalRef `json:"requestedBy"`
+
+	// Status Where the transfer is; `expired` is reserved, as nothing expires a transfer yet.
+	Status OwnershipTransferStatus `json:"status"`
+
+	// To A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	To PrincipalRef `json:"to"`
+}
+
+// OwnershipTransferStatus Where the transfer is; `expired` is reserved, as nothing expires a transfer yet.
+type OwnershipTransferStatus string
 
 // Principal defines model for Principal.
 type Principal struct {
@@ -209,6 +1168,20 @@ type Principal struct {
 // PrincipalKind defines model for Principal.Kind.
 type PrincipalKind string
 
+// PrincipalRef A principal, as the resources that name one show it. The display name
+// is absent only where a caller asked to leave names out, as a
+// pseudonymized export does.
+type PrincipalRef struct {
+	DisplayName *string            `json:"displayName,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Status An inactive principal no longer owns agents (INV-02, INV-05).
+	Status PrincipalRefStatus `json:"status"`
+}
+
+// PrincipalRefStatus An inactive principal no longer owns agents (INV-02, INV-05).
+type PrincipalRefStatus string
+
 // Problem RFC 9457 problem details. `type` and `code` identify the error;
 // `title` is the same for every occurrence of it, and `detail`
 // explains this one. No internal detail reaches the client.
@@ -226,6 +1199,150 @@ type Problem struct {
 	Type string `json:"type"`
 }
 
+// ProposeAgentRequest A new agent: the mandatory metadata of INV-01, of which the vendor or
+// the framework, at least one of them, and its options. The AI Act
+// classification is `not_assessed`, the halt mode `interrupt` and drills
+// not allowed, unless the request says otherwise.
+type ProposeAgentRequest struct {
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification *AiActClassification `json:"aiActClassification,omitempty"`
+
+	// DataCategories The categories of data the agent accesses, from the setting `inventory.data_categories`.
+	DataCategories     []string `json:"dataCategories"`
+	DeploymentLocation string   `json:"deploymentLocation"`
+	Description        string   `json:"description"`
+	DrillEligible      *bool    `json:"drillEligible,omitempty"`
+
+	// Environments Where the agent runs, such as `production`; lowercase letters, digits and inner hyphens.
+	Environments []string `json:"environments"`
+	Framework    *string  `json:"framework,omitempty"`
+
+	// HaltMode How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+	HaltMode *HaltMode `json:"haltMode,omitempty"`
+
+	// Harness The declaration of what confines the agent where it runs. White Tower
+	// records it in the MVP, and enforces it from Phase 2 (requirements,
+	// section 5.1.1).
+	Harness *Harness `json:"harness,omitempty"`
+
+	// Kind Whether the organization builds the agent, or uses a third party's (INV-01).
+	Kind AgentKind `json:"kind"`
+
+	// Labels Labels, which filters, selector halts and policies use; policies see
+	// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+	// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+	// Enforcement points receive them with the agent's governance state, so
+	// they never hold personal data (CORE-9).
+	Labels *Labels `json:"labels,omitempty"`
+	Name   string  `json:"name"`
+
+	// RiskTier The agent's risk tier. It sets how often the agent is reviewed,
+	// whether its reviews need a sign-off, and the lease of its enforcement
+	// points.
+	RiskTier RiskTier `json:"riskTier"`
+
+	// Slug Lowercase letters, digits and inner hyphens, 63 characters at most; unique, and never changed.
+	Slug      string             `json:"slug"`
+	UseCaseId openapi_types.UUID `json:"useCaseId"`
+	Vendor    *string            `json:"vendor,omitempty"`
+}
+
+// ReassignOwnerRequest defines model for ReassignOwnerRequest.
+type ReassignOwnerRequest struct {
+	// PrincipalId The new primary owner.
+	PrincipalId openapi_types.UUID `json:"principalId"`
+	Reason      string             `json:"reason"`
+}
+
+// RequestOwnershipTransferRequest defines model for RequestOwnershipTransferRequest.
+type RequestOwnershipTransferRequest struct {
+	// PrincipalId The principal offered the agent's ownership.
+	PrincipalId openapi_types.UUID `json:"principalId"`
+}
+
+// RequestedAction A lifecycle action that people take; White Tower takes the others itself.
+type RequestedAction string
+
+// Review A periodic review of an agent (INV-06). Once its grace period ends
+// while it is still open, the agent is suspended (INV-05). The
+// candidates to disable, and those the owner kept, are tooling: only
+// the callers who may view agents' tooling see them (permission matrix:
+// not the user role, and never a break-glass session), and lists leave
+// the candidates out.
+type Review struct {
+	AgentId openapi_types.UUID `json:"agentId"`
+
+	// Attestation The owner's attestation (INV-06). Each statement must be true: an
+	// agent no longer needed is retired instead, an agent whose owner is no
+	// longer right gets another one, and its data categories and policy are
+	// brought up to date before the review is completed.
+	Attestation *ReviewAttestation `json:"attestation,omitempty"`
+	CompletedAt *time.Time         `json:"completedAt,omitempty"`
+
+	// CompletedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	CompletedBy *PrincipalRef      `json:"completedBy,omitempty"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	DueAt       time.Time          `json:"dueAt"`
+	GraceEndsAt time.Time          `json:"graceEndsAt"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Overdue Whether the review is open past its due date.
+	Overdue     bool       `json:"overdue"`
+	SignedOffAt *time.Time `json:"signedOffAt,omitempty"`
+
+	// SignedOffBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	SignedOffBy     *PrincipalRef `json:"signedOffBy,omitempty"`
+	SignoffRequired bool          `json:"signoffRequired"`
+
+	// Status Where the review is: scheduled until the owner completes it, then
+	// waiting for a sign-off when the agent's risk tier needs one;
+	// cancelled when the agent is retired.
+	Status ReviewStatus `json:"status"`
+
+	// UnusedTooling For an open review, the enabled tools and models that the agent has not used recently (CAT-09).
+	UnusedTooling *[]UnusedTooling `json:"unusedTooling,omitempty"`
+}
+
+// ReviewAttestation The owner's attestation (INV-06). Each statement must be true: an
+// agent no longer needed is retired instead, an agent whose owner is no
+// longer right gets another one, and its data categories and policy are
+// brought up to date before the review is completed.
+type ReviewAttestation struct {
+	Comment               *string `json:"comment,omitempty"`
+	DataCategoriesCurrent bool    `json:"dataCategoriesCurrent"`
+
+	// KeptTooling The keys of the candidates to disable that the owner keeps; none when absent.
+	KeptTooling        *[]string `json:"keptTooling,omitempty"`
+	OwnerStillRight    bool      `json:"ownerStillRight"`
+	PolicyAdequate     bool      `json:"policyAdequate"`
+	StillNeeded        bool      `json:"stillNeeded"`
+	ToolingStillNeeded bool      `json:"toolingStillNeeded"`
+}
+
+// ReviewList defines model for ReviewList.
+type ReviewList struct {
+	NextCursor *string  `json:"nextCursor,omitempty"`
+	Reviews    []Review `json:"reviews"`
+}
+
+// ReviewStatus Where the review is: scheduled until the owner completes it, then
+// waiting for a sign-off when the agent's risk tier needs one;
+// cancelled when the agent is retired.
+type ReviewStatus string
+
+// RiskTier The agent's risk tier. It sets how often the agent is reviewed,
+// whether its reviews need a sign-off, and the lease of its enforcement
+// points.
+type RiskTier string
+
+// RunState Whether the agent may act now, or a halt of the agent or of the fleet
+// stops it, whatever its lifecycle state (lifecycle, section 2).
+type RunState string
+
 // ServiceAccount defines model for ServiceAccount.
 type ServiceAccount struct {
 	CreatedAt              time.Time            `json:"createdAt"`
@@ -239,6 +1356,138 @@ type ServiceAccount struct {
 
 // ServiceAccountStatus defines model for ServiceAccount.Status.
 type ServiceAccountStatus string
+
+// Suspension Why and since when the agent is suspended, and the state that reinstating it returns to (`from`).
+type Suspension struct {
+	At   time.Time      `json:"at"`
+	From SuspensionFrom `json:"from"`
+
+	// Reason Why the agent was suspended (lifecycle, transitions T10 to T12).
+	Reason SuspensionReason `json:"reason"`
+}
+
+// SuspensionFrom defines model for Suspension.From.
+type SuspensionFrom string
+
+// SuspensionReason Why the agent was suspended (lifecycle, transitions T10 to T12).
+type SuspensionReason string
+
+// Transition One transition of an agent's lifecycle. `fromState` is absent for the
+// agent's creation, T1, and `reason` is present for a suspension.
+type Transition struct {
+	// Action An action of the lifecycle, as agent-lifecycle.yaml names it.
+	Action LifecycleAction `json:"action"`
+
+	// Actor Who made a change, by pseudonymous principal ID. The system is White Tower itself.
+	Actor   Actor   `json:"actor"`
+	Comment *string `json:"comment,omitempty"`
+
+	// FromState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+	FromState  *LifecycleState    `json:"fromState,omitempty"`
+	Id         openapi_types.UUID `json:"id"`
+	OccurredAt time.Time          `json:"occurredAt"`
+
+	// Reason Why the agent was suspended (lifecycle, transitions T10 to T12).
+	Reason *SuspensionReason `json:"reason,omitempty"`
+
+	// StateVersion The governance state version that the transition took.
+	StateVersion int64 `json:"stateVersion"`
+
+	// ToState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+	ToState    LifecycleState `json:"toState"`
+	Transition string         `json:"transition"`
+}
+
+// TransitionList defines model for TransitionList.
+type TransitionList struct {
+	NextCursor  *string      `json:"nextCursor,omitempty"`
+	Transitions []Transition `json:"transitions"`
+}
+
+// TransitionRequest defines model for TransitionRequest.
+type TransitionRequest struct {
+	// Action A lifecycle action that people take; White Tower takes the others itself.
+	Action RequestedAction `json:"action"`
+
+	// Comment Why. `request_changes`, `reject`, `validate`, `suspend`,
+	// `reinstate` and `retire` need one, and a decision's comment is
+	// also the use case decision's. The agent's history shows it; its
+	// audit event records only that it was given.
+	Comment *string `json:"comment,omitempty"`
+}
+
+// UnusedTooling An enabled tool or model that the agent has not used recently, a candidate to disable (CAT-09).
+type UnusedTooling struct {
+	// Key The key of the tool or model in the catalog (RFC-0002, section 3).
+	Key  string            `json:"key"`
+	Kind UnusedToolingKind `json:"kind"`
+
+	// LastUsedAt When the agent last used it; absent if it never did.
+	LastUsedAt *time.Time `json:"lastUsedAt,omitempty"`
+}
+
+// UnusedToolingKind defines model for UnusedTooling.Kind.
+type UnusedToolingKind string
+
+// UseCase The business purpose that justifies one or more agents (INV-03). Its
+// conditions are those under which the agents it justifies may run,
+// which the advisory committee validates with it.
+type UseCase struct {
+	// AffectedPersons Who the work of its agents affects.
+	AffectedPersons *string `json:"affectedPersons,omitempty"`
+
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification   AiActClassification `json:"aiActClassification"`
+	BusinessJustification string              `json:"businessJustification"`
+	Conditions            *string             `json:"conditions,omitempty"`
+	CreatedAt             time.Time           `json:"createdAt"`
+
+	// CreatedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	CreatedBy      PrincipalRef       `json:"createdBy"`
+	DataCategories []string           `json:"dataCategories"`
+	Description    string             `json:"description"`
+	Id             openapi_types.UUID `json:"id"`
+
+	// Status Where the use case is in the advisory committee's decision.
+	Status    UseCaseStatus `json:"status"`
+	Title     string        `json:"title"`
+	UpdatedAt time.Time     `json:"updatedAt"`
+}
+
+// UseCaseDecision A decision of the advisory committee on a use case, made on an agent's proposal.
+type UseCaseDecision struct {
+	// AgentId The agent whose proposal was decided.
+	AgentId   *openapi_types.UUID `json:"agentId,omitempty"`
+	Comment   string              `json:"comment"`
+	DecidedAt time.Time           `json:"decidedAt"`
+
+	// DecidedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DecidedBy PrincipalRef            `json:"decidedBy"`
+	Decision  UseCaseDecisionDecision `json:"decision"`
+	Id        openapi_types.UUID      `json:"id"`
+}
+
+// UseCaseDecisionDecision defines model for UseCaseDecision.Decision.
+type UseCaseDecisionDecision string
+
+// UseCaseDecisionList defines model for UseCaseDecisionList.
+type UseCaseDecisionList struct {
+	Decisions  []UseCaseDecision `json:"decisions"`
+	NextCursor *string           `json:"nextCursor,omitempty"`
+}
+
+// UseCaseList defines model for UseCaseList.
+type UseCaseList struct {
+	NextCursor *string   `json:"nextCursor,omitempty"`
+	UseCases   []UseCase `json:"useCases"`
+}
+
+// UseCaseStatus Where the use case is in the advisory committee's decision.
+type UseCaseStatus string
 
 // VersionInfo defines model for VersionInfo.
 type VersionInfo struct {
@@ -254,6 +1503,194 @@ type VersionInfo struct {
 
 // VersionInfoApiVersion Version of this API.
 type VersionInfoApiVersion string
+
+// AgentCoverageFilter defines model for AgentCoverageFilter.
+type AgentCoverageFilter = []CoverageLevel
+
+// AgentEnvironmentFilter defines model for AgentEnvironmentFilter.
+type AgentEnvironmentFilter = string
+
+// AgentId defines model for AgentId.
+type AgentId = openapi_types.UUID
+
+// AgentLabelFilter defines model for AgentLabelFilter.
+type AgentLabelFilter = []string
+
+// AgentOwnerFilter defines model for AgentOwnerFilter.
+type AgentOwnerFilter = openapi_types.UUID
+
+// AgentRiskTierFilter defines model for AgentRiskTierFilter.
+type AgentRiskTierFilter = []RiskTier
+
+// AgentSearch defines model for AgentSearch.
+type AgentSearch = string
+
+// AgentStateFilter defines model for AgentStateFilter.
+type AgentStateFilter = []LifecycleState
+
+// AgentUseCaseFilter defines model for AgentUseCaseFilter.
+type AgentUseCaseFilter = openapi_types.UUID
+
+// Cursor defines model for Cursor.
+type Cursor = string
+
+// DelegateId defines model for DelegateId.
+type DelegateId = openapi_types.UUID
+
+// IfMatch defines model for IfMatch.
+type IfMatch = string
+
+// Limit defines model for Limit.
+type Limit = int
+
+// ReviewId defines model for ReviewId.
+type ReviewId = openapi_types.UUID
+
+// TransferId defines model for TransferId.
+type TransferId = openapi_types.UUID
+
+// UseCaseId defines model for UseCaseId.
+type UseCaseId = openapi_types.UUID
+
+// ListAgentsParams defines parameters for ListAgents.
+type ListAgentsParams struct {
+	// State Agents in any of these lifecycle states.
+	State *AgentStateFilter `form:"state,omitempty" json:"state,omitempty"`
+
+	// OwnerId Agents whose primary owner or one of whose delegates is this principal.
+	OwnerId *AgentOwnerFilter `form:"ownerId,omitempty" json:"ownerId,omitempty"`
+
+	// RiskTier Agents in any of these risk tiers.
+	RiskTier *AgentRiskTierFilter `form:"riskTier,omitempty" json:"riskTier,omitempty"`
+
+	// Environment Agents deployed in this environment.
+	Environment *AgentEnvironmentFilter `form:"environment,omitempty" json:"environment,omitempty"`
+
+	// Coverage Agents at any of these coverage levels.
+	Coverage *AgentCoverageFilter `form:"coverage,omitempty" json:"coverage,omitempty"`
+
+	// Label Agents that carry every one of these labels, each written as `key=value`.
+	Label *AgentLabelFilter `form:"label,omitempty" json:"label,omitempty"`
+
+	// UseCaseId Agents that this use case justifies.
+	UseCaseId *AgentUseCaseFilter `form:"useCaseId,omitempty" json:"useCaseId,omitempty"`
+
+	// Q Text to look for in the slug, the name and the description.
+	Q *AgentSearch `form:"q,omitempty" json:"q,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ExportAgentsParams defines parameters for ExportAgents.
+type ExportAgentsParams struct {
+	// Format The format of the export.
+	Format *ExportAgentsParamsFormat `form:"format,omitempty" json:"format,omitempty"`
+
+	// Pseudonymize Leaves out the names of people, and keeps their pseudonymous IDs
+	// (NFR-20): the CSV column `primaryOwnerName` stays empty, and the
+	// JSON holds no display name.
+	Pseudonymize *bool `form:"pseudonymize,omitempty" json:"pseudonymize,omitempty"`
+
+	// State Agents in any of these lifecycle states.
+	State *AgentStateFilter `form:"state,omitempty" json:"state,omitempty"`
+
+	// OwnerId Agents whose primary owner or one of whose delegates is this principal.
+	OwnerId *AgentOwnerFilter `form:"ownerId,omitempty" json:"ownerId,omitempty"`
+
+	// RiskTier Agents in any of these risk tiers.
+	RiskTier *AgentRiskTierFilter `form:"riskTier,omitempty" json:"riskTier,omitempty"`
+
+	// Environment Agents deployed in this environment.
+	Environment *AgentEnvironmentFilter `form:"environment,omitempty" json:"environment,omitempty"`
+
+	// Coverage Agents at any of these coverage levels.
+	Coverage *AgentCoverageFilter `form:"coverage,omitempty" json:"coverage,omitempty"`
+
+	// Label Agents that carry every one of these labels, each written as `key=value`.
+	Label *AgentLabelFilter `form:"label,omitempty" json:"label,omitempty"`
+
+	// UseCaseId Agents that this use case justifies.
+	UseCaseId *AgentUseCaseFilter `form:"useCaseId,omitempty" json:"useCaseId,omitempty"`
+
+	// Q Text to look for in the slug, the name and the description.
+	Q *AgentSearch `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ExportAgentsParamsFormat defines parameters for ExportAgents.
+type ExportAgentsParamsFormat string
+
+// EditAgentParams defines parameters for EditAgent.
+type EditAgentParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// RemoveAgentDelegateParams defines parameters for RemoveAgentDelegate.
+type RemoveAgentDelegateParams struct {
+	// Reason Why the assignment ends. A request without a reason is refused (`bad_request`).
+	Reason *string `form:"reason,omitempty" json:"reason,omitempty"`
+}
+
+// ListAgentInstancesParams defines parameters for ListAgentInstances.
+type ListAgentInstancesParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListAgentOwnersParams defines parameters for ListAgentOwners.
+type ListAgentOwnersParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ReassignAgentOwnerParams defines parameters for ReassignAgentOwner.
+type ReassignAgentOwnerParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListAgentReviewsParams defines parameters for ListAgentReviews.
+type ListAgentReviewsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListAgentTransitionsParams defines parameters for ListAgentTransitions.
+type ListAgentTransitionsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// TransitionAgentParams defines parameters for TransitionAgent.
+type TransitionAgentParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
 
 // GetAuditEventsParams defines parameters for GetAuditEvents.
 type GetAuditEventsParams struct {
@@ -291,6 +1728,48 @@ type GetAuditEventsParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListInboxItemsParams defines parameters for ListInboxItems.
+type ListInboxItemsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListReviewsParams defines parameters for ListReviews.
+type ListReviewsParams struct {
+	// Status Reviews in any of these statuses.
+	Status *[]ReviewStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Overdue Only the open reviews past their due date, or only the others.
+	Overdue *bool `form:"overdue,omitempty" json:"overdue,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CompleteReviewParams defines parameters for CompleteReview.
+type CompleteReviewParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// SignOffReviewParams defines parameters for SignOffReview.
+type SignOffReviewParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // ListTokensParams defines parameters for ListTokens.
 type ListTokensParams struct {
 	// PrincipalId Optional principal ID to filter tokens (allowed for responsible owners and administrators).
@@ -303,6 +1782,60 @@ type RevokeTokenParams struct {
 	Reason *string `form:"reason,omitempty" json:"reason,omitempty"`
 }
 
+// ListUseCasesParams defines parameters for ListUseCases.
+type ListUseCasesParams struct {
+	// Status Use cases in any of these statuses.
+	Status *[]UseCaseStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Q Text to look for in the title and the description.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// EditUseCaseParams defines parameters for EditUseCase.
+type EditUseCaseParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListUseCaseDecisionsParams defines parameters for ListUseCaseDecisions.
+type ListUseCaseDecisionsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ProposeAgentJSONRequestBody defines body for ProposeAgent for application/json ContentType.
+type ProposeAgentJSONRequestBody = ProposeAgentRequest
+
+// EditAgentJSONRequestBody defines body for EditAgent for application/json ContentType.
+type EditAgentJSONRequestBody = EditAgentRequest
+
+// AddAgentDelegateJSONRequestBody defines body for AddAgentDelegate for application/json ContentType.
+type AddAgentDelegateJSONRequestBody = AddDelegateRequest
+
+// RequestOwnershipTransferJSONRequestBody defines body for RequestOwnershipTransfer for application/json ContentType.
+type RequestOwnershipTransferJSONRequestBody = RequestOwnershipTransferRequest
+
+// ReassignAgentOwnerJSONRequestBody defines body for ReassignAgentOwner for application/json ContentType.
+type ReassignAgentOwnerJSONRequestBody = ReassignOwnerRequest
+
+// TransitionAgentJSONRequestBody defines body for TransitionAgent for application/json ContentType.
+type TransitionAgentJSONRequestBody = TransitionRequest
+
+// CompleteReviewJSONRequestBody defines body for CompleteReview for application/json ContentType.
+type CompleteReviewJSONRequestBody = ReviewAttestation
+
 // CreateServiceAccountJSONRequestBody defines body for CreateServiceAccount for application/json ContentType.
 type CreateServiceAccountJSONRequestBody = CreateServiceAccountRequest
 
@@ -312,8 +1845,68 @@ type CreateTokenJSONRequestBody = CreateTokenRequest
 // ExchangeTokenJSONRequestBody defines body for ExchangeToken for application/json ContentType.
 type ExchangeTokenJSONRequestBody = ExchangeTokenRequest
 
+// CreateUseCaseJSONRequestBody defines body for CreateUseCase for application/json ContentType.
+type CreateUseCaseJSONRequestBody = CreateUseCaseRequest
+
+// EditUseCaseJSONRequestBody defines body for EditUseCase for application/json ContentType.
+type EditUseCaseJSONRequestBody = EditUseCaseRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListAgents List agents
+	// (GET /agents)
+	ListAgents(w http.ResponseWriter, r *http.Request, params ListAgentsParams)
+	// ProposeAgent Propose an agent
+	// (POST /agents)
+	ProposeAgent(w http.ResponseWriter, r *http.Request)
+	// ExportAgents Export agents
+	// (GET /agents/export)
+	ExportAgents(w http.ResponseWriter, r *http.Request, params ExportAgentsParams)
+	// GetAgent Get an agent
+	// (GET /agents/{id})
+	GetAgent(w http.ResponseWriter, r *http.Request, id AgentId)
+	// EditAgent Edit an agent's metadata
+	// (PATCH /agents/{id})
+	EditAgent(w http.ResponseWriter, r *http.Request, id AgentId, params EditAgentParams)
+	// GetAgentActions Get the lifecycle actions open to the caller
+	// (GET /agents/{id}/actions)
+	GetAgentActions(w http.ResponseWriter, r *http.Request, id AgentId)
+	// AddAgentDelegate Add a delegate
+	// (POST /agents/{id}/delegates)
+	AddAgentDelegate(w http.ResponseWriter, r *http.Request, id AgentId)
+	// RemoveAgentDelegate Remove a delegate
+	// (DELETE /agents/{id}/delegates/{principalId})
+	RemoveAgentDelegate(w http.ResponseWriter, r *http.Request, id AgentId, principalId DelegateId, params RemoveAgentDelegateParams)
+	// ListAgentInstances List an agent's instances
+	// (GET /agents/{id}/instances)
+	ListAgentInstances(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentInstancesParams)
+	// ListAgentOwners List an agent's owners and their history
+	// (GET /agents/{id}/owners)
+	ListAgentOwners(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentOwnersParams)
+	// RequestOwnershipTransfer Offer an agent's ownership to someone else
+	// (POST /agents/{id}/ownership-transfers)
+	RequestOwnershipTransfer(w http.ResponseWriter, r *http.Request, id AgentId)
+	// CancelOwnershipTransfer Cancel an ownership transfer
+	// (DELETE /agents/{id}/ownership-transfers/{transferId})
+	CancelOwnershipTransfer(w http.ResponseWriter, r *http.Request, id AgentId, transferId TransferId)
+	// AcceptOwnershipTransfer Accept an ownership transfer
+	// (POST /agents/{id}/ownership-transfers/{transferId}/accept)
+	AcceptOwnershipTransfer(w http.ResponseWriter, r *http.Request, id AgentId, transferId TransferId)
+	// DeclineOwnershipTransfer Decline an ownership transfer
+	// (POST /agents/{id}/ownership-transfers/{transferId}/decline)
+	DeclineOwnershipTransfer(w http.ResponseWriter, r *http.Request, id AgentId, transferId TransferId)
+	// ReassignAgentOwner Reassign an agent's primary owner
+	// (PUT /agents/{id}/primary-owner)
+	ReassignAgentOwner(w http.ResponseWriter, r *http.Request, id AgentId, params ReassignAgentOwnerParams)
+	// ListAgentReviews List an agent's periodic reviews
+	// (GET /agents/{id}/reviews)
+	ListAgentReviews(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentReviewsParams)
+	// ListAgentTransitions List an agent's lifecycle history
+	// (GET /agents/{id}/transitions)
+	ListAgentTransitions(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentTransitionsParams)
+	// TransitionAgent Take a lifecycle action
+	// (POST /agents/{id}/transitions)
+	TransitionAgent(w http.ResponseWriter, r *http.Request, id AgentId, params TransitionAgentParams)
 	// GetAuditCheckpoints List signed checkpoints
 	// (GET /audit/checkpoints)
 	GetAuditCheckpoints(w http.ResponseWriter, r *http.Request)
@@ -326,9 +1919,27 @@ type ServerInterface interface {
 	// GetAuditKeys List checkpoint signing keys
 	// (GET /audit/keys)
 	GetAuditKeys(w http.ResponseWriter, r *http.Request)
+	// ListDataCategories List the data categories
+	// (GET /data-categories)
+	ListDataCategories(w http.ResponseWriter, r *http.Request)
+	// ListInboxItems List the caller's pending work
+	// (GET /inbox)
+	ListInboxItems(w http.ResponseWriter, r *http.Request, params ListInboxItemsParams)
 	// GetMe Get the calling principal
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// ListReviews List periodic reviews
+	// (GET /reviews)
+	ListReviews(w http.ResponseWriter, r *http.Request, params ListReviewsParams)
+	// GetReview Get a periodic review
+	// (GET /reviews/{id})
+	GetReview(w http.ResponseWriter, r *http.Request, id ReviewId)
+	// CompleteReview Complete a periodic review
+	// (POST /reviews/{id}/completion)
+	CompleteReview(w http.ResponseWriter, r *http.Request, id ReviewId, params CompleteReviewParams)
+	// SignOffReview Sign off a periodic review
+	// (POST /reviews/{id}/sign-off)
+	SignOffReview(w http.ResponseWriter, r *http.Request, id ReviewId, params SignOffReviewParams)
 	// ListServiceAccounts List service accounts
 	// (GET /service-accounts)
 	ListServiceAccounts(w http.ResponseWriter, r *http.Request)
@@ -347,6 +1958,21 @@ type ServerInterface interface {
 	// RevokeToken Revoke an API token
 	// (DELETE /tokens/{id})
 	RevokeToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RevokeTokenParams)
+	// ListUseCases List use cases
+	// (GET /use-cases)
+	ListUseCases(w http.ResponseWriter, r *http.Request, params ListUseCasesParams)
+	// CreateUseCase Create a use case
+	// (POST /use-cases)
+	CreateUseCase(w http.ResponseWriter, r *http.Request)
+	// GetUseCase Get a use case
+	// (GET /use-cases/{id})
+	GetUseCase(w http.ResponseWriter, r *http.Request, id UseCaseId)
+	// EditUseCase Edit a use case
+	// (PATCH /use-cases/{id})
+	EditUseCase(w http.ResponseWriter, r *http.Request, id UseCaseId, params EditUseCaseParams)
+	// ListUseCaseDecisions List the decisions on a use case
+	// (GET /use-cases/{id}/decisions)
+	ListUseCaseDecisions(w http.ResponseWriter, r *http.Request, id UseCaseId, params ListUseCaseDecisionsParams)
 	// GetVersion Get the version of the running server
 	// (GET /version)
 	GetVersion(w http.ResponseWriter, r *http.Request)
@@ -360,6 +1986,950 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAgents operation middleware
+func (siw *ServerInterfaceWrapper) ListAgents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAgentsParams
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "ownerId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ownerId", r.URL.Query(), &params.OwnerId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "ownerId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ownerId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "riskTier" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "riskTier", r.URL.Query(), &params.RiskTier, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "riskTier"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "riskTier", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "coverage" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "coverage", r.URL.Query(), &params.Coverage, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "coverage"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "coverage", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "label" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "label", r.URL.Query(), &params.Label, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "label"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "label", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "useCaseId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "useCaseId", r.URL.Query(), &params.UseCaseId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "useCaseId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "useCaseId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ProposeAgent operation middleware
+func (siw *ServerInterfaceWrapper) ProposeAgent(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ProposeAgent(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportAgents operation middleware
+func (siw *ServerInterfaceWrapper) ExportAgents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportAgentsParams
+
+	// ------------- Optional query parameter "format" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "format", r.URL.Query(), &params.Format, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "format"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "format", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "pseudonymize" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "pseudonymize", r.URL.Query(), &params.Pseudonymize, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "pseudonymize"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pseudonymize", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "ownerId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ownerId", r.URL.Query(), &params.OwnerId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "ownerId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ownerId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "riskTier" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "riskTier", r.URL.Query(), &params.RiskTier, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "riskTier"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "riskTier", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "coverage" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "coverage", r.URL.Query(), &params.Coverage, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "coverage"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "coverage", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "label" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "label", r.URL.Query(), &params.Label, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "label"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "label", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "useCaseId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "useCaseId", r.URL.Query(), &params.UseCaseId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "useCaseId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "useCaseId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportAgents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAgent operation middleware
+func (siw *ServerInterfaceWrapper) GetAgent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgent(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EditAgent operation middleware
+func (siw *ServerInterfaceWrapper) EditAgent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params EditAgentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EditAgent(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAgentActions operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentActions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentActions(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddAgentDelegate operation middleware
+func (siw *ServerInterfaceWrapper) AddAgentDelegate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddAgentDelegate(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveAgentDelegate operation middleware
+func (siw *ServerInterfaceWrapper) RemoveAgentDelegate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "principalId" -------------
+	var principalId DelegateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "principalId", r.PathValue("principalId"), &principalId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "principalId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RemoveAgentDelegateParams
+
+	// ------------- Optional query parameter "reason" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "reason", r.URL.Query(), &params.Reason, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "reason"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reason", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveAgentDelegate(w, r, id, principalId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAgentInstances operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentInstances(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAgentInstancesParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentInstances(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAgentOwners operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentOwners(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAgentOwnersParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentOwners(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestOwnershipTransfer operation middleware
+func (siw *ServerInterfaceWrapper) RequestOwnershipTransfer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestOwnershipTransfer(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelOwnershipTransfer operation middleware
+func (siw *ServerInterfaceWrapper) CancelOwnershipTransfer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "transferId" -------------
+	var transferId TransferId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "transferId", r.PathValue("transferId"), &transferId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "transferId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelOwnershipTransfer(w, r, id, transferId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcceptOwnershipTransfer operation middleware
+func (siw *ServerInterfaceWrapper) AcceptOwnershipTransfer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "transferId" -------------
+	var transferId TransferId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "transferId", r.PathValue("transferId"), &transferId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "transferId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcceptOwnershipTransfer(w, r, id, transferId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeclineOwnershipTransfer operation middleware
+func (siw *ServerInterfaceWrapper) DeclineOwnershipTransfer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "transferId" -------------
+	var transferId TransferId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "transferId", r.PathValue("transferId"), &transferId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "transferId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeclineOwnershipTransfer(w, r, id, transferId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReassignAgentOwner operation middleware
+func (siw *ServerInterfaceWrapper) ReassignAgentOwner(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReassignAgentOwnerParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReassignAgentOwner(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAgentReviews operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentReviews(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAgentReviewsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentReviews(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAgentTransitions operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentTransitions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAgentTransitionsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentTransitions(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TransitionAgent operation middleware
+func (siw *ServerInterfaceWrapper) TransitionAgent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TransitionAgentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TransitionAgent(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetAuditCheckpoints operation middleware
 func (siw *ServerInterfaceWrapper) GetAuditCheckpoints(w http.ResponseWriter, r *http.Request) {
@@ -578,11 +3148,269 @@ func (siw *ServerInterfaceWrapper) GetAuditKeys(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListDataCategories operation middleware
+func (siw *ServerInterfaceWrapper) ListDataCategories(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDataCategories(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListInboxItems operation middleware
+func (siw *ServerInterfaceWrapper) ListInboxItems(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListInboxItemsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListInboxItems(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListReviews operation middleware
+func (siw *ServerInterfaceWrapper) ListReviews(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListReviewsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "overdue" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "overdue", r.URL.Query(), &params.Overdue, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "overdue"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "overdue", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReviews(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetReview operation middleware
+func (siw *ServerInterfaceWrapper) GetReview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ReviewId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetReview(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteReview operation middleware
+func (siw *ServerInterfaceWrapper) CompleteReview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ReviewId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompleteReviewParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteReview(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SignOffReview operation middleware
+func (siw *ServerInterfaceWrapper) SignOffReview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ReviewId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SignOffReviewParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SignOffReview(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -714,6 +3542,223 @@ func (siw *ServerInterfaceWrapper) RevokeToken(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeToken(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUseCases operation middleware
+func (siw *ServerInterfaceWrapper) ListUseCases(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUseCasesParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUseCases(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateUseCase operation middleware
+func (siw *ServerInterfaceWrapper) CreateUseCase(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateUseCase(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUseCase operation middleware
+func (siw *ServerInterfaceWrapper) GetUseCase(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id UseCaseId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUseCase(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EditUseCase operation middleware
+func (siw *ServerInterfaceWrapper) EditUseCase(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id UseCaseId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params EditUseCaseParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EditUseCase(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUseCaseDecisions operation middleware
+func (siw *ServerInterfaceWrapper) ListUseCaseDecisions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id UseCaseId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUseCaseDecisionsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUseCaseDecisions(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -869,11 +3914,821 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events/{id}", wrapper.GetAuditEvent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/checkpoints", wrapper.GetAuditCheckpoints)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/keys", wrapper.GetAuditKeys)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents", wrapper.ListAgents)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents", wrapper.ProposeAgent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/export", wrapper.ExportAgents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{id}", wrapper.GetAgent)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/agents/{id}", wrapper.EditAgent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{id}/actions", wrapper.GetAgentActions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{id}/transitions", wrapper.ListAgentTransitions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{id}/transitions", wrapper.TransitionAgent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{id}/instances", wrapper.ListAgentInstances)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{id}/owners", wrapper.ListAgentOwners)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{id}/primary-owner", wrapper.ReassignAgentOwner)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{id}/delegates", wrapper.AddAgentDelegate)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/agents/{id}/delegates/{principalId}", wrapper.RemoveAgentDelegate)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{id}/ownership-transfers", wrapper.RequestOwnershipTransfer)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/agents/{id}/ownership-transfers/{transferId}", wrapper.CancelOwnershipTransfer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{id}/ownership-transfers/{transferId}/accept", wrapper.AcceptOwnershipTransfer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{id}/ownership-transfers/{transferId}/decline", wrapper.DeclineOwnershipTransfer)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{id}/reviews", wrapper.ListAgentReviews)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/use-cases", wrapper.ListUseCases)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/use-cases", wrapper.CreateUseCase)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/use-cases/{id}", wrapper.GetUseCase)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/use-cases/{id}", wrapper.EditUseCase)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/use-cases/{id}/decisions", wrapper.ListUseCaseDecisions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/reviews", wrapper.ListReviews)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/reviews/{id}", wrapper.GetReview)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/reviews/{id}/completion", wrapper.CompleteReview)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/reviews/{id}/sign-off", wrapper.SignOffReview)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/data-categories", wrapper.ListDataCategories)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/inbox", wrapper.ListInboxItems)
 
 	return m
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type ListAgentsRequestObject struct {
+	Params ListAgentsParams
+}
+
+type ListAgentsResponseObject interface {
+	VisitListAgentsResponse(w http.ResponseWriter) error
+}
+
+type ListAgents200JSONResponse AgentList
+
+func (response ListAgents200JSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListAgentsdefaultApplicationProblemPlusJSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProposeAgentRequestObject struct {
+	Body *ProposeAgentJSONRequestBody
+}
+
+type ProposeAgentResponseObject interface {
+	VisitProposeAgentResponse(w http.ResponseWriter) error
+}
+
+type ProposeAgent201ResponseHeaders struct {
+	ETag string
+}
+
+type ProposeAgent201JSONResponse struct {
+	Body    Agent
+	Headers ProposeAgent201ResponseHeaders
+}
+
+func (response ProposeAgent201JSONResponse) VisitProposeAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProposeAgentdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ProposeAgentdefaultApplicationProblemPlusJSONResponse) VisitProposeAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportAgentsRequestObject struct {
+	Params ExportAgentsParams
+}
+
+type ExportAgentsResponseObject interface {
+	VisitExportAgentsResponse(w http.ResponseWriter) error
+}
+
+type ExportAgents200ResponseHeaders struct {
+	ContentDisposition *string
+}
+
+type ExportAgents200JSONResponse struct {
+	Body    []Agent
+	Headers ExportAgents200ResponseHeaders
+}
+
+func (response ExportAgents200JSONResponse) VisitExportAgentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportAgents200TextcsvResponse struct {
+	Body          io.Reader
+	Headers       ExportAgents200ResponseHeaders
+	ContentLength int64
+}
+
+func (response ExportAgents200TextcsvResponse) VisitExportAgentsResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "text/csv")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type ExportAgentsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ExportAgentsdefaultApplicationProblemPlusJSONResponse) VisitExportAgentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgentRequestObject struct {
+	Id AgentId `json:"id"`
+}
+
+type GetAgentResponseObject interface {
+	VisitGetAgentResponse(w http.ResponseWriter) error
+}
+
+type GetAgent200ResponseHeaders struct {
+	ETag string
+}
+
+type GetAgent200JSONResponse struct {
+	Body    Agent
+	Headers GetAgent200ResponseHeaders
+}
+
+func (response GetAgent200JSONResponse) VisitGetAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgentdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetAgentdefaultApplicationProblemPlusJSONResponse) VisitGetAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EditAgentRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params EditAgentParams
+	Body   *EditAgentJSONRequestBody
+}
+
+type EditAgentResponseObject interface {
+	VisitEditAgentResponse(w http.ResponseWriter) error
+}
+
+type EditAgent200ResponseHeaders struct {
+	ETag string
+}
+
+type EditAgent200JSONResponse struct {
+	Body    Agent
+	Headers EditAgent200ResponseHeaders
+}
+
+func (response EditAgent200JSONResponse) VisitEditAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EditAgentdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response EditAgentdefaultApplicationProblemPlusJSONResponse) VisitEditAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgentActionsRequestObject struct {
+	Id AgentId `json:"id"`
+}
+
+type GetAgentActionsResponseObject interface {
+	VisitGetAgentActionsResponse(w http.ResponseWriter) error
+}
+
+type GetAgentActions200JSONResponse AgentActions
+
+func (response GetAgentActions200JSONResponse) VisitGetAgentActionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgentActionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetAgentActionsdefaultApplicationProblemPlusJSONResponse) VisitGetAgentActionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAgentDelegateRequestObject struct {
+	Id   AgentId `json:"id"`
+	Body *AddAgentDelegateJSONRequestBody
+}
+
+type AddAgentDelegateResponseObject interface {
+	VisitAddAgentDelegateResponse(w http.ResponseWriter) error
+}
+
+type AddAgentDelegate201JSONResponse OwnerAssignment
+
+func (response AddAgentDelegate201JSONResponse) VisitAddAgentDelegateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAgentDelegatedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response AddAgentDelegatedefaultApplicationProblemPlusJSONResponse) VisitAddAgentDelegateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgentDelegateRequestObject struct {
+	Id          AgentId    `json:"id"`
+	PrincipalId DelegateId `json:"principalId"`
+	Params      RemoveAgentDelegateParams
+}
+
+type RemoveAgentDelegateResponseObject interface {
+	VisitRemoveAgentDelegateResponse(w http.ResponseWriter) error
+}
+
+type RemoveAgentDelegate204Response struct {
+}
+
+func (response RemoveAgentDelegate204Response) VisitRemoveAgentDelegateResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveAgentDelegatedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RemoveAgentDelegatedefaultApplicationProblemPlusJSONResponse) VisitRemoveAgentDelegateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentInstancesRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params ListAgentInstancesParams
+}
+
+type ListAgentInstancesResponseObject interface {
+	VisitListAgentInstancesResponse(w http.ResponseWriter) error
+}
+
+type ListAgentInstances200JSONResponse InstanceList
+
+func (response ListAgentInstances200JSONResponse) VisitListAgentInstancesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentInstancesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListAgentInstancesdefaultApplicationProblemPlusJSONResponse) VisitListAgentInstancesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentOwnersRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params ListAgentOwnersParams
+}
+
+type ListAgentOwnersResponseObject interface {
+	VisitListAgentOwnersResponse(w http.ResponseWriter) error
+}
+
+type ListAgentOwners200JSONResponse OwnerAssignmentList
+
+func (response ListAgentOwners200JSONResponse) VisitListAgentOwnersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentOwnersdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListAgentOwnersdefaultApplicationProblemPlusJSONResponse) VisitListAgentOwnersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestOwnershipTransferRequestObject struct {
+	Id   AgentId `json:"id"`
+	Body *RequestOwnershipTransferJSONRequestBody
+}
+
+type RequestOwnershipTransferResponseObject interface {
+	VisitRequestOwnershipTransferResponse(w http.ResponseWriter) error
+}
+
+type RequestOwnershipTransfer201JSONResponse OwnershipTransfer
+
+func (response RequestOwnershipTransfer201JSONResponse) VisitRequestOwnershipTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestOwnershipTransferdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RequestOwnershipTransferdefaultApplicationProblemPlusJSONResponse) VisitRequestOwnershipTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelOwnershipTransferRequestObject struct {
+	Id         AgentId    `json:"id"`
+	TransferId TransferId `json:"transferId"`
+}
+
+type CancelOwnershipTransferResponseObject interface {
+	VisitCancelOwnershipTransferResponse(w http.ResponseWriter) error
+}
+
+type CancelOwnershipTransfer204Response struct {
+}
+
+func (response CancelOwnershipTransfer204Response) VisitCancelOwnershipTransferResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type CancelOwnershipTransferdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CancelOwnershipTransferdefaultApplicationProblemPlusJSONResponse) VisitCancelOwnershipTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptOwnershipTransferRequestObject struct {
+	Id         AgentId    `json:"id"`
+	TransferId TransferId `json:"transferId"`
+}
+
+type AcceptOwnershipTransferResponseObject interface {
+	VisitAcceptOwnershipTransferResponse(w http.ResponseWriter) error
+}
+
+type AcceptOwnershipTransfer200JSONResponse OwnershipTransfer
+
+func (response AcceptOwnershipTransfer200JSONResponse) VisitAcceptOwnershipTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptOwnershipTransferdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response AcceptOwnershipTransferdefaultApplicationProblemPlusJSONResponse) VisitAcceptOwnershipTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineOwnershipTransferRequestObject struct {
+	Id         AgentId    `json:"id"`
+	TransferId TransferId `json:"transferId"`
+}
+
+type DeclineOwnershipTransferResponseObject interface {
+	VisitDeclineOwnershipTransferResponse(w http.ResponseWriter) error
+}
+
+type DeclineOwnershipTransfer200JSONResponse OwnershipTransfer
+
+func (response DeclineOwnershipTransfer200JSONResponse) VisitDeclineOwnershipTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineOwnershipTransferdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeclineOwnershipTransferdefaultApplicationProblemPlusJSONResponse) VisitDeclineOwnershipTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReassignAgentOwnerRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params ReassignAgentOwnerParams
+	Body   *ReassignAgentOwnerJSONRequestBody
+}
+
+type ReassignAgentOwnerResponseObject interface {
+	VisitReassignAgentOwnerResponse(w http.ResponseWriter) error
+}
+
+type ReassignAgentOwner200ResponseHeaders struct {
+	ETag string
+}
+
+type ReassignAgentOwner200JSONResponse struct {
+	Body    Agent
+	Headers ReassignAgentOwner200ResponseHeaders
+}
+
+func (response ReassignAgentOwner200JSONResponse) VisitReassignAgentOwnerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReassignAgentOwnerdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ReassignAgentOwnerdefaultApplicationProblemPlusJSONResponse) VisitReassignAgentOwnerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentReviewsRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params ListAgentReviewsParams
+}
+
+type ListAgentReviewsResponseObject interface {
+	VisitListAgentReviewsResponse(w http.ResponseWriter) error
+}
+
+type ListAgentReviews200JSONResponse ReviewList
+
+func (response ListAgentReviews200JSONResponse) VisitListAgentReviewsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentReviewsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListAgentReviewsdefaultApplicationProblemPlusJSONResponse) VisitListAgentReviewsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentTransitionsRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params ListAgentTransitionsParams
+}
+
+type ListAgentTransitionsResponseObject interface {
+	VisitListAgentTransitionsResponse(w http.ResponseWriter) error
+}
+
+type ListAgentTransitions200JSONResponse TransitionList
+
+func (response ListAgentTransitions200JSONResponse) VisitListAgentTransitionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentTransitionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListAgentTransitionsdefaultApplicationProblemPlusJSONResponse) VisitListAgentTransitionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TransitionAgentRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params TransitionAgentParams
+	Body   *TransitionAgentJSONRequestBody
+}
+
+type TransitionAgentResponseObject interface {
+	VisitTransitionAgentResponse(w http.ResponseWriter) error
+}
+
+type TransitionAgent200ResponseHeaders struct {
+	ETag string
+}
+
+type TransitionAgent200JSONResponse struct {
+	Body    Agent
+	Headers TransitionAgent200ResponseHeaders
+}
+
+func (response TransitionAgent200JSONResponse) VisitTransitionAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TransitionAgentdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response TransitionAgentdefaultApplicationProblemPlusJSONResponse) VisitTransitionAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type GetAuditCheckpointsRequestObject struct {
 }
@@ -1045,6 +4900,83 @@ func (response GetAuditKeysdefaultApplicationProblemPlusJSONResponse) VisitGetAu
 	return err
 }
 
+type ListDataCategoriesRequestObject struct {
+}
+
+type ListDataCategoriesResponseObject interface {
+	VisitListDataCategoriesResponse(w http.ResponseWriter) error
+}
+
+type ListDataCategories200JSONResponse DataCategoryList
+
+func (response ListDataCategories200JSONResponse) VisitListDataCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDataCategoriesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListDataCategoriesdefaultApplicationProblemPlusJSONResponse) VisitListDataCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInboxItemsRequestObject struct {
+	Params ListInboxItemsParams
+}
+
+type ListInboxItemsResponseObject interface {
+	VisitListInboxItemsResponse(w http.ResponseWriter) error
+}
+
+type ListInboxItems200JSONResponse InboxItemList
+
+func (response ListInboxItems200JSONResponse) VisitListInboxItemsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInboxItemsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListInboxItemsdefaultApplicationProblemPlusJSONResponse) VisitListInboxItemsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -1072,6 +5004,189 @@ type GetMedefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetMedefaultApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReviewsRequestObject struct {
+	Params ListReviewsParams
+}
+
+type ListReviewsResponseObject interface {
+	VisitListReviewsResponse(w http.ResponseWriter) error
+}
+
+type ListReviews200JSONResponse ReviewList
+
+func (response ListReviews200JSONResponse) VisitListReviewsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReviewsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListReviewsdefaultApplicationProblemPlusJSONResponse) VisitListReviewsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetReviewRequestObject struct {
+	Id ReviewId `json:"id"`
+}
+
+type GetReviewResponseObject interface {
+	VisitGetReviewResponse(w http.ResponseWriter) error
+}
+
+type GetReview200ResponseHeaders struct {
+	ETag string
+}
+
+type GetReview200JSONResponse struct {
+	Body    Review
+	Headers GetReview200ResponseHeaders
+}
+
+func (response GetReview200JSONResponse) VisitGetReviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetReviewdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetReviewdefaultApplicationProblemPlusJSONResponse) VisitGetReviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteReviewRequestObject struct {
+	Id     ReviewId `json:"id"`
+	Params CompleteReviewParams
+	Body   *CompleteReviewJSONRequestBody
+}
+
+type CompleteReviewResponseObject interface {
+	VisitCompleteReviewResponse(w http.ResponseWriter) error
+}
+
+type CompleteReview200ResponseHeaders struct {
+	ETag string
+}
+
+type CompleteReview200JSONResponse struct {
+	Body    Review
+	Headers CompleteReview200ResponseHeaders
+}
+
+func (response CompleteReview200JSONResponse) VisitCompleteReviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteReviewdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CompleteReviewdefaultApplicationProblemPlusJSONResponse) VisitCompleteReviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignOffReviewRequestObject struct {
+	Id     ReviewId `json:"id"`
+	Params SignOffReviewParams
+}
+
+type SignOffReviewResponseObject interface {
+	VisitSignOffReviewResponse(w http.ResponseWriter) error
+}
+
+type SignOffReview200ResponseHeaders struct {
+	ETag string
+}
+
+type SignOffReview200JSONResponse struct {
+	Body    Review
+	Headers SignOffReview200ResponseHeaders
+}
+
+func (response SignOffReview200JSONResponse) VisitSignOffReviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignOffReviewdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response SignOffReviewdefaultApplicationProblemPlusJSONResponse) VisitSignOffReviewResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -1311,6 +5426,228 @@ func (response RevokeTokendefaultApplicationProblemPlusJSONResponse) VisitRevoke
 	return err
 }
 
+type ListUseCasesRequestObject struct {
+	Params ListUseCasesParams
+}
+
+type ListUseCasesResponseObject interface {
+	VisitListUseCasesResponse(w http.ResponseWriter) error
+}
+
+type ListUseCases200JSONResponse UseCaseList
+
+func (response ListUseCases200JSONResponse) VisitListUseCasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUseCasesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListUseCasesdefaultApplicationProblemPlusJSONResponse) VisitListUseCasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUseCaseRequestObject struct {
+	Body *CreateUseCaseJSONRequestBody
+}
+
+type CreateUseCaseResponseObject interface {
+	VisitCreateUseCaseResponse(w http.ResponseWriter) error
+}
+
+type CreateUseCase201ResponseHeaders struct {
+	ETag string
+}
+
+type CreateUseCase201JSONResponse struct {
+	Body    UseCase
+	Headers CreateUseCase201ResponseHeaders
+}
+
+func (response CreateUseCase201JSONResponse) VisitCreateUseCaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUseCasedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateUseCasedefaultApplicationProblemPlusJSONResponse) VisitCreateUseCaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUseCaseRequestObject struct {
+	Id UseCaseId `json:"id"`
+}
+
+type GetUseCaseResponseObject interface {
+	VisitGetUseCaseResponse(w http.ResponseWriter) error
+}
+
+type GetUseCase200ResponseHeaders struct {
+	ETag string
+}
+
+type GetUseCase200JSONResponse struct {
+	Body    UseCase
+	Headers GetUseCase200ResponseHeaders
+}
+
+func (response GetUseCase200JSONResponse) VisitGetUseCaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUseCasedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetUseCasedefaultApplicationProblemPlusJSONResponse) VisitGetUseCaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EditUseCaseRequestObject struct {
+	Id     UseCaseId `json:"id"`
+	Params EditUseCaseParams
+	Body   *EditUseCaseJSONRequestBody
+}
+
+type EditUseCaseResponseObject interface {
+	VisitEditUseCaseResponse(w http.ResponseWriter) error
+}
+
+type EditUseCase200ResponseHeaders struct {
+	ETag string
+}
+
+type EditUseCase200JSONResponse struct {
+	Body    UseCase
+	Headers EditUseCase200ResponseHeaders
+}
+
+func (response EditUseCase200JSONResponse) VisitEditUseCaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EditUseCasedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response EditUseCasedefaultApplicationProblemPlusJSONResponse) VisitEditUseCaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUseCaseDecisionsRequestObject struct {
+	Id     UseCaseId `json:"id"`
+	Params ListUseCaseDecisionsParams
+}
+
+type ListUseCaseDecisionsResponseObject interface {
+	VisitListUseCaseDecisionsResponse(w http.ResponseWriter) error
+}
+
+type ListUseCaseDecisions200JSONResponse UseCaseDecisionList
+
+func (response ListUseCaseDecisions200JSONResponse) VisitListUseCaseDecisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUseCaseDecisionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListUseCaseDecisionsdefaultApplicationProblemPlusJSONResponse) VisitListUseCaseDecisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetVersionRequestObject struct {
 }
 
@@ -1351,6 +5688,60 @@ func (response GetVersiondefaultApplicationProblemPlusJSONResponse) VisitGetVers
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListAgents List agents
+	// (GET /agents)
+	ListAgents(ctx context.Context, request ListAgentsRequestObject) (ListAgentsResponseObject, error)
+	// ProposeAgent Propose an agent
+	// (POST /agents)
+	ProposeAgent(ctx context.Context, request ProposeAgentRequestObject) (ProposeAgentResponseObject, error)
+	// ExportAgents Export agents
+	// (GET /agents/export)
+	ExportAgents(ctx context.Context, request ExportAgentsRequestObject) (ExportAgentsResponseObject, error)
+	// GetAgent Get an agent
+	// (GET /agents/{id})
+	GetAgent(ctx context.Context, request GetAgentRequestObject) (GetAgentResponseObject, error)
+	// EditAgent Edit an agent's metadata
+	// (PATCH /agents/{id})
+	EditAgent(ctx context.Context, request EditAgentRequestObject) (EditAgentResponseObject, error)
+	// GetAgentActions Get the lifecycle actions open to the caller
+	// (GET /agents/{id}/actions)
+	GetAgentActions(ctx context.Context, request GetAgentActionsRequestObject) (GetAgentActionsResponseObject, error)
+	// AddAgentDelegate Add a delegate
+	// (POST /agents/{id}/delegates)
+	AddAgentDelegate(ctx context.Context, request AddAgentDelegateRequestObject) (AddAgentDelegateResponseObject, error)
+	// RemoveAgentDelegate Remove a delegate
+	// (DELETE /agents/{id}/delegates/{principalId})
+	RemoveAgentDelegate(ctx context.Context, request RemoveAgentDelegateRequestObject) (RemoveAgentDelegateResponseObject, error)
+	// ListAgentInstances List an agent's instances
+	// (GET /agents/{id}/instances)
+	ListAgentInstances(ctx context.Context, request ListAgentInstancesRequestObject) (ListAgentInstancesResponseObject, error)
+	// ListAgentOwners List an agent's owners and their history
+	// (GET /agents/{id}/owners)
+	ListAgentOwners(ctx context.Context, request ListAgentOwnersRequestObject) (ListAgentOwnersResponseObject, error)
+	// RequestOwnershipTransfer Offer an agent's ownership to someone else
+	// (POST /agents/{id}/ownership-transfers)
+	RequestOwnershipTransfer(ctx context.Context, request RequestOwnershipTransferRequestObject) (RequestOwnershipTransferResponseObject, error)
+	// CancelOwnershipTransfer Cancel an ownership transfer
+	// (DELETE /agents/{id}/ownership-transfers/{transferId})
+	CancelOwnershipTransfer(ctx context.Context, request CancelOwnershipTransferRequestObject) (CancelOwnershipTransferResponseObject, error)
+	// AcceptOwnershipTransfer Accept an ownership transfer
+	// (POST /agents/{id}/ownership-transfers/{transferId}/accept)
+	AcceptOwnershipTransfer(ctx context.Context, request AcceptOwnershipTransferRequestObject) (AcceptOwnershipTransferResponseObject, error)
+	// DeclineOwnershipTransfer Decline an ownership transfer
+	// (POST /agents/{id}/ownership-transfers/{transferId}/decline)
+	DeclineOwnershipTransfer(ctx context.Context, request DeclineOwnershipTransferRequestObject) (DeclineOwnershipTransferResponseObject, error)
+	// ReassignAgentOwner Reassign an agent's primary owner
+	// (PUT /agents/{id}/primary-owner)
+	ReassignAgentOwner(ctx context.Context, request ReassignAgentOwnerRequestObject) (ReassignAgentOwnerResponseObject, error)
+	// ListAgentReviews List an agent's periodic reviews
+	// (GET /agents/{id}/reviews)
+	ListAgentReviews(ctx context.Context, request ListAgentReviewsRequestObject) (ListAgentReviewsResponseObject, error)
+	// ListAgentTransitions List an agent's lifecycle history
+	// (GET /agents/{id}/transitions)
+	ListAgentTransitions(ctx context.Context, request ListAgentTransitionsRequestObject) (ListAgentTransitionsResponseObject, error)
+	// TransitionAgent Take a lifecycle action
+	// (POST /agents/{id}/transitions)
+	TransitionAgent(ctx context.Context, request TransitionAgentRequestObject) (TransitionAgentResponseObject, error)
 	// GetAuditCheckpoints List signed checkpoints
 	// (GET /audit/checkpoints)
 	GetAuditCheckpoints(ctx context.Context, request GetAuditCheckpointsRequestObject) (GetAuditCheckpointsResponseObject, error)
@@ -1363,9 +5754,27 @@ type StrictServerInterface interface {
 	// GetAuditKeys List checkpoint signing keys
 	// (GET /audit/keys)
 	GetAuditKeys(ctx context.Context, request GetAuditKeysRequestObject) (GetAuditKeysResponseObject, error)
+	// ListDataCategories List the data categories
+	// (GET /data-categories)
+	ListDataCategories(ctx context.Context, request ListDataCategoriesRequestObject) (ListDataCategoriesResponseObject, error)
+	// ListInboxItems List the caller's pending work
+	// (GET /inbox)
+	ListInboxItems(ctx context.Context, request ListInboxItemsRequestObject) (ListInboxItemsResponseObject, error)
 	// GetMe Get the calling principal
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// ListReviews List periodic reviews
+	// (GET /reviews)
+	ListReviews(ctx context.Context, request ListReviewsRequestObject) (ListReviewsResponseObject, error)
+	// GetReview Get a periodic review
+	// (GET /reviews/{id})
+	GetReview(ctx context.Context, request GetReviewRequestObject) (GetReviewResponseObject, error)
+	// CompleteReview Complete a periodic review
+	// (POST /reviews/{id}/completion)
+	CompleteReview(ctx context.Context, request CompleteReviewRequestObject) (CompleteReviewResponseObject, error)
+	// SignOffReview Sign off a periodic review
+	// (POST /reviews/{id}/sign-off)
+	SignOffReview(ctx context.Context, request SignOffReviewRequestObject) (SignOffReviewResponseObject, error)
 	// ListServiceAccounts List service accounts
 	// (GET /service-accounts)
 	ListServiceAccounts(ctx context.Context, request ListServiceAccountsRequestObject) (ListServiceAccountsResponseObject, error)
@@ -1384,6 +5793,21 @@ type StrictServerInterface interface {
 	// RevokeToken Revoke an API token
 	// (DELETE /tokens/{id})
 	RevokeToken(ctx context.Context, request RevokeTokenRequestObject) (RevokeTokenResponseObject, error)
+	// ListUseCases List use cases
+	// (GET /use-cases)
+	ListUseCases(ctx context.Context, request ListUseCasesRequestObject) (ListUseCasesResponseObject, error)
+	// CreateUseCase Create a use case
+	// (POST /use-cases)
+	CreateUseCase(ctx context.Context, request CreateUseCaseRequestObject) (CreateUseCaseResponseObject, error)
+	// GetUseCase Get a use case
+	// (GET /use-cases/{id})
+	GetUseCase(ctx context.Context, request GetUseCaseRequestObject) (GetUseCaseResponseObject, error)
+	// EditUseCase Edit a use case
+	// (PATCH /use-cases/{id})
+	EditUseCase(ctx context.Context, request EditUseCaseRequestObject) (EditUseCaseResponseObject, error)
+	// ListUseCaseDecisions List the decisions on a use case
+	// (GET /use-cases/{id}/decisions)
+	ListUseCaseDecisions(ctx context.Context, request ListUseCaseDecisionsRequestObject) (ListUseCaseDecisionsResponseObject, error)
 	// GetVersion Get the version of the running server
 	// (GET /version)
 	GetVersion(ctx context.Context, request GetVersionRequestObject) (GetVersionResponseObject, error)
@@ -1426,6 +5850,526 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListAgents operation middleware
+func (sh *strictHandler) ListAgents(w http.ResponseWriter, r *http.Request, params ListAgentsParams) {
+	var request ListAgentsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgents(ctx, request.(ListAgentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentsResponseObject); ok {
+		if err := validResponse.VisitListAgentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ProposeAgent operation middleware
+func (sh *strictHandler) ProposeAgent(w http.ResponseWriter, r *http.Request) {
+	var request ProposeAgentRequestObject
+
+	var body ProposeAgentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ProposeAgent(ctx, request.(ProposeAgentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ProposeAgent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ProposeAgentResponseObject); ok {
+		if err := validResponse.VisitProposeAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExportAgents operation middleware
+func (sh *strictHandler) ExportAgents(w http.ResponseWriter, r *http.Request, params ExportAgentsParams) {
+	var request ExportAgentsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExportAgents(ctx, request.(ExportAgentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExportAgents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExportAgentsResponseObject); ok {
+		if err := validResponse.VisitExportAgentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgent operation middleware
+func (sh *strictHandler) GetAgent(w http.ResponseWriter, r *http.Request, id AgentId) {
+	var request GetAgentRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgent(ctx, request.(GetAgentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentResponseObject); ok {
+		if err := validResponse.VisitGetAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EditAgent operation middleware
+func (sh *strictHandler) EditAgent(w http.ResponseWriter, r *http.Request, id AgentId, params EditAgentParams) {
+	var request EditAgentRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body EditAgentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EditAgent(ctx, request.(EditAgentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EditAgent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EditAgentResponseObject); ok {
+		if err := validResponse.VisitEditAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgentActions operation middleware
+func (sh *strictHandler) GetAgentActions(w http.ResponseWriter, r *http.Request, id AgentId) {
+	var request GetAgentActionsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentActions(ctx, request.(GetAgentActionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentActions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentActionsResponseObject); ok {
+		if err := validResponse.VisitGetAgentActionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddAgentDelegate operation middleware
+func (sh *strictHandler) AddAgentDelegate(w http.ResponseWriter, r *http.Request, id AgentId) {
+	var request AddAgentDelegateRequestObject
+
+	request.Id = id
+
+	var body AddAgentDelegateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddAgentDelegate(ctx, request.(AddAgentDelegateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddAgentDelegate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddAgentDelegateResponseObject); ok {
+		if err := validResponse.VisitAddAgentDelegateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveAgentDelegate operation middleware
+func (sh *strictHandler) RemoveAgentDelegate(w http.ResponseWriter, r *http.Request, id AgentId, principalId DelegateId, params RemoveAgentDelegateParams) {
+	var request RemoveAgentDelegateRequestObject
+
+	request.Id = id
+	request.PrincipalId = principalId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveAgentDelegate(ctx, request.(RemoveAgentDelegateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveAgentDelegate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveAgentDelegateResponseObject); ok {
+		if err := validResponse.VisitRemoveAgentDelegateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentInstances operation middleware
+func (sh *strictHandler) ListAgentInstances(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentInstancesParams) {
+	var request ListAgentInstancesRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentInstances(ctx, request.(ListAgentInstancesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentInstances")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentInstancesResponseObject); ok {
+		if err := validResponse.VisitListAgentInstancesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentOwners operation middleware
+func (sh *strictHandler) ListAgentOwners(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentOwnersParams) {
+	var request ListAgentOwnersRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentOwners(ctx, request.(ListAgentOwnersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentOwners")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentOwnersResponseObject); ok {
+		if err := validResponse.VisitListAgentOwnersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RequestOwnershipTransfer operation middleware
+func (sh *strictHandler) RequestOwnershipTransfer(w http.ResponseWriter, r *http.Request, id AgentId) {
+	var request RequestOwnershipTransferRequestObject
+
+	request.Id = id
+
+	var body RequestOwnershipTransferJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RequestOwnershipTransfer(ctx, request.(RequestOwnershipTransferRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RequestOwnershipTransfer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RequestOwnershipTransferResponseObject); ok {
+		if err := validResponse.VisitRequestOwnershipTransferResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelOwnershipTransfer operation middleware
+func (sh *strictHandler) CancelOwnershipTransfer(w http.ResponseWriter, r *http.Request, id AgentId, transferId TransferId) {
+	var request CancelOwnershipTransferRequestObject
+
+	request.Id = id
+	request.TransferId = transferId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelOwnershipTransfer(ctx, request.(CancelOwnershipTransferRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelOwnershipTransfer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelOwnershipTransferResponseObject); ok {
+		if err := validResponse.VisitCancelOwnershipTransferResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AcceptOwnershipTransfer operation middleware
+func (sh *strictHandler) AcceptOwnershipTransfer(w http.ResponseWriter, r *http.Request, id AgentId, transferId TransferId) {
+	var request AcceptOwnershipTransferRequestObject
+
+	request.Id = id
+	request.TransferId = transferId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AcceptOwnershipTransfer(ctx, request.(AcceptOwnershipTransferRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcceptOwnershipTransfer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AcceptOwnershipTransferResponseObject); ok {
+		if err := validResponse.VisitAcceptOwnershipTransferResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeclineOwnershipTransfer operation middleware
+func (sh *strictHandler) DeclineOwnershipTransfer(w http.ResponseWriter, r *http.Request, id AgentId, transferId TransferId) {
+	var request DeclineOwnershipTransferRequestObject
+
+	request.Id = id
+	request.TransferId = transferId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeclineOwnershipTransfer(ctx, request.(DeclineOwnershipTransferRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeclineOwnershipTransfer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeclineOwnershipTransferResponseObject); ok {
+		if err := validResponse.VisitDeclineOwnershipTransferResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReassignAgentOwner operation middleware
+func (sh *strictHandler) ReassignAgentOwner(w http.ResponseWriter, r *http.Request, id AgentId, params ReassignAgentOwnerParams) {
+	var request ReassignAgentOwnerRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ReassignAgentOwnerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReassignAgentOwner(ctx, request.(ReassignAgentOwnerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReassignAgentOwner")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReassignAgentOwnerResponseObject); ok {
+		if err := validResponse.VisitReassignAgentOwnerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentReviews operation middleware
+func (sh *strictHandler) ListAgentReviews(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentReviewsParams) {
+	var request ListAgentReviewsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentReviews(ctx, request.(ListAgentReviewsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentReviews")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentReviewsResponseObject); ok {
+		if err := validResponse.VisitListAgentReviewsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentTransitions operation middleware
+func (sh *strictHandler) ListAgentTransitions(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentTransitionsParams) {
+	var request ListAgentTransitionsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentTransitions(ctx, request.(ListAgentTransitionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentTransitions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentTransitionsResponseObject); ok {
+		if err := validResponse.VisitListAgentTransitionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TransitionAgent operation middleware
+func (sh *strictHandler) TransitionAgent(w http.ResponseWriter, r *http.Request, id AgentId, params TransitionAgentParams) {
+	var request TransitionAgentRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body TransitionAgentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TransitionAgent(ctx, request.(TransitionAgentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TransitionAgent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TransitionAgentResponseObject); ok {
+		if err := validResponse.VisitTransitionAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetAuditCheckpoints operation middleware
@@ -1528,6 +6472,56 @@ func (sh *strictHandler) GetAuditKeys(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListDataCategories operation middleware
+func (sh *strictHandler) ListDataCategories(w http.ResponseWriter, r *http.Request) {
+	var request ListDataCategoriesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDataCategories(ctx, request.(ListDataCategoriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDataCategories")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDataCategoriesResponseObject); ok {
+		if err := validResponse.VisitListDataCategoriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListInboxItems operation middleware
+func (sh *strictHandler) ListInboxItems(w http.ResponseWriter, r *http.Request, params ListInboxItemsParams) {
+	var request ListInboxItemsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListInboxItems(ctx, request.(ListInboxItemsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListInboxItems")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListInboxItemsResponseObject); ok {
+		if err := validResponse.VisitListInboxItemsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -1545,6 +6539,119 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListReviews operation middleware
+func (sh *strictHandler) ListReviews(w http.ResponseWriter, r *http.Request, params ListReviewsParams) {
+	var request ListReviewsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListReviews(ctx, request.(ListReviewsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListReviews")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListReviewsResponseObject); ok {
+		if err := validResponse.VisitListReviewsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetReview operation middleware
+func (sh *strictHandler) GetReview(w http.ResponseWriter, r *http.Request, id ReviewId) {
+	var request GetReviewRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetReview(ctx, request.(GetReviewRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetReview")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetReviewResponseObject); ok {
+		if err := validResponse.VisitGetReviewResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteReview operation middleware
+func (sh *strictHandler) CompleteReview(w http.ResponseWriter, r *http.Request, id ReviewId, params CompleteReviewParams) {
+	var request CompleteReviewRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body CompleteReviewJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteReview(ctx, request.(CompleteReviewRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteReview")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteReviewResponseObject); ok {
+		if err := validResponse.VisitCompleteReviewResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SignOffReview operation middleware
+func (sh *strictHandler) SignOffReview(w http.ResponseWriter, r *http.Request, id ReviewId, params SignOffReviewParams) {
+	var request SignOffReviewRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SignOffReview(ctx, request.(SignOffReviewRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SignOffReview")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SignOffReviewResponseObject); ok {
+		if err := validResponse.VisitSignOffReviewResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1715,6 +6822,150 @@ func (sh *strictHandler) RevokeToken(w http.ResponseWriter, r *http.Request, id 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeTokenResponseObject); ok {
 		if err := validResponse.VisitRevokeTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListUseCases operation middleware
+func (sh *strictHandler) ListUseCases(w http.ResponseWriter, r *http.Request, params ListUseCasesParams) {
+	var request ListUseCasesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUseCases(ctx, request.(ListUseCasesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUseCases")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUseCasesResponseObject); ok {
+		if err := validResponse.VisitListUseCasesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateUseCase operation middleware
+func (sh *strictHandler) CreateUseCase(w http.ResponseWriter, r *http.Request) {
+	var request CreateUseCaseRequestObject
+
+	var body CreateUseCaseJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateUseCase(ctx, request.(CreateUseCaseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateUseCase")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateUseCaseResponseObject); ok {
+		if err := validResponse.VisitCreateUseCaseResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetUseCase operation middleware
+func (sh *strictHandler) GetUseCase(w http.ResponseWriter, r *http.Request, id UseCaseId) {
+	var request GetUseCaseRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetUseCase(ctx, request.(GetUseCaseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetUseCase")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetUseCaseResponseObject); ok {
+		if err := validResponse.VisitGetUseCaseResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EditUseCase operation middleware
+func (sh *strictHandler) EditUseCase(w http.ResponseWriter, r *http.Request, id UseCaseId, params EditUseCaseParams) {
+	var request EditUseCaseRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body EditUseCaseJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EditUseCase(ctx, request.(EditUseCaseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EditUseCase")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EditUseCaseResponseObject); ok {
+		if err := validResponse.VisitEditUseCaseResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListUseCaseDecisions operation middleware
+func (sh *strictHandler) ListUseCaseDecisions(w http.ResponseWriter, r *http.Request, id UseCaseId, params ListUseCaseDecisionsParams) {
+	var request ListUseCaseDecisionsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUseCaseDecisions(ctx, request.(ListUseCaseDecisionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUseCaseDecisions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUseCaseDecisionsResponseObject); ok {
+		if err := validResponse.VisitListUseCaseDecisionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

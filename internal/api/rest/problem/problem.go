@@ -27,11 +27,13 @@ const (
 	Forbidden            Code = "forbidden"
 	NotFound             Code = "not_found"
 	MethodNotAllowed     Code = "method_not_allowed"
+	Conflict             Code = "conflict"
 	PreconditionFailed   Code = "precondition_failed"
 	PayloadTooLarge      Code = "payload_too_large"
 	PreconditionRequired Code = "precondition_required"
 	RateLimited          Code = "rate_limited"
 	Internal             Code = "internal"
+	NotImplemented       Code = "not_implemented"
 )
 
 // Codes maps every code to its HTTP status and title.
@@ -45,11 +47,13 @@ var Codes = map[Code]struct {
 	Forbidden:            {http.StatusForbidden, "The operation is not permitted"},
 	NotFound:             {http.StatusNotFound, "Not found"},
 	MethodNotAllowed:     {http.StatusMethodNotAllowed, "The method is not allowed"},
+	Conflict:             {http.StatusConflict, "The resource's state does not allow the operation"},
 	PreconditionFailed:   {http.StatusPreconditionFailed, "The resource has changed"},
 	PayloadTooLarge:      {http.StatusRequestEntityTooLarge, "The request body is too large"},
 	PreconditionRequired: {http.StatusPreconditionRequired, "The request must name the version it changes"},
 	RateLimited:          {http.StatusTooManyRequests, "Too many requests"},
 	Internal:             {http.StatusInternalServerError, "Internal error"},
+	NotImplemented:       {http.StatusNotImplemented, "The operation is not built yet"},
 }
 
 // TypeBase starts the type URI of every problem: it ends with the code, and

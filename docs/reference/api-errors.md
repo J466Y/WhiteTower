@@ -30,11 +30,13 @@ The codes are defined in `internal/api/rest/problem`; a test keeps this table in
 | `forbidden` | 403 | The caller's roles do not permit the operation. |
 | `not_found` | 404 | No resource, or no operation of the API, has this path. |
 | `method_not_allowed` | 405 | The path exists, but not with this method; `Allow` lists those it supports. |
+| `conflict` | 409 | The resource's state does not allow the operation: a lifecycle transition whose guard does not hold, a use case already validated or rejected, a slug already taken, or a request already pending. The detail says which. |
 | `precondition_failed` | 412 | The resource changed since the client read it: read it again, then retry with the new ETag. |
 | `payload_too_large` | 413 | The request body is larger than the server accepts (1 MiB on the console listener). |
 | `precondition_required` | 428 | An update must send `If-Match` with the ETag of the version it changes, so that nobody silently overwrites someone else's change (threat model, T-08). |
 | `rate_limited` | 429 | The caller sent too many requests; `Retry-After` says when to try again. |
 | `internal` | 500 | The server failed. The details are in its logs, under the request ID. |
+| `not_implemented` | 501 | The operation is in the API, but its server side is not built yet: a plan agrees on its operations before it builds them (pre-alpha). |
 
 ## Conventions that go with them
 
