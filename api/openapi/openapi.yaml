@@ -14,8 +14,8 @@ info:
     English. Clients are rate-limited, per principal or, before login, per
     client address.
 
-    Pre-alpha: only placeholder operations exist until the Phase 1 plans add
-    the real ones.
+    Pre-alpha: a plan agrees on its operations before it builds them, and an
+    operation whose server side is not built yet answers `not_implemented`.
   contact:
     name: White Tower maintainers
     url: https://github.com/J466Y/WhiteTower
@@ -36,6 +36,10 @@ tags:
     description: API tokens for personal access and automation.
   - name: audit
     description: Tamper-evident audit log events, proofs, checkpoints and verification keys.
+  - name: inventory
+    description: Agents, their owners and use cases, their lifecycle and their periodic reviews.
+  - name: inbox
+    description: The work that waits for the caller.
 paths:
   /version:
     get:
@@ -358,6 +362,840 @@ paths:
                   additionalProperties: true
         default:
           $ref: "#/components/responses/Problem"
+  /agents:
+    get:
+      operationId: listAgents
+      summary: List agents
+      description: |
+        Lists the agents that match every filter given, ordered by slug, one
+        page at a time (INV-09). Whoever may see only active agents, as the
+        user role, sees only those.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentStateFilter"
+        - $ref: "#/components/parameters/AgentOwnerFilter"
+        - $ref: "#/components/parameters/AgentRiskTierFilter"
+        - $ref: "#/components/parameters/AgentEnvironmentFilter"
+        - $ref: "#/components/parameters/AgentCoverageFilter"
+        - $ref: "#/components/parameters/AgentLabelFilter"
+        - $ref: "#/components/parameters/AgentUseCaseFilter"
+        - $ref: "#/components/parameters/AgentSearch"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of agents.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: proposeAgent
+      summary: Propose an agent
+      description: |
+        Registers an agent as a draft, lifecycle transition T1, with the
+        mandatory metadata of INV-01 and a use case that is not rejected
+        (INV-03). The caller, an active human with the owner role, becomes its
+        primary owner. A third-party agent without runtime integration is
+        registered the same way, with the kind `third_party`, and has coverage
+        C0 (INV-07).
+      tags: [inventory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposeAgentRequest"
+      responses:
+        "201":
+          description: The new agent.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/export:
+    get:
+      operationId: exportAgents
+      summary: Export agents
+      description: |
+        Streams every agent that matches the filters, as CSV or JSON (INV-09),
+        with the visibility of listAgents. It is not paged: it streams its
+        rows (plan P1-04, step 9).
+
+        CSV has a header row, then one row per agent, with the columns `id`,
+        `slug`, `name`, `description`, `kind`, `source`, `vendor`, `framework`,
+        `deploymentLocation`, `environments`, `riskTier`,
+        `aiActClassification`, `dataCategories`, `useCaseId`,
+        `lifecycleState`, `runState`, `coverage`, `primaryOwnerId`,
+        `primaryOwnerName`, `delegateIds`, `labels`, `haltMode`,
+        `drillEligible`, `createdAt`, `activatedAt` and `retiredAt`. Lists are
+        joined with `;`, and labels are written as `key=value` pairs. A cell,
+        or a part of one that follows a `;`, that starts with `=`, `+`, `-`,
+        `@`, a tab or a carriage return gets a leading `'`, so that
+        spreadsheets never run it as a formula, whatever their list separator
+        (threat model, T-09).
+      tags: [inventory]
+      parameters:
+        - name: format
+          in: query
+          required: false
+          description: The format of the export.
+          schema:
+            type: string
+            enum: [csv, json]
+            default: csv
+        - name: pseudonymize
+          in: query
+          required: false
+          description: |
+            Leaves out the names of people, and keeps their pseudonymous IDs
+            (NFR-20): the CSV column `primaryOwnerName` stays empty, and the
+            JSON holds no display name.
+          schema:
+            type: boolean
+            default: false
+        - $ref: "#/components/parameters/AgentStateFilter"
+        - $ref: "#/components/parameters/AgentOwnerFilter"
+        - $ref: "#/components/parameters/AgentRiskTierFilter"
+        - $ref: "#/components/parameters/AgentEnvironmentFilter"
+        - $ref: "#/components/parameters/AgentCoverageFilter"
+        - $ref: "#/components/parameters/AgentLabelFilter"
+        - $ref: "#/components/parameters/AgentUseCaseFilter"
+        - $ref: "#/components/parameters/AgentSearch"
+      responses:
+        "200":
+          description: The agents, as CSV or as a JSON array of agents.
+          headers:
+            Content-Disposition:
+              $ref: "#/components/headers/ContentDisposition"
+          content:
+            text/csv:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agent"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}:
+    get:
+      operationId: getAgent
+      summary: Get an agent
+      description: |
+        Returns an agent, with the ETag that a change to it must send back.
+        Every change to the agent changes its ETag, including a change to its
+        delegates or to an ownership transfer.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: The agent.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: editAgent
+      summary: Edit an agent's metadata
+      description: |
+        Changes the members the request names and keeps the others; an empty
+        string clears an optional text member, but an edit that would leave
+        neither a vendor nor a framework is refused (`bad_request`, INV-01).
+        The agent's owners edit it, and operators edit any agent (permission
+        matrix). The slug and the kind never change; the use case changes only
+        while the agent is a draft, and never to a rejected one; a retired or
+        rejected agent no longer changes (`conflict`). A harness, once
+        declared, can be replaced but not removed. A change to what policies
+        see of the agent (its risk tier, data categories and labels) or to its
+        halt mode takes a new governance state version, so that enforcement
+        points learn of it.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditAgentRequest"
+      responses:
+        "200":
+          description: The agent, changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/actions:
+    get:
+      operationId: getAgentActions
+      summary: Get the lifecycle actions open to the caller
+      description: |
+        Lists the lifecycle actions that the agent's state allows, and whether
+        the caller may take each one now. When the caller may not, it says
+        what refuses the action: the caller's permission, separation of
+        duties, or the guards of the lifecycle that do not hold
+        (docs/architecture/lifecycle.md, section 4). The console explains its
+        disabled actions with it. The answer holds for the moment it was
+        computed: transitionAgent checks everything again.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: The actions the agent's state allows.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentActions"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/transitions:
+    get:
+      operationId: listAgentTransitions
+      summary: List an agent's lifecycle history
+      description: |
+        Lists the agent's lifecycle transitions, newest first: who made each
+        one, with what reason and comment, and the governance state version it
+        took (INV-04).
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of the agent's transitions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransitionList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: transitionAgent
+      summary: Take a lifecycle action
+      description: |
+        Takes one lifecycle action on the agent, as the lifecycle
+        specification defines it (docs/architecture/lifecycle.md and
+        agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+        itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+        `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+        ETag, so that nobody acts on a state they did not see.
+
+        Besides `inventory.view`, each action needs its own permission, within
+        its scope (permission matrix): `agent.propose` to submit or withdraw,
+        as the agent's primary owner or one of its delegates;
+        `usecase.validate` to request changes, reject or validate; and
+        `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+        for the others. The decisions on a proposal (`request_changes`,
+        `reject` and `validate`) are taken by people, never by a service
+        account, and nobody decides on a proposal they own, are a delegate of
+        or created, nor on one whose use case they created (HUM-04): these
+        refusals are `forbidden`. A guard that does not hold answers
+        `conflict`, and the detail names it; getAgentActions tells beforehand
+        which guards refuse. `request_changes`, `reject`, `validate`,
+        `suspend`, `reinstate` and `retire` need a comment, and a request
+        without one is refused (`bad_request`).
+
+        A use case can justify several agents. `submit`, `withdraw`,
+        `request_changes`, `reject` and `validate` change the agent's use case
+        too, but only while it is neither validated nor rejected: a validated
+        or rejected use case never changes, because other agents may rely on
+        it. The decision is then recorded with the agent, and only the agent
+        changes state. While the agent's use case is rejected, `submit` and
+        `validate` are refused (`conflict`): the owner takes the agent back to
+        a draft and links another use case.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionRequest"
+      responses:
+        "200":
+          description: The agent, in its new state.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/instances:
+    get:
+      operationId: listAgentInstances
+      summary: List an agent's instances
+      description: |
+        Lists the module instances that serve the agent, as enforcement points
+        and other modules report them through the module API, latest
+        connection first. The inventory only reads them: plan P1-07 records
+        them.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of the agent's instances.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceList"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/owners:
+    get:
+      operationId: listAgentOwners
+      summary: List an agent's owners and their history
+      description: |
+        Lists the agent's primary owner and delegates (INV-02): the current
+        assignments first, then those that ended, newest first.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of the agent's owner assignments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerAssignmentList"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/primary-owner:
+    put:
+      operationId: reassignAgentOwner
+      summary: Reassign an agent's primary owner
+      description: |
+        Makes another active human with the owner role the agent's primary
+        owner at once, for a reason (INV-02): the advisory committee and
+        operators do it, for example after an owner left
+        (`agent.ownership.reassign`). The former primary owner's assignment
+        ends, the new owner stops being a delegate if they were one, and a
+        pending ownership transfer is cancelled. It needs If-Match with the
+        agent's ETag, and takes a new governance state version, because
+        policies see the owner.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReassignOwnerRequest"
+      responses:
+        "200":
+          description: The agent, with its new primary owner.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/delegates:
+    post:
+      operationId: addAgentDelegate
+      summary: Add a delegate
+      description: |
+        Makes an active human with the owner role a delegate of the agent: the
+        owner role's `own` grants then let them act for its owner (INV-02).
+        Anyone else is refused (`bad_request`). The agent's owners and
+        operators manage its delegates (`agent.metadata.edit`). The agent's
+        ETag changes.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddDelegateRequest"
+      responses:
+        "201":
+          description: The delegate's assignment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerAssignment"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/delegates/{principalId}:
+    delete:
+      operationId: removeAgentDelegate
+      summary: Remove a delegate
+      description: |
+        Ends the principal's assignment as a delegate of the agent, for a
+        reason; the history keeps it. The agent's owners and operators manage
+        its delegates (`agent.metadata.edit`). The agent's ETag changes.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/DelegateId"
+        - name: reason
+          in: query
+          required: false
+          description: Why the assignment ends. A request without a reason is refused (`bad_request`).
+          schema:
+            type: string
+            maxLength: 1000
+      responses:
+        "204":
+          description: The delegate was removed.
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/ownership-transfers:
+    post:
+      operationId: requestOwnershipTransfer
+      summary: Offer an agent's ownership to someone else
+      description: |
+        Starts a transfer of the agent's primary ownership to another active
+        human with the owner role, who must accept it (INV-02): it waits in
+        their inbox. Anyone else is refused (`bad_request`). Only the primary
+        owner starts one, and an agent has one pending transfer at most. The
+        agent's ETag changes.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestOwnershipTransferRequest"
+      responses:
+        "201":
+          description: The pending transfer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnershipTransfer"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/ownership-transfers/{transferId}:
+    delete:
+      operationId: cancelOwnershipTransfer
+      summary: Cancel an ownership transfer
+      description: |
+        Cancels a pending transfer. The primary owner who started it, or an
+        operator, cancels it (`agent.metadata.edit`). The agent's ETag
+        changes.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/TransferId"
+      responses:
+        "204":
+          description: The transfer was cancelled.
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/ownership-transfers/{transferId}/accept:
+    post:
+      operationId: acceptOwnershipTransfer
+      summary: Accept an ownership transfer
+      description: |
+        The principal that a pending transfer names accepts it, and becomes
+        the agent's primary owner; they need the owner role
+        (`agent.propose`). The former primary owner's assignment ends, the
+        agent's ETag changes, and the agent takes a new governance state
+        version, because policies see the owner.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/TransferId"
+      responses:
+        "200":
+          description: The accepted transfer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnershipTransfer"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/ownership-transfers/{transferId}/decline:
+    post:
+      operationId: declineOwnershipTransfer
+      summary: Decline an ownership transfer
+      description: The principal that a pending transfer names declines it; the agent keeps its primary owner, and its ETag changes.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/TransferId"
+      responses:
+        "200":
+          description: The declined transfer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnershipTransfer"
+        default:
+          $ref: "#/components/responses/Problem"
+  /agents/{id}/reviews:
+    get:
+      operationId: listAgentReviews
+      summary: List an agent's periodic reviews
+      description: Lists the agent's periodic reviews (INV-06), the latest due first.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of the agent's reviews.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewList"
+        default:
+          $ref: "#/components/responses/Problem"
+  /use-cases:
+    get:
+      operationId: listUseCases
+      summary: List use cases
+      description: |
+        Lists the use cases that match every filter given, newest first.
+        Whoever may see only active agents sees only the use cases of active
+        agents.
+      tags: [inventory]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Use cases in any of these statuses.
+          schema:
+            type: array
+            maxItems: 5
+            items:
+              $ref: "#/components/schemas/UseCaseStatus"
+        - name: q
+          in: query
+          required: false
+          description: Text to look for in the title and the description.
+          schema:
+            type: string
+            maxLength: 200
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of use cases.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UseCaseList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createUseCase
+      summary: Create a use case
+      description: |
+        Creates a use case as a draft: the business purpose that justifies one
+        or more agents (INV-03). Owners create them (`agent.propose`). The
+        advisory committee decides on a use case through the lifecycle of the
+        agents it justifies (transitionAgent).
+      tags: [inventory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUseCaseRequest"
+      responses:
+        "201":
+          description: The new use case.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UseCase"
+        default:
+          $ref: "#/components/responses/Problem"
+  /use-cases/{id}:
+    get:
+      operationId: getUseCase
+      summary: Get a use case
+      description: Returns a use case, with the ETag that a change to it must send back.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/UseCaseId"
+      responses:
+        "200":
+          description: The use case.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UseCase"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: editUseCase
+      summary: Edit a use case
+      description: |
+        Changes the members the request names and keeps the others; an empty
+        string clears an optional text member. The use case's creator edits it
+        (`agent.propose`) while it is a draft or changes were requested, and
+        no agent it justifies waits for a decision; otherwise the edit is
+        refused (`conflict`), so that the committee decides on what it read.
+        To change a use case under review, its owner withdraws the proposal.
+        A validated or rejected use case never changes, because the agents it
+        justifies rely on what the committee decided: a new use case replaces
+        it.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/UseCaseId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditUseCaseRequest"
+      responses:
+        "200":
+          description: The use case, changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UseCase"
+        default:
+          $ref: "#/components/responses/Problem"
+  /use-cases/{id}/decisions:
+    get:
+      operationId: listUseCaseDecisions
+      summary: List the decisions on a use case
+      description: |
+        Lists the advisory committee's decisions on the use case, newest
+        first: validations, rejections and requests for changes, each with its
+        comment and the agent whose proposal it decided.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/UseCaseId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of decisions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UseCaseDecisionList"
+        default:
+          $ref: "#/components/responses/Problem"
+  /reviews:
+    get:
+      operationId: listReviews
+      summary: List periodic reviews
+      description: |
+        Lists the periodic reviews of every agent the caller may see that
+        match the filters, the earliest due first: for example the overdue
+        reviews of the dashboard (UI-08), or those waiting for sign-off.
+      tags: [inventory]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Reviews in any of these statuses.
+          schema:
+            type: array
+            maxItems: 4
+            items:
+              $ref: "#/components/schemas/ReviewStatus"
+        - name: overdue
+          in: query
+          required: false
+          description: Only the open reviews past their due date, or only the others.
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of reviews.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewList"
+        default:
+          $ref: "#/components/responses/Problem"
+  /reviews/{id}:
+    get:
+      operationId: getReview
+      summary: Get a periodic review
+      description: |
+        Returns a periodic review, with the ETag that its completion or
+        sign-off must send back. An open review lists, as candidates to
+        disable, the enabled tools and models that the agent has not used
+        within the setting `lifecycle.review_unused_tooling_days` (CAT-09),
+        to the callers who may view agents' tooling (permission matrix: not
+        the user role, and never a break-glass session).
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/ReviewId"
+      responses:
+        "200":
+          description: The review.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+        default:
+          $ref: "#/components/responses/Problem"
+  /reviews/{id}/completion:
+    post:
+      operationId: completeReview
+      summary: Complete a periodic review
+      description: |
+        Records the owner's attestation (INV-06): the agent is still needed,
+        its owner is still right, its data categories are current, its policy
+        is still adequate and its enabled tooling is still needed. The
+        attestation names the candidates to disable that the owner keeps; the
+        owner disables the others in the agent's tooling (plan P1-16). The
+        agent's primary owner or a delegate completes it (`agent.review`).
+        When the review needs a sign-off (`signoffRequired`), it then waits
+        for one; otherwise it is completed and the next review is scheduled.
+        It needs If-Match with the review's ETag.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/ReviewId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewAttestation"
+      responses:
+        "200":
+          description: The review, completed or waiting for its sign-off.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+        default:
+          $ref: "#/components/responses/Problem"
+  /reviews/{id}/sign-off:
+    post:
+      operationId: signOffReview
+      summary: Sign off a periodic review
+      description: |
+        A member of the advisory committee signs off a review that waits for
+        it, whatever the agent's risk tier: the review's `signoffRequired`,
+        set from the setting `lifecycle.review_signoff_risk_tiers`, decides
+        (`agent.review`). The signer is a person, neither the one who
+        completed the review nor one of the agent's owners (HUM-04). The
+        review is then completed, and the next one scheduled. It needs
+        If-Match with the review's ETag.
+      tags: [inventory]
+      parameters:
+        - $ref: "#/components/parameters/ReviewId"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The completed review.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+        default:
+          $ref: "#/components/responses/Problem"
+  /data-categories:
+    get:
+      operationId: listDataCategories
+      summary: List the data categories
+      description: |
+        Lists the categories of data that agents and use cases may name: the
+        setting `inventory.data_categories`, which administrators edit. They
+        are keys, which the console translates; it shows a key it does not
+        know as it is.
+      tags: [inventory]
+      responses:
+        "200":
+          description: The data categories.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataCategoryList"
+        default:
+          $ref: "#/components/responses/Problem"
+  /inbox:
+    get:
+      operationId: listInboxItems
+      summary: List the caller's pending work
+      description: |
+        Lists the open items addressed to the caller, or to one of the
+        caller's roles, newest first (UI-09): proposals waiting for
+        validation, reviews due, sign-offs and ownership transfers, and the
+        kinds of later plans, such as policy approvals, halt releases and
+        catalog requests. An item leaves every inbox once someone handles it.
+        Nobody sees the items about a proposal they may not decide on: one
+        they own, are a delegate of or created, or one whose use case they
+        created (HUM-04).
+      tags: [inbox]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of inbox items.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxItemList"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     session:
@@ -379,6 +1217,159 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+  parameters:
+    AgentId:
+      name: id
+      in: path
+      required: true
+      description: The agent's ID.
+      schema:
+        type: string
+        format: uuid
+    UseCaseId:
+      name: id
+      in: path
+      required: true
+      description: The use case's ID.
+      schema:
+        type: string
+        format: uuid
+    ReviewId:
+      name: id
+      in: path
+      required: true
+      description: The review's ID.
+      schema:
+        type: string
+        format: uuid
+    TransferId:
+      name: transferId
+      in: path
+      required: true
+      description: The ownership transfer's ID.
+      schema:
+        type: string
+        format: uuid
+    DelegateId:
+      name: principalId
+      in: path
+      required: true
+      description: The delegate's principal ID.
+      schema:
+        type: string
+        format: uuid
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Where the page starts, as the previous page returned it in `nextCursor`.
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: The page size.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: |
+        The ETag of the version the change applies to (API-03). A change
+        without it is refused with `precondition_required`, and one with an
+        ETag that is no longer current with `precondition_failed` (threat
+        model, T-08).
+      schema:
+        type: string
+    AgentStateFilter:
+      name: state
+      in: query
+      required: false
+      description: Agents in any of these lifecycle states.
+      schema:
+        type: array
+        maxItems: 8
+        items:
+          $ref: "#/components/schemas/LifecycleState"
+    AgentOwnerFilter:
+      name: ownerId
+      in: query
+      required: false
+      description: Agents whose primary owner or one of whose delegates is this principal.
+      schema:
+        type: string
+        format: uuid
+    AgentRiskTierFilter:
+      name: riskTier
+      in: query
+      required: false
+      description: Agents in any of these risk tiers.
+      schema:
+        type: array
+        maxItems: 4
+        items:
+          $ref: "#/components/schemas/RiskTier"
+    AgentEnvironmentFilter:
+      name: environment
+      in: query
+      required: false
+      description: Agents deployed in this environment.
+      schema:
+        type: string
+        maxLength: 63
+    AgentCoverageFilter:
+      name: coverage
+      in: query
+      required: false
+      description: Agents at any of these coverage levels.
+      schema:
+        type: array
+        maxItems: 4
+        items:
+          $ref: "#/components/schemas/CoverageLevel"
+    AgentLabelFilter:
+      name: label
+      in: query
+      required: false
+      description: Agents that carry every one of these labels, each written as `key=value`.
+      schema:
+        type: array
+        maxItems: 16
+        items:
+          type: string
+          maxLength: 320
+    AgentUseCaseFilter:
+      name: useCaseId
+      in: query
+      required: false
+      description: Agents that this use case justifies.
+      schema:
+        type: string
+        format: uuid
+    AgentSearch:
+      name: q
+      in: query
+      required: false
+      description: Text to look for in the slug, the name and the description.
+      schema:
+        type: string
+        maxLength: 200
+  headers:
+    ETag:
+      description: A strong tag of the resource's version, which a change to it sends back in If-Match (API-03).
+      required: true
+      schema:
+        type: string
+    ContentDisposition:
+      description: The name to save the export as, `agents.csv` or `agents.json`.
+      required: false
+      schema:
+        type: string
   schemas:
     VersionInfo:
       type: object
@@ -702,5 +1693,988 @@ components:
         createdAt:
           type: string
           format: date-time
+    LifecycleState:
+      type: string
+      description: Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+      enum: [draft, proposed, validated, ready, active, suspended, retired, rejected]
+    RunState:
+      type: string
+      description: |
+        Whether the agent may act now, or a halt of the agent or of the fleet
+        stops it, whatever its lifecycle state (lifecycle, section 2).
+      enum: [running, halted]
+    AgentKind:
+      type: string
+      description: Whether the organization builds the agent, or uses a third party's (INV-01).
+      enum: [in_house, third_party]
+    RiskTier:
+      type: string
+      description: |
+        The agent's risk tier. It sets how often the agent is reviewed,
+        whether its reviews need a sign-off, and the lease of its enforcement
+        points.
+      enum: [low, medium, high, critical]
+    AiActClassification:
+      type: string
+      description: The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+      enum: [prohibited, high_risk, limited, minimal, not_assessed]
+    HaltMode:
+      type: string
+      description: How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+      enum: [block, interrupt, terminate]
+    CoverageLevel:
+      type: string
+      description: |
+        How deeply White Tower governs the agent (INV-08): C0, declared in the
+        inventory; C1, it authenticates with White Tower credentials; C2, an
+        enforcement point governs it and reports its decisions; C3, a halt or
+        a drill of it was confirmed within the configured period.
+      enum: [C0, C1, C2, C3]
+    SuspensionReason:
+      type: string
+      description: Why the agent was suspended (lifecycle, transitions T10 to T12).
+      enum: [manual, owner_inactive, review_overdue, halt]
+    LifecycleAction:
+      type: string
+      description: An action of the lifecycle, as agent-lifecycle.yaml names it.
+      enum:
+        - create
+        - submit
+        - withdraw
+        - request_changes
+        - reject
+        - validate
+        - mark_ready
+        - unmark_ready
+        - activate
+        - suspend
+        - auto_suspend
+        - halt_suspend
+        - reinstate
+        - retire
+    RequestedAction:
+      type: string
+      description: A lifecycle action that people take; White Tower takes the others itself.
+      enum: [submit, withdraw, request_changes, reject, validate, activate, suspend, reinstate, retire]
+    UseCaseStatus:
+      type: string
+      description: Where the use case is in the advisory committee's decision.
+      enum: [draft, submitted, changes_requested, validated, rejected]
+    ReviewStatus:
+      type: string
+      description: |
+        Where the review is: scheduled until the owner completes it, then
+        waiting for a sign-off when the agent's risk tier needs one;
+        cancelled when the agent is retired.
+      enum: [scheduled, awaiting_signoff, completed, cancelled]
+    Labels:
+      type: object
+      description: |
+        Labels, which filters, selector halts and policies use; policies see
+        them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+        digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+        Enforcement points receive them with the agent's governance state, so
+        they never hold personal data (CORE-9).
+      maxProperties: 64
+      propertyNames:
+        pattern: "^[a-z0-9._/-]{1,63}$"
+      additionalProperties:
+        type: string
+        maxLength: 255
+    PrincipalRef:
+      type: object
+      additionalProperties: false
+      required: [id, status]
+      description: |
+        A principal, as the resources that name one show it. The display name
+        is absent only where a caller asked to leave names out, as a
+        pseudonymized export does.
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        status:
+          type: string
+          description: An inactive principal no longer owns agents (INV-02, INV-05).
+          enum: [active, inactive]
+    Actor:
+      type: object
+      additionalProperties: false
+      required: [type]
+      description: Who made a change, by pseudonymous principal ID. The system is White Tower itself.
+      properties:
+        type:
+          type: string
+          enum: [human, service_account, breakglass, system]
+        id:
+          type: string
+          format: uuid
+          description: The principal's ID; the system has none.
+        displayName:
+          type: string
+          description: The principal's display name; the system has none.
+    Harness:
+      type: object
+      additionalProperties: false
+      required: [description]
+      description: |
+        The declaration of what confines the agent where it runs. White Tower
+        records it in the MVP, and enforces it from Phase 2 (requirements,
+        section 5.1.1).
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 4000
+    Suspension:
+      type: object
+      additionalProperties: false
+      required: [from, reason, at]
+      description: Why and since when the agent is suspended, and the state that reinstating it returns to (`from`).
+      properties:
+        from:
+          type: string
+          enum: [validated, ready, active]
+        reason:
+          $ref: "#/components/schemas/SuspensionReason"
+        at:
+          type: string
+          format: date-time
+    Agent:
+      type: object
+      additionalProperties: false
+      description: |
+        An agent of the inventory, in-house or third-party (INV-01). The
+        suspension is present while the agent is suspended, and the harness
+        once it is declared. Its ETag changes with every change to the agent,
+        its delegates or its ownership transfers.
+      required:
+        - id
+        - slug
+        - name
+        - description
+        - kind
+        - source
+        - environments
+        - riskTier
+        - aiActClassification
+        - dataCategories
+        - useCaseId
+        - lifecycleState
+        - runState
+        - coverage
+        - labels
+        - haltMode
+        - drillEligible
+        - primaryOwner
+        - delegates
+        - createdBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          description: The agent's unique, readable key, which never changes.
+        name:
+          type: string
+        description:
+          type: string
+        kind:
+          $ref: "#/components/schemas/AgentKind"
+        source:
+          type: string
+          description: How the agent entered the inventory; `discovered` is reserved for Phase 3.
+          enum: [registered, imported, discovered]
+        vendor:
+          type: string
+        framework:
+          type: string
+        deploymentLocation:
+          type: string
+        environments:
+          type: array
+          items:
+            type: string
+        riskTier:
+          $ref: "#/components/schemas/RiskTier"
+        aiActClassification:
+          $ref: "#/components/schemas/AiActClassification"
+        dataCategories:
+          type: array
+          description: The categories of data the agent accesses, from the setting `inventory.data_categories`.
+          items:
+            type: string
+        useCaseId:
+          type: string
+          format: uuid
+          description: The use case that justifies the agent (INV-03).
+        lifecycleState:
+          $ref: "#/components/schemas/LifecycleState"
+        suspension:
+          $ref: "#/components/schemas/Suspension"
+        runState:
+          $ref: "#/components/schemas/RunState"
+        coverage:
+          $ref: "#/components/schemas/CoverageLevel"
+        harness:
+          $ref: "#/components/schemas/Harness"
+        labels:
+          $ref: "#/components/schemas/Labels"
+        haltMode:
+          $ref: "#/components/schemas/HaltMode"
+        drillEligible:
+          type: boolean
+          description: Whether the agent's owner lets kill-switch drills halt it (KIL-09).
+        primaryOwner:
+          $ref: "#/components/schemas/PrincipalRef"
+        delegates:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrincipalRef"
+        pendingOwnershipTransfer:
+          $ref: "#/components/schemas/OwnershipTransfer"
+        createdBy:
+          $ref: "#/components/schemas/PrincipalRef"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        activatedAt:
+          type: string
+          format: date-time
+        retiredAt:
+          type: string
+          format: date-time
+    AgentList:
+      type: object
+      additionalProperties: false
+      required: [agents]
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Agent"
+        nextCursor:
+          type: string
+          nullable: true
+    ProposeAgentRequest:
+      type: object
+      additionalProperties: false
+      description: |
+        A new agent: the mandatory metadata of INV-01, of which the vendor or
+        the framework, at least one of them, and its options. The AI Act
+        classification is `not_assessed`, the halt mode `interrupt` and drills
+        not allowed, unless the request says otherwise.
+      required: [slug, name, description, kind, deploymentLocation, environments, riskTier, dataCategories, useCaseId]
+      properties:
+        slug:
+          type: string
+          pattern: "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+          description: Lowercase letters, digits and inner hyphens, 63 characters at most; unique, and never changed.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        kind:
+          $ref: "#/components/schemas/AgentKind"
+        vendor:
+          type: string
+          maxLength: 200
+        framework:
+          type: string
+          maxLength: 200
+        deploymentLocation:
+          type: string
+          minLength: 1
+          maxLength: 200
+        environments:
+          type: array
+          description: Where the agent runs, such as `production`; lowercase letters, digits and inner hyphens.
+          minItems: 1
+          maxItems: 16
+          items:
+            type: string
+            pattern: "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+        riskTier:
+          $ref: "#/components/schemas/RiskTier"
+        aiActClassification:
+          $ref: "#/components/schemas/AiActClassification"
+        dataCategories:
+          type: array
+          description: The categories of data the agent accesses, from the setting `inventory.data_categories`.
+          minItems: 1
+          maxItems: 32
+          items:
+            type: string
+            maxLength: 63
+        useCaseId:
+          type: string
+          format: uuid
+        labels:
+          $ref: "#/components/schemas/Labels"
+        harness:
+          $ref: "#/components/schemas/Harness"
+        haltMode:
+          $ref: "#/components/schemas/HaltMode"
+        drillEligible:
+          type: boolean
+    EditAgentRequest:
+      type: object
+      additionalProperties: false
+      description: The members to change; the others keep their values (editAgent).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        vendor:
+          type: string
+          maxLength: 200
+        framework:
+          type: string
+          maxLength: 200
+        deploymentLocation:
+          type: string
+          minLength: 1
+          maxLength: 200
+        environments:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            type: string
+            pattern: "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+        riskTier:
+          $ref: "#/components/schemas/RiskTier"
+        aiActClassification:
+          $ref: "#/components/schemas/AiActClassification"
+        dataCategories:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            type: string
+            maxLength: 63
+        useCaseId:
+          type: string
+          format: uuid
+        labels:
+          $ref: "#/components/schemas/Labels"
+        harness:
+          $ref: "#/components/schemas/Harness"
+        haltMode:
+          $ref: "#/components/schemas/HaltMode"
+        drillEligible:
+          type: boolean
+    TransitionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          $ref: "#/components/schemas/RequestedAction"
+        comment:
+          type: string
+          maxLength: 2000
+          description: |
+            Why. `request_changes`, `reject`, `validate`, `suspend`,
+            `reinstate` and `retire` need one, and a decision's comment is
+            also the use case decision's. The agent's history shows it; its
+            audit event records only that it was given.
+    AgentActions:
+      type: object
+      additionalProperties: false
+      required: [lifecycleState, actions]
+      properties:
+        lifecycleState:
+          $ref: "#/components/schemas/LifecycleState"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentAction"
+    AgentAction:
+      type: object
+      additionalProperties: false
+      required: [action, transition, available, commentRequired, refusedBy]
+      properties:
+        action:
+          $ref: "#/components/schemas/RequestedAction"
+        transition:
+          type: string
+          pattern: "^T([2-9]|1[0-4])$"
+          description: The transition's ID in the lifecycle specification.
+        available:
+          type: boolean
+          description: Whether the caller may take the action now.
+        commentRequired:
+          type: boolean
+        refusedBy:
+          type: array
+          description: |
+            What refuses the action, empty when it is available: `permission`
+            when the caller's roles, the scope of their grant (own, active
+            only, sign-off) or their kind (people take decisions) do not allow
+            it; `not_owner_or_creator` when separation of duties does (HUM-04);
+            otherwise the guards of the lifecycle that do not hold, as
+            agent-lifecycle.yaml names them: `metadata_complete`,
+            `owner_active`, `use_case_not_prohibited`, `use_case_not_rejected`,
+            `use_case_validated`, `agent_policy_active`, `harness_declared`,
+            `not_halted`, `review_not_overdue` and
+            `previous_state_invariants_hold`. A client shows a value it does
+            not know as a generic refusal.
+          items:
+            type: string
+            x-extensible-enum:
+              - permission
+              - metadata_complete
+              - owner_active
+              - not_owner_or_creator
+              - use_case_not_prohibited
+              - use_case_not_rejected
+              - use_case_validated
+              - agent_policy_active
+              - harness_declared
+              - not_halted
+              - review_not_overdue
+              - previous_state_invariants_hold
+    Transition:
+      type: object
+      additionalProperties: false
+      description: |
+        One transition of an agent's lifecycle. `fromState` is absent for the
+        agent's creation, T1, and `reason` is present for a suspension.
+      required: [id, transition, action, toState, actor, stateVersion, occurredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        transition:
+          type: string
+          pattern: "^T([1-9]|1[0-4])$"
+        action:
+          $ref: "#/components/schemas/LifecycleAction"
+        fromState:
+          $ref: "#/components/schemas/LifecycleState"
+        toState:
+          $ref: "#/components/schemas/LifecycleState"
+        actor:
+          $ref: "#/components/schemas/Actor"
+        reason:
+          $ref: "#/components/schemas/SuspensionReason"
+        comment:
+          type: string
+        stateVersion:
+          type: integer
+          format: int64
+          description: The governance state version that the transition took.
+        occurredAt:
+          type: string
+          format: date-time
+    TransitionList:
+      type: object
+      additionalProperties: false
+      required: [transitions]
+      properties:
+        transitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transition"
+        nextCursor:
+          type: string
+          nullable: true
+    Instance:
+      type: object
+      additionalProperties: false
+      description: An instance of a module, such as an enforcement point, that serves the agent.
+      required: [id, moduleId, moduleSlug, instanceKey, moduleVersion, contractVersion, status, connectedAt, lastSeenAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        moduleId:
+          type: string
+          format: uuid
+        moduleSlug:
+          type: string
+        instanceKey:
+          type: string
+          description: The instance's key, unique within its module.
+        moduleVersion:
+          type: string
+        contractVersion:
+          type: string
+          description: The version of the module contracts that the instance speaks.
+        host:
+          type: string
+        status:
+          type: string
+          enum: [connected, disconnected, lost]
+        connectedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        disconnectedAt:
+          type: string
+          format: date-time
+        activeBundleVersion:
+          type: integer
+          format: int64
+          description: The version of the agent's policy bundle that the instance applies.
+        observedStateVersion:
+          type: integer
+          format: int64
+          description: The last governance state version of the agent that the instance applied.
+    InstanceList:
+      type: object
+      additionalProperties: false
+      required: [instances]
+      properties:
+        instances:
+          type: array
+          items:
+            $ref: "#/components/schemas/Instance"
+        nextCursor:
+          type: string
+          nullable: true
+    OwnerAssignment:
+      type: object
+      additionalProperties: false
+      description: A principal's assignment as an agent's primary owner or delegate; an ended one records who ended it, and why.
+      required: [id, principal, role, assignedBy, assignedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        principal:
+          $ref: "#/components/schemas/PrincipalRef"
+        role:
+          type: string
+          enum: [primary, delegate]
+        assignedBy:
+          $ref: "#/components/schemas/PrincipalRef"
+        assignedAt:
+          type: string
+          format: date-time
+        endedBy:
+          $ref: "#/components/schemas/PrincipalRef"
+        endedAt:
+          type: string
+          format: date-time
+        endReason:
+          type: string
+          description: |
+            Why the assignment ended: the reason of a reassignment or of a
+            delegate's removal, or `ownership transferred` when the new owner
+            accepted a transfer.
+    OwnerAssignmentList:
+      type: object
+      additionalProperties: false
+      required: [owners]
+      properties:
+        owners:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnerAssignment"
+        nextCursor:
+          type: string
+          nullable: true
+    AddDelegateRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId]
+      properties:
+        principalId:
+          type: string
+          format: uuid
+    ReassignOwnerRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId, reason]
+      properties:
+        principalId:
+          type: string
+          format: uuid
+          description: The new primary owner.
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    RequestOwnershipTransferRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId]
+      properties:
+        principalId:
+          type: string
+          format: uuid
+          description: The principal offered the agent's ownership.
+    OwnershipTransfer:
+      type: object
+      additionalProperties: false
+      description: An offer of an agent's primary ownership, from its primary owner to another principal, who accepts or declines it.
+      required: [id, agentId, from, to, requestedBy, requestedAt, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        from:
+          $ref: "#/components/schemas/PrincipalRef"
+        to:
+          $ref: "#/components/schemas/PrincipalRef"
+        requestedBy:
+          $ref: "#/components/schemas/PrincipalRef"
+        requestedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          description: Where the transfer is; `expired` is reserved, as nothing expires a transfer yet.
+          enum: [pending, accepted, declined, cancelled, expired]
+        decidedAt:
+          type: string
+          format: date-time
+    UseCase:
+      type: object
+      additionalProperties: false
+      description: |
+        The business purpose that justifies one or more agents (INV-03). Its
+        conditions are those under which the agents it justifies may run,
+        which the advisory committee validates with it.
+      required: [id, title, description, businessJustification, dataCategories, aiActClassification, status, createdBy, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        businessJustification:
+          type: string
+        dataCategories:
+          type: array
+          items:
+            type: string
+        affectedPersons:
+          type: string
+          description: Who the work of its agents affects.
+        aiActClassification:
+          $ref: "#/components/schemas/AiActClassification"
+        conditions:
+          type: string
+        status:
+          $ref: "#/components/schemas/UseCaseStatus"
+        createdBy:
+          $ref: "#/components/schemas/PrincipalRef"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UseCaseList:
+      type: object
+      additionalProperties: false
+      required: [useCases]
+      properties:
+        useCases:
+          type: array
+          items:
+            $ref: "#/components/schemas/UseCase"
+        nextCursor:
+          type: string
+          nullable: true
+    CreateUseCaseRequest:
+      type: object
+      additionalProperties: false
+      description: A new use case. Its AI Act classification is `not_assessed` unless the request says otherwise.
+      required: [title, description, businessJustification, dataCategories]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        businessJustification:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        dataCategories:
+          type: array
+          description: Categories from the setting `inventory.data_categories`.
+          minItems: 1
+          maxItems: 32
+          items:
+            type: string
+            maxLength: 63
+        affectedPersons:
+          type: string
+          maxLength: 2000
+        aiActClassification:
+          $ref: "#/components/schemas/AiActClassification"
+        conditions:
+          type: string
+          maxLength: 4000
+    EditUseCaseRequest:
+      type: object
+      additionalProperties: false
+      description: The members to change; the others keep their values (editUseCase).
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        businessJustification:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        dataCategories:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            type: string
+            maxLength: 63
+        affectedPersons:
+          type: string
+          maxLength: 2000
+        aiActClassification:
+          $ref: "#/components/schemas/AiActClassification"
+        conditions:
+          type: string
+          maxLength: 4000
+    UseCaseDecision:
+      type: object
+      additionalProperties: false
+      description: A decision of the advisory committee on a use case, made on an agent's proposal.
+      required: [id, decision, comment, decidedBy, decidedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        decision:
+          type: string
+          enum: [validated, rejected, changes_requested]
+        comment:
+          type: string
+        agentId:
+          type: string
+          format: uuid
+          description: The agent whose proposal was decided.
+        decidedBy:
+          $ref: "#/components/schemas/PrincipalRef"
+        decidedAt:
+          type: string
+          format: date-time
+    UseCaseDecisionList:
+      type: object
+      additionalProperties: false
+      required: [decisions]
+      properties:
+        decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UseCaseDecision"
+        nextCursor:
+          type: string
+          nullable: true
+    Review:
+      type: object
+      additionalProperties: false
+      description: |
+        A periodic review of an agent (INV-06). Once its grace period ends
+        while it is still open, the agent is suspended (INV-05). The
+        candidates to disable, and those the owner kept, are tooling: only
+        the callers who may view agents' tooling see them (permission matrix:
+        not the user role, and never a break-glass session), and lists leave
+        the candidates out.
+      required: [id, agentId, status, dueAt, graceEndsAt, overdue, signoffRequired, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/ReviewStatus"
+        dueAt:
+          type: string
+          format: date-time
+        graceEndsAt:
+          type: string
+          format: date-time
+        overdue:
+          type: boolean
+          description: Whether the review is open past its due date.
+        signoffRequired:
+          type: boolean
+        attestation:
+          $ref: "#/components/schemas/ReviewAttestation"
+        completedBy:
+          $ref: "#/components/schemas/PrincipalRef"
+        completedAt:
+          type: string
+          format: date-time
+        signedOffBy:
+          $ref: "#/components/schemas/PrincipalRef"
+        signedOffAt:
+          type: string
+          format: date-time
+        unusedTooling:
+          type: array
+          description: For an open review, the enabled tools and models that the agent has not used recently (CAT-09).
+          items:
+            $ref: "#/components/schemas/UnusedTooling"
+        createdAt:
+          type: string
+          format: date-time
+    UnusedTooling:
+      type: object
+      additionalProperties: false
+      description: An enabled tool or model that the agent has not used recently, a candidate to disable (CAT-09).
+      required: [key, kind]
+      properties:
+        key:
+          type: string
+          description: The key of the tool or model in the catalog (RFC-0002, section 3).
+        kind:
+          type: string
+          enum: [tool, model]
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: When the agent last used it; absent if it never did.
+    ReviewAttestation:
+      type: object
+      additionalProperties: false
+      description: |
+        The owner's attestation (INV-06). Each statement must be true: an
+        agent no longer needed is retired instead, an agent whose owner is no
+        longer right gets another one, and its data categories and policy are
+        brought up to date before the review is completed.
+      required: [stillNeeded, ownerStillRight, dataCategoriesCurrent, policyAdequate, toolingStillNeeded]
+      properties:
+        stillNeeded:
+          type: boolean
+        ownerStillRight:
+          type: boolean
+        dataCategoriesCurrent:
+          type: boolean
+        policyAdequate:
+          type: boolean
+        toolingStillNeeded:
+          type: boolean
+        keptTooling:
+          type: array
+          description: The keys of the candidates to disable that the owner keeps; none when absent.
+          maxItems: 500
+          items:
+            type: string
+            maxLength: 255
+        comment:
+          type: string
+          maxLength: 2000
+    ReviewList:
+      type: object
+      additionalProperties: false
+      required: [reviews]
+      properties:
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Review"
+        nextCursor:
+          type: string
+          nullable: true
+    InboxItem:
+      type: object
+      additionalProperties: false
+      description: Work that waits for the caller, addressed to them or to one of their roles.
+      required: [id, kind, subjectType, subjectId, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          description: |
+            What waits: `use_case_validation`, `policy_approval`,
+            `review_due`, `review_signoff`, `halt_release`,
+            `ownership_transfer` or `module_approval`. Later plans add kinds,
+            and a client shows a kind it does not know generically.
+          x-extensible-enum:
+            - use_case_validation
+            - policy_approval
+            - review_due
+            - review_signoff
+            - halt_release
+            - ownership_transfer
+            - module_approval
+        subjectType:
+          type: string
+          description: The kind of resource the item is about, such as `agent`, `review` or `ownership_transfer`.
+        subjectId:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+          description: The agent the item is about, when there is one.
+        role:
+          type: string
+          description: The caller's role that the item is addressed to; absent when it is addressed to the caller.
+          enum: [steering, advisory, owner, user, operator, auditor, admin]
+        createdAt:
+          type: string
+          format: date-time
+    DataCategoryList:
+      type: object
+      additionalProperties: false
+      required: [dataCategories]
+      properties:
+        dataCategories:
+          type: array
+          items:
+            type: string
+    InboxItemList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InboxItem"
+        nextCursor:
+          type: string
+          nullable: true
 
 

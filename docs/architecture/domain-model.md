@@ -112,7 +112,7 @@ The full list of columns and constraints is in the schema file; the tables of se
 
 | Entity | Purpose | Invariants |
 | --- | --- | --- |
-| `use_cases` | Business purpose, data categories, affected persons, EU AI Act classification | A `prohibited` use case can never be validated (guard in [lifecycle](lifecycle.md)) |
+| `use_cases` | Business purpose, data categories, affected persons, EU AI Act classification | A `prohibited` use case can never be validated (guard in [lifecycle](lifecycle.md)); a validated or rejected use case never changes (domain) |
 | `use_case_decisions` | Every validation, rejection or change request, with its comment | Append-only (DB); a comment is mandatory (DB) |
 | `agents` | The registry: metadata, risk tier, data categories, lifecycle state, harness declaration, halt mode, labels | Slug format (DB); suspension and retirement recorded consistently (DB); `ready` and `active` need a harness declaration (DB); lifecycle rules in [lifecycle](lifecycle.md) |
 | `agent_owners` | Primary owner and delegates, with full history | At most one active primary owner (DB), at least one (domain); one active assignment per person (DB) |

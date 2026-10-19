@@ -169,6 +169,8 @@ func TestBreakglassEmergencyAccess(t *testing.T) {
 		"getAuditEvents",
 		"getAuditCheckpoints",
 		"exportAudit",
+		"exportAgents",
+		"listAgentTransitions",
 	}
 	for _, op := range allowedOps {
 		if err := authorizer.Authorize(ctx, principal, op); err != nil {
@@ -179,12 +181,11 @@ func TestBreakglassEmergencyAccess(t *testing.T) {
 	forbiddenOps := []string{
 		"requestHaltRelease",
 		"approveHaltRelease",
-		"activateAgent",
 		"proposeAgent",
 		"editAgent",
-		"suspendAgent",
-		"reinstateAgent",
-		"retireAgent",
+		"transitionAgent",
+		"declineOwnershipTransfer",
+		"reassignAgentOwner",
 		"manageSettings",
 		"manageModules",
 		"createToken",

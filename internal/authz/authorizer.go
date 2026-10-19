@@ -47,20 +47,11 @@ func (az *Authorizer) registerDefaults() {
 	az.operations["getAuditCheckpoints"] = PermissionAuditVerify
 	az.operations["getAuditKeys"] = PermissionAuditVerify
 	az.operations["exportAudit"] = PermissionAuditExport
-	az.operations["listAgents"] = PermissionInventoryView
-	az.operations["getAgent"] = PermissionInventoryView
-	az.operations["proposeAgent"] = PermissionAgentPropose
-	az.operations["editAgent"] = PermissionAgentMetadataEdit
-	az.operations["activateAgent"] = PermissionAgentActivate
-	az.operations["suspendAgent"] = PermissionAgentSuspend
-	az.operations["reinstateAgent"] = PermissionAgentReinstate
-	az.operations["retireAgent"] = PermissionAgentRetire
 	az.operations["manageCredentials"] = PermissionAgentCredentialsManage
 	az.operations["haltAgent"] = PermissionHaltAgentIssue
 	az.operations["haltFleet"] = PermissionHaltFleetIssue
 	az.operations["requestHaltRelease"] = PermissionHaltReleaseRequest
 	az.operations["approveHaltRelease"] = PermissionHaltReleaseApprove
-	az.operations["validateUsecase"] = PermissionUsecaseValidate
 	az.operations["authorGlobalPolicy"] = PermissionPolicyGlobalAuthor
 	az.operations["approveGlobalPolicy"] = PermissionPolicyGlobalApprove
 	az.operations["authorAgentPolicy"] = PermissionPolicyAgentAuthor
@@ -72,6 +63,44 @@ func (az *Authorizer) registerDefaults() {
 	az.operations["revokeToken"] = PermissionIdentityMeRead
 	az.operations["listServiceAccounts"] = PermissionIdentityMeRead
 	az.operations["createServiceAccount"] = PermissionIdentityMeRead
+
+	// The inventory (plan P1-04). Its handlers check the scope of each grant
+	// against the agent: ownership, an active agent, a sign-off.
+	az.operations["listAgents"] = PermissionInventoryView
+	az.operations["proposeAgent"] = PermissionAgentPropose
+	az.operations["exportAgents"] = PermissionInventoryView
+	az.operations["getAgent"] = PermissionInventoryView
+	az.operations["editAgent"] = PermissionAgentMetadataEdit
+	az.operations["getAgentActions"] = PermissionInventoryView
+	az.operations["listAgentTransitions"] = PermissionInventoryView
+	// Each lifecycle action needs its own permission besides this one. The
+	// inventory checks it with Authorize, the action's permission as the
+	// operation and the agent's relationship in the context: unlike
+	// AuthorizeResource, that call also enforces a token's scopes.
+	az.operations["transitionAgent"] = PermissionInventoryView
+	az.operations["listAgentInstances"] = PermissionInventoryView
+	az.operations["listAgentOwners"] = PermissionInventoryView
+	az.operations["reassignAgentOwner"] = PermissionAgentOwnershipReassign
+	az.operations["addAgentDelegate"] = PermissionAgentMetadataEdit
+	az.operations["removeAgentDelegate"] = PermissionAgentMetadataEdit
+	az.operations["requestOwnershipTransfer"] = PermissionAgentMetadataEdit
+	az.operations["cancelOwnershipTransfer"] = PermissionAgentMetadataEdit
+	// Accepting an agent makes one its owner, which needs the owner role, as
+	// proposing one does; declining needs none.
+	az.operations["acceptOwnershipTransfer"] = PermissionAgentPropose
+	az.operations["declineOwnershipTransfer"] = PermissionIdentityMeRead
+	az.operations["listUseCases"] = PermissionInventoryView
+	az.operations["createUseCase"] = PermissionAgentPropose
+	az.operations["getUseCase"] = PermissionInventoryView
+	az.operations["editUseCase"] = PermissionAgentPropose
+	az.operations["listUseCaseDecisions"] = PermissionInventoryView
+	az.operations["listDataCategories"] = PermissionInventoryView
+	az.operations["listAgentReviews"] = PermissionInventoryView
+	az.operations["listReviews"] = PermissionInventoryView
+	az.operations["getReview"] = PermissionInventoryView
+	az.operations["completeReview"] = PermissionAgentReview
+	az.operations["signOffReview"] = PermissionAgentReview
+	az.operations["listInboxItems"] = PermissionIdentityMeRead
 }
 
 // RegisterOperation maps an OpenAPI operation ID to a Permission.
@@ -113,7 +142,9 @@ func (az *Authorizer) Authorize(ctx context.Context, p *auth.Principal, operatio
 	if p.IsBreakglass {
 		switch perm {
 		case PermissionHaltAgentIssue, PermissionHaltFleetIssue, PermissionInventoryView, PermissionAuditEventsRead, PermissionAuditVerify, PermissionAuditExport, PermissionIdentityMeRead:
-			if operation == "createToken" || operation == "revokeToken" || operation == "createServiceAccount" {
+			// These change state, although the permission they map to only reads.
+			switch operation {
+			case "createToken", "revokeToken", "createServiceAccount", "transitionAgent", "declineOwnershipTransfer":
 				return auth.ErrDenied
 			}
 		default:

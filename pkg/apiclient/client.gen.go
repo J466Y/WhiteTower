@@ -18,6 +18,330 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ActorType.
+const (
+	ActorTypeBreakglass     ActorType = "breakglass"
+	ActorTypeHuman          ActorType = "human"
+	ActorTypeServiceAccount ActorType = "service_account"
+	ActorTypeSystem         ActorType = "system"
+)
+
+// Valid indicates whether the value is a known member of the ActorType enum.
+func (e ActorType) Valid() bool {
+	switch e {
+	case ActorTypeBreakglass:
+		return true
+	case ActorTypeHuman:
+		return true
+	case ActorTypeServiceAccount:
+		return true
+	case ActorTypeSystem:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentSource.
+const (
+	Discovered AgentSource = "discovered"
+	Imported   AgentSource = "imported"
+	Registered AgentSource = "registered"
+)
+
+// Valid indicates whether the value is a known member of the AgentSource enum.
+func (e AgentSource) Valid() bool {
+	switch e {
+	case Discovered:
+		return true
+	case Imported:
+		return true
+	case Registered:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentKind.
+const (
+	InHouse    AgentKind = "in_house"
+	ThirdParty AgentKind = "third_party"
+)
+
+// Valid indicates whether the value is a known member of the AgentKind enum.
+func (e AgentKind) Valid() bool {
+	switch e {
+	case InHouse:
+		return true
+	case ThirdParty:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AiActClassification.
+const (
+	HighRisk    AiActClassification = "high_risk"
+	Limited     AiActClassification = "limited"
+	Minimal     AiActClassification = "minimal"
+	NotAssessed AiActClassification = "not_assessed"
+	Prohibited  AiActClassification = "prohibited"
+)
+
+// Valid indicates whether the value is a known member of the AiActClassification enum.
+func (e AiActClassification) Valid() bool {
+	switch e {
+	case HighRisk:
+		return true
+	case Limited:
+		return true
+	case Minimal:
+		return true
+	case NotAssessed:
+		return true
+	case Prohibited:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CoverageLevel.
+const (
+	C0 CoverageLevel = "C0"
+	C1 CoverageLevel = "C1"
+	C2 CoverageLevel = "C2"
+	C3 CoverageLevel = "C3"
+)
+
+// Valid indicates whether the value is a known member of the CoverageLevel enum.
+func (e CoverageLevel) Valid() bool {
+	switch e {
+	case C0:
+		return true
+	case C1:
+		return true
+	case C2:
+		return true
+	case C3:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HaltMode.
+const (
+	Block     HaltMode = "block"
+	Interrupt HaltMode = "interrupt"
+	Terminate HaltMode = "terminate"
+)
+
+// Valid indicates whether the value is a known member of the HaltMode enum.
+func (e HaltMode) Valid() bool {
+	switch e {
+	case Block:
+		return true
+	case Interrupt:
+		return true
+	case Terminate:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InboxItemRole.
+const (
+	Admin    InboxItemRole = "admin"
+	Advisory InboxItemRole = "advisory"
+	Auditor  InboxItemRole = "auditor"
+	Operator InboxItemRole = "operator"
+	Owner    InboxItemRole = "owner"
+	Steering InboxItemRole = "steering"
+	User     InboxItemRole = "user"
+)
+
+// Valid indicates whether the value is a known member of the InboxItemRole enum.
+func (e InboxItemRole) Valid() bool {
+	switch e {
+	case Admin:
+		return true
+	case Advisory:
+		return true
+	case Auditor:
+		return true
+	case Operator:
+		return true
+	case Owner:
+		return true
+	case Steering:
+		return true
+	case User:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InstanceStatus.
+const (
+	Connected    InstanceStatus = "connected"
+	Disconnected InstanceStatus = "disconnected"
+	Lost         InstanceStatus = "lost"
+)
+
+// Valid indicates whether the value is a known member of the InstanceStatus enum.
+func (e InstanceStatus) Valid() bool {
+	switch e {
+	case Connected:
+		return true
+	case Disconnected:
+		return true
+	case Lost:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LifecycleAction.
+const (
+	LifecycleActionActivate       LifecycleAction = "activate"
+	LifecycleActionAutoSuspend    LifecycleAction = "auto_suspend"
+	LifecycleActionCreate         LifecycleAction = "create"
+	LifecycleActionHaltSuspend    LifecycleAction = "halt_suspend"
+	LifecycleActionMarkReady      LifecycleAction = "mark_ready"
+	LifecycleActionReinstate      LifecycleAction = "reinstate"
+	LifecycleActionReject         LifecycleAction = "reject"
+	LifecycleActionRequestChanges LifecycleAction = "request_changes"
+	LifecycleActionRetire         LifecycleAction = "retire"
+	LifecycleActionSubmit         LifecycleAction = "submit"
+	LifecycleActionSuspend        LifecycleAction = "suspend"
+	LifecycleActionUnmarkReady    LifecycleAction = "unmark_ready"
+	LifecycleActionValidate       LifecycleAction = "validate"
+	LifecycleActionWithdraw       LifecycleAction = "withdraw"
+)
+
+// Valid indicates whether the value is a known member of the LifecycleAction enum.
+func (e LifecycleAction) Valid() bool {
+	switch e {
+	case LifecycleActionActivate:
+		return true
+	case LifecycleActionAutoSuspend:
+		return true
+	case LifecycleActionCreate:
+		return true
+	case LifecycleActionHaltSuspend:
+		return true
+	case LifecycleActionMarkReady:
+		return true
+	case LifecycleActionReinstate:
+		return true
+	case LifecycleActionReject:
+		return true
+	case LifecycleActionRequestChanges:
+		return true
+	case LifecycleActionRetire:
+		return true
+	case LifecycleActionSubmit:
+		return true
+	case LifecycleActionSuspend:
+		return true
+	case LifecycleActionUnmarkReady:
+		return true
+	case LifecycleActionValidate:
+		return true
+	case LifecycleActionWithdraw:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LifecycleState.
+const (
+	LifecycleStateActive    LifecycleState = "active"
+	LifecycleStateDraft     LifecycleState = "draft"
+	LifecycleStateProposed  LifecycleState = "proposed"
+	LifecycleStateReady     LifecycleState = "ready"
+	LifecycleStateRejected  LifecycleState = "rejected"
+	LifecycleStateRetired   LifecycleState = "retired"
+	LifecycleStateSuspended LifecycleState = "suspended"
+	LifecycleStateValidated LifecycleState = "validated"
+)
+
+// Valid indicates whether the value is a known member of the LifecycleState enum.
+func (e LifecycleState) Valid() bool {
+	switch e {
+	case LifecycleStateActive:
+		return true
+	case LifecycleStateDraft:
+		return true
+	case LifecycleStateProposed:
+		return true
+	case LifecycleStateReady:
+		return true
+	case LifecycleStateRejected:
+		return true
+	case LifecycleStateRetired:
+		return true
+	case LifecycleStateSuspended:
+		return true
+	case LifecycleStateValidated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OwnerAssignmentRole.
+const (
+	Delegate OwnerAssignmentRole = "delegate"
+	Primary  OwnerAssignmentRole = "primary"
+)
+
+// Valid indicates whether the value is a known member of the OwnerAssignmentRole enum.
+func (e OwnerAssignmentRole) Valid() bool {
+	switch e {
+	case Delegate:
+		return true
+	case Primary:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OwnershipTransferStatus.
+const (
+	OwnershipTransferStatusAccepted  OwnershipTransferStatus = "accepted"
+	OwnershipTransferStatusCancelled OwnershipTransferStatus = "cancelled"
+	OwnershipTransferStatusDeclined  OwnershipTransferStatus = "declined"
+	OwnershipTransferStatusExpired   OwnershipTransferStatus = "expired"
+	OwnershipTransferStatusPending   OwnershipTransferStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the OwnershipTransferStatus enum.
+func (e OwnershipTransferStatus) Valid() bool {
+	switch e {
+	case OwnershipTransferStatusAccepted:
+		return true
+	case OwnershipTransferStatusCancelled:
+		return true
+	case OwnershipTransferStatusDeclined:
+		return true
+	case OwnershipTransferStatusExpired:
+		return true
+	case OwnershipTransferStatusPending:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PrincipalKind.
 const (
 	PrincipalKindHuman          PrincipalKind = "human"
@@ -36,18 +360,252 @@ func (e PrincipalKind) Valid() bool {
 	}
 }
 
+// Defines values for PrincipalRefStatus.
+const (
+	PrincipalRefStatusActive   PrincipalRefStatus = "active"
+	PrincipalRefStatusInactive PrincipalRefStatus = "inactive"
+)
+
+// Valid indicates whether the value is a known member of the PrincipalRefStatus enum.
+func (e PrincipalRefStatus) Valid() bool {
+	switch e {
+	case PrincipalRefStatusActive:
+		return true
+	case PrincipalRefStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RequestedAction.
+const (
+	RequestedActionActivate       RequestedAction = "activate"
+	RequestedActionReinstate      RequestedAction = "reinstate"
+	RequestedActionReject         RequestedAction = "reject"
+	RequestedActionRequestChanges RequestedAction = "request_changes"
+	RequestedActionRetire         RequestedAction = "retire"
+	RequestedActionSubmit         RequestedAction = "submit"
+	RequestedActionSuspend        RequestedAction = "suspend"
+	RequestedActionValidate       RequestedAction = "validate"
+	RequestedActionWithdraw       RequestedAction = "withdraw"
+)
+
+// Valid indicates whether the value is a known member of the RequestedAction enum.
+func (e RequestedAction) Valid() bool {
+	switch e {
+	case RequestedActionActivate:
+		return true
+	case RequestedActionReinstate:
+		return true
+	case RequestedActionReject:
+		return true
+	case RequestedActionRequestChanges:
+		return true
+	case RequestedActionRetire:
+		return true
+	case RequestedActionSubmit:
+		return true
+	case RequestedActionSuspend:
+		return true
+	case RequestedActionValidate:
+		return true
+	case RequestedActionWithdraw:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReviewStatus.
+const (
+	ReviewStatusAwaitingSignoff ReviewStatus = "awaiting_signoff"
+	ReviewStatusCancelled       ReviewStatus = "cancelled"
+	ReviewStatusCompleted       ReviewStatus = "completed"
+	ReviewStatusScheduled       ReviewStatus = "scheduled"
+)
+
+// Valid indicates whether the value is a known member of the ReviewStatus enum.
+func (e ReviewStatus) Valid() bool {
+	switch e {
+	case ReviewStatusAwaitingSignoff:
+		return true
+	case ReviewStatusCancelled:
+		return true
+	case ReviewStatusCompleted:
+		return true
+	case ReviewStatusScheduled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RiskTier.
+const (
+	Critical RiskTier = "critical"
+	High     RiskTier = "high"
+	Low      RiskTier = "low"
+	Medium   RiskTier = "medium"
+)
+
+// Valid indicates whether the value is a known member of the RiskTier enum.
+func (e RiskTier) Valid() bool {
+	switch e {
+	case Critical:
+		return true
+	case High:
+		return true
+	case Low:
+		return true
+	case Medium:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunState.
+const (
+	Halted  RunState = "halted"
+	Running RunState = "running"
+)
+
+// Valid indicates whether the value is a known member of the RunState enum.
+func (e RunState) Valid() bool {
+	switch e {
+	case Halted:
+		return true
+	case Running:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ServiceAccountStatus.
 const (
-	Active   ServiceAccountStatus = "active"
-	Inactive ServiceAccountStatus = "inactive"
+	ServiceAccountStatusActive   ServiceAccountStatus = "active"
+	ServiceAccountStatusInactive ServiceAccountStatus = "inactive"
 )
 
 // Valid indicates whether the value is a known member of the ServiceAccountStatus enum.
 func (e ServiceAccountStatus) Valid() bool {
 	switch e {
-	case Active:
+	case ServiceAccountStatusActive:
 		return true
-	case Inactive:
+	case ServiceAccountStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SuspensionFrom.
+const (
+	SuspensionFromActive    SuspensionFrom = "active"
+	SuspensionFromReady     SuspensionFrom = "ready"
+	SuspensionFromValidated SuspensionFrom = "validated"
+)
+
+// Valid indicates whether the value is a known member of the SuspensionFrom enum.
+func (e SuspensionFrom) Valid() bool {
+	switch e {
+	case SuspensionFromActive:
+		return true
+	case SuspensionFromReady:
+		return true
+	case SuspensionFromValidated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SuspensionReason.
+const (
+	Halt          SuspensionReason = "halt"
+	Manual        SuspensionReason = "manual"
+	OwnerInactive SuspensionReason = "owner_inactive"
+	ReviewOverdue SuspensionReason = "review_overdue"
+)
+
+// Valid indicates whether the value is a known member of the SuspensionReason enum.
+func (e SuspensionReason) Valid() bool {
+	switch e {
+	case Halt:
+		return true
+	case Manual:
+		return true
+	case OwnerInactive:
+		return true
+	case ReviewOverdue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UnusedToolingKind.
+const (
+	Model UnusedToolingKind = "model"
+	Tool  UnusedToolingKind = "tool"
+)
+
+// Valid indicates whether the value is a known member of the UnusedToolingKind enum.
+func (e UnusedToolingKind) Valid() bool {
+	switch e {
+	case Model:
+		return true
+	case Tool:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UseCaseDecisionDecision.
+const (
+	UseCaseDecisionDecisionChangesRequested UseCaseDecisionDecision = "changes_requested"
+	UseCaseDecisionDecisionRejected         UseCaseDecisionDecision = "rejected"
+	UseCaseDecisionDecisionValidated        UseCaseDecisionDecision = "validated"
+)
+
+// Valid indicates whether the value is a known member of the UseCaseDecisionDecision enum.
+func (e UseCaseDecisionDecision) Valid() bool {
+	switch e {
+	case UseCaseDecisionDecisionChangesRequested:
+		return true
+	case UseCaseDecisionDecisionRejected:
+		return true
+	case UseCaseDecisionDecisionValidated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UseCaseStatus.
+const (
+	UseCaseStatusChangesRequested UseCaseStatus = "changes_requested"
+	UseCaseStatusDraft            UseCaseStatus = "draft"
+	UseCaseStatusRejected         UseCaseStatus = "rejected"
+	UseCaseStatusSubmitted        UseCaseStatus = "submitted"
+	UseCaseStatusValidated        UseCaseStatus = "validated"
+)
+
+// Valid indicates whether the value is a known member of the UseCaseStatus enum.
+func (e UseCaseStatus) Valid() bool {
+	switch e {
+	case UseCaseStatusChangesRequested:
+		return true
+	case UseCaseStatusDraft:
+		return true
+	case UseCaseStatusRejected:
+		return true
+	case UseCaseStatusSubmitted:
+		return true
+	case UseCaseStatusValidated:
 		return true
 	default:
 		return false
@@ -68,6 +626,180 @@ func (e VersionInfoApiVersion) Valid() bool {
 		return false
 	}
 }
+
+// Defines values for ExportAgentsParamsFormat.
+const (
+	Csv  ExportAgentsParamsFormat = "csv"
+	Json ExportAgentsParamsFormat = "json"
+)
+
+// Valid indicates whether the value is a known member of the ExportAgentsParamsFormat enum.
+func (e ExportAgentsParamsFormat) Valid() bool {
+	switch e {
+	case Csv:
+		return true
+	case Json:
+		return true
+	default:
+		return false
+	}
+}
+
+// Actor Who made a change, by pseudonymous principal ID. The system is White Tower itself.
+type Actor struct {
+	// DisplayName The principal's display name; the system has none.
+	DisplayName *string `json:"displayName,omitempty"`
+
+	// Id The principal's ID; the system has none.
+	Id   *openapi_types.UUID `json:"id,omitempty"`
+	Type ActorType           `json:"type"`
+}
+
+// ActorType defines model for Actor.Type.
+type ActorType string
+
+// AddDelegateRequest defines model for AddDelegateRequest.
+type AddDelegateRequest struct {
+	PrincipalId openapi_types.UUID `json:"principalId"`
+}
+
+// Agent An agent of the inventory, in-house or third-party (INV-01). The
+// suspension is present while the agent is suspended, and the harness
+// once it is declared. Its ETag changes with every change to the agent,
+// its delegates or its ownership transfers.
+type Agent struct {
+	ActivatedAt *time.Time `json:"activatedAt,omitempty"`
+
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification AiActClassification `json:"aiActClassification"`
+
+	// Coverage How deeply White Tower governs the agent (INV-08): C0, declared in the
+	// inventory; C1, it authenticates with White Tower credentials; C2, an
+	// enforcement point governs it and reports its decisions; C3, a halt or
+	// a drill of it was confirmed within the configured period.
+	Coverage  CoverageLevel `json:"coverage"`
+	CreatedAt time.Time     `json:"createdAt"`
+
+	// CreatedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	CreatedBy PrincipalRef `json:"createdBy"`
+
+	// DataCategories The categories of data the agent accesses, from the setting `inventory.data_categories`.
+	DataCategories     []string       `json:"dataCategories"`
+	Delegates          []PrincipalRef `json:"delegates"`
+	DeploymentLocation *string        `json:"deploymentLocation,omitempty"`
+	Description        string         `json:"description"`
+
+	// DrillEligible Whether the agent's owner lets kill-switch drills halt it (KIL-09).
+	DrillEligible bool     `json:"drillEligible"`
+	Environments  []string `json:"environments"`
+	Framework     *string  `json:"framework,omitempty"`
+
+	// HaltMode How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+	HaltMode HaltMode `json:"haltMode"`
+
+	// Harness The declaration of what confines the agent where it runs. White Tower
+	// records it in the MVP, and enforces it from Phase 2 (requirements,
+	// section 5.1.1).
+	Harness *Harness           `json:"harness,omitempty"`
+	Id      openapi_types.UUID `json:"id"`
+
+	// Kind Whether the organization builds the agent, or uses a third party's (INV-01).
+	Kind AgentKind `json:"kind"`
+
+	// Labels Labels, which filters, selector halts and policies use; policies see
+	// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+	// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+	// Enforcement points receive them with the agent's governance state, so
+	// they never hold personal data (CORE-9).
+	Labels Labels `json:"labels"`
+
+	// LifecycleState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+	LifecycleState LifecycleState `json:"lifecycleState"`
+	Name           string         `json:"name"`
+
+	// PendingOwnershipTransfer An offer of an agent's primary ownership, from its primary owner to another principal, who accepts or declines it.
+	PendingOwnershipTransfer *OwnershipTransfer `json:"pendingOwnershipTransfer,omitempty"`
+
+	// PrimaryOwner A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	PrimaryOwner PrincipalRef `json:"primaryOwner"`
+	RetiredAt    *time.Time   `json:"retiredAt,omitempty"`
+
+	// RiskTier The agent's risk tier. It sets how often the agent is reviewed,
+	// whether its reviews need a sign-off, and the lease of its enforcement
+	// points.
+	RiskTier RiskTier `json:"riskTier"`
+
+	// RunState Whether the agent may act now, or a halt of the agent or of the fleet
+	// stops it, whatever its lifecycle state (lifecycle, section 2).
+	RunState RunState `json:"runState"`
+
+	// Slug The agent's unique, readable key, which never changes.
+	Slug string `json:"slug"`
+
+	// Source How the agent entered the inventory; `discovered` is reserved for Phase 3.
+	Source AgentSource `json:"source"`
+
+	// Suspension Why and since when the agent is suspended, and the state that reinstating it returns to (`from`).
+	Suspension *Suspension `json:"suspension,omitempty"`
+	UpdatedAt  time.Time   `json:"updatedAt"`
+
+	// UseCaseId The use case that justifies the agent (INV-03).
+	UseCaseId openapi_types.UUID `json:"useCaseId"`
+	Vendor    *string            `json:"vendor,omitempty"`
+}
+
+// AgentSource How the agent entered the inventory; `discovered` is reserved for Phase 3.
+type AgentSource string
+
+// AgentAction defines model for AgentAction.
+type AgentAction struct {
+	// Action A lifecycle action that people take; White Tower takes the others itself.
+	Action RequestedAction `json:"action"`
+
+	// Available Whether the caller may take the action now.
+	Available       bool `json:"available"`
+	CommentRequired bool `json:"commentRequired"`
+
+	// RefusedBy What refuses the action, empty when it is available: `permission`
+	// when the caller's roles, the scope of their grant (own, active
+	// only, sign-off) or their kind (people take decisions) do not allow
+	// it; `not_owner_or_creator` when separation of duties does (HUM-04);
+	// otherwise the guards of the lifecycle that do not hold, as
+	// agent-lifecycle.yaml names them: `metadata_complete`,
+	// `owner_active`, `use_case_not_prohibited`, `use_case_not_rejected`,
+	// `use_case_validated`, `agent_policy_active`, `harness_declared`,
+	// `not_halted`, `review_not_overdue` and
+	// `previous_state_invariants_hold`. A client shows a value it does
+	// not know as a generic refusal.
+	RefusedBy []string `json:"refusedBy"`
+
+	// Transition The transition's ID in the lifecycle specification.
+	Transition string `json:"transition"`
+}
+
+// AgentActions defines model for AgentActions.
+type AgentActions struct {
+	Actions []AgentAction `json:"actions"`
+
+	// LifecycleState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+	LifecycleState LifecycleState `json:"lifecycleState"`
+}
+
+// AgentKind Whether the organization builds the agent, or uses a third party's (INV-01).
+type AgentKind string
+
+// AgentList defines model for AgentList.
+type AgentList struct {
+	Agents     []Agent `json:"agents"`
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+type AiActClassification string
 
 // ApiTokenMetadata defines model for ApiTokenMetadata.
 type ApiTokenMetadata struct {
@@ -142,6 +874,12 @@ type AuditInclusionProof struct {
 	TreeSize int64  `json:"treeSize"`
 }
 
+// CoverageLevel How deeply White Tower governs the agent (INV-08): C0, declared in the
+// inventory; C1, it authenticates with White Tower credentials; C2, an
+// enforcement point governs it and reports its decisions; C3, a halt or
+// a drill of it was confirmed within the configured period.
+type CoverageLevel string
+
 // CreateServiceAccountRequest defines model for CreateServiceAccountRequest.
 type CreateServiceAccountRequest struct {
 	DisplayName string               `json:"displayName"`
@@ -164,6 +902,21 @@ type CreateTokenRequest struct {
 	Scopes []string `json:"scopes"`
 }
 
+// CreateUseCaseRequest A new use case. Its AI Act classification is `not_assessed` unless the request says otherwise.
+type CreateUseCaseRequest struct {
+	AffectedPersons *string `json:"affectedPersons,omitempty"`
+
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification   *AiActClassification `json:"aiActClassification,omitempty"`
+	BusinessJustification string               `json:"businessJustification"`
+	Conditions            *string              `json:"conditions,omitempty"`
+
+	// DataCategories Categories from the setting `inventory.data_categories`.
+	DataCategories []string `json:"dataCategories"`
+	Description    string   `json:"description"`
+	Title          string   `json:"title"`
+}
+
 // CreatedToken defines model for CreatedToken.
 type CreatedToken struct {
 	CreatedAt   time.Time          `json:"createdAt"`
@@ -180,11 +933,216 @@ type CreatedToken struct {
 	TokenPrefix string `json:"tokenPrefix"`
 }
 
+// DataCategoryList defines model for DataCategoryList.
+type DataCategoryList struct {
+	DataCategories []string `json:"dataCategories"`
+}
+
+// EditAgentRequest The members to change; the others keep their values (editAgent).
+type EditAgentRequest struct {
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification *AiActClassification `json:"aiActClassification,omitempty"`
+	DataCategories      *[]string            `json:"dataCategories,omitempty"`
+	DeploymentLocation  *string              `json:"deploymentLocation,omitempty"`
+	Description         *string              `json:"description,omitempty"`
+	DrillEligible       *bool                `json:"drillEligible,omitempty"`
+	Environments        *[]string            `json:"environments,omitempty"`
+	Framework           *string              `json:"framework,omitempty"`
+
+	// HaltMode How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+	HaltMode *HaltMode `json:"haltMode,omitempty"`
+
+	// Harness The declaration of what confines the agent where it runs. White Tower
+	// records it in the MVP, and enforces it from Phase 2 (requirements,
+	// section 5.1.1).
+	Harness *Harness `json:"harness,omitempty"`
+
+	// Labels Labels, which filters, selector halts and policies use; policies see
+	// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+	// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+	// Enforcement points receive them with the agent's governance state, so
+	// they never hold personal data (CORE-9).
+	Labels *Labels `json:"labels,omitempty"`
+	Name   *string `json:"name,omitempty"`
+
+	// RiskTier The agent's risk tier. It sets how often the agent is reviewed,
+	// whether its reviews need a sign-off, and the lease of its enforcement
+	// points.
+	RiskTier  *RiskTier           `json:"riskTier,omitempty"`
+	UseCaseId *openapi_types.UUID `json:"useCaseId,omitempty"`
+	Vendor    *string             `json:"vendor,omitempty"`
+}
+
+// EditUseCaseRequest The members to change; the others keep their values (editUseCase).
+type EditUseCaseRequest struct {
+	AffectedPersons *string `json:"affectedPersons,omitempty"`
+
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification   *AiActClassification `json:"aiActClassification,omitempty"`
+	BusinessJustification *string              `json:"businessJustification,omitempty"`
+	Conditions            *string              `json:"conditions,omitempty"`
+	DataCategories        *[]string            `json:"dataCategories,omitempty"`
+	Description           *string              `json:"description,omitempty"`
+	Title                 *string              `json:"title,omitempty"`
+}
+
 // ExchangeTokenRequest defines model for ExchangeTokenRequest.
 type ExchangeTokenRequest struct {
 	// IdToken Raw OpenID Connect ID token obtained by the CLI.
 	IdToken string `json:"idToken"`
 }
+
+// HaltMode How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+type HaltMode string
+
+// Harness The declaration of what confines the agent where it runs. White Tower
+// records it in the MVP, and enforces it from Phase 2 (requirements,
+// section 5.1.1).
+type Harness struct {
+	Description string `json:"description"`
+}
+
+// InboxItem Work that waits for the caller, addressed to them or to one of their roles.
+type InboxItem struct {
+	// AgentId The agent the item is about, when there is one.
+	AgentId   *openapi_types.UUID `json:"agentId,omitempty"`
+	CreatedAt time.Time           `json:"createdAt"`
+	Id        openapi_types.UUID  `json:"id"`
+
+	// Kind What waits: `use_case_validation`, `policy_approval`,
+	// `review_due`, `review_signoff`, `halt_release`,
+	// `ownership_transfer` or `module_approval`. Later plans add kinds,
+	// and a client shows a kind it does not know generically.
+	Kind string `json:"kind"`
+
+	// Role The caller's role that the item is addressed to; absent when it is addressed to the caller.
+	Role      *InboxItemRole     `json:"role,omitempty"`
+	SubjectId openapi_types.UUID `json:"subjectId"`
+
+	// SubjectType The kind of resource the item is about, such as `agent`, `review` or `ownership_transfer`.
+	SubjectType string `json:"subjectType"`
+}
+
+// InboxItemRole The caller's role that the item is addressed to; absent when it is addressed to the caller.
+type InboxItemRole string
+
+// InboxItemList defines model for InboxItemList.
+type InboxItemList struct {
+	Items      []InboxItem `json:"items"`
+	NextCursor *string     `json:"nextCursor,omitempty"`
+}
+
+// Instance An instance of a module, such as an enforcement point, that serves the agent.
+type Instance struct {
+	// ActiveBundleVersion The version of the agent's policy bundle that the instance applies.
+	ActiveBundleVersion *int64    `json:"activeBundleVersion,omitempty"`
+	ConnectedAt         time.Time `json:"connectedAt"`
+
+	// ContractVersion The version of the module contracts that the instance speaks.
+	ContractVersion string             `json:"contractVersion"`
+	DisconnectedAt  *time.Time         `json:"disconnectedAt,omitempty"`
+	Host            *string            `json:"host,omitempty"`
+	Id              openapi_types.UUID `json:"id"`
+
+	// InstanceKey The instance's key, unique within its module.
+	InstanceKey   string             `json:"instanceKey"`
+	LastSeenAt    time.Time          `json:"lastSeenAt"`
+	ModuleId      openapi_types.UUID `json:"moduleId"`
+	ModuleSlug    string             `json:"moduleSlug"`
+	ModuleVersion string             `json:"moduleVersion"`
+
+	// ObservedStateVersion The last governance state version of the agent that the instance applied.
+	ObservedStateVersion *int64         `json:"observedStateVersion,omitempty"`
+	Status               InstanceStatus `json:"status"`
+}
+
+// InstanceStatus defines model for Instance.Status.
+type InstanceStatus string
+
+// InstanceList defines model for InstanceList.
+type InstanceList struct {
+	Instances  []Instance `json:"instances"`
+	NextCursor *string    `json:"nextCursor,omitempty"`
+}
+
+// Labels Labels, which filters, selector halts and policies use; policies see
+// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+// Enforcement points receive them with the agent's governance state, so
+// they never hold personal data (CORE-9).
+type Labels map[string]string
+
+// LifecycleAction An action of the lifecycle, as agent-lifecycle.yaml names it.
+type LifecycleAction string
+
+// LifecycleState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+type LifecycleState string
+
+// OwnerAssignment A principal's assignment as an agent's primary owner or delegate; an ended one records who ended it, and why.
+type OwnerAssignment struct {
+	AssignedAt time.Time `json:"assignedAt"`
+
+	// AssignedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	AssignedBy PrincipalRef `json:"assignedBy"`
+
+	// EndReason Why the assignment ended: the reason of a reassignment or of a
+	// delegate's removal, or `ownership transferred` when the new owner
+	// accepted a transfer.
+	EndReason *string    `json:"endReason,omitempty"`
+	EndedAt   *time.Time `json:"endedAt,omitempty"`
+
+	// EndedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	EndedBy *PrincipalRef      `json:"endedBy,omitempty"`
+	Id      openapi_types.UUID `json:"id"`
+
+	// Principal A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	Principal PrincipalRef        `json:"principal"`
+	Role      OwnerAssignmentRole `json:"role"`
+}
+
+// OwnerAssignmentRole defines model for OwnerAssignment.Role.
+type OwnerAssignmentRole string
+
+// OwnerAssignmentList defines model for OwnerAssignmentList.
+type OwnerAssignmentList struct {
+	NextCursor *string           `json:"nextCursor,omitempty"`
+	Owners     []OwnerAssignment `json:"owners"`
+}
+
+// OwnershipTransfer An offer of an agent's primary ownership, from its primary owner to another principal, who accepts or declines it.
+type OwnershipTransfer struct {
+	AgentId   openapi_types.UUID `json:"agentId"`
+	DecidedAt *time.Time         `json:"decidedAt,omitempty"`
+
+	// From A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	From        PrincipalRef       `json:"from"`
+	Id          openapi_types.UUID `json:"id"`
+	RequestedAt time.Time          `json:"requestedAt"`
+
+	// RequestedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	RequestedBy PrincipalRef `json:"requestedBy"`
+
+	// Status Where the transfer is; `expired` is reserved, as nothing expires a transfer yet.
+	Status OwnershipTransferStatus `json:"status"`
+
+	// To A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	To PrincipalRef `json:"to"`
+}
+
+// OwnershipTransferStatus Where the transfer is; `expired` is reserved, as nothing expires a transfer yet.
+type OwnershipTransferStatus string
 
 // Principal defines model for Principal.
 type Principal struct {
@@ -209,6 +1167,20 @@ type Principal struct {
 // PrincipalKind defines model for Principal.Kind.
 type PrincipalKind string
 
+// PrincipalRef A principal, as the resources that name one show it. The display name
+// is absent only where a caller asked to leave names out, as a
+// pseudonymized export does.
+type PrincipalRef struct {
+	DisplayName *string            `json:"displayName,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Status An inactive principal no longer owns agents (INV-02, INV-05).
+	Status PrincipalRefStatus `json:"status"`
+}
+
+// PrincipalRefStatus An inactive principal no longer owns agents (INV-02, INV-05).
+type PrincipalRefStatus string
+
 // Problem RFC 9457 problem details. `type` and `code` identify the error;
 // `title` is the same for every occurrence of it, and `detail`
 // explains this one. No internal detail reaches the client.
@@ -226,6 +1198,150 @@ type Problem struct {
 	Type string `json:"type"`
 }
 
+// ProposeAgentRequest A new agent: the mandatory metadata of INV-01, of which the vendor or
+// the framework, at least one of them, and its options. The AI Act
+// classification is `not_assessed`, the halt mode `interrupt` and drills
+// not allowed, unless the request says otherwise.
+type ProposeAgentRequest struct {
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification *AiActClassification `json:"aiActClassification,omitempty"`
+
+	// DataCategories The categories of data the agent accesses, from the setting `inventory.data_categories`.
+	DataCategories     []string `json:"dataCategories"`
+	DeploymentLocation string   `json:"deploymentLocation"`
+	Description        string   `json:"description"`
+	DrillEligible      *bool    `json:"drillEligible,omitempty"`
+
+	// Environments Where the agent runs, such as `production`; lowercase letters, digits and inner hyphens.
+	Environments []string `json:"environments"`
+	Framework    *string  `json:"framework,omitempty"`
+
+	// HaltMode How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+	HaltMode *HaltMode `json:"haltMode,omitempty"`
+
+	// Harness The declaration of what confines the agent where it runs. White Tower
+	// records it in the MVP, and enforces it from Phase 2 (requirements,
+	// section 5.1.1).
+	Harness *Harness `json:"harness,omitempty"`
+
+	// Kind Whether the organization builds the agent, or uses a third party's (INV-01).
+	Kind AgentKind `json:"kind"`
+
+	// Labels Labels, which filters, selector halts and policies use; policies see
+	// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+	// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+	// Enforcement points receive them with the agent's governance state, so
+	// they never hold personal data (CORE-9).
+	Labels *Labels `json:"labels,omitempty"`
+	Name   string  `json:"name"`
+
+	// RiskTier The agent's risk tier. It sets how often the agent is reviewed,
+	// whether its reviews need a sign-off, and the lease of its enforcement
+	// points.
+	RiskTier RiskTier `json:"riskTier"`
+
+	// Slug Lowercase letters, digits and inner hyphens, 63 characters at most; unique, and never changed.
+	Slug      string             `json:"slug"`
+	UseCaseId openapi_types.UUID `json:"useCaseId"`
+	Vendor    *string            `json:"vendor,omitempty"`
+}
+
+// ReassignOwnerRequest defines model for ReassignOwnerRequest.
+type ReassignOwnerRequest struct {
+	// PrincipalId The new primary owner.
+	PrincipalId openapi_types.UUID `json:"principalId"`
+	Reason      string             `json:"reason"`
+}
+
+// RequestOwnershipTransferRequest defines model for RequestOwnershipTransferRequest.
+type RequestOwnershipTransferRequest struct {
+	// PrincipalId The principal offered the agent's ownership.
+	PrincipalId openapi_types.UUID `json:"principalId"`
+}
+
+// RequestedAction A lifecycle action that people take; White Tower takes the others itself.
+type RequestedAction string
+
+// Review A periodic review of an agent (INV-06). Once its grace period ends
+// while it is still open, the agent is suspended (INV-05). The
+// candidates to disable, and those the owner kept, are tooling: only
+// the callers who may view agents' tooling see them (permission matrix:
+// not the user role, and never a break-glass session), and lists leave
+// the candidates out.
+type Review struct {
+	AgentId openapi_types.UUID `json:"agentId"`
+
+	// Attestation The owner's attestation (INV-06). Each statement must be true: an
+	// agent no longer needed is retired instead, an agent whose owner is no
+	// longer right gets another one, and its data categories and policy are
+	// brought up to date before the review is completed.
+	Attestation *ReviewAttestation `json:"attestation,omitempty"`
+	CompletedAt *time.Time         `json:"completedAt,omitempty"`
+
+	// CompletedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	CompletedBy *PrincipalRef      `json:"completedBy,omitempty"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	DueAt       time.Time          `json:"dueAt"`
+	GraceEndsAt time.Time          `json:"graceEndsAt"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Overdue Whether the review is open past its due date.
+	Overdue     bool       `json:"overdue"`
+	SignedOffAt *time.Time `json:"signedOffAt,omitempty"`
+
+	// SignedOffBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	SignedOffBy     *PrincipalRef `json:"signedOffBy,omitempty"`
+	SignoffRequired bool          `json:"signoffRequired"`
+
+	// Status Where the review is: scheduled until the owner completes it, then
+	// waiting for a sign-off when the agent's risk tier needs one;
+	// cancelled when the agent is retired.
+	Status ReviewStatus `json:"status"`
+
+	// UnusedTooling For an open review, the enabled tools and models that the agent has not used recently (CAT-09).
+	UnusedTooling *[]UnusedTooling `json:"unusedTooling,omitempty"`
+}
+
+// ReviewAttestation The owner's attestation (INV-06). Each statement must be true: an
+// agent no longer needed is retired instead, an agent whose owner is no
+// longer right gets another one, and its data categories and policy are
+// brought up to date before the review is completed.
+type ReviewAttestation struct {
+	Comment               *string `json:"comment,omitempty"`
+	DataCategoriesCurrent bool    `json:"dataCategoriesCurrent"`
+
+	// KeptTooling The keys of the candidates to disable that the owner keeps; none when absent.
+	KeptTooling        *[]string `json:"keptTooling,omitempty"`
+	OwnerStillRight    bool      `json:"ownerStillRight"`
+	PolicyAdequate     bool      `json:"policyAdequate"`
+	StillNeeded        bool      `json:"stillNeeded"`
+	ToolingStillNeeded bool      `json:"toolingStillNeeded"`
+}
+
+// ReviewList defines model for ReviewList.
+type ReviewList struct {
+	NextCursor *string  `json:"nextCursor,omitempty"`
+	Reviews    []Review `json:"reviews"`
+}
+
+// ReviewStatus Where the review is: scheduled until the owner completes it, then
+// waiting for a sign-off when the agent's risk tier needs one;
+// cancelled when the agent is retired.
+type ReviewStatus string
+
+// RiskTier The agent's risk tier. It sets how often the agent is reviewed,
+// whether its reviews need a sign-off, and the lease of its enforcement
+// points.
+type RiskTier string
+
+// RunState Whether the agent may act now, or a halt of the agent or of the fleet
+// stops it, whatever its lifecycle state (lifecycle, section 2).
+type RunState string
+
 // ServiceAccount defines model for ServiceAccount.
 type ServiceAccount struct {
 	CreatedAt              time.Time            `json:"createdAt"`
@@ -239,6 +1355,138 @@ type ServiceAccount struct {
 
 // ServiceAccountStatus defines model for ServiceAccount.Status.
 type ServiceAccountStatus string
+
+// Suspension Why and since when the agent is suspended, and the state that reinstating it returns to (`from`).
+type Suspension struct {
+	At   time.Time      `json:"at"`
+	From SuspensionFrom `json:"from"`
+
+	// Reason Why the agent was suspended (lifecycle, transitions T10 to T12).
+	Reason SuspensionReason `json:"reason"`
+}
+
+// SuspensionFrom defines model for Suspension.From.
+type SuspensionFrom string
+
+// SuspensionReason Why the agent was suspended (lifecycle, transitions T10 to T12).
+type SuspensionReason string
+
+// Transition One transition of an agent's lifecycle. `fromState` is absent for the
+// agent's creation, T1, and `reason` is present for a suspension.
+type Transition struct {
+	// Action An action of the lifecycle, as agent-lifecycle.yaml names it.
+	Action LifecycleAction `json:"action"`
+
+	// Actor Who made a change, by pseudonymous principal ID. The system is White Tower itself.
+	Actor   Actor   `json:"actor"`
+	Comment *string `json:"comment,omitempty"`
+
+	// FromState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+	FromState  *LifecycleState    `json:"fromState,omitempty"`
+	Id         openapi_types.UUID `json:"id"`
+	OccurredAt time.Time          `json:"occurredAt"`
+
+	// Reason Why the agent was suspended (lifecycle, transitions T10 to T12).
+	Reason *SuspensionReason `json:"reason,omitempty"`
+
+	// StateVersion The governance state version that the transition took.
+	StateVersion int64 `json:"stateVersion"`
+
+	// ToState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+	ToState    LifecycleState `json:"toState"`
+	Transition string         `json:"transition"`
+}
+
+// TransitionList defines model for TransitionList.
+type TransitionList struct {
+	NextCursor  *string      `json:"nextCursor,omitempty"`
+	Transitions []Transition `json:"transitions"`
+}
+
+// TransitionRequest defines model for TransitionRequest.
+type TransitionRequest struct {
+	// Action A lifecycle action that people take; White Tower takes the others itself.
+	Action RequestedAction `json:"action"`
+
+	// Comment Why. `request_changes`, `reject`, `validate`, `suspend`,
+	// `reinstate` and `retire` need one, and a decision's comment is
+	// also the use case decision's. The agent's history shows it; its
+	// audit event records only that it was given.
+	Comment *string `json:"comment,omitempty"`
+}
+
+// UnusedTooling An enabled tool or model that the agent has not used recently, a candidate to disable (CAT-09).
+type UnusedTooling struct {
+	// Key The key of the tool or model in the catalog (RFC-0002, section 3).
+	Key  string            `json:"key"`
+	Kind UnusedToolingKind `json:"kind"`
+
+	// LastUsedAt When the agent last used it; absent if it never did.
+	LastUsedAt *time.Time `json:"lastUsedAt,omitempty"`
+}
+
+// UnusedToolingKind defines model for UnusedTooling.Kind.
+type UnusedToolingKind string
+
+// UseCase The business purpose that justifies one or more agents (INV-03). Its
+// conditions are those under which the agents it justifies may run,
+// which the advisory committee validates with it.
+type UseCase struct {
+	// AffectedPersons Who the work of its agents affects.
+	AffectedPersons *string `json:"affectedPersons,omitempty"`
+
+	// AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+	AiActClassification   AiActClassification `json:"aiActClassification"`
+	BusinessJustification string              `json:"businessJustification"`
+	Conditions            *string             `json:"conditions,omitempty"`
+	CreatedAt             time.Time           `json:"createdAt"`
+
+	// CreatedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	CreatedBy      PrincipalRef       `json:"createdBy"`
+	DataCategories []string           `json:"dataCategories"`
+	Description    string             `json:"description"`
+	Id             openapi_types.UUID `json:"id"`
+
+	// Status Where the use case is in the advisory committee's decision.
+	Status    UseCaseStatus `json:"status"`
+	Title     string        `json:"title"`
+	UpdatedAt time.Time     `json:"updatedAt"`
+}
+
+// UseCaseDecision A decision of the advisory committee on a use case, made on an agent's proposal.
+type UseCaseDecision struct {
+	// AgentId The agent whose proposal was decided.
+	AgentId   *openapi_types.UUID `json:"agentId,omitempty"`
+	Comment   string              `json:"comment"`
+	DecidedAt time.Time           `json:"decidedAt"`
+
+	// DecidedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DecidedBy PrincipalRef            `json:"decidedBy"`
+	Decision  UseCaseDecisionDecision `json:"decision"`
+	Id        openapi_types.UUID      `json:"id"`
+}
+
+// UseCaseDecisionDecision defines model for UseCaseDecision.Decision.
+type UseCaseDecisionDecision string
+
+// UseCaseDecisionList defines model for UseCaseDecisionList.
+type UseCaseDecisionList struct {
+	Decisions  []UseCaseDecision `json:"decisions"`
+	NextCursor *string           `json:"nextCursor,omitempty"`
+}
+
+// UseCaseList defines model for UseCaseList.
+type UseCaseList struct {
+	NextCursor *string   `json:"nextCursor,omitempty"`
+	UseCases   []UseCase `json:"useCases"`
+}
+
+// UseCaseStatus Where the use case is in the advisory committee's decision.
+type UseCaseStatus string
 
 // VersionInfo defines model for VersionInfo.
 type VersionInfo struct {
@@ -254,6 +1502,194 @@ type VersionInfo struct {
 
 // VersionInfoApiVersion Version of this API.
 type VersionInfoApiVersion string
+
+// AgentCoverageFilter defines model for AgentCoverageFilter.
+type AgentCoverageFilter = []CoverageLevel
+
+// AgentEnvironmentFilter defines model for AgentEnvironmentFilter.
+type AgentEnvironmentFilter = string
+
+// AgentId defines model for AgentId.
+type AgentId = openapi_types.UUID
+
+// AgentLabelFilter defines model for AgentLabelFilter.
+type AgentLabelFilter = []string
+
+// AgentOwnerFilter defines model for AgentOwnerFilter.
+type AgentOwnerFilter = openapi_types.UUID
+
+// AgentRiskTierFilter defines model for AgentRiskTierFilter.
+type AgentRiskTierFilter = []RiskTier
+
+// AgentSearch defines model for AgentSearch.
+type AgentSearch = string
+
+// AgentStateFilter defines model for AgentStateFilter.
+type AgentStateFilter = []LifecycleState
+
+// AgentUseCaseFilter defines model for AgentUseCaseFilter.
+type AgentUseCaseFilter = openapi_types.UUID
+
+// Cursor defines model for Cursor.
+type Cursor = string
+
+// DelegateId defines model for DelegateId.
+type DelegateId = openapi_types.UUID
+
+// IfMatch defines model for IfMatch.
+type IfMatch = string
+
+// Limit defines model for Limit.
+type Limit = int
+
+// ReviewId defines model for ReviewId.
+type ReviewId = openapi_types.UUID
+
+// TransferId defines model for TransferId.
+type TransferId = openapi_types.UUID
+
+// UseCaseId defines model for UseCaseId.
+type UseCaseId = openapi_types.UUID
+
+// ListAgentsParams defines parameters for ListAgents.
+type ListAgentsParams struct {
+	// State Agents in any of these lifecycle states.
+	State *AgentStateFilter `form:"state,omitempty" json:"state,omitempty"`
+
+	// OwnerId Agents whose primary owner or one of whose delegates is this principal.
+	OwnerId *AgentOwnerFilter `form:"ownerId,omitempty" json:"ownerId,omitempty"`
+
+	// RiskTier Agents in any of these risk tiers.
+	RiskTier *AgentRiskTierFilter `form:"riskTier,omitempty" json:"riskTier,omitempty"`
+
+	// Environment Agents deployed in this environment.
+	Environment *AgentEnvironmentFilter `form:"environment,omitempty" json:"environment,omitempty"`
+
+	// Coverage Agents at any of these coverage levels.
+	Coverage *AgentCoverageFilter `form:"coverage,omitempty" json:"coverage,omitempty"`
+
+	// Label Agents that carry every one of these labels, each written as `key=value`.
+	Label *AgentLabelFilter `form:"label,omitempty" json:"label,omitempty"`
+
+	// UseCaseId Agents that this use case justifies.
+	UseCaseId *AgentUseCaseFilter `form:"useCaseId,omitempty" json:"useCaseId,omitempty"`
+
+	// Q Text to look for in the slug, the name and the description.
+	Q *AgentSearch `form:"q,omitempty" json:"q,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ExportAgentsParams defines parameters for ExportAgents.
+type ExportAgentsParams struct {
+	// Format The format of the export.
+	Format *ExportAgentsParamsFormat `form:"format,omitempty" json:"format,omitempty"`
+
+	// Pseudonymize Leaves out the names of people, and keeps their pseudonymous IDs
+	// (NFR-20): the CSV column `primaryOwnerName` stays empty, and the
+	// JSON holds no display name.
+	Pseudonymize *bool `form:"pseudonymize,omitempty" json:"pseudonymize,omitempty"`
+
+	// State Agents in any of these lifecycle states.
+	State *AgentStateFilter `form:"state,omitempty" json:"state,omitempty"`
+
+	// OwnerId Agents whose primary owner or one of whose delegates is this principal.
+	OwnerId *AgentOwnerFilter `form:"ownerId,omitempty" json:"ownerId,omitempty"`
+
+	// RiskTier Agents in any of these risk tiers.
+	RiskTier *AgentRiskTierFilter `form:"riskTier,omitempty" json:"riskTier,omitempty"`
+
+	// Environment Agents deployed in this environment.
+	Environment *AgentEnvironmentFilter `form:"environment,omitempty" json:"environment,omitempty"`
+
+	// Coverage Agents at any of these coverage levels.
+	Coverage *AgentCoverageFilter `form:"coverage,omitempty" json:"coverage,omitempty"`
+
+	// Label Agents that carry every one of these labels, each written as `key=value`.
+	Label *AgentLabelFilter `form:"label,omitempty" json:"label,omitempty"`
+
+	// UseCaseId Agents that this use case justifies.
+	UseCaseId *AgentUseCaseFilter `form:"useCaseId,omitempty" json:"useCaseId,omitempty"`
+
+	// Q Text to look for in the slug, the name and the description.
+	Q *AgentSearch `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ExportAgentsParamsFormat defines parameters for ExportAgents.
+type ExportAgentsParamsFormat string
+
+// EditAgentParams defines parameters for EditAgent.
+type EditAgentParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// RemoveAgentDelegateParams defines parameters for RemoveAgentDelegate.
+type RemoveAgentDelegateParams struct {
+	// Reason Why the assignment ends. A request without a reason is refused (`bad_request`).
+	Reason *string `form:"reason,omitempty" json:"reason,omitempty"`
+}
+
+// ListAgentInstancesParams defines parameters for ListAgentInstances.
+type ListAgentInstancesParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListAgentOwnersParams defines parameters for ListAgentOwners.
+type ListAgentOwnersParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ReassignAgentOwnerParams defines parameters for ReassignAgentOwner.
+type ReassignAgentOwnerParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListAgentReviewsParams defines parameters for ListAgentReviews.
+type ListAgentReviewsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListAgentTransitionsParams defines parameters for ListAgentTransitions.
+type ListAgentTransitionsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// TransitionAgentParams defines parameters for TransitionAgent.
+type TransitionAgentParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
 
 // GetAuditEventsParams defines parameters for GetAuditEvents.
 type GetAuditEventsParams struct {
@@ -291,6 +1727,48 @@ type GetAuditEventsParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListInboxItemsParams defines parameters for ListInboxItems.
+type ListInboxItemsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListReviewsParams defines parameters for ListReviews.
+type ListReviewsParams struct {
+	// Status Reviews in any of these statuses.
+	Status *[]ReviewStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Overdue Only the open reviews past their due date, or only the others.
+	Overdue *bool `form:"overdue,omitempty" json:"overdue,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CompleteReviewParams defines parameters for CompleteReview.
+type CompleteReviewParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// SignOffReviewParams defines parameters for SignOffReview.
+type SignOffReviewParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // ListTokensParams defines parameters for ListTokens.
 type ListTokensParams struct {
 	// PrincipalId Optional principal ID to filter tokens (allowed for responsible owners and administrators).
@@ -303,6 +1781,60 @@ type RevokeTokenParams struct {
 	Reason *string `form:"reason,omitempty" json:"reason,omitempty"`
 }
 
+// ListUseCasesParams defines parameters for ListUseCases.
+type ListUseCasesParams struct {
+	// Status Use cases in any of these statuses.
+	Status *[]UseCaseStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Q Text to look for in the title and the description.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// EditUseCaseParams defines parameters for EditUseCase.
+type EditUseCaseParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListUseCaseDecisionsParams defines parameters for ListUseCaseDecisions.
+type ListUseCaseDecisionsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ProposeAgentJSONRequestBody defines body for ProposeAgent for application/json ContentType.
+type ProposeAgentJSONRequestBody = ProposeAgentRequest
+
+// EditAgentJSONRequestBody defines body for EditAgent for application/json ContentType.
+type EditAgentJSONRequestBody = EditAgentRequest
+
+// AddAgentDelegateJSONRequestBody defines body for AddAgentDelegate for application/json ContentType.
+type AddAgentDelegateJSONRequestBody = AddDelegateRequest
+
+// RequestOwnershipTransferJSONRequestBody defines body for RequestOwnershipTransfer for application/json ContentType.
+type RequestOwnershipTransferJSONRequestBody = RequestOwnershipTransferRequest
+
+// ReassignAgentOwnerJSONRequestBody defines body for ReassignAgentOwner for application/json ContentType.
+type ReassignAgentOwnerJSONRequestBody = ReassignOwnerRequest
+
+// TransitionAgentJSONRequestBody defines body for TransitionAgent for application/json ContentType.
+type TransitionAgentJSONRequestBody = TransitionRequest
+
+// CompleteReviewJSONRequestBody defines body for CompleteReview for application/json ContentType.
+type CompleteReviewJSONRequestBody = ReviewAttestation
+
 // CreateServiceAccountJSONRequestBody defines body for CreateServiceAccount for application/json ContentType.
 type CreateServiceAccountJSONRequestBody = CreateServiceAccountRequest
 
@@ -311,6 +1843,12 @@ type CreateTokenJSONRequestBody = CreateTokenRequest
 
 // ExchangeTokenJSONRequestBody defines body for ExchangeToken for application/json ContentType.
 type ExchangeTokenJSONRequestBody = ExchangeTokenRequest
+
+// CreateUseCaseJSONRequestBody defines body for CreateUseCase for application/json ContentType.
+type CreateUseCaseJSONRequestBody = CreateUseCaseRequest
+
+// EditUseCaseJSONRequestBody defines body for EditUseCase for application/json ContentType.
+type EditUseCaseJSONRequestBody = EditUseCaseRequest
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -386,6 +1924,355 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// ListAgents List agents
+	//
+	// Lists the agents that match every filter given, ordered by slug, one
+	// page at a time (INV-09). Whoever may see only active agents, as the
+	// user role, sees only those.
+	//
+	// Corresponds with GET /agents (the `ListAgents` operationId).
+	ListAgents(ctx context.Context, params *ListAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ProposeAgentWithBody Propose an agent
+	//
+	// Registers an agent as a draft, lifecycle transition T1, with the
+	// mandatory metadata of INV-01 and a use case that is not rejected
+	// (INV-03). The caller, an active human with the owner role, becomes its
+	// primary owner. A third-party agent without runtime integration is
+	// registered the same way, with the kind `third_party`, and has coverage
+	// C0 (INV-07).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents (the `ProposeAgent` operationId).
+	ProposeAgentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ProposeAgent Propose an agent
+	//
+	// Registers an agent as a draft, lifecycle transition T1, with the
+	// mandatory metadata of INV-01 and a use case that is not rejected
+	// (INV-03). The caller, an active human with the owner role, becomes its
+	// primary owner. A third-party agent without runtime integration is
+	// registered the same way, with the kind `third_party`, and has coverage
+	// C0 (INV-07).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents (the `ProposeAgent` operationId).
+	ProposeAgent(ctx context.Context, body ProposeAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportAgents Export agents
+	//
+	// Streams every agent that matches the filters, as CSV or JSON (INV-09),
+	// with the visibility of listAgents. It is not paged: it streams its
+	// rows (plan P1-04, step 9).
+	//
+	// CSV has a header row, then one row per agent, with the columns `id`,
+	// `slug`, `name`, `description`, `kind`, `source`, `vendor`, `framework`,
+	// `deploymentLocation`, `environments`, `riskTier`,
+	// `aiActClassification`, `dataCategories`, `useCaseId`,
+	// `lifecycleState`, `runState`, `coverage`, `primaryOwnerId`,
+	// `primaryOwnerName`, `delegateIds`, `labels`, `haltMode`,
+	// `drillEligible`, `createdAt`, `activatedAt` and `retiredAt`. Lists are
+	// joined with `;`, and labels are written as `key=value` pairs. A cell,
+	// or a part of one that follows a `;`, that starts with `=`, `+`, `-`,
+	// `@`, a tab or a carriage return gets a leading `'`, so that
+	// spreadsheets never run it as a formula, whatever their list separator
+	// (threat model, T-09).
+	//
+	// Corresponds with GET /agents/export (the `ExportAgents` operationId).
+	ExportAgents(ctx context.Context, params *ExportAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAgent Get an agent
+	//
+	// Returns an agent, with the ETag that a change to it must send back.
+	// Every change to the agent changes its ETag, including a change to its
+	// delegates or to an ownership transfer.
+	//
+	// Corresponds with GET /agents/{id} (the `GetAgent` operationId).
+	GetAgent(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EditAgentWithBody Edit an agent's metadata
+	//
+	// Changes the members the request names and keeps the others; an empty
+	// string clears an optional text member, but an edit that would leave
+	// neither a vendor nor a framework is refused (`bad_request`, INV-01).
+	// The agent's owners edit it, and operators edit any agent (permission
+	// matrix). The slug and the kind never change; the use case changes only
+	// while the agent is a draft, and never to a rejected one; a retired or
+	// rejected agent no longer changes (`conflict`). A harness, once
+	// declared, can be replaced but not removed. A change to what policies
+	// see of the agent (its risk tier, data categories and labels) or to its
+	// halt mode takes a new governance state version, so that enforcement
+	// points learn of it.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /agents/{id} (the `EditAgent` operationId).
+	EditAgentWithBody(ctx context.Context, id AgentId, params *EditAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EditAgent Edit an agent's metadata
+	//
+	// Changes the members the request names and keeps the others; an empty
+	// string clears an optional text member, but an edit that would leave
+	// neither a vendor nor a framework is refused (`bad_request`, INV-01).
+	// The agent's owners edit it, and operators edit any agent (permission
+	// matrix). The slug and the kind never change; the use case changes only
+	// while the agent is a draft, and never to a rejected one; a retired or
+	// rejected agent no longer changes (`conflict`). A harness, once
+	// declared, can be replaced but not removed. A change to what policies
+	// see of the agent (its risk tier, data categories and labels) or to its
+	// halt mode takes a new governance state version, so that enforcement
+	// points learn of it.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /agents/{id} (the `EditAgent` operationId).
+	EditAgent(ctx context.Context, id AgentId, params *EditAgentParams, body EditAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAgentActions Get the lifecycle actions open to the caller
+	//
+	// Lists the lifecycle actions that the agent's state allows, and whether
+	// the caller may take each one now. When the caller may not, it says
+	// what refuses the action: the caller's permission, separation of
+	// duties, or the guards of the lifecycle that do not hold
+	// (docs/architecture/lifecycle.md, section 4). The console explains its
+	// disabled actions with it. The answer holds for the moment it was
+	// computed: transitionAgent checks everything again.
+	//
+	// Corresponds with GET /agents/{id}/actions (the `GetAgentActions` operationId).
+	GetAgentActions(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddAgentDelegateWithBody Add a delegate
+	//
+	// Makes an active human with the owner role a delegate of the agent: the
+	// owner role's `own` grants then let them act for its owner (INV-02).
+	// Anyone else is refused (`bad_request`). The agent's owners and
+	// operators manage its delegates (`agent.metadata.edit`). The agent's
+	// ETag changes.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{id}/delegates (the `AddAgentDelegate` operationId).
+	AddAgentDelegateWithBody(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddAgentDelegate Add a delegate
+	//
+	// Makes an active human with the owner role a delegate of the agent: the
+	// owner role's `own` grants then let them act for its owner (INV-02).
+	// Anyone else is refused (`bad_request`). The agent's owners and
+	// operators manage its delegates (`agent.metadata.edit`). The agent's
+	// ETag changes.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{id}/delegates (the `AddAgentDelegate` operationId).
+	AddAgentDelegate(ctx context.Context, id AgentId, body AddAgentDelegateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveAgentDelegate Remove a delegate
+	//
+	// Ends the principal's assignment as a delegate of the agent, for a
+	// reason; the history keeps it. The agent's owners and operators manage
+	// its delegates (`agent.metadata.edit`). The agent's ETag changes.
+	//
+	// Corresponds with DELETE /agents/{id}/delegates/{principalId} (the `RemoveAgentDelegate` operationId).
+	RemoveAgentDelegate(ctx context.Context, id AgentId, principalId DelegateId, params *RemoveAgentDelegateParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgentInstances List an agent's instances
+	//
+	// Lists the module instances that serve the agent, as enforcement points
+	// and other modules report them through the module API, latest
+	// connection first. The inventory only reads them: plan P1-07 records
+	// them.
+	//
+	// Corresponds with GET /agents/{id}/instances (the `ListAgentInstances` operationId).
+	ListAgentInstances(ctx context.Context, id AgentId, params *ListAgentInstancesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgentOwners List an agent's owners and their history
+	//
+	// Lists the agent's primary owner and delegates (INV-02): the current
+	// assignments first, then those that ended, newest first.
+	//
+	// Corresponds with GET /agents/{id}/owners (the `ListAgentOwners` operationId).
+	ListAgentOwners(ctx context.Context, id AgentId, params *ListAgentOwnersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestOwnershipTransferWithBody Offer an agent's ownership to someone else
+	//
+	// Starts a transfer of the agent's primary ownership to another active
+	// human with the owner role, who must accept it (INV-02): it waits in
+	// their inbox. Anyone else is refused (`bad_request`). Only the primary
+	// owner starts one, and an agent has one pending transfer at most. The
+	// agent's ETag changes.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{id}/ownership-transfers (the `RequestOwnershipTransfer` operationId).
+	RequestOwnershipTransferWithBody(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestOwnershipTransfer Offer an agent's ownership to someone else
+	//
+	// Starts a transfer of the agent's primary ownership to another active
+	// human with the owner role, who must accept it (INV-02): it waits in
+	// their inbox. Anyone else is refused (`bad_request`). Only the primary
+	// owner starts one, and an agent has one pending transfer at most. The
+	// agent's ETag changes.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{id}/ownership-transfers (the `RequestOwnershipTransfer` operationId).
+	RequestOwnershipTransfer(ctx context.Context, id AgentId, body RequestOwnershipTransferJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelOwnershipTransfer Cancel an ownership transfer
+	//
+	// Cancels a pending transfer. The primary owner who started it, or an
+	// operator, cancels it (`agent.metadata.edit`). The agent's ETag
+	// changes.
+	//
+	// Corresponds with DELETE /agents/{id}/ownership-transfers/{transferId} (the `CancelOwnershipTransfer` operationId).
+	CancelOwnershipTransfer(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AcceptOwnershipTransfer Accept an ownership transfer
+	//
+	// The principal that a pending transfer names accepts it, and becomes
+	// the agent's primary owner; they need the owner role
+	// (`agent.propose`). The former primary owner's assignment ends, the
+	// agent's ETag changes, and the agent takes a new governance state
+	// version, because policies see the owner.
+	//
+	// Corresponds with POST /agents/{id}/ownership-transfers/{transferId}/accept (the `AcceptOwnershipTransfer` operationId).
+	AcceptOwnershipTransfer(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineOwnershipTransfer Decline an ownership transfer
+	//
+	// The principal that a pending transfer names declines it; the agent keeps its primary owner, and its ETag changes.
+	//
+	// Corresponds with POST /agents/{id}/ownership-transfers/{transferId}/decline (the `DeclineOwnershipTransfer` operationId).
+	DeclineOwnershipTransfer(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReassignAgentOwnerWithBody Reassign an agent's primary owner
+	//
+	// Makes another active human with the owner role the agent's primary
+	// owner at once, for a reason (INV-02): the advisory committee and
+	// operators do it, for example after an owner left
+	// (`agent.ownership.reassign`). The former primary owner's assignment
+	// ends, the new owner stops being a delegate if they were one, and a
+	// pending ownership transfer is cancelled. It needs If-Match with the
+	// agent's ETag, and takes a new governance state version, because
+	// policies see the owner.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /agents/{id}/primary-owner (the `ReassignAgentOwner` operationId).
+	ReassignAgentOwnerWithBody(ctx context.Context, id AgentId, params *ReassignAgentOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReassignAgentOwner Reassign an agent's primary owner
+	//
+	// Makes another active human with the owner role the agent's primary
+	// owner at once, for a reason (INV-02): the advisory committee and
+	// operators do it, for example after an owner left
+	// (`agent.ownership.reassign`). The former primary owner's assignment
+	// ends, the new owner stops being a delegate if they were one, and a
+	// pending ownership transfer is cancelled. It needs If-Match with the
+	// agent's ETag, and takes a new governance state version, because
+	// policies see the owner.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /agents/{id}/primary-owner (the `ReassignAgentOwner` operationId).
+	ReassignAgentOwner(ctx context.Context, id AgentId, params *ReassignAgentOwnerParams, body ReassignAgentOwnerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgentReviews List an agent's periodic reviews
+	//
+	// Lists the agent's periodic reviews (INV-06), the latest due first.
+	//
+	// Corresponds with GET /agents/{id}/reviews (the `ListAgentReviews` operationId).
+	ListAgentReviews(ctx context.Context, id AgentId, params *ListAgentReviewsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgentTransitions List an agent's lifecycle history
+	//
+	// Lists the agent's lifecycle transitions, newest first: who made each
+	// one, with what reason and comment, and the governance state version it
+	// took (INV-04).
+	//
+	// Corresponds with GET /agents/{id}/transitions (the `ListAgentTransitions` operationId).
+	ListAgentTransitions(ctx context.Context, id AgentId, params *ListAgentTransitionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TransitionAgentWithBody Take a lifecycle action
+	//
+	// Takes one lifecycle action on the agent, as the lifecycle
+	// specification defines it (docs/architecture/lifecycle.md and
+	// agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+	// itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+	// `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+	// ETag, so that nobody acts on a state they did not see.
+	//
+	// Besides `inventory.view`, each action needs its own permission, within
+	// its scope (permission matrix): `agent.propose` to submit or withdraw,
+	// as the agent's primary owner or one of its delegates;
+	// `usecase.validate` to request changes, reject or validate; and
+	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+	// for the others. The decisions on a proposal (`request_changes`,
+	// `reject` and `validate`) are taken by people, never by a service
+	// account, and nobody decides on a proposal they own, are a delegate of
+	// or created, nor on one whose use case they created (HUM-04): these
+	// refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse. `request_changes`, `reject`, `validate`,
+	// `suspend`, `reinstate` and `retire` need a comment, and a request
+	// without one is refused (`bad_request`).
+	//
+	// A use case can justify several agents. `submit`, `withdraw`,
+	// `request_changes`, `reject` and `validate` change the agent's use case
+	// too, but only while it is neither validated nor rejected: a validated
+	// or rejected use case never changes, because other agents may rely on
+	// it. The decision is then recorded with the agent, and only the agent
+	// changes state. While the agent's use case is rejected, `submit` and
+	// `validate` are refused (`conflict`): the owner takes the agent back to
+	// a draft and links another use case.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{id}/transitions (the `TransitionAgent` operationId).
+	TransitionAgentWithBody(ctx context.Context, id AgentId, params *TransitionAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TransitionAgent Take a lifecycle action
+	//
+	// Takes one lifecycle action on the agent, as the lifecycle
+	// specification defines it (docs/architecture/lifecycle.md and
+	// agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+	// itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+	// `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+	// ETag, so that nobody acts on a state they did not see.
+	//
+	// Besides `inventory.view`, each action needs its own permission, within
+	// its scope (permission matrix): `agent.propose` to submit or withdraw,
+	// as the agent's primary owner or one of its delegates;
+	// `usecase.validate` to request changes, reject or validate; and
+	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+	// for the others. The decisions on a proposal (`request_changes`,
+	// `reject` and `validate`) are taken by people, never by a service
+	// account, and nobody decides on a proposal they own, are a delegate of
+	// or created, nor on one whose use case they created (HUM-04): these
+	// refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse. `request_changes`, `reject`, `validate`,
+	// `suspend`, `reinstate` and `retire` need a comment, and a request
+	// without one is refused (`bad_request`).
+	//
+	// A use case can justify several agents. `submit`, `withdraw`,
+	// `request_changes`, `reject` and `validate` change the agent's use case
+	// too, but only while it is neither validated nor rejected: a validated
+	// or rejected use case never changes, because other agents may rely on
+	// it. The decision is then recorded with the agent, and only the agent
+	// changes state. While the agent's use case is rejected, `submit` and
+	// `validate` are refused (`conflict`): the owner takes the agent back to
+	// a draft and links another use case.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{id}/transitions (the `TransitionAgent` operationId).
+	TransitionAgent(ctx context.Context, id AgentId, params *TransitionAgentParams, body TransitionAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetAuditCheckpoints List signed checkpoints
 	//
 	// Returns stored checkpoints signed over the audit log Merkle tree.
@@ -416,6 +2303,30 @@ type ClientInterface interface {
 	// Corresponds with GET /audit/keys (the `GetAuditKeys` operationId).
 	GetAuditKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListDataCategories List the data categories
+	//
+	// Lists the categories of data that agents and use cases may name: the
+	// setting `inventory.data_categories`, which administrators edit. They
+	// are keys, which the console translates; it shows a key it does not
+	// know as it is.
+	//
+	// Corresponds with GET /data-categories (the `ListDataCategories` operationId).
+	ListDataCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListInboxItems List the caller's pending work
+	//
+	// Lists the open items addressed to the caller, or to one of the
+	// caller's roles, newest first (UI-09): proposals waiting for
+	// validation, reviews due, sign-offs and ownership transfers, and the
+	// kinds of later plans, such as policy approvals, halt releases and
+	// catalog requests. An item leaves every inbox once someone handles it.
+	// Nobody sees the items about a proposal they may not decide on: one
+	// they own, are a delegate of or created, or one whose use case they
+	// created (HUM-04).
+	//
+	// Corresponds with GET /inbox (the `ListInboxItems` operationId).
+	ListInboxItems(ctx context.Context, params *ListInboxItemsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetMe Get the calling principal
 	//
 	// Returns the calling principal, their roles, their permissions derived
@@ -423,6 +2334,74 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /me (the `GetMe` operationId).
 	GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListReviews List periodic reviews
+	//
+	// Lists the periodic reviews of every agent the caller may see that
+	// match the filters, the earliest due first: for example the overdue
+	// reviews of the dashboard (UI-08), or those waiting for sign-off.
+	//
+	// Corresponds with GET /reviews (the `ListReviews` operationId).
+	ListReviews(ctx context.Context, params *ListReviewsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetReview Get a periodic review
+	//
+	// Returns a periodic review, with the ETag that its completion or
+	// sign-off must send back. An open review lists, as candidates to
+	// disable, the enabled tools and models that the agent has not used
+	// within the setting `lifecycle.review_unused_tooling_days` (CAT-09),
+	// to the callers who may view agents' tooling (permission matrix: not
+	// the user role, and never a break-glass session).
+	//
+	// Corresponds with GET /reviews/{id} (the `GetReview` operationId).
+	GetReview(ctx context.Context, id ReviewId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteReviewWithBody Complete a periodic review
+	//
+	// Records the owner's attestation (INV-06): the agent is still needed,
+	// its owner is still right, its data categories are current, its policy
+	// is still adequate and its enabled tooling is still needed. The
+	// attestation names the candidates to disable that the owner keeps; the
+	// owner disables the others in the agent's tooling (plan P1-16). The
+	// agent's primary owner or a delegate completes it (`agent.review`).
+	// When the review needs a sign-off (`signoffRequired`), it then waits
+	// for one; otherwise it is completed and the next review is scheduled.
+	// It needs If-Match with the review's ETag.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /reviews/{id}/completion (the `CompleteReview` operationId).
+	CompleteReviewWithBody(ctx context.Context, id ReviewId, params *CompleteReviewParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteReview Complete a periodic review
+	//
+	// Records the owner's attestation (INV-06): the agent is still needed,
+	// its owner is still right, its data categories are current, its policy
+	// is still adequate and its enabled tooling is still needed. The
+	// attestation names the candidates to disable that the owner keeps; the
+	// owner disables the others in the agent's tooling (plan P1-16). The
+	// agent's primary owner or a delegate completes it (`agent.review`).
+	// When the review needs a sign-off (`signoffRequired`), it then waits
+	// for one; otherwise it is completed and the next review is scheduled.
+	// It needs If-Match with the review's ETag.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /reviews/{id}/completion (the `CompleteReview` operationId).
+	CompleteReview(ctx context.Context, id ReviewId, params *CompleteReviewParams, body CompleteReviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SignOffReview Sign off a periodic review
+	//
+	// A member of the advisory committee signs off a review that waits for
+	// it, whatever the agent's risk tier: the review's `signoffRequired`,
+	// set from the setting `lifecycle.review_signoff_risk_tiers`, decides
+	// (`agent.review`). The signer is a person, neither the one who
+	// completed the review nor one of the agent's owners (HUM-04). The
+	// review is then completed, and the next one scheduled. It needs
+	// If-Match with the review's ETag.
+	//
+	// Corresponds with POST /reviews/{id}/sign-off (the `SignOffReview` operationId).
+	SignOffReview(ctx context.Context, id ReviewId, params *SignOffReviewParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListServiceAccounts List service accounts
 	//
@@ -503,6 +2482,89 @@ type ClientInterface interface {
 	// Corresponds with DELETE /tokens/{id} (the `RevokeToken` operationId).
 	RevokeToken(ctx context.Context, id openapi_types.UUID, params *RevokeTokenParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListUseCases List use cases
+	//
+	// Lists the use cases that match every filter given, newest first.
+	// Whoever may see only active agents sees only the use cases of active
+	// agents.
+	//
+	// Corresponds with GET /use-cases (the `ListUseCases` operationId).
+	ListUseCases(ctx context.Context, params *ListUseCasesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateUseCaseWithBody Create a use case
+	//
+	// Creates a use case as a draft: the business purpose that justifies one
+	// or more agents (INV-03). Owners create them (`agent.propose`). The
+	// advisory committee decides on a use case through the lifecycle of the
+	// agents it justifies (transitionAgent).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /use-cases (the `CreateUseCase` operationId).
+	CreateUseCaseWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateUseCase Create a use case
+	//
+	// Creates a use case as a draft: the business purpose that justifies one
+	// or more agents (INV-03). Owners create them (`agent.propose`). The
+	// advisory committee decides on a use case through the lifecycle of the
+	// agents it justifies (transitionAgent).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /use-cases (the `CreateUseCase` operationId).
+	CreateUseCase(ctx context.Context, body CreateUseCaseJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUseCase Get a use case
+	//
+	// Returns a use case, with the ETag that a change to it must send back.
+	//
+	// Corresponds with GET /use-cases/{id} (the `GetUseCase` operationId).
+	GetUseCase(ctx context.Context, id UseCaseId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EditUseCaseWithBody Edit a use case
+	//
+	// Changes the members the request names and keeps the others; an empty
+	// string clears an optional text member. The use case's creator edits it
+	// (`agent.propose`) while it is a draft or changes were requested, and
+	// no agent it justifies waits for a decision; otherwise the edit is
+	// refused (`conflict`), so that the committee decides on what it read.
+	// To change a use case under review, its owner withdraws the proposal.
+	// A validated or rejected use case never changes, because the agents it
+	// justifies rely on what the committee decided: a new use case replaces
+	// it.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /use-cases/{id} (the `EditUseCase` operationId).
+	EditUseCaseWithBody(ctx context.Context, id UseCaseId, params *EditUseCaseParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EditUseCase Edit a use case
+	//
+	// Changes the members the request names and keeps the others; an empty
+	// string clears an optional text member. The use case's creator edits it
+	// (`agent.propose`) while it is a draft or changes were requested, and
+	// no agent it justifies waits for a decision; otherwise the edit is
+	// refused (`conflict`), so that the committee decides on what it read.
+	// To change a use case under review, its owner withdraws the proposal.
+	// A validated or rejected use case never changes, because the agents it
+	// justifies rely on what the committee decided: a new use case replaces
+	// it.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /use-cases/{id} (the `EditUseCase` operationId).
+	EditUseCase(ctx context.Context, id UseCaseId, params *EditUseCaseParams, body EditUseCaseJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListUseCaseDecisions List the decisions on a use case
+	//
+	// Lists the advisory committee's decisions on the use case, newest
+	// first: validations, rejections and requests for changes, each with its
+	// comment and the agent whose proposal it decided.
+	//
+	// Corresponds with GET /use-cases/{id}/decisions (the `ListUseCaseDecisions` operationId).
+	ListUseCaseDecisions(ctx context.Context, id UseCaseId, params *ListUseCaseDecisionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetVersion Get the version of the running server
 	//
 	// Returns the release version and Git commit of the running server, and
@@ -511,6 +2573,595 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /version (the `GetVersion` operationId).
 	GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// ListAgents List agents
+//
+// Lists the agents that match every filter given, ordered by slug, one
+// page at a time (INV-09). Whoever may see only active agents, as the
+// user role, sees only those.
+//
+// Corresponds with GET /agents (the `ListAgents` operationId).
+func (c *Client) ListAgents(ctx context.Context, params *ListAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ProposeAgentWithBody Propose an agent
+//
+// Registers an agent as a draft, lifecycle transition T1, with the
+// mandatory metadata of INV-01 and a use case that is not rejected
+// (INV-03). The caller, an active human with the owner role, becomes its
+// primary owner. A third-party agent without runtime integration is
+// registered the same way, with the kind `third_party`, and has coverage
+// C0 (INV-07).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents (the `ProposeAgent` operationId).
+func (c *Client) ProposeAgentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewProposeAgentRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ProposeAgent Propose an agent
+//
+// Registers an agent as a draft, lifecycle transition T1, with the
+// mandatory metadata of INV-01 and a use case that is not rejected
+// (INV-03). The caller, an active human with the owner role, becomes its
+// primary owner. A third-party agent without runtime integration is
+// registered the same way, with the kind `third_party`, and has coverage
+// C0 (INV-07).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents (the `ProposeAgent` operationId).
+func (c *Client) ProposeAgent(ctx context.Context, body ProposeAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewProposeAgentRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExportAgents Export agents
+//
+// Streams every agent that matches the filters, as CSV or JSON (INV-09),
+// with the visibility of listAgents. It is not paged: it streams its
+// rows (plan P1-04, step 9).
+//
+// CSV has a header row, then one row per agent, with the columns `id`,
+// `slug`, `name`, `description`, `kind`, `source`, `vendor`, `framework`,
+// `deploymentLocation`, `environments`, `riskTier`,
+// `aiActClassification`, `dataCategories`, `useCaseId`,
+// `lifecycleState`, `runState`, `coverage`, `primaryOwnerId`,
+// `primaryOwnerName`, `delegateIds`, `labels`, `haltMode`,
+// `drillEligible`, `createdAt`, `activatedAt` and `retiredAt`. Lists are
+// joined with `;`, and labels are written as `key=value` pairs. A cell,
+// or a part of one that follows a `;`, that starts with `=`, `+`, `-`,
+// `@`, a tab or a carriage return gets a leading `'`, so that
+// spreadsheets never run it as a formula, whatever their list separator
+// (threat model, T-09).
+//
+// Corresponds with GET /agents/export (the `ExportAgents` operationId).
+func (c *Client) ExportAgents(ctx context.Context, params *ExportAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportAgentsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAgent Get an agent
+//
+// Returns an agent, with the ETag that a change to it must send back.
+// Every change to the agent changes its ETag, including a change to its
+// delegates or to an ownership transfer.
+//
+// Corresponds with GET /agents/{id} (the `GetAgent` operationId).
+func (c *Client) GetAgent(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EditAgentWithBody Edit an agent's metadata
+//
+// Changes the members the request names and keeps the others; an empty
+// string clears an optional text member, but an edit that would leave
+// neither a vendor nor a framework is refused (`bad_request`, INV-01).
+// The agent's owners edit it, and operators edit any agent (permission
+// matrix). The slug and the kind never change; the use case changes only
+// while the agent is a draft, and never to a rejected one; a retired or
+// rejected agent no longer changes (`conflict`). A harness, once
+// declared, can be replaced but not removed. A change to what policies
+// see of the agent (its risk tier, data categories and labels) or to its
+// halt mode takes a new governance state version, so that enforcement
+// points learn of it.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /agents/{id} (the `EditAgent` operationId).
+func (c *Client) EditAgentWithBody(ctx context.Context, id AgentId, params *EditAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEditAgentRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EditAgent Edit an agent's metadata
+//
+// Changes the members the request names and keeps the others; an empty
+// string clears an optional text member, but an edit that would leave
+// neither a vendor nor a framework is refused (`bad_request`, INV-01).
+// The agent's owners edit it, and operators edit any agent (permission
+// matrix). The slug and the kind never change; the use case changes only
+// while the agent is a draft, and never to a rejected one; a retired or
+// rejected agent no longer changes (`conflict`). A harness, once
+// declared, can be replaced but not removed. A change to what policies
+// see of the agent (its risk tier, data categories and labels) or to its
+// halt mode takes a new governance state version, so that enforcement
+// points learn of it.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /agents/{id} (the `EditAgent` operationId).
+func (c *Client) EditAgent(ctx context.Context, id AgentId, params *EditAgentParams, body EditAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEditAgentRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAgentActions Get the lifecycle actions open to the caller
+//
+// Lists the lifecycle actions that the agent's state allows, and whether
+// the caller may take each one now. When the caller may not, it says
+// what refuses the action: the caller's permission, separation of
+// duties, or the guards of the lifecycle that do not hold
+// (docs/architecture/lifecycle.md, section 4). The console explains its
+// disabled actions with it. The answer holds for the moment it was
+// computed: transitionAgent checks everything again.
+//
+// Corresponds with GET /agents/{id}/actions (the `GetAgentActions` operationId).
+func (c *Client) GetAgentActions(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentActionsRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AddAgentDelegateWithBody Add a delegate
+//
+// Makes an active human with the owner role a delegate of the agent: the
+// owner role's `own` grants then let them act for its owner (INV-02).
+// Anyone else is refused (`bad_request`). The agent's owners and
+// operators manage its delegates (`agent.metadata.edit`). The agent's
+// ETag changes.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{id}/delegates (the `AddAgentDelegate` operationId).
+func (c *Client) AddAgentDelegateWithBody(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddAgentDelegateRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AddAgentDelegate Add a delegate
+//
+// Makes an active human with the owner role a delegate of the agent: the
+// owner role's `own` grants then let them act for its owner (INV-02).
+// Anyone else is refused (`bad_request`). The agent's owners and
+// operators manage its delegates (`agent.metadata.edit`). The agent's
+// ETag changes.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{id}/delegates (the `AddAgentDelegate` operationId).
+func (c *Client) AddAgentDelegate(ctx context.Context, id AgentId, body AddAgentDelegateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddAgentDelegateRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RemoveAgentDelegate Remove a delegate
+//
+// Ends the principal's assignment as a delegate of the agent, for a
+// reason; the history keeps it. The agent's owners and operators manage
+// its delegates (`agent.metadata.edit`). The agent's ETag changes.
+//
+// Corresponds with DELETE /agents/{id}/delegates/{principalId} (the `RemoveAgentDelegate` operationId).
+func (c *Client) RemoveAgentDelegate(ctx context.Context, id AgentId, principalId DelegateId, params *RemoveAgentDelegateParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveAgentDelegateRequest(c.Server, id, principalId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentInstances List an agent's instances
+//
+// Lists the module instances that serve the agent, as enforcement points
+// and other modules report them through the module API, latest
+// connection first. The inventory only reads them: plan P1-07 records
+// them.
+//
+// Corresponds with GET /agents/{id}/instances (the `ListAgentInstances` operationId).
+func (c *Client) ListAgentInstances(ctx context.Context, id AgentId, params *ListAgentInstancesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentInstancesRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentOwners List an agent's owners and their history
+//
+// Lists the agent's primary owner and delegates (INV-02): the current
+// assignments first, then those that ended, newest first.
+//
+// Corresponds with GET /agents/{id}/owners (the `ListAgentOwners` operationId).
+func (c *Client) ListAgentOwners(ctx context.Context, id AgentId, params *ListAgentOwnersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentOwnersRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestOwnershipTransferWithBody Offer an agent's ownership to someone else
+//
+// Starts a transfer of the agent's primary ownership to another active
+// human with the owner role, who must accept it (INV-02): it waits in
+// their inbox. Anyone else is refused (`bad_request`). Only the primary
+// owner starts one, and an agent has one pending transfer at most. The
+// agent's ETag changes.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{id}/ownership-transfers (the `RequestOwnershipTransfer` operationId).
+func (c *Client) RequestOwnershipTransferWithBody(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestOwnershipTransferRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestOwnershipTransfer Offer an agent's ownership to someone else
+//
+// Starts a transfer of the agent's primary ownership to another active
+// human with the owner role, who must accept it (INV-02): it waits in
+// their inbox. Anyone else is refused (`bad_request`). Only the primary
+// owner starts one, and an agent has one pending transfer at most. The
+// agent's ETag changes.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{id}/ownership-transfers (the `RequestOwnershipTransfer` operationId).
+func (c *Client) RequestOwnershipTransfer(ctx context.Context, id AgentId, body RequestOwnershipTransferJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestOwnershipTransferRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CancelOwnershipTransfer Cancel an ownership transfer
+//
+// Cancels a pending transfer. The primary owner who started it, or an
+// operator, cancels it (`agent.metadata.edit`). The agent's ETag
+// changes.
+//
+// Corresponds with DELETE /agents/{id}/ownership-transfers/{transferId} (the `CancelOwnershipTransfer` operationId).
+func (c *Client) CancelOwnershipTransfer(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCancelOwnershipTransferRequest(c.Server, id, transferId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AcceptOwnershipTransfer Accept an ownership transfer
+//
+// The principal that a pending transfer names accepts it, and becomes
+// the agent's primary owner; they need the owner role
+// (`agent.propose`). The former primary owner's assignment ends, the
+// agent's ETag changes, and the agent takes a new governance state
+// version, because policies see the owner.
+//
+// Corresponds with POST /agents/{id}/ownership-transfers/{transferId}/accept (the `AcceptOwnershipTransfer` operationId).
+func (c *Client) AcceptOwnershipTransfer(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAcceptOwnershipTransferRequest(c.Server, id, transferId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineOwnershipTransfer Decline an ownership transfer
+//
+// The principal that a pending transfer names declines it; the agent keeps its primary owner, and its ETag changes.
+//
+// Corresponds with POST /agents/{id}/ownership-transfers/{transferId}/decline (the `DeclineOwnershipTransfer` operationId).
+func (c *Client) DeclineOwnershipTransfer(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineOwnershipTransferRequest(c.Server, id, transferId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReassignAgentOwnerWithBody Reassign an agent's primary owner
+//
+// Makes another active human with the owner role the agent's primary
+// owner at once, for a reason (INV-02): the advisory committee and
+// operators do it, for example after an owner left
+// (`agent.ownership.reassign`). The former primary owner's assignment
+// ends, the new owner stops being a delegate if they were one, and a
+// pending ownership transfer is cancelled. It needs If-Match with the
+// agent's ETag, and takes a new governance state version, because
+// policies see the owner.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /agents/{id}/primary-owner (the `ReassignAgentOwner` operationId).
+func (c *Client) ReassignAgentOwnerWithBody(ctx context.Context, id AgentId, params *ReassignAgentOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReassignAgentOwnerRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReassignAgentOwner Reassign an agent's primary owner
+//
+// Makes another active human with the owner role the agent's primary
+// owner at once, for a reason (INV-02): the advisory committee and
+// operators do it, for example after an owner left
+// (`agent.ownership.reassign`). The former primary owner's assignment
+// ends, the new owner stops being a delegate if they were one, and a
+// pending ownership transfer is cancelled. It needs If-Match with the
+// agent's ETag, and takes a new governance state version, because
+// policies see the owner.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /agents/{id}/primary-owner (the `ReassignAgentOwner` operationId).
+func (c *Client) ReassignAgentOwner(ctx context.Context, id AgentId, params *ReassignAgentOwnerParams, body ReassignAgentOwnerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReassignAgentOwnerRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentReviews List an agent's periodic reviews
+//
+// Lists the agent's periodic reviews (INV-06), the latest due first.
+//
+// Corresponds with GET /agents/{id}/reviews (the `ListAgentReviews` operationId).
+func (c *Client) ListAgentReviews(ctx context.Context, id AgentId, params *ListAgentReviewsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentReviewsRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentTransitions List an agent's lifecycle history
+//
+// Lists the agent's lifecycle transitions, newest first: who made each
+// one, with what reason and comment, and the governance state version it
+// took (INV-04).
+//
+// Corresponds with GET /agents/{id}/transitions (the `ListAgentTransitions` operationId).
+func (c *Client) ListAgentTransitions(ctx context.Context, id AgentId, params *ListAgentTransitionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentTransitionsRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TransitionAgentWithBody Take a lifecycle action
+//
+// Takes one lifecycle action on the agent, as the lifecycle
+// specification defines it (docs/architecture/lifecycle.md and
+// agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+// itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+// `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+// ETag, so that nobody acts on a state they did not see.
+//
+// Besides `inventory.view`, each action needs its own permission, within
+// its scope (permission matrix): `agent.propose` to submit or withdraw,
+// as the agent's primary owner or one of its delegates;
+// `usecase.validate` to request changes, reject or validate; and
+// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+// for the others. The decisions on a proposal (`request_changes`,
+// `reject` and `validate`) are taken by people, never by a service
+// account, and nobody decides on a proposal they own, are a delegate of
+// or created, nor on one whose use case they created (HUM-04): these
+// refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse. `request_changes`, `reject`, `validate`,
+// `suspend`, `reinstate` and `retire` need a comment, and a request
+// without one is refused (`bad_request`).
+//
+// A use case can justify several agents. `submit`, `withdraw`,
+// `request_changes`, `reject` and `validate` change the agent's use case
+// too, but only while it is neither validated nor rejected: a validated
+// or rejected use case never changes, because other agents may rely on
+// it. The decision is then recorded with the agent, and only the agent
+// changes state. While the agent's use case is rejected, `submit` and
+// `validate` are refused (`conflict`): the owner takes the agent back to
+// a draft and links another use case.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{id}/transitions (the `TransitionAgent` operationId).
+func (c *Client) TransitionAgentWithBody(ctx context.Context, id AgentId, params *TransitionAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTransitionAgentRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TransitionAgent Take a lifecycle action
+//
+// Takes one lifecycle action on the agent, as the lifecycle
+// specification defines it (docs/architecture/lifecycle.md and
+// agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+// itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+// `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+// ETag, so that nobody acts on a state they did not see.
+//
+// Besides `inventory.view`, each action needs its own permission, within
+// its scope (permission matrix): `agent.propose` to submit or withdraw,
+// as the agent's primary owner or one of its delegates;
+// `usecase.validate` to request changes, reject or validate; and
+// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+// for the others. The decisions on a proposal (`request_changes`,
+// `reject` and `validate`) are taken by people, never by a service
+// account, and nobody decides on a proposal they own, are a delegate of
+// or created, nor on one whose use case they created (HUM-04): these
+// refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse. `request_changes`, `reject`, `validate`,
+// `suspend`, `reinstate` and `retire` need a comment, and a request
+// without one is refused (`bad_request`).
+//
+// A use case can justify several agents. `submit`, `withdraw`,
+// `request_changes`, `reject` and `validate` change the agent's use case
+// too, but only while it is neither validated nor rejected: a validated
+// or rejected use case never changes, because other agents may rely on
+// it. The decision is then recorded with the agent, and only the agent
+// changes state. While the agent's use case is rejected, `submit` and
+// `validate` are refused (`conflict`): the owner takes the agent back to
+// a draft and links another use case.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{id}/transitions (the `TransitionAgent` operationId).
+func (c *Client) TransitionAgent(ctx context.Context, id AgentId, params *TransitionAgentParams, body TransitionAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTransitionAgentRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // GetAuditCheckpoints List signed checkpoints
@@ -583,6 +3234,50 @@ func (c *Client) GetAuditKeys(ctx context.Context, reqEditors ...RequestEditorFn
 	return c.Client.Do(req)
 }
 
+// ListDataCategories List the data categories
+//
+// Lists the categories of data that agents and use cases may name: the
+// setting `inventory.data_categories`, which administrators edit. They
+// are keys, which the console translates; it shows a key it does not
+// know as it is.
+//
+// Corresponds with GET /data-categories (the `ListDataCategories` operationId).
+func (c *Client) ListDataCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDataCategoriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListInboxItems List the caller's pending work
+//
+// Lists the open items addressed to the caller, or to one of the
+// caller's roles, newest first (UI-09): proposals waiting for
+// validation, reviews due, sign-offs and ownership transfers, and the
+// kinds of later plans, such as policy approvals, halt releases and
+// catalog requests. An item leaves every inbox once someone handles it.
+// Nobody sees the items about a proposal they may not decide on: one
+// they own, are a delegate of or created, or one whose use case they
+// created (HUM-04).
+//
+// Corresponds with GET /inbox (the `ListInboxItems` operationId).
+func (c *Client) ListInboxItems(ctx context.Context, params *ListInboxItemsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListInboxItemsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetMe Get the calling principal
 //
 // Returns the calling principal, their roles, their permissions derived
@@ -591,6 +3286,124 @@ func (c *Client) GetAuditKeys(ctx context.Context, reqEditors ...RequestEditorFn
 // Corresponds with GET /me (the `GetMe` operationId).
 func (c *Client) GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMeRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListReviews List periodic reviews
+//
+// Lists the periodic reviews of every agent the caller may see that
+// match the filters, the earliest due first: for example the overdue
+// reviews of the dashboard (UI-08), or those waiting for sign-off.
+//
+// Corresponds with GET /reviews (the `ListReviews` operationId).
+func (c *Client) ListReviews(ctx context.Context, params *ListReviewsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListReviewsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetReview Get a periodic review
+//
+// Returns a periodic review, with the ETag that its completion or
+// sign-off must send back. An open review lists, as candidates to
+// disable, the enabled tools and models that the agent has not used
+// within the setting `lifecycle.review_unused_tooling_days` (CAT-09),
+// to the callers who may view agents' tooling (permission matrix: not
+// the user role, and never a break-glass session).
+//
+// Corresponds with GET /reviews/{id} (the `GetReview` operationId).
+func (c *Client) GetReview(ctx context.Context, id ReviewId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetReviewRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteReviewWithBody Complete a periodic review
+//
+// Records the owner's attestation (INV-06): the agent is still needed,
+// its owner is still right, its data categories are current, its policy
+// is still adequate and its enabled tooling is still needed. The
+// attestation names the candidates to disable that the owner keeps; the
+// owner disables the others in the agent's tooling (plan P1-16). The
+// agent's primary owner or a delegate completes it (`agent.review`).
+// When the review needs a sign-off (`signoffRequired`), it then waits
+// for one; otherwise it is completed and the next review is scheduled.
+// It needs If-Match with the review's ETag.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /reviews/{id}/completion (the `CompleteReview` operationId).
+func (c *Client) CompleteReviewWithBody(ctx context.Context, id ReviewId, params *CompleteReviewParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteReviewRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteReview Complete a periodic review
+//
+// Records the owner's attestation (INV-06): the agent is still needed,
+// its owner is still right, its data categories are current, its policy
+// is still adequate and its enabled tooling is still needed. The
+// attestation names the candidates to disable that the owner keeps; the
+// owner disables the others in the agent's tooling (plan P1-16). The
+// agent's primary owner or a delegate completes it (`agent.review`).
+// When the review needs a sign-off (`signoffRequired`), it then waits
+// for one; otherwise it is completed and the next review is scheduled.
+// It needs If-Match with the review's ETag.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /reviews/{id}/completion (the `CompleteReview` operationId).
+func (c *Client) CompleteReview(ctx context.Context, id ReviewId, params *CompleteReviewParams, body CompleteReviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteReviewRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SignOffReview Sign off a periodic review
+//
+// A member of the advisory committee signs off a review that waits for
+// it, whatever the agent's risk tier: the review's `signoffRequired`,
+// set from the setting `lifecycle.review_signoff_risk_tiers`, decides
+// (`agent.review`). The signer is a person, neither the one who
+// completed the review nor one of the agent's owners (HUM-04). The
+// review is then completed, and the next one scheduled. It needs
+// If-Match with the review's ETag.
+//
+// Corresponds with POST /reviews/{id}/sign-off (the `SignOffReview` operationId).
+func (c *Client) SignOffReview(ctx context.Context, id ReviewId, params *SignOffReviewParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSignOffReviewRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -770,6 +3583,159 @@ func (c *Client) RevokeToken(ctx context.Context, id openapi_types.UUID, params 
 	return c.Client.Do(req)
 }
 
+// ListUseCases List use cases
+//
+// Lists the use cases that match every filter given, newest first.
+// Whoever may see only active agents sees only the use cases of active
+// agents.
+//
+// Corresponds with GET /use-cases (the `ListUseCases` operationId).
+func (c *Client) ListUseCases(ctx context.Context, params *ListUseCasesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListUseCasesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateUseCaseWithBody Create a use case
+//
+// Creates a use case as a draft: the business purpose that justifies one
+// or more agents (INV-03). Owners create them (`agent.propose`). The
+// advisory committee decides on a use case through the lifecycle of the
+// agents it justifies (transitionAgent).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /use-cases (the `CreateUseCase` operationId).
+func (c *Client) CreateUseCaseWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateUseCaseRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateUseCase Create a use case
+//
+// Creates a use case as a draft: the business purpose that justifies one
+// or more agents (INV-03). Owners create them (`agent.propose`). The
+// advisory committee decides on a use case through the lifecycle of the
+// agents it justifies (transitionAgent).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /use-cases (the `CreateUseCase` operationId).
+func (c *Client) CreateUseCase(ctx context.Context, body CreateUseCaseJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateUseCaseRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetUseCase Get a use case
+//
+// Returns a use case, with the ETag that a change to it must send back.
+//
+// Corresponds with GET /use-cases/{id} (the `GetUseCase` operationId).
+func (c *Client) GetUseCase(ctx context.Context, id UseCaseId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUseCaseRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EditUseCaseWithBody Edit a use case
+//
+// Changes the members the request names and keeps the others; an empty
+// string clears an optional text member. The use case's creator edits it
+// (`agent.propose`) while it is a draft or changes were requested, and
+// no agent it justifies waits for a decision; otherwise the edit is
+// refused (`conflict`), so that the committee decides on what it read.
+// To change a use case under review, its owner withdraws the proposal.
+// A validated or rejected use case never changes, because the agents it
+// justifies rely on what the committee decided: a new use case replaces
+// it.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /use-cases/{id} (the `EditUseCase` operationId).
+func (c *Client) EditUseCaseWithBody(ctx context.Context, id UseCaseId, params *EditUseCaseParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEditUseCaseRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EditUseCase Edit a use case
+//
+// Changes the members the request names and keeps the others; an empty
+// string clears an optional text member. The use case's creator edits it
+// (`agent.propose`) while it is a draft or changes were requested, and
+// no agent it justifies waits for a decision; otherwise the edit is
+// refused (`conflict`), so that the committee decides on what it read.
+// To change a use case under review, its owner withdraws the proposal.
+// A validated or rejected use case never changes, because the agents it
+// justifies rely on what the committee decided: a new use case replaces
+// it.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /use-cases/{id} (the `EditUseCase` operationId).
+func (c *Client) EditUseCase(ctx context.Context, id UseCaseId, params *EditUseCaseParams, body EditUseCaseJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEditUseCaseRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListUseCaseDecisions List the decisions on a use case
+//
+// Lists the advisory committee's decisions on the use case, newest
+// first: validations, rejections and requests for changes, each with its
+// comment and the agent whose proposal it decided.
+//
+// Corresponds with GET /use-cases/{id}/decisions (the `ListUseCaseDecisions` operationId).
+func (c *Client) ListUseCaseDecisions(ctx context.Context, id UseCaseId, params *ListUseCaseDecisionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListUseCaseDecisionsRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetVersion Get the version of the running server
 //
 // Returns the release version and Git commit of the running server, and
@@ -787,6 +3753,1201 @@ func (c *Client) GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) 
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewListAgentsRequest constructs an http.Request for the ListAgents method
+func NewListAgentsRequest(server string, params *ListAgentsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.State != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OwnerId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ownerId", *params.OwnerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.RiskTier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "riskTier", *params.RiskTier, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Environment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", *params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Coverage != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "coverage", *params.Coverage, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Label != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "label", *params.Label, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.UseCaseId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "useCaseId", *params.UseCaseId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewProposeAgentRequest calls the generic ProposeAgent builder with application/json body
+func NewProposeAgentRequest(server string, body ProposeAgentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewProposeAgentRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewProposeAgentRequestWithBody constructs an http.Request for the ProposeAgent method, with any body, and a specified content type
+func NewProposeAgentRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewExportAgentsRequest constructs an http.Request for the ExportAgents method
+func NewExportAgentsRequest(server string, params *ExportAgentsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/export")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Format != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "format", *params.Format, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Pseudonymize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "pseudonymize", *params.Pseudonymize, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.State != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OwnerId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ownerId", *params.OwnerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.RiskTier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "riskTier", *params.RiskTier, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Environment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", *params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Coverage != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "coverage", *params.Coverage, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Label != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "label", *params.Label, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.UseCaseId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "useCaseId", *params.UseCaseId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAgentRequest constructs an http.Request for the GetAgent method
+func NewGetAgentRequest(server string, id AgentId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEditAgentRequest calls the generic EditAgent builder with application/json body
+func NewEditAgentRequest(server string, id AgentId, params *EditAgentParams, body EditAgentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewEditAgentRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewEditAgentRequestWithBody constructs an http.Request for the EditAgent method, with any body, and a specified content type
+func NewEditAgentRequestWithBody(server string, id AgentId, params *EditAgentParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetAgentActionsRequest constructs an http.Request for the GetAgentActions method
+func NewGetAgentActionsRequest(server string, id AgentId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/actions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewAddAgentDelegateRequest calls the generic AddAgentDelegate builder with application/json body
+func NewAddAgentDelegateRequest(server string, id AgentId, body AddAgentDelegateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAddAgentDelegateRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewAddAgentDelegateRequestWithBody constructs an http.Request for the AddAgentDelegate method, with any body, and a specified content type
+func NewAddAgentDelegateRequestWithBody(server string, id AgentId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/delegates", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRemoveAgentDelegateRequest constructs an http.Request for the RemoveAgentDelegate method
+func NewRemoveAgentDelegateRequest(server string, id AgentId, principalId DelegateId, params *RemoveAgentDelegateParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "principalId", principalId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/delegates/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Reason != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "reason", *params.Reason, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAgentInstancesRequest constructs an http.Request for the ListAgentInstances method
+func NewListAgentInstancesRequest(server string, id AgentId, params *ListAgentInstancesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/instances", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAgentOwnersRequest constructs an http.Request for the ListAgentOwners method
+func NewListAgentOwnersRequest(server string, id AgentId, params *ListAgentOwnersParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/owners", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRequestOwnershipTransferRequest calls the generic RequestOwnershipTransfer builder with application/json body
+func NewRequestOwnershipTransferRequest(server string, id AgentId, body RequestOwnershipTransferJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRequestOwnershipTransferRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewRequestOwnershipTransferRequestWithBody constructs an http.Request for the RequestOwnershipTransfer method, with any body, and a specified content type
+func NewRequestOwnershipTransferRequestWithBody(server string, id AgentId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/ownership-transfers", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCancelOwnershipTransferRequest constructs an http.Request for the CancelOwnershipTransfer method
+func NewCancelOwnershipTransferRequest(server string, id AgentId, transferId TransferId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "transferId", transferId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/ownership-transfers/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewAcceptOwnershipTransferRequest constructs an http.Request for the AcceptOwnershipTransfer method
+func NewAcceptOwnershipTransferRequest(server string, id AgentId, transferId TransferId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "transferId", transferId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/ownership-transfers/%s/accept", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeclineOwnershipTransferRequest constructs an http.Request for the DeclineOwnershipTransfer method
+func NewDeclineOwnershipTransferRequest(server string, id AgentId, transferId TransferId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "transferId", transferId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/ownership-transfers/%s/decline", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReassignAgentOwnerRequest calls the generic ReassignAgentOwner builder with application/json body
+func NewReassignAgentOwnerRequest(server string, id AgentId, params *ReassignAgentOwnerParams, body ReassignAgentOwnerJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReassignAgentOwnerRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewReassignAgentOwnerRequestWithBody constructs an http.Request for the ReassignAgentOwner method, with any body, and a specified content type
+func NewReassignAgentOwnerRequestWithBody(server string, id AgentId, params *ReassignAgentOwnerParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/primary-owner", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListAgentReviewsRequest constructs an http.Request for the ListAgentReviews method
+func NewListAgentReviewsRequest(server string, id AgentId, params *ListAgentReviewsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/reviews", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAgentTransitionsRequest constructs an http.Request for the ListAgentTransitions method
+func NewListAgentTransitionsRequest(server string, id AgentId, params *ListAgentTransitionsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/transitions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewTransitionAgentRequest calls the generic TransitionAgent builder with application/json body
+func NewTransitionAgentRequest(server string, id AgentId, params *TransitionAgentParams, body TransitionAgentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewTransitionAgentRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewTransitionAgentRequestWithBody constructs an http.Request for the TransitionAgent method, with any body, and a specified content type
+func NewTransitionAgentRequestWithBody(server string, id AgentId, params *TransitionAgentParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/transitions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
 }
 
 // NewGetAuditCheckpointsRequest constructs an http.Request for the GetAuditCheckpoints method
@@ -1051,6 +5212,99 @@ func NewGetAuditKeysRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListDataCategoriesRequest constructs an http.Request for the ListDataCategories method
+func NewListDataCategoriesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/data-categories")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListInboxItemsRequest constructs an http.Request for the ListInboxItems method
+func NewListInboxItemsRequest(server string, params *ListInboxItemsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/inbox")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetMeRequest constructs an http.Request for the GetMe method
 func NewGetMeRequest(server string) (*http.Request, error) {
 	var err error
@@ -1073,6 +5327,241 @@ func NewGetMeRequest(server string) (*http.Request, error) {
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListReviewsRequest constructs an http.Request for the ListReviews method
+func NewListReviewsRequest(server string, params *ListReviewsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/reviews")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Overdue != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "overdue", *params.Overdue, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetReviewRequest constructs an http.Request for the GetReview method
+func NewGetReviewRequest(server string, id ReviewId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/reviews/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCompleteReviewRequest calls the generic CompleteReview builder with application/json body
+func NewCompleteReviewRequest(server string, id ReviewId, params *CompleteReviewParams, body CompleteReviewJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCompleteReviewRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewCompleteReviewRequestWithBody constructs an http.Request for the CompleteReview method, with any body, and a specified content type
+func NewCompleteReviewRequestWithBody(server string, id ReviewId, params *CompleteReviewParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/reviews/%s/completion", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewSignOffReviewRequest constructs an http.Request for the SignOffReview method
+func NewSignOffReviewRequest(server string, id ReviewId, params *SignOffReviewParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/reviews/%s/sign-off", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -1340,6 +5829,305 @@ func NewRevokeTokenRequest(server string, id openapi_types.UUID, params *RevokeT
 	return req, nil
 }
 
+// NewListUseCasesRequest constructs an http.Request for the ListUseCases method
+func NewListUseCasesRequest(server string, params *ListUseCasesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/use-cases")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateUseCaseRequest calls the generic CreateUseCase builder with application/json body
+func NewCreateUseCaseRequest(server string, body CreateUseCaseJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateUseCaseRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateUseCaseRequestWithBody constructs an http.Request for the CreateUseCase method, with any body, and a specified content type
+func NewCreateUseCaseRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/use-cases")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetUseCaseRequest constructs an http.Request for the GetUseCase method
+func NewGetUseCaseRequest(server string, id UseCaseId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/use-cases/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEditUseCaseRequest calls the generic EditUseCase builder with application/json body
+func NewEditUseCaseRequest(server string, id UseCaseId, params *EditUseCaseParams, body EditUseCaseJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewEditUseCaseRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewEditUseCaseRequestWithBody constructs an http.Request for the EditUseCase method, with any body, and a specified content type
+func NewEditUseCaseRequestWithBody(server string, id UseCaseId, params *EditUseCaseParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/use-cases/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListUseCaseDecisionsRequest constructs an http.Request for the ListUseCaseDecisions method
+func NewListUseCaseDecisionsRequest(server string, id UseCaseId, params *ListUseCaseDecisionsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/use-cases/%s/decisions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetVersionRequest constructs an http.Request for the GetVersion method
 func NewGetVersionRequest(server string) (*http.Request, error) {
 	var err error
@@ -1411,6 +6199,379 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// ListAgentsWithResponse List agents
+	//
+	// Lists the agents that match every filter given, ordered by slug, one
+	// page at a time (INV-09). Whoever may see only active agents, as the
+	// user role, sees only those.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents (the `ListAgents` operationId).
+	ListAgentsWithResponse(ctx context.Context, params *ListAgentsParams, reqEditors ...RequestEditorFn) (*ListAgentsResponse, error)
+
+	// ProposeAgentWithBodyWithResponse Propose an agent
+	//
+	// Registers an agent as a draft, lifecycle transition T1, with the
+	// mandatory metadata of INV-01 and a use case that is not rejected
+	// (INV-03). The caller, an active human with the owner role, becomes its
+	// primary owner. A third-party agent without runtime integration is
+	// registered the same way, with the kind `third_party`, and has coverage
+	// C0 (INV-07).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents (the `ProposeAgent` operationId).
+	ProposeAgentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ProposeAgentResponse, error)
+
+	// ProposeAgentWithResponse Propose an agent
+	//
+	// Registers an agent as a draft, lifecycle transition T1, with the
+	// mandatory metadata of INV-01 and a use case that is not rejected
+	// (INV-03). The caller, an active human with the owner role, becomes its
+	// primary owner. A third-party agent without runtime integration is
+	// registered the same way, with the kind `third_party`, and has coverage
+	// C0 (INV-07).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents (the `ProposeAgent` operationId).
+	ProposeAgentWithResponse(ctx context.Context, body ProposeAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*ProposeAgentResponse, error)
+
+	// ExportAgentsWithResponse Export agents
+	//
+	// Streams every agent that matches the filters, as CSV or JSON (INV-09),
+	// with the visibility of listAgents. It is not paged: it streams its
+	// rows (plan P1-04, step 9).
+	//
+	// CSV has a header row, then one row per agent, with the columns `id`,
+	// `slug`, `name`, `description`, `kind`, `source`, `vendor`, `framework`,
+	// `deploymentLocation`, `environments`, `riskTier`,
+	// `aiActClassification`, `dataCategories`, `useCaseId`,
+	// `lifecycleState`, `runState`, `coverage`, `primaryOwnerId`,
+	// `primaryOwnerName`, `delegateIds`, `labels`, `haltMode`,
+	// `drillEligible`, `createdAt`, `activatedAt` and `retiredAt`. Lists are
+	// joined with `;`, and labels are written as `key=value` pairs. A cell,
+	// or a part of one that follows a `;`, that starts with `=`, `+`, `-`,
+	// `@`, a tab or a carriage return gets a leading `'`, so that
+	// spreadsheets never run it as a formula, whatever their list separator
+	// (threat model, T-09).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/export (the `ExportAgents` operationId).
+	ExportAgentsWithResponse(ctx context.Context, params *ExportAgentsParams, reqEditors ...RequestEditorFn) (*ExportAgentsResponse, error)
+
+	// GetAgentWithResponse Get an agent
+	//
+	// Returns an agent, with the ETag that a change to it must send back.
+	// Every change to the agent changes its ETag, including a change to its
+	// delegates or to an ownership transfer.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/{id} (the `GetAgent` operationId).
+	GetAgentWithResponse(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*GetAgentResponse, error)
+
+	// EditAgentWithBodyWithResponse Edit an agent's metadata
+	//
+	// Changes the members the request names and keeps the others; an empty
+	// string clears an optional text member, but an edit that would leave
+	// neither a vendor nor a framework is refused (`bad_request`, INV-01).
+	// The agent's owners edit it, and operators edit any agent (permission
+	// matrix). The slug and the kind never change; the use case changes only
+	// while the agent is a draft, and never to a rejected one; a retired or
+	// rejected agent no longer changes (`conflict`). A harness, once
+	// declared, can be replaced but not removed. A change to what policies
+	// see of the agent (its risk tier, data categories and labels) or to its
+	// halt mode takes a new governance state version, so that enforcement
+	// points learn of it.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /agents/{id} (the `EditAgent` operationId).
+	EditAgentWithBodyWithResponse(ctx context.Context, id AgentId, params *EditAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EditAgentResponse, error)
+
+	// EditAgentWithResponse Edit an agent's metadata
+	//
+	// Changes the members the request names and keeps the others; an empty
+	// string clears an optional text member, but an edit that would leave
+	// neither a vendor nor a framework is refused (`bad_request`, INV-01).
+	// The agent's owners edit it, and operators edit any agent (permission
+	// matrix). The slug and the kind never change; the use case changes only
+	// while the agent is a draft, and never to a rejected one; a retired or
+	// rejected agent no longer changes (`conflict`). A harness, once
+	// declared, can be replaced but not removed. A change to what policies
+	// see of the agent (its risk tier, data categories and labels) or to its
+	// halt mode takes a new governance state version, so that enforcement
+	// points learn of it.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /agents/{id} (the `EditAgent` operationId).
+	EditAgentWithResponse(ctx context.Context, id AgentId, params *EditAgentParams, body EditAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*EditAgentResponse, error)
+
+	// GetAgentActionsWithResponse Get the lifecycle actions open to the caller
+	//
+	// Lists the lifecycle actions that the agent's state allows, and whether
+	// the caller may take each one now. When the caller may not, it says
+	// what refuses the action: the caller's permission, separation of
+	// duties, or the guards of the lifecycle that do not hold
+	// (docs/architecture/lifecycle.md, section 4). The console explains its
+	// disabled actions with it. The answer holds for the moment it was
+	// computed: transitionAgent checks everything again.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/{id}/actions (the `GetAgentActions` operationId).
+	GetAgentActionsWithResponse(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*GetAgentActionsResponse, error)
+
+	// AddAgentDelegateWithBodyWithResponse Add a delegate
+	//
+	// Makes an active human with the owner role a delegate of the agent: the
+	// owner role's `own` grants then let them act for its owner (INV-02).
+	// Anyone else is refused (`bad_request`). The agent's owners and
+	// operators manage its delegates (`agent.metadata.edit`). The agent's
+	// ETag changes.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/delegates (the `AddAgentDelegate` operationId).
+	AddAgentDelegateWithBodyWithResponse(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddAgentDelegateResponse, error)
+
+	// AddAgentDelegateWithResponse Add a delegate
+	//
+	// Makes an active human with the owner role a delegate of the agent: the
+	// owner role's `own` grants then let them act for its owner (INV-02).
+	// Anyone else is refused (`bad_request`). The agent's owners and
+	// operators manage its delegates (`agent.metadata.edit`). The agent's
+	// ETag changes.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/delegates (the `AddAgentDelegate` operationId).
+	AddAgentDelegateWithResponse(ctx context.Context, id AgentId, body AddAgentDelegateJSONRequestBody, reqEditors ...RequestEditorFn) (*AddAgentDelegateResponse, error)
+
+	// RemoveAgentDelegateWithResponse Remove a delegate
+	//
+	// Ends the principal's assignment as a delegate of the agent, for a
+	// reason; the history keeps it. The agent's owners and operators manage
+	// its delegates (`agent.metadata.edit`). The agent's ETag changes.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /agents/{id}/delegates/{principalId} (the `RemoveAgentDelegate` operationId).
+	RemoveAgentDelegateWithResponse(ctx context.Context, id AgentId, principalId DelegateId, params *RemoveAgentDelegateParams, reqEditors ...RequestEditorFn) (*RemoveAgentDelegateResponse, error)
+
+	// ListAgentInstancesWithResponse List an agent's instances
+	//
+	// Lists the module instances that serve the agent, as enforcement points
+	// and other modules report them through the module API, latest
+	// connection first. The inventory only reads them: plan P1-07 records
+	// them.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/{id}/instances (the `ListAgentInstances` operationId).
+	ListAgentInstancesWithResponse(ctx context.Context, id AgentId, params *ListAgentInstancesParams, reqEditors ...RequestEditorFn) (*ListAgentInstancesResponse, error)
+
+	// ListAgentOwnersWithResponse List an agent's owners and their history
+	//
+	// Lists the agent's primary owner and delegates (INV-02): the current
+	// assignments first, then those that ended, newest first.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/{id}/owners (the `ListAgentOwners` operationId).
+	ListAgentOwnersWithResponse(ctx context.Context, id AgentId, params *ListAgentOwnersParams, reqEditors ...RequestEditorFn) (*ListAgentOwnersResponse, error)
+
+	// RequestOwnershipTransferWithBodyWithResponse Offer an agent's ownership to someone else
+	//
+	// Starts a transfer of the agent's primary ownership to another active
+	// human with the owner role, who must accept it (INV-02): it waits in
+	// their inbox. Anyone else is refused (`bad_request`). Only the primary
+	// owner starts one, and an agent has one pending transfer at most. The
+	// agent's ETag changes.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/ownership-transfers (the `RequestOwnershipTransfer` operationId).
+	RequestOwnershipTransferWithBodyWithResponse(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestOwnershipTransferResponse, error)
+
+	// RequestOwnershipTransferWithResponse Offer an agent's ownership to someone else
+	//
+	// Starts a transfer of the agent's primary ownership to another active
+	// human with the owner role, who must accept it (INV-02): it waits in
+	// their inbox. Anyone else is refused (`bad_request`). Only the primary
+	// owner starts one, and an agent has one pending transfer at most. The
+	// agent's ETag changes.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/ownership-transfers (the `RequestOwnershipTransfer` operationId).
+	RequestOwnershipTransferWithResponse(ctx context.Context, id AgentId, body RequestOwnershipTransferJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestOwnershipTransferResponse, error)
+
+	// CancelOwnershipTransferWithResponse Cancel an ownership transfer
+	//
+	// Cancels a pending transfer. The primary owner who started it, or an
+	// operator, cancels it (`agent.metadata.edit`). The agent's ETag
+	// changes.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /agents/{id}/ownership-transfers/{transferId} (the `CancelOwnershipTransfer` operationId).
+	CancelOwnershipTransferWithResponse(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*CancelOwnershipTransferResponse, error)
+
+	// AcceptOwnershipTransferWithResponse Accept an ownership transfer
+	//
+	// The principal that a pending transfer names accepts it, and becomes
+	// the agent's primary owner; they need the owner role
+	// (`agent.propose`). The former primary owner's assignment ends, the
+	// agent's ETag changes, and the agent takes a new governance state
+	// version, because policies see the owner.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/ownership-transfers/{transferId}/accept (the `AcceptOwnershipTransfer` operationId).
+	AcceptOwnershipTransferWithResponse(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*AcceptOwnershipTransferResponse, error)
+
+	// DeclineOwnershipTransferWithResponse Decline an ownership transfer
+	//
+	// The principal that a pending transfer names declines it; the agent keeps its primary owner, and its ETag changes.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/ownership-transfers/{transferId}/decline (the `DeclineOwnershipTransfer` operationId).
+	DeclineOwnershipTransferWithResponse(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*DeclineOwnershipTransferResponse, error)
+
+	// ReassignAgentOwnerWithBodyWithResponse Reassign an agent's primary owner
+	//
+	// Makes another active human with the owner role the agent's primary
+	// owner at once, for a reason (INV-02): the advisory committee and
+	// operators do it, for example after an owner left
+	// (`agent.ownership.reassign`). The former primary owner's assignment
+	// ends, the new owner stops being a delegate if they were one, and a
+	// pending ownership transfer is cancelled. It needs If-Match with the
+	// agent's ETag, and takes a new governance state version, because
+	// policies see the owner.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /agents/{id}/primary-owner (the `ReassignAgentOwner` operationId).
+	ReassignAgentOwnerWithBodyWithResponse(ctx context.Context, id AgentId, params *ReassignAgentOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReassignAgentOwnerResponse, error)
+
+	// ReassignAgentOwnerWithResponse Reassign an agent's primary owner
+	//
+	// Makes another active human with the owner role the agent's primary
+	// owner at once, for a reason (INV-02): the advisory committee and
+	// operators do it, for example after an owner left
+	// (`agent.ownership.reassign`). The former primary owner's assignment
+	// ends, the new owner stops being a delegate if they were one, and a
+	// pending ownership transfer is cancelled. It needs If-Match with the
+	// agent's ETag, and takes a new governance state version, because
+	// policies see the owner.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /agents/{id}/primary-owner (the `ReassignAgentOwner` operationId).
+	ReassignAgentOwnerWithResponse(ctx context.Context, id AgentId, params *ReassignAgentOwnerParams, body ReassignAgentOwnerJSONRequestBody, reqEditors ...RequestEditorFn) (*ReassignAgentOwnerResponse, error)
+
+	// ListAgentReviewsWithResponse List an agent's periodic reviews
+	//
+	// Lists the agent's periodic reviews (INV-06), the latest due first.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/{id}/reviews (the `ListAgentReviews` operationId).
+	ListAgentReviewsWithResponse(ctx context.Context, id AgentId, params *ListAgentReviewsParams, reqEditors ...RequestEditorFn) (*ListAgentReviewsResponse, error)
+
+	// ListAgentTransitionsWithResponse List an agent's lifecycle history
+	//
+	// Lists the agent's lifecycle transitions, newest first: who made each
+	// one, with what reason and comment, and the governance state version it
+	// took (INV-04).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/{id}/transitions (the `ListAgentTransitions` operationId).
+	ListAgentTransitionsWithResponse(ctx context.Context, id AgentId, params *ListAgentTransitionsParams, reqEditors ...RequestEditorFn) (*ListAgentTransitionsResponse, error)
+
+	// TransitionAgentWithBodyWithResponse Take a lifecycle action
+	//
+	// Takes one lifecycle action on the agent, as the lifecycle
+	// specification defines it (docs/architecture/lifecycle.md and
+	// agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+	// itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+	// `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+	// ETag, so that nobody acts on a state they did not see.
+	//
+	// Besides `inventory.view`, each action needs its own permission, within
+	// its scope (permission matrix): `agent.propose` to submit or withdraw,
+	// as the agent's primary owner or one of its delegates;
+	// `usecase.validate` to request changes, reject or validate; and
+	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+	// for the others. The decisions on a proposal (`request_changes`,
+	// `reject` and `validate`) are taken by people, never by a service
+	// account, and nobody decides on a proposal they own, are a delegate of
+	// or created, nor on one whose use case they created (HUM-04): these
+	// refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse. `request_changes`, `reject`, `validate`,
+	// `suspend`, `reinstate` and `retire` need a comment, and a request
+	// without one is refused (`bad_request`).
+	//
+	// A use case can justify several agents. `submit`, `withdraw`,
+	// `request_changes`, `reject` and `validate` change the agent's use case
+	// too, but only while it is neither validated nor rejected: a validated
+	// or rejected use case never changes, because other agents may rely on
+	// it. The decision is then recorded with the agent, and only the agent
+	// changes state. While the agent's use case is rejected, `submit` and
+	// `validate` are refused (`conflict`): the owner takes the agent back to
+	// a draft and links another use case.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/transitions (the `TransitionAgent` operationId).
+	TransitionAgentWithBodyWithResponse(ctx context.Context, id AgentId, params *TransitionAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransitionAgentResponse, error)
+
+	// TransitionAgentWithResponse Take a lifecycle action
+	//
+	// Takes one lifecycle action on the agent, as the lifecycle
+	// specification defines it (docs/architecture/lifecycle.md and
+	// agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+	// itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+	// `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+	// ETag, so that nobody acts on a state they did not see.
+	//
+	// Besides `inventory.view`, each action needs its own permission, within
+	// its scope (permission matrix): `agent.propose` to submit or withdraw,
+	// as the agent's primary owner or one of its delegates;
+	// `usecase.validate` to request changes, reject or validate; and
+	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+	// for the others. The decisions on a proposal (`request_changes`,
+	// `reject` and `validate`) are taken by people, never by a service
+	// account, and nobody decides on a proposal they own, are a delegate of
+	// or created, nor on one whose use case they created (HUM-04): these
+	// refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse. `request_changes`, `reject`, `validate`,
+	// `suspend`, `reinstate` and `retire` need a comment, and a request
+	// without one is refused (`bad_request`).
+	//
+	// A use case can justify several agents. `submit`, `withdraw`,
+	// `request_changes`, `reject` and `validate` change the agent's use case
+	// too, but only while it is neither validated nor rejected: a validated
+	// or rejected use case never changes, because other agents may rely on
+	// it. The decision is then recorded with the agent, and only the agent
+	// changes state. While the agent's use case is rejected, `submit` and
+	// `validate` are refused (`conflict`): the owner takes the agent back to
+	// a draft and links another use case.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/transitions (the `TransitionAgent` operationId).
+	TransitionAgentWithResponse(ctx context.Context, id AgentId, params *TransitionAgentParams, body TransitionAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*TransitionAgentResponse, error)
+
 	// GetAuditCheckpointsWithResponse List signed checkpoints
 	//
 	// Returns stored checkpoints signed over the audit log Merkle tree.
@@ -1449,6 +6610,34 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /audit/keys (the `GetAuditKeys` operationId).
 	GetAuditKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditKeysResponse, error)
 
+	// ListDataCategoriesWithResponse List the data categories
+	//
+	// Lists the categories of data that agents and use cases may name: the
+	// setting `inventory.data_categories`, which administrators edit. They
+	// are keys, which the console translates; it shows a key it does not
+	// know as it is.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /data-categories (the `ListDataCategories` operationId).
+	ListDataCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListDataCategoriesResponse, error)
+
+	// ListInboxItemsWithResponse List the caller's pending work
+	//
+	// Lists the open items addressed to the caller, or to one of the
+	// caller's roles, newest first (UI-09): proposals waiting for
+	// validation, reviews due, sign-offs and ownership transfers, and the
+	// kinds of later plans, such as policy approvals, halt releases and
+	// catalog requests. An item leaves every inbox once someone handles it.
+	// Nobody sees the items about a proposal they may not decide on: one
+	// they own, are a delegate of or created, or one whose use case they
+	// created (HUM-04).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /inbox (the `ListInboxItems` operationId).
+	ListInboxItemsWithResponse(ctx context.Context, params *ListInboxItemsParams, reqEditors ...RequestEditorFn) (*ListInboxItemsResponse, error)
+
 	// GetMeWithResponse Get the calling principal
 	//
 	// Returns the calling principal, their roles, their permissions derived
@@ -1458,6 +6647,80 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /me (the `GetMe` operationId).
 	GetMeWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMeResponse, error)
+
+	// ListReviewsWithResponse List periodic reviews
+	//
+	// Lists the periodic reviews of every agent the caller may see that
+	// match the filters, the earliest due first: for example the overdue
+	// reviews of the dashboard (UI-08), or those waiting for sign-off.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /reviews (the `ListReviews` operationId).
+	ListReviewsWithResponse(ctx context.Context, params *ListReviewsParams, reqEditors ...RequestEditorFn) (*ListReviewsResponse, error)
+
+	// GetReviewWithResponse Get a periodic review
+	//
+	// Returns a periodic review, with the ETag that its completion or
+	// sign-off must send back. An open review lists, as candidates to
+	// disable, the enabled tools and models that the agent has not used
+	// within the setting `lifecycle.review_unused_tooling_days` (CAT-09),
+	// to the callers who may view agents' tooling (permission matrix: not
+	// the user role, and never a break-glass session).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /reviews/{id} (the `GetReview` operationId).
+	GetReviewWithResponse(ctx context.Context, id ReviewId, reqEditors ...RequestEditorFn) (*GetReviewResponse, error)
+
+	// CompleteReviewWithBodyWithResponse Complete a periodic review
+	//
+	// Records the owner's attestation (INV-06): the agent is still needed,
+	// its owner is still right, its data categories are current, its policy
+	// is still adequate and its enabled tooling is still needed. The
+	// attestation names the candidates to disable that the owner keeps; the
+	// owner disables the others in the agent's tooling (plan P1-16). The
+	// agent's primary owner or a delegate completes it (`agent.review`).
+	// When the review needs a sign-off (`signoffRequired`), it then waits
+	// for one; otherwise it is completed and the next review is scheduled.
+	// It needs If-Match with the review's ETag.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /reviews/{id}/completion (the `CompleteReview` operationId).
+	CompleteReviewWithBodyWithResponse(ctx context.Context, id ReviewId, params *CompleteReviewParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompleteReviewResponse, error)
+
+	// CompleteReviewWithResponse Complete a periodic review
+	//
+	// Records the owner's attestation (INV-06): the agent is still needed,
+	// its owner is still right, its data categories are current, its policy
+	// is still adequate and its enabled tooling is still needed. The
+	// attestation names the candidates to disable that the owner keeps; the
+	// owner disables the others in the agent's tooling (plan P1-16). The
+	// agent's primary owner or a delegate completes it (`agent.review`).
+	// When the review needs a sign-off (`signoffRequired`), it then waits
+	// for one; otherwise it is completed and the next review is scheduled.
+	// It needs If-Match with the review's ETag.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /reviews/{id}/completion (the `CompleteReview` operationId).
+	CompleteReviewWithResponse(ctx context.Context, id ReviewId, params *CompleteReviewParams, body CompleteReviewJSONRequestBody, reqEditors ...RequestEditorFn) (*CompleteReviewResponse, error)
+
+	// SignOffReviewWithResponse Sign off a periodic review
+	//
+	// A member of the advisory committee signs off a review that waits for
+	// it, whatever the agent's risk tier: the review's `signoffRequired`,
+	// set from the setting `lifecycle.review_signoff_risk_tiers`, decides
+	// (`agent.review`). The signer is a person, neither the one who
+	// completed the review nor one of the agent's owners (HUM-04). The
+	// review is then completed, and the next one scheduled. It needs
+	// If-Match with the review's ETag.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /reviews/{id}/sign-off (the `SignOffReview` operationId).
+	SignOffReviewWithResponse(ctx context.Context, id ReviewId, params *SignOffReviewParams, reqEditors ...RequestEditorFn) (*SignOffReviewResponse, error)
 
 	// ListServiceAccountsWithResponse List service accounts
 	//
@@ -1544,6 +6807,95 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /tokens/{id} (the `RevokeToken` operationId).
 	RevokeTokenWithResponse(ctx context.Context, id openapi_types.UUID, params *RevokeTokenParams, reqEditors ...RequestEditorFn) (*RevokeTokenResponse, error)
 
+	// ListUseCasesWithResponse List use cases
+	//
+	// Lists the use cases that match every filter given, newest first.
+	// Whoever may see only active agents sees only the use cases of active
+	// agents.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /use-cases (the `ListUseCases` operationId).
+	ListUseCasesWithResponse(ctx context.Context, params *ListUseCasesParams, reqEditors ...RequestEditorFn) (*ListUseCasesResponse, error)
+
+	// CreateUseCaseWithBodyWithResponse Create a use case
+	//
+	// Creates a use case as a draft: the business purpose that justifies one
+	// or more agents (INV-03). Owners create them (`agent.propose`). The
+	// advisory committee decides on a use case through the lifecycle of the
+	// agents it justifies (transitionAgent).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /use-cases (the `CreateUseCase` operationId).
+	CreateUseCaseWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUseCaseResponse, error)
+
+	// CreateUseCaseWithResponse Create a use case
+	//
+	// Creates a use case as a draft: the business purpose that justifies one
+	// or more agents (INV-03). Owners create them (`agent.propose`). The
+	// advisory committee decides on a use case through the lifecycle of the
+	// agents it justifies (transitionAgent).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /use-cases (the `CreateUseCase` operationId).
+	CreateUseCaseWithResponse(ctx context.Context, body CreateUseCaseJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateUseCaseResponse, error)
+
+	// GetUseCaseWithResponse Get a use case
+	//
+	// Returns a use case, with the ETag that a change to it must send back.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /use-cases/{id} (the `GetUseCase` operationId).
+	GetUseCaseWithResponse(ctx context.Context, id UseCaseId, reqEditors ...RequestEditorFn) (*GetUseCaseResponse, error)
+
+	// EditUseCaseWithBodyWithResponse Edit a use case
+	//
+	// Changes the members the request names and keeps the others; an empty
+	// string clears an optional text member. The use case's creator edits it
+	// (`agent.propose`) while it is a draft or changes were requested, and
+	// no agent it justifies waits for a decision; otherwise the edit is
+	// refused (`conflict`), so that the committee decides on what it read.
+	// To change a use case under review, its owner withdraws the proposal.
+	// A validated or rejected use case never changes, because the agents it
+	// justifies rely on what the committee decided: a new use case replaces
+	// it.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /use-cases/{id} (the `EditUseCase` operationId).
+	EditUseCaseWithBodyWithResponse(ctx context.Context, id UseCaseId, params *EditUseCaseParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EditUseCaseResponse, error)
+
+	// EditUseCaseWithResponse Edit a use case
+	//
+	// Changes the members the request names and keeps the others; an empty
+	// string clears an optional text member. The use case's creator edits it
+	// (`agent.propose`) while it is a draft or changes were requested, and
+	// no agent it justifies waits for a decision; otherwise the edit is
+	// refused (`conflict`), so that the committee decides on what it read.
+	// To change a use case under review, its owner withdraws the proposal.
+	// A validated or rejected use case never changes, because the agents it
+	// justifies rely on what the committee decided: a new use case replaces
+	// it.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /use-cases/{id} (the `EditUseCase` operationId).
+	EditUseCaseWithResponse(ctx context.Context, id UseCaseId, params *EditUseCaseParams, body EditUseCaseJSONRequestBody, reqEditors ...RequestEditorFn) (*EditUseCaseResponse, error)
+
+	// ListUseCaseDecisionsWithResponse List the decisions on a use case
+	//
+	// Lists the advisory committee's decisions on the use case, newest
+	// first: validations, rejections and requests for changes, each with its
+	// comment and the agent whose proposal it decided.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /use-cases/{id}/decisions (the `ListUseCaseDecisions` operationId).
+	ListUseCaseDecisionsWithResponse(ctx context.Context, id UseCaseId, params *ListUseCaseDecisionsParams, reqEditors ...RequestEditorFn) (*ListUseCaseDecisionsResponse, error)
+
 	// GetVersionWithResponse Get the version of the running server
 	//
 	// Returns the release version and Git commit of the running server, and
@@ -1554,6 +6906,898 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /version (the `GetVersion` operationId).
 	GetVersionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVersionResponse, error)
+}
+
+type ListAgentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AgentList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAgentsResponse) GetJSON200() *AgentList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAgentsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAgentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAgentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAgentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAgentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ProposeAgentResponse201Headers the declared response headers of an HTTP 201 response for ProposeAgent
+type ProposeAgentResponse201Headers struct {
+	ETag string
+}
+
+type ProposeAgentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Agent
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *ProposeAgentResponse201Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r ProposeAgentResponse) GetJSON201() *Agent {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ProposeAgentResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ProposeAgentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ProposeAgentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ProposeAgentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ProposeAgentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ExportAgentsResponse200Headers the declared response headers of an HTTP 200 response for ExportAgents
+type ExportAgentsResponse200Headers struct {
+	ContentDisposition *string
+}
+
+type ExportAgentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]Agent
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ExportAgentsResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ExportAgentsResponse) GetJSON200() *[]Agent {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ExportAgentsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ExportAgentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportAgentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportAgentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExportAgentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetAgentResponse200Headers the declared response headers of an HTTP 200 response for GetAgent
+type GetAgentResponse200Headers struct {
+	ETag string
+}
+
+type GetAgentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Agent
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetAgentResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAgentResponse) GetJSON200() *Agent {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetAgentResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAgentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAgentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// EditAgentResponse200Headers the declared response headers of an HTTP 200 response for EditAgent
+type EditAgentResponse200Headers struct {
+	ETag string
+}
+
+type EditAgentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Agent
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *EditAgentResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r EditAgentResponse) GetJSON200() *Agent {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r EditAgentResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r EditAgentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EditAgentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EditAgentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EditAgentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAgentActionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AgentActions
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAgentActionsResponse) GetJSON200() *AgentActions {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetAgentActionsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAgentActionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgentActionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgentActionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAgentActionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type AddAgentDelegateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *OwnerAssignment
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r AddAgentDelegateResponse) GetJSON201() *OwnerAssignment {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r AddAgentDelegateResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r AddAgentDelegateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r AddAgentDelegateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AddAgentDelegateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AddAgentDelegateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RemoveAgentDelegateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RemoveAgentDelegateResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RemoveAgentDelegateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RemoveAgentDelegateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RemoveAgentDelegateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RemoveAgentDelegateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListAgentInstancesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *InstanceList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAgentInstancesResponse) GetJSON200() *InstanceList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAgentInstancesResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAgentInstancesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAgentInstancesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAgentInstancesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAgentInstancesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListAgentOwnersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *OwnerAssignmentList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAgentOwnersResponse) GetJSON200() *OwnerAssignmentList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAgentOwnersResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAgentOwnersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAgentOwnersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAgentOwnersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAgentOwnersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RequestOwnershipTransferResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *OwnershipTransfer
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r RequestOwnershipTransferResponse) GetJSON201() *OwnershipTransfer {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RequestOwnershipTransferResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RequestOwnershipTransferResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RequestOwnershipTransferResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RequestOwnershipTransferResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RequestOwnershipTransferResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CancelOwnershipTransferResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CancelOwnershipTransferResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CancelOwnershipTransferResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CancelOwnershipTransferResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CancelOwnershipTransferResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CancelOwnershipTransferResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type AcceptOwnershipTransferResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *OwnershipTransfer
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r AcceptOwnershipTransferResponse) GetJSON200() *OwnershipTransfer {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r AcceptOwnershipTransferResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r AcceptOwnershipTransferResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r AcceptOwnershipTransferResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AcceptOwnershipTransferResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AcceptOwnershipTransferResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeclineOwnershipTransferResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *OwnershipTransfer
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeclineOwnershipTransferResponse) GetJSON200() *OwnershipTransfer {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeclineOwnershipTransferResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeclineOwnershipTransferResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeclineOwnershipTransferResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeclineOwnershipTransferResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeclineOwnershipTransferResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ReassignAgentOwnerResponse200Headers the declared response headers of an HTTP 200 response for ReassignAgentOwner
+type ReassignAgentOwnerResponse200Headers struct {
+	ETag string
+}
+
+type ReassignAgentOwnerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Agent
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ReassignAgentOwnerResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ReassignAgentOwnerResponse) GetJSON200() *Agent {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ReassignAgentOwnerResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ReassignAgentOwnerResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReassignAgentOwnerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReassignAgentOwnerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReassignAgentOwnerResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListAgentReviewsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ReviewList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAgentReviewsResponse) GetJSON200() *ReviewList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAgentReviewsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAgentReviewsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAgentReviewsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAgentReviewsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAgentReviewsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListAgentTransitionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TransitionList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAgentTransitionsResponse) GetJSON200() *TransitionList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAgentTransitionsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAgentTransitionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAgentTransitionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAgentTransitionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAgentTransitionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// TransitionAgentResponse200Headers the declared response headers of an HTTP 200 response for TransitionAgent
+type TransitionAgentResponse200Headers struct {
+	ETag string
+}
+
+type TransitionAgentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Agent
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *TransitionAgentResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r TransitionAgentResponse) GetJSON200() *Agent {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r TransitionAgentResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r TransitionAgentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TransitionAgentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TransitionAgentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TransitionAgentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type GetAuditCheckpointsResponse struct {
@@ -1755,6 +7999,102 @@ func (r GetAuditKeysResponse) ContentType() string {
 	return ""
 }
 
+type ListDataCategoriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DataCategoryList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListDataCategoriesResponse) GetJSON200() *DataCategoryList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListDataCategoriesResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListDataCategoriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDataCategoriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDataCategoriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListDataCategoriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListInboxItemsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *InboxItemList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListInboxItemsResponse) GetJSON200() *InboxItemList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListInboxItemsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListInboxItemsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListInboxItemsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListInboxItemsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListInboxItemsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetMeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1797,6 +8137,219 @@ func (r GetMeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetMeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListReviewsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ReviewList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListReviewsResponse) GetJSON200() *ReviewList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListReviewsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListReviewsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListReviewsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListReviewsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListReviewsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetReviewResponse200Headers the declared response headers of an HTTP 200 response for GetReview
+type GetReviewResponse200Headers struct {
+	ETag string
+}
+
+type GetReviewResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Review
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetReviewResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetReviewResponse) GetJSON200() *Review {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetReviewResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetReviewResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetReviewResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetReviewResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetReviewResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CompleteReviewResponse200Headers the declared response headers of an HTTP 200 response for CompleteReview
+type CompleteReviewResponse200Headers struct {
+	ETag string
+}
+
+type CompleteReviewResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Review
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *CompleteReviewResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CompleteReviewResponse) GetJSON200() *Review {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CompleteReviewResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CompleteReviewResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CompleteReviewResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CompleteReviewResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CompleteReviewResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SignOffReviewResponse200Headers the declared response headers of an HTTP 200 response for SignOffReview
+type SignOffReviewResponse200Headers struct {
+	ETag string
+}
+
+type SignOffReviewResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Review
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SignOffReviewResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SignOffReviewResponse) GetJSON200() *Review {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SignOffReviewResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SignOffReviewResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SignOffReviewResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SignOffReviewResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SignOffReviewResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -2084,6 +8637,267 @@ func (r RevokeTokenResponse) ContentType() string {
 	return ""
 }
 
+type ListUseCasesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UseCaseList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListUseCasesResponse) GetJSON200() *UseCaseList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListUseCasesResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListUseCasesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListUseCasesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListUseCasesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListUseCasesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateUseCaseResponse201Headers the declared response headers of an HTTP 201 response for CreateUseCase
+type CreateUseCaseResponse201Headers struct {
+	ETag string
+}
+
+type CreateUseCaseResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *UseCase
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateUseCaseResponse201Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateUseCaseResponse) GetJSON201() *UseCase {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateUseCaseResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateUseCaseResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateUseCaseResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateUseCaseResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateUseCaseResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetUseCaseResponse200Headers the declared response headers of an HTTP 200 response for GetUseCase
+type GetUseCaseResponse200Headers struct {
+	ETag string
+}
+
+type GetUseCaseResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UseCase
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetUseCaseResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetUseCaseResponse) GetJSON200() *UseCase {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetUseCaseResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetUseCaseResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetUseCaseResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetUseCaseResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetUseCaseResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// EditUseCaseResponse200Headers the declared response headers of an HTTP 200 response for EditUseCase
+type EditUseCaseResponse200Headers struct {
+	ETag string
+}
+
+type EditUseCaseResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UseCase
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *EditUseCaseResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r EditUseCaseResponse) GetJSON200() *UseCase {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r EditUseCaseResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r EditUseCaseResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EditUseCaseResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EditUseCaseResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EditUseCaseResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListUseCaseDecisionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UseCaseDecisionList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListUseCaseDecisionsResponse) GetJSON200() *UseCaseDecisionList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListUseCaseDecisionsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListUseCaseDecisionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListUseCaseDecisionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListUseCaseDecisionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListUseCaseDecisionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetVersionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2130,6 +8944,523 @@ func (r GetVersionResponse) ContentType() string {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
 	return ""
+}
+
+// ListAgentsWithResponse List agents
+//
+// Lists the agents that match every filter given, ordered by slug, one
+// page at a time (INV-09). Whoever may see only active agents, as the
+// user role, sees only those.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents (the `ListAgents` operationId).
+func (c *ClientWithResponses) ListAgentsWithResponse(ctx context.Context, params *ListAgentsParams, reqEditors ...RequestEditorFn) (*ListAgentsResponse, error) {
+	rsp, err := c.ListAgents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAgentsResponse(rsp)
+}
+
+// ProposeAgentWithBodyWithResponse Propose an agent
+//
+// Registers an agent as a draft, lifecycle transition T1, with the
+// mandatory metadata of INV-01 and a use case that is not rejected
+// (INV-03). The caller, an active human with the owner role, becomes its
+// primary owner. A third-party agent without runtime integration is
+// registered the same way, with the kind `third_party`, and has coverage
+// C0 (INV-07).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents (the `ProposeAgent` operationId).
+func (c *ClientWithResponses) ProposeAgentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ProposeAgentResponse, error) {
+	rsp, err := c.ProposeAgentWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseProposeAgentResponse(rsp)
+}
+
+// ProposeAgentWithResponse Propose an agent
+//
+// Registers an agent as a draft, lifecycle transition T1, with the
+// mandatory metadata of INV-01 and a use case that is not rejected
+// (INV-03). The caller, an active human with the owner role, becomes its
+// primary owner. A third-party agent without runtime integration is
+// registered the same way, with the kind `third_party`, and has coverage
+// C0 (INV-07).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents (the `ProposeAgent` operationId).
+func (c *ClientWithResponses) ProposeAgentWithResponse(ctx context.Context, body ProposeAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*ProposeAgentResponse, error) {
+	rsp, err := c.ProposeAgent(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseProposeAgentResponse(rsp)
+}
+
+// ExportAgentsWithResponse Export agents
+//
+// Streams every agent that matches the filters, as CSV or JSON (INV-09),
+// with the visibility of listAgents. It is not paged: it streams its
+// rows (plan P1-04, step 9).
+//
+// CSV has a header row, then one row per agent, with the columns `id`,
+// `slug`, `name`, `description`, `kind`, `source`, `vendor`, `framework`,
+// `deploymentLocation`, `environments`, `riskTier`,
+// `aiActClassification`, `dataCategories`, `useCaseId`,
+// `lifecycleState`, `runState`, `coverage`, `primaryOwnerId`,
+// `primaryOwnerName`, `delegateIds`, `labels`, `haltMode`,
+// `drillEligible`, `createdAt`, `activatedAt` and `retiredAt`. Lists are
+// joined with `;`, and labels are written as `key=value` pairs. A cell,
+// or a part of one that follows a `;`, that starts with `=`, `+`, `-`,
+// `@`, a tab or a carriage return gets a leading `'`, so that
+// spreadsheets never run it as a formula, whatever their list separator
+// (threat model, T-09).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/export (the `ExportAgents` operationId).
+func (c *ClientWithResponses) ExportAgentsWithResponse(ctx context.Context, params *ExportAgentsParams, reqEditors ...RequestEditorFn) (*ExportAgentsResponse, error) {
+	rsp, err := c.ExportAgents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportAgentsResponse(rsp)
+}
+
+// GetAgentWithResponse Get an agent
+//
+// Returns an agent, with the ETag that a change to it must send back.
+// Every change to the agent changes its ETag, including a change to its
+// delegates or to an ownership transfer.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{id} (the `GetAgent` operationId).
+func (c *ClientWithResponses) GetAgentWithResponse(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*GetAgentResponse, error) {
+	rsp, err := c.GetAgent(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentResponse(rsp)
+}
+
+// EditAgentWithBodyWithResponse Edit an agent's metadata
+//
+// Changes the members the request names and keeps the others; an empty
+// string clears an optional text member, but an edit that would leave
+// neither a vendor nor a framework is refused (`bad_request`, INV-01).
+// The agent's owners edit it, and operators edit any agent (permission
+// matrix). The slug and the kind never change; the use case changes only
+// while the agent is a draft, and never to a rejected one; a retired or
+// rejected agent no longer changes (`conflict`). A harness, once
+// declared, can be replaced but not removed. A change to what policies
+// see of the agent (its risk tier, data categories and labels) or to its
+// halt mode takes a new governance state version, so that enforcement
+// points learn of it.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /agents/{id} (the `EditAgent` operationId).
+func (c *ClientWithResponses) EditAgentWithBodyWithResponse(ctx context.Context, id AgentId, params *EditAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EditAgentResponse, error) {
+	rsp, err := c.EditAgentWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEditAgentResponse(rsp)
+}
+
+// EditAgentWithResponse Edit an agent's metadata
+//
+// Changes the members the request names and keeps the others; an empty
+// string clears an optional text member, but an edit that would leave
+// neither a vendor nor a framework is refused (`bad_request`, INV-01).
+// The agent's owners edit it, and operators edit any agent (permission
+// matrix). The slug and the kind never change; the use case changes only
+// while the agent is a draft, and never to a rejected one; a retired or
+// rejected agent no longer changes (`conflict`). A harness, once
+// declared, can be replaced but not removed. A change to what policies
+// see of the agent (its risk tier, data categories and labels) or to its
+// halt mode takes a new governance state version, so that enforcement
+// points learn of it.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /agents/{id} (the `EditAgent` operationId).
+func (c *ClientWithResponses) EditAgentWithResponse(ctx context.Context, id AgentId, params *EditAgentParams, body EditAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*EditAgentResponse, error) {
+	rsp, err := c.EditAgent(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEditAgentResponse(rsp)
+}
+
+// GetAgentActionsWithResponse Get the lifecycle actions open to the caller
+//
+// Lists the lifecycle actions that the agent's state allows, and whether
+// the caller may take each one now. When the caller may not, it says
+// what refuses the action: the caller's permission, separation of
+// duties, or the guards of the lifecycle that do not hold
+// (docs/architecture/lifecycle.md, section 4). The console explains its
+// disabled actions with it. The answer holds for the moment it was
+// computed: transitionAgent checks everything again.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{id}/actions (the `GetAgentActions` operationId).
+func (c *ClientWithResponses) GetAgentActionsWithResponse(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*GetAgentActionsResponse, error) {
+	rsp, err := c.GetAgentActions(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentActionsResponse(rsp)
+}
+
+// AddAgentDelegateWithBodyWithResponse Add a delegate
+//
+// Makes an active human with the owner role a delegate of the agent: the
+// owner role's `own` grants then let them act for its owner (INV-02).
+// Anyone else is refused (`bad_request`). The agent's owners and
+// operators manage its delegates (`agent.metadata.edit`). The agent's
+// ETag changes.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/delegates (the `AddAgentDelegate` operationId).
+func (c *ClientWithResponses) AddAgentDelegateWithBodyWithResponse(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddAgentDelegateResponse, error) {
+	rsp, err := c.AddAgentDelegateWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddAgentDelegateResponse(rsp)
+}
+
+// AddAgentDelegateWithResponse Add a delegate
+//
+// Makes an active human with the owner role a delegate of the agent: the
+// owner role's `own` grants then let them act for its owner (INV-02).
+// Anyone else is refused (`bad_request`). The agent's owners and
+// operators manage its delegates (`agent.metadata.edit`). The agent's
+// ETag changes.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/delegates (the `AddAgentDelegate` operationId).
+func (c *ClientWithResponses) AddAgentDelegateWithResponse(ctx context.Context, id AgentId, body AddAgentDelegateJSONRequestBody, reqEditors ...RequestEditorFn) (*AddAgentDelegateResponse, error) {
+	rsp, err := c.AddAgentDelegate(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddAgentDelegateResponse(rsp)
+}
+
+// RemoveAgentDelegateWithResponse Remove a delegate
+//
+// Ends the principal's assignment as a delegate of the agent, for a
+// reason; the history keeps it. The agent's owners and operators manage
+// its delegates (`agent.metadata.edit`). The agent's ETag changes.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /agents/{id}/delegates/{principalId} (the `RemoveAgentDelegate` operationId).
+func (c *ClientWithResponses) RemoveAgentDelegateWithResponse(ctx context.Context, id AgentId, principalId DelegateId, params *RemoveAgentDelegateParams, reqEditors ...RequestEditorFn) (*RemoveAgentDelegateResponse, error) {
+	rsp, err := c.RemoveAgentDelegate(ctx, id, principalId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveAgentDelegateResponse(rsp)
+}
+
+// ListAgentInstancesWithResponse List an agent's instances
+//
+// Lists the module instances that serve the agent, as enforcement points
+// and other modules report them through the module API, latest
+// connection first. The inventory only reads them: plan P1-07 records
+// them.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{id}/instances (the `ListAgentInstances` operationId).
+func (c *ClientWithResponses) ListAgentInstancesWithResponse(ctx context.Context, id AgentId, params *ListAgentInstancesParams, reqEditors ...RequestEditorFn) (*ListAgentInstancesResponse, error) {
+	rsp, err := c.ListAgentInstances(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAgentInstancesResponse(rsp)
+}
+
+// ListAgentOwnersWithResponse List an agent's owners and their history
+//
+// Lists the agent's primary owner and delegates (INV-02): the current
+// assignments first, then those that ended, newest first.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{id}/owners (the `ListAgentOwners` operationId).
+func (c *ClientWithResponses) ListAgentOwnersWithResponse(ctx context.Context, id AgentId, params *ListAgentOwnersParams, reqEditors ...RequestEditorFn) (*ListAgentOwnersResponse, error) {
+	rsp, err := c.ListAgentOwners(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAgentOwnersResponse(rsp)
+}
+
+// RequestOwnershipTransferWithBodyWithResponse Offer an agent's ownership to someone else
+//
+// Starts a transfer of the agent's primary ownership to another active
+// human with the owner role, who must accept it (INV-02): it waits in
+// their inbox. Anyone else is refused (`bad_request`). Only the primary
+// owner starts one, and an agent has one pending transfer at most. The
+// agent's ETag changes.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/ownership-transfers (the `RequestOwnershipTransfer` operationId).
+func (c *ClientWithResponses) RequestOwnershipTransferWithBodyWithResponse(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestOwnershipTransferResponse, error) {
+	rsp, err := c.RequestOwnershipTransferWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestOwnershipTransferResponse(rsp)
+}
+
+// RequestOwnershipTransferWithResponse Offer an agent's ownership to someone else
+//
+// Starts a transfer of the agent's primary ownership to another active
+// human with the owner role, who must accept it (INV-02): it waits in
+// their inbox. Anyone else is refused (`bad_request`). Only the primary
+// owner starts one, and an agent has one pending transfer at most. The
+// agent's ETag changes.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/ownership-transfers (the `RequestOwnershipTransfer` operationId).
+func (c *ClientWithResponses) RequestOwnershipTransferWithResponse(ctx context.Context, id AgentId, body RequestOwnershipTransferJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestOwnershipTransferResponse, error) {
+	rsp, err := c.RequestOwnershipTransfer(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestOwnershipTransferResponse(rsp)
+}
+
+// CancelOwnershipTransferWithResponse Cancel an ownership transfer
+//
+// Cancels a pending transfer. The primary owner who started it, or an
+// operator, cancels it (`agent.metadata.edit`). The agent's ETag
+// changes.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /agents/{id}/ownership-transfers/{transferId} (the `CancelOwnershipTransfer` operationId).
+func (c *ClientWithResponses) CancelOwnershipTransferWithResponse(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*CancelOwnershipTransferResponse, error) {
+	rsp, err := c.CancelOwnershipTransfer(ctx, id, transferId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCancelOwnershipTransferResponse(rsp)
+}
+
+// AcceptOwnershipTransferWithResponse Accept an ownership transfer
+//
+// The principal that a pending transfer names accepts it, and becomes
+// the agent's primary owner; they need the owner role
+// (`agent.propose`). The former primary owner's assignment ends, the
+// agent's ETag changes, and the agent takes a new governance state
+// version, because policies see the owner.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/ownership-transfers/{transferId}/accept (the `AcceptOwnershipTransfer` operationId).
+func (c *ClientWithResponses) AcceptOwnershipTransferWithResponse(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*AcceptOwnershipTransferResponse, error) {
+	rsp, err := c.AcceptOwnershipTransfer(ctx, id, transferId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAcceptOwnershipTransferResponse(rsp)
+}
+
+// DeclineOwnershipTransferWithResponse Decline an ownership transfer
+//
+// The principal that a pending transfer names declines it; the agent keeps its primary owner, and its ETag changes.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/ownership-transfers/{transferId}/decline (the `DeclineOwnershipTransfer` operationId).
+func (c *ClientWithResponses) DeclineOwnershipTransferWithResponse(ctx context.Context, id AgentId, transferId TransferId, reqEditors ...RequestEditorFn) (*DeclineOwnershipTransferResponse, error) {
+	rsp, err := c.DeclineOwnershipTransfer(ctx, id, transferId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineOwnershipTransferResponse(rsp)
+}
+
+// ReassignAgentOwnerWithBodyWithResponse Reassign an agent's primary owner
+//
+// Makes another active human with the owner role the agent's primary
+// owner at once, for a reason (INV-02): the advisory committee and
+// operators do it, for example after an owner left
+// (`agent.ownership.reassign`). The former primary owner's assignment
+// ends, the new owner stops being a delegate if they were one, and a
+// pending ownership transfer is cancelled. It needs If-Match with the
+// agent's ETag, and takes a new governance state version, because
+// policies see the owner.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /agents/{id}/primary-owner (the `ReassignAgentOwner` operationId).
+func (c *ClientWithResponses) ReassignAgentOwnerWithBodyWithResponse(ctx context.Context, id AgentId, params *ReassignAgentOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReassignAgentOwnerResponse, error) {
+	rsp, err := c.ReassignAgentOwnerWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReassignAgentOwnerResponse(rsp)
+}
+
+// ReassignAgentOwnerWithResponse Reassign an agent's primary owner
+//
+// Makes another active human with the owner role the agent's primary
+// owner at once, for a reason (INV-02): the advisory committee and
+// operators do it, for example after an owner left
+// (`agent.ownership.reassign`). The former primary owner's assignment
+// ends, the new owner stops being a delegate if they were one, and a
+// pending ownership transfer is cancelled. It needs If-Match with the
+// agent's ETag, and takes a new governance state version, because
+// policies see the owner.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /agents/{id}/primary-owner (the `ReassignAgentOwner` operationId).
+func (c *ClientWithResponses) ReassignAgentOwnerWithResponse(ctx context.Context, id AgentId, params *ReassignAgentOwnerParams, body ReassignAgentOwnerJSONRequestBody, reqEditors ...RequestEditorFn) (*ReassignAgentOwnerResponse, error) {
+	rsp, err := c.ReassignAgentOwner(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReassignAgentOwnerResponse(rsp)
+}
+
+// ListAgentReviewsWithResponse List an agent's periodic reviews
+//
+// Lists the agent's periodic reviews (INV-06), the latest due first.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{id}/reviews (the `ListAgentReviews` operationId).
+func (c *ClientWithResponses) ListAgentReviewsWithResponse(ctx context.Context, id AgentId, params *ListAgentReviewsParams, reqEditors ...RequestEditorFn) (*ListAgentReviewsResponse, error) {
+	rsp, err := c.ListAgentReviews(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAgentReviewsResponse(rsp)
+}
+
+// ListAgentTransitionsWithResponse List an agent's lifecycle history
+//
+// Lists the agent's lifecycle transitions, newest first: who made each
+// one, with what reason and comment, and the governance state version it
+// took (INV-04).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{id}/transitions (the `ListAgentTransitions` operationId).
+func (c *ClientWithResponses) ListAgentTransitionsWithResponse(ctx context.Context, id AgentId, params *ListAgentTransitionsParams, reqEditors ...RequestEditorFn) (*ListAgentTransitionsResponse, error) {
+	rsp, err := c.ListAgentTransitions(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAgentTransitionsResponse(rsp)
+}
+
+// TransitionAgentWithBodyWithResponse Take a lifecycle action
+//
+// Takes one lifecycle action on the agent, as the lifecycle
+// specification defines it (docs/architecture/lifecycle.md and
+// agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+// itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+// `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+// ETag, so that nobody acts on a state they did not see.
+//
+// Besides `inventory.view`, each action needs its own permission, within
+// its scope (permission matrix): `agent.propose` to submit or withdraw,
+// as the agent's primary owner or one of its delegates;
+// `usecase.validate` to request changes, reject or validate; and
+// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+// for the others. The decisions on a proposal (`request_changes`,
+// `reject` and `validate`) are taken by people, never by a service
+// account, and nobody decides on a proposal they own, are a delegate of
+// or created, nor on one whose use case they created (HUM-04): these
+// refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse. `request_changes`, `reject`, `validate`,
+// `suspend`, `reinstate` and `retire` need a comment, and a request
+// without one is refused (`bad_request`).
+//
+// A use case can justify several agents. `submit`, `withdraw`,
+// `request_changes`, `reject` and `validate` change the agent's use case
+// too, but only while it is neither validated nor rejected: a validated
+// or rejected use case never changes, because other agents may rely on
+// it. The decision is then recorded with the agent, and only the agent
+// changes state. While the agent's use case is rejected, `submit` and
+// `validate` are refused (`conflict`): the owner takes the agent back to
+// a draft and links another use case.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/transitions (the `TransitionAgent` operationId).
+func (c *ClientWithResponses) TransitionAgentWithBodyWithResponse(ctx context.Context, id AgentId, params *TransitionAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransitionAgentResponse, error) {
+	rsp, err := c.TransitionAgentWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTransitionAgentResponse(rsp)
+}
+
+// TransitionAgentWithResponse Take a lifecycle action
+//
+// Takes one lifecycle action on the agent, as the lifecycle
+// specification defines it (docs/architecture/lifecycle.md and
+// agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+// itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+// `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+// ETag, so that nobody acts on a state they did not see.
+//
+// Besides `inventory.view`, each action needs its own permission, within
+// its scope (permission matrix): `agent.propose` to submit or withdraw,
+// as the agent's primary owner or one of its delegates;
+// `usecase.validate` to request changes, reject or validate; and
+// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+// for the others. The decisions on a proposal (`request_changes`,
+// `reject` and `validate`) are taken by people, never by a service
+// account, and nobody decides on a proposal they own, are a delegate of
+// or created, nor on one whose use case they created (HUM-04): these
+// refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse. `request_changes`, `reject`, `validate`,
+// `suspend`, `reinstate` and `retire` need a comment, and a request
+// without one is refused (`bad_request`).
+//
+// A use case can justify several agents. `submit`, `withdraw`,
+// `request_changes`, `reject` and `validate` change the agent's use case
+// too, but only while it is neither validated nor rejected: a validated
+// or rejected use case never changes, because other agents may rely on
+// it. The decision is then recorded with the agent, and only the agent
+// changes state. While the agent's use case is rejected, `submit` and
+// `validate` are refused (`conflict`): the owner takes the agent back to
+// a draft and links another use case.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/transitions (the `TransitionAgent` operationId).
+func (c *ClientWithResponses) TransitionAgentWithResponse(ctx context.Context, id AgentId, params *TransitionAgentParams, body TransitionAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*TransitionAgentResponse, error) {
+	rsp, err := c.TransitionAgent(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTransitionAgentResponse(rsp)
 }
 
 // GetAuditCheckpointsWithResponse List signed checkpoints
@@ -2194,6 +9525,46 @@ func (c *ClientWithResponses) GetAuditKeysWithResponse(ctx context.Context, reqE
 	return ParseGetAuditKeysResponse(rsp)
 }
 
+// ListDataCategoriesWithResponse List the data categories
+//
+// Lists the categories of data that agents and use cases may name: the
+// setting `inventory.data_categories`, which administrators edit. They
+// are keys, which the console translates; it shows a key it does not
+// know as it is.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /data-categories (the `ListDataCategories` operationId).
+func (c *ClientWithResponses) ListDataCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListDataCategoriesResponse, error) {
+	rsp, err := c.ListDataCategories(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDataCategoriesResponse(rsp)
+}
+
+// ListInboxItemsWithResponse List the caller's pending work
+//
+// Lists the open items addressed to the caller, or to one of the
+// caller's roles, newest first (UI-09): proposals waiting for
+// validation, reviews due, sign-offs and ownership transfers, and the
+// kinds of later plans, such as policy approvals, halt releases and
+// catalog requests. An item leaves every inbox once someone handles it.
+// Nobody sees the items about a proposal they may not decide on: one
+// they own, are a delegate of or created, or one whose use case they
+// created (HUM-04).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /inbox (the `ListInboxItems` operationId).
+func (c *ClientWithResponses) ListInboxItemsWithResponse(ctx context.Context, params *ListInboxItemsParams, reqEditors ...RequestEditorFn) (*ListInboxItemsResponse, error) {
+	rsp, err := c.ListInboxItems(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListInboxItemsResponse(rsp)
+}
+
 // GetMeWithResponse Get the calling principal
 //
 // Returns the calling principal, their roles, their permissions derived
@@ -2208,6 +9579,110 @@ func (c *ClientWithResponses) GetMeWithResponse(ctx context.Context, reqEditors 
 		return nil, err
 	}
 	return ParseGetMeResponse(rsp)
+}
+
+// ListReviewsWithResponse List periodic reviews
+//
+// Lists the periodic reviews of every agent the caller may see that
+// match the filters, the earliest due first: for example the overdue
+// reviews of the dashboard (UI-08), or those waiting for sign-off.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /reviews (the `ListReviews` operationId).
+func (c *ClientWithResponses) ListReviewsWithResponse(ctx context.Context, params *ListReviewsParams, reqEditors ...RequestEditorFn) (*ListReviewsResponse, error) {
+	rsp, err := c.ListReviews(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListReviewsResponse(rsp)
+}
+
+// GetReviewWithResponse Get a periodic review
+//
+// Returns a periodic review, with the ETag that its completion or
+// sign-off must send back. An open review lists, as candidates to
+// disable, the enabled tools and models that the agent has not used
+// within the setting `lifecycle.review_unused_tooling_days` (CAT-09),
+// to the callers who may view agents' tooling (permission matrix: not
+// the user role, and never a break-glass session).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /reviews/{id} (the `GetReview` operationId).
+func (c *ClientWithResponses) GetReviewWithResponse(ctx context.Context, id ReviewId, reqEditors ...RequestEditorFn) (*GetReviewResponse, error) {
+	rsp, err := c.GetReview(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetReviewResponse(rsp)
+}
+
+// CompleteReviewWithBodyWithResponse Complete a periodic review
+//
+// Records the owner's attestation (INV-06): the agent is still needed,
+// its owner is still right, its data categories are current, its policy
+// is still adequate and its enabled tooling is still needed. The
+// attestation names the candidates to disable that the owner keeps; the
+// owner disables the others in the agent's tooling (plan P1-16). The
+// agent's primary owner or a delegate completes it (`agent.review`).
+// When the review needs a sign-off (`signoffRequired`), it then waits
+// for one; otherwise it is completed and the next review is scheduled.
+// It needs If-Match with the review's ETag.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /reviews/{id}/completion (the `CompleteReview` operationId).
+func (c *ClientWithResponses) CompleteReviewWithBodyWithResponse(ctx context.Context, id ReviewId, params *CompleteReviewParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompleteReviewResponse, error) {
+	rsp, err := c.CompleteReviewWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompleteReviewResponse(rsp)
+}
+
+// CompleteReviewWithResponse Complete a periodic review
+//
+// Records the owner's attestation (INV-06): the agent is still needed,
+// its owner is still right, its data categories are current, its policy
+// is still adequate and its enabled tooling is still needed. The
+// attestation names the candidates to disable that the owner keeps; the
+// owner disables the others in the agent's tooling (plan P1-16). The
+// agent's primary owner or a delegate completes it (`agent.review`).
+// When the review needs a sign-off (`signoffRequired`), it then waits
+// for one; otherwise it is completed and the next review is scheduled.
+// It needs If-Match with the review's ETag.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /reviews/{id}/completion (the `CompleteReview` operationId).
+func (c *ClientWithResponses) CompleteReviewWithResponse(ctx context.Context, id ReviewId, params *CompleteReviewParams, body CompleteReviewJSONRequestBody, reqEditors ...RequestEditorFn) (*CompleteReviewResponse, error) {
+	rsp, err := c.CompleteReview(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompleteReviewResponse(rsp)
+}
+
+// SignOffReviewWithResponse Sign off a periodic review
+//
+// A member of the advisory committee signs off a review that waits for
+// it, whatever the agent's risk tier: the review's `signoffRequired`,
+// set from the setting `lifecycle.review_signoff_risk_tiers`, decides
+// (`agent.review`). The signer is a person, neither the one who
+// completed the review nor one of the agent's owners (HUM-04). The
+// review is then completed, and the next one scheduled. It needs
+// If-Match with the review's ETag.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /reviews/{id}/sign-off (the `SignOffReview` operationId).
+func (c *ClientWithResponses) SignOffReviewWithResponse(ctx context.Context, id ReviewId, params *SignOffReviewParams, reqEditors ...RequestEditorFn) (*SignOffReviewResponse, error) {
+	rsp, err := c.SignOffReview(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignOffReviewResponse(rsp)
 }
 
 // ListServiceAccountsWithResponse List service accounts
@@ -2349,6 +9824,137 @@ func (c *ClientWithResponses) RevokeTokenWithResponse(ctx context.Context, id op
 	return ParseRevokeTokenResponse(rsp)
 }
 
+// ListUseCasesWithResponse List use cases
+//
+// Lists the use cases that match every filter given, newest first.
+// Whoever may see only active agents sees only the use cases of active
+// agents.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /use-cases (the `ListUseCases` operationId).
+func (c *ClientWithResponses) ListUseCasesWithResponse(ctx context.Context, params *ListUseCasesParams, reqEditors ...RequestEditorFn) (*ListUseCasesResponse, error) {
+	rsp, err := c.ListUseCases(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListUseCasesResponse(rsp)
+}
+
+// CreateUseCaseWithBodyWithResponse Create a use case
+//
+// Creates a use case as a draft: the business purpose that justifies one
+// or more agents (INV-03). Owners create them (`agent.propose`). The
+// advisory committee decides on a use case through the lifecycle of the
+// agents it justifies (transitionAgent).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /use-cases (the `CreateUseCase` operationId).
+func (c *ClientWithResponses) CreateUseCaseWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUseCaseResponse, error) {
+	rsp, err := c.CreateUseCaseWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateUseCaseResponse(rsp)
+}
+
+// CreateUseCaseWithResponse Create a use case
+//
+// Creates a use case as a draft: the business purpose that justifies one
+// or more agents (INV-03). Owners create them (`agent.propose`). The
+// advisory committee decides on a use case through the lifecycle of the
+// agents it justifies (transitionAgent).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /use-cases (the `CreateUseCase` operationId).
+func (c *ClientWithResponses) CreateUseCaseWithResponse(ctx context.Context, body CreateUseCaseJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateUseCaseResponse, error) {
+	rsp, err := c.CreateUseCase(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateUseCaseResponse(rsp)
+}
+
+// GetUseCaseWithResponse Get a use case
+//
+// Returns a use case, with the ETag that a change to it must send back.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /use-cases/{id} (the `GetUseCase` operationId).
+func (c *ClientWithResponses) GetUseCaseWithResponse(ctx context.Context, id UseCaseId, reqEditors ...RequestEditorFn) (*GetUseCaseResponse, error) {
+	rsp, err := c.GetUseCase(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUseCaseResponse(rsp)
+}
+
+// EditUseCaseWithBodyWithResponse Edit a use case
+//
+// Changes the members the request names and keeps the others; an empty
+// string clears an optional text member. The use case's creator edits it
+// (`agent.propose`) while it is a draft or changes were requested, and
+// no agent it justifies waits for a decision; otherwise the edit is
+// refused (`conflict`), so that the committee decides on what it read.
+// To change a use case under review, its owner withdraws the proposal.
+// A validated or rejected use case never changes, because the agents it
+// justifies rely on what the committee decided: a new use case replaces
+// it.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /use-cases/{id} (the `EditUseCase` operationId).
+func (c *ClientWithResponses) EditUseCaseWithBodyWithResponse(ctx context.Context, id UseCaseId, params *EditUseCaseParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EditUseCaseResponse, error) {
+	rsp, err := c.EditUseCaseWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEditUseCaseResponse(rsp)
+}
+
+// EditUseCaseWithResponse Edit a use case
+//
+// Changes the members the request names and keeps the others; an empty
+// string clears an optional text member. The use case's creator edits it
+// (`agent.propose`) while it is a draft or changes were requested, and
+// no agent it justifies waits for a decision; otherwise the edit is
+// refused (`conflict`), so that the committee decides on what it read.
+// To change a use case under review, its owner withdraws the proposal.
+// A validated or rejected use case never changes, because the agents it
+// justifies rely on what the committee decided: a new use case replaces
+// it.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /use-cases/{id} (the `EditUseCase` operationId).
+func (c *ClientWithResponses) EditUseCaseWithResponse(ctx context.Context, id UseCaseId, params *EditUseCaseParams, body EditUseCaseJSONRequestBody, reqEditors ...RequestEditorFn) (*EditUseCaseResponse, error) {
+	rsp, err := c.EditUseCase(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEditUseCaseResponse(rsp)
+}
+
+// ListUseCaseDecisionsWithResponse List the decisions on a use case
+//
+// Lists the advisory committee's decisions on the use case, newest
+// first: validations, rejections and requests for changes, each with its
+// comment and the agent whose proposal it decided.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /use-cases/{id}/decisions (the `ListUseCaseDecisions` operationId).
+func (c *ClientWithResponses) ListUseCaseDecisionsWithResponse(ctx context.Context, id UseCaseId, params *ListUseCaseDecisionsParams, reqEditors ...RequestEditorFn) (*ListUseCaseDecisionsResponse, error) {
+	rsp, err := c.ListUseCaseDecisions(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListUseCaseDecisionsResponse(rsp)
+}
+
 // GetVersionWithResponse Get the version of the running server
 //
 // Returns the release version and Git commit of the running server, and
@@ -2364,6 +9970,673 @@ func (c *ClientWithResponses) GetVersionWithResponse(ctx context.Context, reqEdi
 		return nil, err
 	}
 	return ParseGetVersionResponse(rsp)
+}
+
+// ParseListAgentsResponse parses an HTTP response from a ListAgentsWithResponse call
+func ParseListAgentsResponse(rsp *http.Response) (*ListAgentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAgentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AgentList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseProposeAgentResponse parses an HTTP response from a ProposeAgentWithResponse call
+func ParseProposeAgentResponse(rsp *http.Response) (*ProposeAgentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ProposeAgentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Agent
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers ProposeAgentResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers201 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseExportAgentsResponse parses an HTTP response from a ExportAgentsWithResponse call
+func ParseExportAgentsResponse(rsp *http.Response) (*ExportAgentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportAgentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Agent
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	case rsp.StatusCode == 200:
+		// Content-type (text/csv) unsupported
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ExportAgentsResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetAgentResponse parses an HTTP response from a GetAgentWithResponse call
+func ParseGetAgentResponse(rsp *http.Response) (*GetAgentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAgentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Agent
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetAgentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseEditAgentResponse parses an HTTP response from a EditAgentWithResponse call
+func ParseEditAgentResponse(rsp *http.Response) (*EditAgentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EditAgentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Agent
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers EditAgentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetAgentActionsResponse parses an HTTP response from a GetAgentActionsWithResponse call
+func ParseGetAgentActionsResponse(rsp *http.Response) (*GetAgentActionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAgentActionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AgentActions
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAddAgentDelegateResponse parses an HTTP response from a AddAgentDelegateWithResponse call
+func ParseAddAgentDelegateResponse(rsp *http.Response) (*AddAgentDelegateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AddAgentDelegateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest OwnerAssignment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRemoveAgentDelegateResponse parses an HTTP response from a RemoveAgentDelegateWithResponse call
+func ParseRemoveAgentDelegateResponse(rsp *http.Response) (*RemoveAgentDelegateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveAgentDelegateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAgentInstancesResponse parses an HTTP response from a ListAgentInstancesWithResponse call
+func ParseListAgentInstancesResponse(rsp *http.Response) (*ListAgentInstancesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAgentInstancesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest InstanceList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAgentOwnersResponse parses an HTTP response from a ListAgentOwnersWithResponse call
+func ParseListAgentOwnersResponse(rsp *http.Response) (*ListAgentOwnersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAgentOwnersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest OwnerAssignmentList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRequestOwnershipTransferResponse parses an HTTP response from a RequestOwnershipTransferWithResponse call
+func ParseRequestOwnershipTransferResponse(rsp *http.Response) (*RequestOwnershipTransferResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RequestOwnershipTransferResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest OwnershipTransfer
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCancelOwnershipTransferResponse parses an HTTP response from a CancelOwnershipTransferWithResponse call
+func ParseCancelOwnershipTransferResponse(rsp *http.Response) (*CancelOwnershipTransferResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CancelOwnershipTransferResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAcceptOwnershipTransferResponse parses an HTTP response from a AcceptOwnershipTransferWithResponse call
+func ParseAcceptOwnershipTransferResponse(rsp *http.Response) (*AcceptOwnershipTransferResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AcceptOwnershipTransferResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest OwnershipTransfer
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeclineOwnershipTransferResponse parses an HTTP response from a DeclineOwnershipTransferWithResponse call
+func ParseDeclineOwnershipTransferResponse(rsp *http.Response) (*DeclineOwnershipTransferResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeclineOwnershipTransferResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest OwnershipTransfer
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReassignAgentOwnerResponse parses an HTTP response from a ReassignAgentOwnerWithResponse call
+func ParseReassignAgentOwnerResponse(rsp *http.Response) (*ReassignAgentOwnerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReassignAgentOwnerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Agent
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ReassignAgentOwnerResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListAgentReviewsResponse parses an HTTP response from a ListAgentReviewsWithResponse call
+func ParseListAgentReviewsResponse(rsp *http.Response) (*ListAgentReviewsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAgentReviewsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ReviewList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAgentTransitionsResponse parses an HTTP response from a ListAgentTransitionsWithResponse call
+func ParseListAgentTransitionsResponse(rsp *http.Response) (*ListAgentTransitionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAgentTransitionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TransitionList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTransitionAgentResponse parses an HTTP response from a TransitionAgentWithResponse call
+func ParseTransitionAgentResponse(rsp *http.Response) (*TransitionAgentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TransitionAgentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Agent
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers TransitionAgentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
 }
 
 // ParseGetAuditCheckpointsResponse parses an HTTP response from a GetAuditCheckpointsWithResponse call
@@ -2505,6 +10778,72 @@ func ParseGetAuditKeysResponse(rsp *http.Response) (*GetAuditKeysResponse, error
 	return response, nil
 }
 
+// ParseListDataCategoriesResponse parses an HTTP response from a ListDataCategoriesWithResponse call
+func ParseListDataCategoriesResponse(rsp *http.Response) (*ListDataCategoriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDataCategoriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DataCategoryList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListInboxItemsResponse parses an HTTP response from a ListInboxItemsWithResponse call
+func ParseListInboxItemsResponse(rsp *http.Response) (*ListInboxItemsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListInboxItemsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest InboxItemList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetMeResponse parses an HTTP response from a GetMeWithResponse call
 func ParseGetMeResponse(rsp *http.Response) (*GetMeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -2533,6 +10872,177 @@ func ParseGetMeResponse(rsp *http.Response) (*GetMeResponse, error) {
 		}
 		response.ApplicationproblemJSONDefault = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseListReviewsResponse parses an HTTP response from a ListReviewsWithResponse call
+func ParseListReviewsResponse(rsp *http.Response) (*ListReviewsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListReviewsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ReviewList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetReviewResponse parses an HTTP response from a GetReviewWithResponse call
+func ParseGetReviewResponse(rsp *http.Response) (*GetReviewResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetReviewResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Review
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetReviewResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCompleteReviewResponse parses an HTTP response from a CompleteReviewWithResponse call
+func ParseCompleteReviewResponse(rsp *http.Response) (*CompleteReviewResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CompleteReviewResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Review
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers CompleteReviewResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseSignOffReviewResponse parses an HTTP response from a SignOffReviewWithResponse call
+func ParseSignOffReviewResponse(rsp *http.Response) (*SignOffReviewResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SignOffReviewResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Review
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers SignOffReviewResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil
@@ -2719,6 +11229,210 @@ func ParseRevokeTokenResponse(rsp *http.Response) (*RevokeTokenResponse, error) 
 	switch {
 	case rsp.StatusCode == 204:
 		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListUseCasesResponse parses an HTTP response from a ListUseCasesWithResponse call
+func ParseListUseCasesResponse(rsp *http.Response) (*ListUseCasesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListUseCasesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UseCaseList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateUseCaseResponse parses an HTTP response from a CreateUseCaseWithResponse call
+func ParseCreateUseCaseResponse(rsp *http.Response) (*CreateUseCaseResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateUseCaseResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest UseCase
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateUseCaseResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers201 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetUseCaseResponse parses an HTTP response from a GetUseCaseWithResponse call
+func ParseGetUseCaseResponse(rsp *http.Response) (*GetUseCaseResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUseCaseResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UseCase
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetUseCaseResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseEditUseCaseResponse parses an HTTP response from a EditUseCaseWithResponse call
+func ParseEditUseCaseResponse(rsp *http.Response) (*EditUseCaseResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EditUseCaseResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UseCase
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers EditUseCaseResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListUseCaseDecisionsResponse parses an HTTP response from a ListUseCaseDecisionsWithResponse call
+func ParseListUseCaseDecisionsResponse(rsp *http.Response) (*ListUseCaseDecisionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListUseCaseDecisionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UseCaseDecisionList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest Problem

@@ -219,6 +219,650 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List agents
+         * @description Lists the agents that match every filter given, ordered by slug, one
+         *     page at a time (INV-09). Whoever may see only active agents, as the
+         *     user role, sees only those.
+         */
+        get: operations["listAgents"];
+        put?: never;
+        /**
+         * Propose an agent
+         * @description Registers an agent as a draft, lifecycle transition T1, with the
+         *     mandatory metadata of INV-01 and a use case that is not rejected
+         *     (INV-03). The caller, an active human with the owner role, becomes its
+         *     primary owner. A third-party agent without runtime integration is
+         *     registered the same way, with the kind `third_party`, and has coverage
+         *     C0 (INV-07).
+         */
+        post: operations["proposeAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export agents
+         * @description Streams every agent that matches the filters, as CSV or JSON (INV-09),
+         *     with the visibility of listAgents. It is not paged: it streams its
+         *     rows (plan P1-04, step 9).
+         *
+         *     CSV has a header row, then one row per agent, with the columns `id`,
+         *     `slug`, `name`, `description`, `kind`, `source`, `vendor`, `framework`,
+         *     `deploymentLocation`, `environments`, `riskTier`,
+         *     `aiActClassification`, `dataCategories`, `useCaseId`,
+         *     `lifecycleState`, `runState`, `coverage`, `primaryOwnerId`,
+         *     `primaryOwnerName`, `delegateIds`, `labels`, `haltMode`,
+         *     `drillEligible`, `createdAt`, `activatedAt` and `retiredAt`. Lists are
+         *     joined with `;`, and labels are written as `key=value` pairs. A cell,
+         *     or a part of one that follows a `;`, that starts with `=`, `+`, `-`,
+         *     `@`, a tab or a carriage return gets a leading `'`, so that
+         *     spreadsheets never run it as a formula, whatever their list separator
+         *     (threat model, T-09).
+         */
+        get: operations["exportAgents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an agent
+         * @description Returns an agent, with the ETag that a change to it must send back.
+         *     Every change to the agent changes its ETag, including a change to its
+         *     delegates or to an ownership transfer.
+         */
+        get: operations["getAgent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit an agent's metadata
+         * @description Changes the members the request names and keeps the others; an empty
+         *     string clears an optional text member, but an edit that would leave
+         *     neither a vendor nor a framework is refused (`bad_request`, INV-01).
+         *     The agent's owners edit it, and operators edit any agent (permission
+         *     matrix). The slug and the kind never change; the use case changes only
+         *     while the agent is a draft, and never to a rejected one; a retired or
+         *     rejected agent no longer changes (`conflict`). A harness, once
+         *     declared, can be replaced but not removed. A change to what policies
+         *     see of the agent (its risk tier, data categories and labels) or to its
+         *     halt mode takes a new governance state version, so that enforcement
+         *     points learn of it.
+         */
+        patch: operations["editAgent"];
+        trace?: never;
+    };
+    "/agents/{id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the lifecycle actions open to the caller
+         * @description Lists the lifecycle actions that the agent's state allows, and whether
+         *     the caller may take each one now. When the caller may not, it says
+         *     what refuses the action: the caller's permission, separation of
+         *     duties, or the guards of the lifecycle that do not hold
+         *     (docs/architecture/lifecycle.md, section 4). The console explains its
+         *     disabled actions with it. The answer holds for the moment it was
+         *     computed: transitionAgent checks everything again.
+         */
+        get: operations["getAgentActions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an agent's lifecycle history
+         * @description Lists the agent's lifecycle transitions, newest first: who made each
+         *     one, with what reason and comment, and the governance state version it
+         *     took (INV-04).
+         */
+        get: operations["listAgentTransitions"];
+        put?: never;
+        /**
+         * Take a lifecycle action
+         * @description Takes one lifecycle action on the agent, as the lifecycle
+         *     specification defines it (docs/architecture/lifecycle.md and
+         *     agent-lifecycle.yaml; INV-04). The transitions that White Tower makes
+         *     itself, `mark_ready`, `unmark_ready`, `auto_suspend` and
+         *     `halt_suspend`, cannot be asked for. It needs If-Match with the agent's
+         *     ETag, so that nobody acts on a state they did not see.
+         *
+         *     Besides `inventory.view`, each action needs its own permission, within
+         *     its scope (permission matrix): `agent.propose` to submit or withdraw,
+         *     as the agent's primary owner or one of its delegates;
+         *     `usecase.validate` to request changes, reject or validate; and
+         *     `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
+         *     for the others. The decisions on a proposal (`request_changes`,
+         *     `reject` and `validate`) are taken by people, never by a service
+         *     account, and nobody decides on a proposal they own, are a delegate of
+         *     or created, nor on one whose use case they created (HUM-04): these
+         *     refusals are `forbidden`. A guard that does not hold answers
+         *     `conflict`, and the detail names it; getAgentActions tells beforehand
+         *     which guards refuse. `request_changes`, `reject`, `validate`,
+         *     `suspend`, `reinstate` and `retire` need a comment, and a request
+         *     without one is refused (`bad_request`).
+         *
+         *     A use case can justify several agents. `submit`, `withdraw`,
+         *     `request_changes`, `reject` and `validate` change the agent's use case
+         *     too, but only while it is neither validated nor rejected: a validated
+         *     or rejected use case never changes, because other agents may rely on
+         *     it. The decision is then recorded with the agent, and only the agent
+         *     changes state. While the agent's use case is rejected, `submit` and
+         *     `validate` are refused (`conflict`): the owner takes the agent back to
+         *     a draft and links another use case.
+         */
+        post: operations["transitionAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an agent's instances
+         * @description Lists the module instances that serve the agent, as enforcement points
+         *     and other modules report them through the module API, latest
+         *     connection first. The inventory only reads them: plan P1-07 records
+         *     them.
+         */
+        get: operations["listAgentInstances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an agent's owners and their history
+         * @description Lists the agent's primary owner and delegates (INV-02): the current
+         *     assignments first, then those that ended, newest first.
+         */
+        get: operations["listAgentOwners"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/primary-owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reassign an agent's primary owner
+         * @description Makes another active human with the owner role the agent's primary
+         *     owner at once, for a reason (INV-02): the advisory committee and
+         *     operators do it, for example after an owner left
+         *     (`agent.ownership.reassign`). The former primary owner's assignment
+         *     ends, the new owner stops being a delegate if they were one, and a
+         *     pending ownership transfer is cancelled. It needs If-Match with the
+         *     agent's ETag, and takes a new governance state version, because
+         *     policies see the owner.
+         */
+        put: operations["reassignAgentOwner"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/delegates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a delegate
+         * @description Makes an active human with the owner role a delegate of the agent: the
+         *     owner role's `own` grants then let them act for its owner (INV-02).
+         *     Anyone else is refused (`bad_request`). The agent's owners and
+         *     operators manage its delegates (`agent.metadata.edit`). The agent's
+         *     ETag changes.
+         */
+        post: operations["addAgentDelegate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/delegates/{principalId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a delegate
+         * @description Ends the principal's assignment as a delegate of the agent, for a
+         *     reason; the history keeps it. The agent's owners and operators manage
+         *     its delegates (`agent.metadata.edit`). The agent's ETag changes.
+         */
+        delete: operations["removeAgentDelegate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/ownership-transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Offer an agent's ownership to someone else
+         * @description Starts a transfer of the agent's primary ownership to another active
+         *     human with the owner role, who must accept it (INV-02): it waits in
+         *     their inbox. Anyone else is refused (`bad_request`). Only the primary
+         *     owner starts one, and an agent has one pending transfer at most. The
+         *     agent's ETag changes.
+         */
+        post: operations["requestOwnershipTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/ownership-transfers/{transferId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel an ownership transfer
+         * @description Cancels a pending transfer. The primary owner who started it, or an
+         *     operator, cancels it (`agent.metadata.edit`). The agent's ETag
+         *     changes.
+         */
+        delete: operations["cancelOwnershipTransfer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/ownership-transfers/{transferId}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept an ownership transfer
+         * @description The principal that a pending transfer names accepts it, and becomes
+         *     the agent's primary owner; they need the owner role
+         *     (`agent.propose`). The former primary owner's assignment ends, the
+         *     agent's ETag changes, and the agent takes a new governance state
+         *     version, because policies see the owner.
+         */
+        post: operations["acceptOwnershipTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/ownership-transfers/{transferId}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline an ownership transfer
+         * @description The principal that a pending transfer names declines it; the agent keeps its primary owner, and its ETag changes.
+         */
+        post: operations["declineOwnershipTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an agent's periodic reviews
+         * @description Lists the agent's periodic reviews (INV-06), the latest due first.
+         */
+        get: operations["listAgentReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/use-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List use cases
+         * @description Lists the use cases that match every filter given, newest first.
+         *     Whoever may see only active agents sees only the use cases of active
+         *     agents.
+         */
+        get: operations["listUseCases"];
+        put?: never;
+        /**
+         * Create a use case
+         * @description Creates a use case as a draft: the business purpose that justifies one
+         *     or more agents (INV-03). Owners create them (`agent.propose`). The
+         *     advisory committee decides on a use case through the lifecycle of the
+         *     agents it justifies (transitionAgent).
+         */
+        post: operations["createUseCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/use-cases/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a use case
+         * @description Returns a use case, with the ETag that a change to it must send back.
+         */
+        get: operations["getUseCase"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a use case
+         * @description Changes the members the request names and keeps the others; an empty
+         *     string clears an optional text member. The use case's creator edits it
+         *     (`agent.propose`) while it is a draft or changes were requested, and
+         *     no agent it justifies waits for a decision; otherwise the edit is
+         *     refused (`conflict`), so that the committee decides on what it read.
+         *     To change a use case under review, its owner withdraws the proposal.
+         *     A validated or rejected use case never changes, because the agents it
+         *     justifies rely on what the committee decided: a new use case replaces
+         *     it.
+         */
+        patch: operations["editUseCase"];
+        trace?: never;
+    };
+    "/use-cases/{id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the decisions on a use case
+         * @description Lists the advisory committee's decisions on the use case, newest
+         *     first: validations, rejections and requests for changes, each with its
+         *     comment and the agent whose proposal it decided.
+         */
+        get: operations["listUseCaseDecisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List periodic reviews
+         * @description Lists the periodic reviews of every agent the caller may see that
+         *     match the filters, the earliest due first: for example the overdue
+         *     reviews of the dashboard (UI-08), or those waiting for sign-off.
+         */
+        get: operations["listReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reviews/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a periodic review
+         * @description Returns a periodic review, with the ETag that its completion or
+         *     sign-off must send back. An open review lists, as candidates to
+         *     disable, the enabled tools and models that the agent has not used
+         *     within the setting `lifecycle.review_unused_tooling_days` (CAT-09),
+         *     to the callers who may view agents' tooling (permission matrix: not
+         *     the user role, and never a break-glass session).
+         */
+        get: operations["getReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reviews/{id}/completion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete a periodic review
+         * @description Records the owner's attestation (INV-06): the agent is still needed,
+         *     its owner is still right, its data categories are current, its policy
+         *     is still adequate and its enabled tooling is still needed. The
+         *     attestation names the candidates to disable that the owner keeps; the
+         *     owner disables the others in the agent's tooling (plan P1-16). The
+         *     agent's primary owner or a delegate completes it (`agent.review`).
+         *     When the review needs a sign-off (`signoffRequired`), it then waits
+         *     for one; otherwise it is completed and the next review is scheduled.
+         *     It needs If-Match with the review's ETag.
+         */
+        post: operations["completeReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reviews/{id}/sign-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign off a periodic review
+         * @description A member of the advisory committee signs off a review that waits for
+         *     it, whatever the agent's risk tier: the review's `signoffRequired`,
+         *     set from the setting `lifecycle.review_signoff_risk_tiers`, decides
+         *     (`agent.review`). The signer is a person, neither the one who
+         *     completed the review nor one of the agent's owners (HUM-04). The
+         *     review is then completed, and the next one scheduled. It needs
+         *     If-Match with the review's ETag.
+         */
+        post: operations["signOffReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/data-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the data categories
+         * @description Lists the categories of data that agents and use cases may name: the
+         *     setting `inventory.data_categories`, which administrators edit. They
+         *     are keys, which the console translates; it shows a key it does not
+         *     know as it is.
+         */
+        get: operations["listDataCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the caller's pending work
+         * @description Lists the open items addressed to the caller, or to one of the
+         *     caller's roles, newest first (UI-09): proposals waiting for
+         *     validation, reviews due, sign-offs and ownership transfers, and the
+         *     kinds of later plans, such as policy approvals, halt releases and
+         *     catalog requests. An item leaves every inbox once someone handles it.
+         *     Nobody sees the items about a proposal they may not decide on: one
+         *     they own, are a delegate of or created, or one whose use case they
+         *     created (HUM-04).
+         */
+        get: operations["listInboxItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -397,6 +1041,559 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /**
+         * @description Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
+         * @enum {string}
+         */
+        LifecycleState: "draft" | "proposed" | "validated" | "ready" | "active" | "suspended" | "retired" | "rejected";
+        /**
+         * @description Whether the agent may act now, or a halt of the agent or of the fleet
+         *     stops it, whatever its lifecycle state (lifecycle, section 2).
+         * @enum {string}
+         */
+        RunState: "running" | "halted";
+        /**
+         * @description Whether the organization builds the agent, or uses a third party's (INV-01).
+         * @enum {string}
+         */
+        AgentKind: "in_house" | "third_party";
+        /**
+         * @description The agent's risk tier. It sets how often the agent is reviewed,
+         *     whether its reviews need a sign-off, and the lease of its enforcement
+         *     points.
+         * @enum {string}
+         */
+        RiskTier: "low" | "medium" | "high" | "critical";
+        /**
+         * @description The classification under the EU AI Act. A use case classified `prohibited` is never validated.
+         * @enum {string}
+         */
+        AiActClassification: "prohibited" | "high_risk" | "limited" | "minimal" | "not_assessed";
+        /**
+         * @description How the agent's enforcement points stop it when it is halted (module contracts, section 5).
+         * @enum {string}
+         */
+        HaltMode: "block" | "interrupt" | "terminate";
+        /**
+         * @description How deeply White Tower governs the agent (INV-08): C0, declared in the
+         *     inventory; C1, it authenticates with White Tower credentials; C2, an
+         *     enforcement point governs it and reports its decisions; C3, a halt or
+         *     a drill of it was confirmed within the configured period.
+         * @enum {string}
+         */
+        CoverageLevel: "C0" | "C1" | "C2" | "C3";
+        /**
+         * @description Why the agent was suspended (lifecycle, transitions T10 to T12).
+         * @enum {string}
+         */
+        SuspensionReason: "manual" | "owner_inactive" | "review_overdue" | "halt";
+        /**
+         * @description An action of the lifecycle, as agent-lifecycle.yaml names it.
+         * @enum {string}
+         */
+        LifecycleAction: "create" | "submit" | "withdraw" | "request_changes" | "reject" | "validate" | "mark_ready" | "unmark_ready" | "activate" | "suspend" | "auto_suspend" | "halt_suspend" | "reinstate" | "retire";
+        /**
+         * @description A lifecycle action that people take; White Tower takes the others itself.
+         * @enum {string}
+         */
+        RequestedAction: "submit" | "withdraw" | "request_changes" | "reject" | "validate" | "activate" | "suspend" | "reinstate" | "retire";
+        /**
+         * @description Where the use case is in the advisory committee's decision.
+         * @enum {string}
+         */
+        UseCaseStatus: "draft" | "submitted" | "changes_requested" | "validated" | "rejected";
+        /**
+         * @description Where the review is: scheduled until the owner completes it, then
+         *     waiting for a sign-off when the agent's risk tier needs one;
+         *     cancelled when the agent is retired.
+         * @enum {string}
+         */
+        ReviewStatus: "scheduled" | "awaiting_signoff" | "completed" | "cancelled";
+        /**
+         * @description Labels, which filters, selector halts and policies use; policies see
+         *     them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
+         *     digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
+         *     Enforcement points receive them with the agent's governance state, so
+         *     they never hold personal data (CORE-9).
+         */
+        Labels: {
+            [key: string]: string;
+        };
+        /**
+         * @description A principal, as the resources that name one show it. The display name
+         *     is absent only where a caller asked to leave names out, as a
+         *     pseudonymized export does.
+         */
+        PrincipalRef: {
+            /** Format: uuid */
+            id: string;
+            displayName?: string;
+            /**
+             * @description An inactive principal no longer owns agents (INV-02, INV-05).
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        /** @description Who made a change, by pseudonymous principal ID. The system is White Tower itself. */
+        Actor: {
+            /** @enum {string} */
+            type: "human" | "service_account" | "breakglass" | "system";
+            /**
+             * Format: uuid
+             * @description The principal's ID; the system has none.
+             */
+            id?: string;
+            /** @description The principal's display name; the system has none. */
+            displayName?: string;
+        };
+        /**
+         * @description The declaration of what confines the agent where it runs. White Tower
+         *     records it in the MVP, and enforces it from Phase 2 (requirements,
+         *     section 5.1.1).
+         */
+        Harness: {
+            description: string;
+        };
+        /** @description Why and since when the agent is suspended, and the state that reinstating it returns to (`from`). */
+        Suspension: {
+            /** @enum {string} */
+            from: "validated" | "ready" | "active";
+            reason: components["schemas"]["SuspensionReason"];
+            /** Format: date-time */
+            at: string;
+        };
+        /**
+         * @description An agent of the inventory, in-house or third-party (INV-01). The
+         *     suspension is present while the agent is suspended, and the harness
+         *     once it is declared. Its ETag changes with every change to the agent,
+         *     its delegates or its ownership transfers.
+         */
+        Agent: {
+            /** Format: uuid */
+            id: string;
+            /** @description The agent's unique, readable key, which never changes. */
+            slug: string;
+            name: string;
+            description: string;
+            kind: components["schemas"]["AgentKind"];
+            /**
+             * @description How the agent entered the inventory; `discovered` is reserved for Phase 3.
+             * @enum {string}
+             */
+            source: "registered" | "imported" | "discovered";
+            vendor?: string;
+            framework?: string;
+            deploymentLocation?: string;
+            environments: string[];
+            riskTier: components["schemas"]["RiskTier"];
+            aiActClassification: components["schemas"]["AiActClassification"];
+            /** @description The categories of data the agent accesses, from the setting `inventory.data_categories`. */
+            dataCategories: string[];
+            /**
+             * Format: uuid
+             * @description The use case that justifies the agent (INV-03).
+             */
+            useCaseId: string;
+            lifecycleState: components["schemas"]["LifecycleState"];
+            suspension?: components["schemas"]["Suspension"];
+            runState: components["schemas"]["RunState"];
+            coverage: components["schemas"]["CoverageLevel"];
+            harness?: components["schemas"]["Harness"];
+            labels: components["schemas"]["Labels"];
+            haltMode: components["schemas"]["HaltMode"];
+            /** @description Whether the agent's owner lets kill-switch drills halt it (KIL-09). */
+            drillEligible: boolean;
+            primaryOwner: components["schemas"]["PrincipalRef"];
+            delegates: components["schemas"]["PrincipalRef"][];
+            pendingOwnershipTransfer?: components["schemas"]["OwnershipTransfer"];
+            createdBy: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            activatedAt?: string;
+            /** Format: date-time */
+            retiredAt?: string;
+        };
+        AgentList: {
+            agents: components["schemas"]["Agent"][];
+            nextCursor?: string | null;
+        };
+        /**
+         * @description A new agent: the mandatory metadata of INV-01, of which the vendor or
+         *     the framework, at least one of them, and its options. The AI Act
+         *     classification is `not_assessed`, the halt mode `interrupt` and drills
+         *     not allowed, unless the request says otherwise.
+         */
+        ProposeAgentRequest: {
+            /** @description Lowercase letters, digits and inner hyphens, 63 characters at most; unique, and never changed. */
+            slug: string;
+            name: string;
+            description: string;
+            kind: components["schemas"]["AgentKind"];
+            vendor?: string;
+            framework?: string;
+            deploymentLocation: string;
+            /** @description Where the agent runs, such as `production`; lowercase letters, digits and inner hyphens. */
+            environments: string[];
+            riskTier: components["schemas"]["RiskTier"];
+            aiActClassification?: components["schemas"]["AiActClassification"];
+            /** @description The categories of data the agent accesses, from the setting `inventory.data_categories`. */
+            dataCategories: string[];
+            /** Format: uuid */
+            useCaseId: string;
+            labels?: components["schemas"]["Labels"];
+            harness?: components["schemas"]["Harness"];
+            haltMode?: components["schemas"]["HaltMode"];
+            drillEligible?: boolean;
+        };
+        /** @description The members to change; the others keep their values (editAgent). */
+        EditAgentRequest: {
+            name?: string;
+            description?: string;
+            vendor?: string;
+            framework?: string;
+            deploymentLocation?: string;
+            environments?: string[];
+            riskTier?: components["schemas"]["RiskTier"];
+            aiActClassification?: components["schemas"]["AiActClassification"];
+            dataCategories?: string[];
+            /** Format: uuid */
+            useCaseId?: string;
+            labels?: components["schemas"]["Labels"];
+            harness?: components["schemas"]["Harness"];
+            haltMode?: components["schemas"]["HaltMode"];
+            drillEligible?: boolean;
+        };
+        TransitionRequest: {
+            action: components["schemas"]["RequestedAction"];
+            /**
+             * @description Why. `request_changes`, `reject`, `validate`, `suspend`,
+             *     `reinstate` and `retire` need one, and a decision's comment is
+             *     also the use case decision's. The agent's history shows it; its
+             *     audit event records only that it was given.
+             */
+            comment?: string;
+        };
+        AgentActions: {
+            lifecycleState: components["schemas"]["LifecycleState"];
+            actions: components["schemas"]["AgentAction"][];
+        };
+        AgentAction: {
+            action: components["schemas"]["RequestedAction"];
+            /** @description The transition's ID in the lifecycle specification. */
+            transition: string;
+            /** @description Whether the caller may take the action now. */
+            available: boolean;
+            commentRequired: boolean;
+            /**
+             * @description What refuses the action, empty when it is available: `permission`
+             *     when the caller's roles, the scope of their grant (own, active
+             *     only, sign-off) or their kind (people take decisions) do not allow
+             *     it; `not_owner_or_creator` when separation of duties does (HUM-04);
+             *     otherwise the guards of the lifecycle that do not hold, as
+             *     agent-lifecycle.yaml names them: `metadata_complete`,
+             *     `owner_active`, `use_case_not_prohibited`, `use_case_not_rejected`,
+             *     `use_case_validated`, `agent_policy_active`, `harness_declared`,
+             *     `not_halted`, `review_not_overdue` and
+             *     `previous_state_invariants_hold`. A client shows a value it does
+             *     not know as a generic refusal.
+             */
+            refusedBy: string[];
+        };
+        /**
+         * @description One transition of an agent's lifecycle. `fromState` is absent for the
+         *     agent's creation, T1, and `reason` is present for a suspension.
+         */
+        Transition: {
+            /** Format: uuid */
+            id: string;
+            transition: string;
+            action: components["schemas"]["LifecycleAction"];
+            fromState?: components["schemas"]["LifecycleState"];
+            toState: components["schemas"]["LifecycleState"];
+            actor: components["schemas"]["Actor"];
+            reason?: components["schemas"]["SuspensionReason"];
+            comment?: string;
+            /**
+             * Format: int64
+             * @description The governance state version that the transition took.
+             */
+            stateVersion: number;
+            /** Format: date-time */
+            occurredAt: string;
+        };
+        TransitionList: {
+            transitions: components["schemas"]["Transition"][];
+            nextCursor?: string | null;
+        };
+        /** @description An instance of a module, such as an enforcement point, that serves the agent. */
+        Instance: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            moduleId: string;
+            moduleSlug: string;
+            /** @description The instance's key, unique within its module. */
+            instanceKey: string;
+            moduleVersion: string;
+            /** @description The version of the module contracts that the instance speaks. */
+            contractVersion: string;
+            host?: string;
+            /** @enum {string} */
+            status: "connected" | "disconnected" | "lost";
+            /** Format: date-time */
+            connectedAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            /** Format: date-time */
+            disconnectedAt?: string;
+            /**
+             * Format: int64
+             * @description The version of the agent's policy bundle that the instance applies.
+             */
+            activeBundleVersion?: number;
+            /**
+             * Format: int64
+             * @description The last governance state version of the agent that the instance applied.
+             */
+            observedStateVersion?: number;
+        };
+        InstanceList: {
+            instances: components["schemas"]["Instance"][];
+            nextCursor?: string | null;
+        };
+        /** @description A principal's assignment as an agent's primary owner or delegate; an ended one records who ended it, and why. */
+        OwnerAssignment: {
+            /** Format: uuid */
+            id: string;
+            principal: components["schemas"]["PrincipalRef"];
+            /** @enum {string} */
+            role: "primary" | "delegate";
+            assignedBy: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            assignedAt: string;
+            endedBy?: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            endedAt?: string;
+            /**
+             * @description Why the assignment ended: the reason of a reassignment or of a
+             *     delegate's removal, or `ownership transferred` when the new owner
+             *     accepted a transfer.
+             */
+            endReason?: string;
+        };
+        OwnerAssignmentList: {
+            owners: components["schemas"]["OwnerAssignment"][];
+            nextCursor?: string | null;
+        };
+        AddDelegateRequest: {
+            /** Format: uuid */
+            principalId: string;
+        };
+        ReassignOwnerRequest: {
+            /**
+             * Format: uuid
+             * @description The new primary owner.
+             */
+            principalId: string;
+            reason: string;
+        };
+        RequestOwnershipTransferRequest: {
+            /**
+             * Format: uuid
+             * @description The principal offered the agent's ownership.
+             */
+            principalId: string;
+        };
+        /** @description An offer of an agent's primary ownership, from its primary owner to another principal, who accepts or declines it. */
+        OwnershipTransfer: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            agentId: string;
+            from: components["schemas"]["PrincipalRef"];
+            to: components["schemas"]["PrincipalRef"];
+            requestedBy: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            requestedAt: string;
+            /**
+             * @description Where the transfer is; `expired` is reserved, as nothing expires a transfer yet.
+             * @enum {string}
+             */
+            status: "pending" | "accepted" | "declined" | "cancelled" | "expired";
+            /** Format: date-time */
+            decidedAt?: string;
+        };
+        /**
+         * @description The business purpose that justifies one or more agents (INV-03). Its
+         *     conditions are those under which the agents it justifies may run,
+         *     which the advisory committee validates with it.
+         */
+        UseCase: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            description: string;
+            businessJustification: string;
+            dataCategories: string[];
+            /** @description Who the work of its agents affects. */
+            affectedPersons?: string;
+            aiActClassification: components["schemas"]["AiActClassification"];
+            conditions?: string;
+            status: components["schemas"]["UseCaseStatus"];
+            createdBy: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        UseCaseList: {
+            useCases: components["schemas"]["UseCase"][];
+            nextCursor?: string | null;
+        };
+        /** @description A new use case. Its AI Act classification is `not_assessed` unless the request says otherwise. */
+        CreateUseCaseRequest: {
+            title: string;
+            description: string;
+            businessJustification: string;
+            /** @description Categories from the setting `inventory.data_categories`. */
+            dataCategories: string[];
+            affectedPersons?: string;
+            aiActClassification?: components["schemas"]["AiActClassification"];
+            conditions?: string;
+        };
+        /** @description The members to change; the others keep their values (editUseCase). */
+        EditUseCaseRequest: {
+            title?: string;
+            description?: string;
+            businessJustification?: string;
+            dataCategories?: string[];
+            affectedPersons?: string;
+            aiActClassification?: components["schemas"]["AiActClassification"];
+            conditions?: string;
+        };
+        /** @description A decision of the advisory committee on a use case, made on an agent's proposal. */
+        UseCaseDecision: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            decision: "validated" | "rejected" | "changes_requested";
+            comment: string;
+            /**
+             * Format: uuid
+             * @description The agent whose proposal was decided.
+             */
+            agentId?: string;
+            decidedBy: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            decidedAt: string;
+        };
+        UseCaseDecisionList: {
+            decisions: components["schemas"]["UseCaseDecision"][];
+            nextCursor?: string | null;
+        };
+        /**
+         * @description A periodic review of an agent (INV-06). Once its grace period ends
+         *     while it is still open, the agent is suspended (INV-05). The
+         *     candidates to disable, and those the owner kept, are tooling: only
+         *     the callers who may view agents' tooling see them (permission matrix:
+         *     not the user role, and never a break-glass session), and lists leave
+         *     the candidates out.
+         */
+        Review: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            agentId: string;
+            status: components["schemas"]["ReviewStatus"];
+            /** Format: date-time */
+            dueAt: string;
+            /** Format: date-time */
+            graceEndsAt: string;
+            /** @description Whether the review is open past its due date. */
+            overdue: boolean;
+            signoffRequired: boolean;
+            attestation?: components["schemas"]["ReviewAttestation"];
+            completedBy?: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            completedAt?: string;
+            signedOffBy?: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            signedOffAt?: string;
+            /** @description For an open review, the enabled tools and models that the agent has not used recently (CAT-09). */
+            unusedTooling?: components["schemas"]["UnusedTooling"][];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description An enabled tool or model that the agent has not used recently, a candidate to disable (CAT-09). */
+        UnusedTooling: {
+            /** @description The key of the tool or model in the catalog (RFC-0002, section 3). */
+            key: string;
+            /** @enum {string} */
+            kind: "tool" | "model";
+            /**
+             * Format: date-time
+             * @description When the agent last used it; absent if it never did.
+             */
+            lastUsedAt?: string;
+        };
+        /**
+         * @description The owner's attestation (INV-06). Each statement must be true: an
+         *     agent no longer needed is retired instead, an agent whose owner is no
+         *     longer right gets another one, and its data categories and policy are
+         *     brought up to date before the review is completed.
+         */
+        ReviewAttestation: {
+            stillNeeded: boolean;
+            ownerStillRight: boolean;
+            dataCategoriesCurrent: boolean;
+            policyAdequate: boolean;
+            toolingStillNeeded: boolean;
+            /** @description The keys of the candidates to disable that the owner keeps; none when absent. */
+            keptTooling?: string[];
+            comment?: string;
+        };
+        ReviewList: {
+            reviews: components["schemas"]["Review"][];
+            nextCursor?: string | null;
+        };
+        /** @description Work that waits for the caller, addressed to them or to one of their roles. */
+        InboxItem: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description What waits: `use_case_validation`, `policy_approval`,
+             *     `review_due`, `review_signoff`, `halt_release`,
+             *     `ownership_transfer` or `module_approval`. Later plans add kinds,
+             *     and a client shows a kind it does not know generically.
+             */
+            kind: string;
+            /** @description The kind of resource the item is about, such as `agent`, `review` or `ownership_transfer`. */
+            subjectType: string;
+            /** Format: uuid */
+            subjectId: string;
+            /**
+             * Format: uuid
+             * @description The agent the item is about, when there is one.
+             */
+            agentId?: string;
+            /**
+             * @description The caller's role that the item is addressed to; absent when it is addressed to the caller.
+             * @enum {string}
+             */
+            role?: "steering" | "advisory" | "owner" | "user" | "operator" | "auditor" | "admin";
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DataCategoryList: {
+            dataCategories: string[];
+        };
+        InboxItemList: {
+            items: components["schemas"]["InboxItem"][];
+            nextCursor?: string | null;
+        };
     };
     responses: {
         /** @description An error, as RFC 9457 problem details. */
@@ -409,9 +1606,52 @@ export interface components {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        /** @description The agent's ID. */
+        AgentId: string;
+        /** @description The use case's ID. */
+        UseCaseId: string;
+        /** @description The review's ID. */
+        ReviewId: string;
+        /** @description The ownership transfer's ID. */
+        TransferId: string;
+        /** @description The delegate's principal ID. */
+        DelegateId: string;
+        /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+        Cursor: string;
+        /** @description The page size. */
+        Limit: number;
+        /**
+         * @description The ETag of the version the change applies to (API-03). A change
+         *     without it is refused with `precondition_required`, and one with an
+         *     ETag that is no longer current with `precondition_failed` (threat
+         *     model, T-08).
+         */
+        IfMatch: string;
+        /** @description Agents in any of these lifecycle states. */
+        AgentStateFilter: components["schemas"]["LifecycleState"][];
+        /** @description Agents whose primary owner or one of whose delegates is this principal. */
+        AgentOwnerFilter: string;
+        /** @description Agents in any of these risk tiers. */
+        AgentRiskTierFilter: components["schemas"]["RiskTier"][];
+        /** @description Agents deployed in this environment. */
+        AgentEnvironmentFilter: string;
+        /** @description Agents at any of these coverage levels. */
+        AgentCoverageFilter: components["schemas"]["CoverageLevel"][];
+        /** @description Agents that carry every one of these labels, each written as `key=value`. */
+        AgentLabelFilter: string[];
+        /** @description Agents that this use case justifies. */
+        AgentUseCaseFilter: string;
+        /** @description Text to look for in the slug, the name and the description. */
+        AgentSearch: string;
+    };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description A strong tag of the resource's version, which a change to it sends back in If-Match (API-03). */
+        ETag: string;
+        /** @description The name to save the export as, `agents.csv` or `agents.json`. */
+        ContentDisposition: string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -711,6 +1951,876 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgents: {
+        parameters: {
+            query?: {
+                /** @description Agents in any of these lifecycle states. */
+                state?: components["parameters"]["AgentStateFilter"];
+                /** @description Agents whose primary owner or one of whose delegates is this principal. */
+                ownerId?: components["parameters"]["AgentOwnerFilter"];
+                /** @description Agents in any of these risk tiers. */
+                riskTier?: components["parameters"]["AgentRiskTierFilter"];
+                /** @description Agents deployed in this environment. */
+                environment?: components["parameters"]["AgentEnvironmentFilter"];
+                /** @description Agents at any of these coverage levels. */
+                coverage?: components["parameters"]["AgentCoverageFilter"];
+                /** @description Agents that carry every one of these labels, each written as `key=value`. */
+                label?: components["parameters"]["AgentLabelFilter"];
+                /** @description Agents that this use case justifies. */
+                useCaseId?: components["parameters"]["AgentUseCaseFilter"];
+                /** @description Text to look for in the slug, the name and the description. */
+                q?: components["parameters"]["AgentSearch"];
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of agents. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    proposeAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeAgentRequest"];
+            };
+        };
+        responses: {
+            /** @description The new agent. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agent"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    exportAgents: {
+        parameters: {
+            query?: {
+                /** @description The format of the export. */
+                format?: "csv" | "json";
+                /**
+                 * @description Leaves out the names of people, and keeps their pseudonymous IDs
+                 *     (NFR-20): the CSV column `primaryOwnerName` stays empty, and the
+                 *     JSON holds no display name.
+                 */
+                pseudonymize?: boolean;
+                /** @description Agents in any of these lifecycle states. */
+                state?: components["parameters"]["AgentStateFilter"];
+                /** @description Agents whose primary owner or one of whose delegates is this principal. */
+                ownerId?: components["parameters"]["AgentOwnerFilter"];
+                /** @description Agents in any of these risk tiers. */
+                riskTier?: components["parameters"]["AgentRiskTierFilter"];
+                /** @description Agents deployed in this environment. */
+                environment?: components["parameters"]["AgentEnvironmentFilter"];
+                /** @description Agents at any of these coverage levels. */
+                coverage?: components["parameters"]["AgentCoverageFilter"];
+                /** @description Agents that carry every one of these labels, each written as `key=value`. */
+                label?: components["parameters"]["AgentLabelFilter"];
+                /** @description Agents that this use case justifies. */
+                useCaseId?: components["parameters"]["AgentUseCaseFilter"];
+                /** @description Text to look for in the slug, the name and the description. */
+                q?: components["parameters"]["AgentSearch"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The agents, as CSV or as a JSON array of agents. */
+            200: {
+                headers: {
+                    "Content-Disposition": components["headers"]["ContentDisposition"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                    "application/json": components["schemas"]["Agent"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The agent. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agent"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    editAgent: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditAgentRequest"];
+            };
+        };
+        responses: {
+            /** @description The agent, changed. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agent"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAgentActions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The actions the agent's state allows. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentActions"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgentTransitions: {
+        parameters: {
+            query?: {
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the agent's transitions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransitionList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    transitionAgent: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description The agent, in its new state. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agent"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgentInstances: {
+        parameters: {
+            query?: {
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the agent's instances. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstanceList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgentOwners: {
+        parameters: {
+            query?: {
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the agent's owner assignments. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerAssignmentList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    reassignAgentOwner: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReassignOwnerRequest"];
+            };
+        };
+        responses: {
+            /** @description The agent, with its new primary owner. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agent"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addAgentDelegate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddDelegateRequest"];
+            };
+        };
+        responses: {
+            /** @description The delegate's assignment. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerAssignment"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeAgentDelegate: {
+        parameters: {
+            query?: {
+                /** @description Why the assignment ends. A request without a reason is refused (`bad_request`). */
+                reason?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+                /** @description The delegate's principal ID. */
+                principalId: components["parameters"]["DelegateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delegate was removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    requestOwnershipTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestOwnershipTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description The pending transfer. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipTransfer"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    cancelOwnershipTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+                /** @description The ownership transfer's ID. */
+                transferId: components["parameters"]["TransferId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The transfer was cancelled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    acceptOwnershipTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+                /** @description The ownership transfer's ID. */
+                transferId: components["parameters"]["TransferId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accepted transfer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipTransfer"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    declineOwnershipTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+                /** @description The ownership transfer's ID. */
+                transferId: components["parameters"]["TransferId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The declined transfer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipTransfer"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgentReviews: {
+        parameters: {
+            query?: {
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the agent's reviews. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listUseCases: {
+        parameters: {
+            query?: {
+                /** @description Use cases in any of these statuses. */
+                status?: components["schemas"]["UseCaseStatus"][];
+                /** @description Text to look for in the title and the description. */
+                q?: string;
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of use cases. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UseCaseList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createUseCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUseCaseRequest"];
+            };
+        };
+        responses: {
+            /** @description The new use case. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UseCase"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getUseCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The use case's ID. */
+                id: components["parameters"]["UseCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The use case. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UseCase"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    editUseCase: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The use case's ID. */
+                id: components["parameters"]["UseCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditUseCaseRequest"];
+            };
+        };
+        responses: {
+            /** @description The use case, changed. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UseCase"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listUseCaseDecisions: {
+        parameters: {
+            query?: {
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description The use case's ID. */
+                id: components["parameters"]["UseCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of decisions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UseCaseDecisionList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listReviews: {
+        parameters: {
+            query?: {
+                /** @description Reviews in any of these statuses. */
+                status?: components["schemas"]["ReviewStatus"][];
+                /** @description Only the open reviews past their due date, or only the others. */
+                overdue?: boolean;
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of reviews. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The review's ID. */
+                id: components["parameters"]["ReviewId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The review. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Review"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    completeReview: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The review's ID. */
+                id: components["parameters"]["ReviewId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewAttestation"];
+            };
+        };
+        responses: {
+            /** @description The review, completed or waiting for its sign-off. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Review"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    signOffReview: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The review's ID. */
+                id: components["parameters"]["ReviewId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The completed review. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Review"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listDataCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The data categories. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataCategoryList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listInboxItems: {
+        parameters: {
+            query?: {
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of inbox items. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItemList"];
                 };
             };
             default: components["responses"]["Problem"];

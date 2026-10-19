@@ -25,6 +25,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/api/rest/problem"
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
+	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
@@ -215,15 +216,7 @@ func TestEveryOperationIsGuarded(t *testing.T) {
 		t.Fatal("no operation found in the document")
 	}
 	for _, op := range ops {
-		path := BasePath + op.Path
-		for strings.Contains(path, "{") {
-			start, end := strings.Index(path, "{"), strings.Index(path, "}")
-			path = path[:start] + olivia + path[end+1:]
-		}
-		body := func() io.Reader { return nil }
-		if op.Method == http.MethodPost || op.Method == http.MethodPut || op.Method == http.MethodPatch {
-			body = func() io.Reader { return strings.NewReader("{}") }
-		}
+		path, body := target(op)
 		anonymous := call(h, op.Method, path, "", nil, body())
 		denied := call(h, op.Method, path, olivia, nil, body())
 		switch {
@@ -233,6 +226,54 @@ func TestEveryOperationIsGuarded(t *testing.T) {
 			t.Errorf("%s: anonymous call got %d, want 401", op.ID, anonymous.status)
 		case !op.Public && denied.status != http.StatusForbidden:
 			t.Errorf("%s: call the authorizer denies got %d, want 403", op.ID, denied.status)
+		}
+	}
+}
+
+// target is where a test calls op: its path, every parameter of which is an
+// ID, and an empty JSON object as the body of a method that takes one.
+func target(op operation) (string, func() io.Reader) {
+	path := BasePath + op.Path
+	for strings.Contains(path, "{") {
+		start, end := strings.Index(path, "{"), strings.Index(path, "}")
+		path = path[:start] + olivia + path[end+1:]
+	}
+	body := func() io.Reader { return nil }
+	if op.Method == http.MethodPost || op.Method == http.MethodPut || op.Method == http.MethodPatch {
+		body = func() io.Reader { return strings.NewReader("{}") }
+	}
+	return path, body
+}
+
+// Every operation that is not public maps to a permission: the authorizer
+// refuses an operation it does not know to everyone.
+func TestEveryOperationHasAPermission(t *testing.T) {
+	az := authz.NewAuthorizer()
+	for _, op := range operations() {
+		if _, ok := az.ResolveOperation(op.ID); !op.Public && !ok {
+			t.Errorf("%s maps to no permission", op.ID)
+		}
+	}
+}
+
+// Security test ST-20: A break-glass session changes nothing: the authorizer
+// refuses it every operation of the document that is not a read, so a new
+// one is covered without a list to keep up to date.
+func TestBreakglassCallsNoOperationThatChangesState(t *testing.T) {
+	az := authz.NewAuthorizer()
+	custodian := &auth.Principal{
+		ID:           authn.BreakglassPrincipalID.String(),
+		Kind:         auth.Human,
+		Roles:        []string{string(authz.RoleOperator)},
+		Scopes:       authn.BreakglassScopes,
+		IsBreakglass: true,
+	}
+	for _, op := range operations() {
+		if op.Public || op.Method == http.MethodGet {
+			continue
+		}
+		if err := az.Authorize(context.Background(), custodian, op.ID); !errors.Is(err, auth.ErrDenied) {
+			t.Errorf("%s: break-glass got %v, want refused", op.ID, err)
 		}
 	}
 }
