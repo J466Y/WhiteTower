@@ -48,7 +48,13 @@ When an agent running on Kubernetes is halted, its pods lose network access with
 
 ### 3. Deny rules per CNI
 
-One cluster-wide rule per halted agent, named deterministically (`whitetower-quarantine-<agent-id>`), selecting pods by the label `whitetower.io/agent-id` (the prefix follows the domain decision of open question Q6). A fleet halt uses one rule selecting every pod that carries the label.
+One cluster-wide rule per halt, rather than one per halted agent, named deterministically (`whitetower-quarantine-<halt-id>`), selecting pods by the label `whitetower.io/agent-id` (the prefix follows the domain decision of open question Q6), as the halt path's [design note](P1-08-kill-switch.md#progress-notes) says (section 14):
+
+- an agent halt's rule selects that agent's pods;
+- a selector halt's rule selects its agents' pods with a set-based selector on the label (`In`, with the agents' IDs), updated as agents join the halt;
+- a fleet halt keeps its single rule, which selects every pod that carries the label.
+
+The controller sizes the rate limit of its Kubernetes client for bursts of halts: at client-go's default of 5 requests per second, 500 rules would take about 100 seconds, against NFR-23's maximum of 10 seconds.
 
 Each rule denies all ingress and egress, with two exceptions:
 
@@ -64,7 +70,7 @@ Each rule denies all ingress and egress, with two exceptions:
 
 **No DNS during a quarantine** ([threat model](../../security/threat-model.md), DC-7): DNS can carry data out, and the halt path does not need it, because the enforcement point reconnects to the core's last resolved addresses (P1-09). On a CNI with DNS-aware rules, such as Cilium, an option allows lookups of the core's name only.
 
-**Done when:** each template isolates a test pod except for the core and node probes, on a cluster running that CNI.
+**Done when:** each template isolates a test pod except for the core and node probes, on a cluster running that CNI, and, once P1-08 has selector halts, a selector halt over every agent meets NFR-23 in the measurements of step 8.
 
 ### 4. Reconciliation
 
@@ -72,13 +78,13 @@ Each rule denies all ingress and egress, with two exceptions:
 - Create and delete rules to match, idempotently; on startup, adopt the rules that already exist.
 - **Never lift a quarantine without fresh state from the core.** While disconnected, or after its lease expires, the controller keeps every existing rule and raises an alert; it applies no new rule until it reconnects, because it no longer knows the state. An option, off by default, quarantines every covered agent when the lease expires, for sites that prefer isolation to availability.
 - Watch pods to count, per agent, the pods each rule covers.
-- Blocks ([RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md)) arrive in their own record of the watch stream. They are not halts: the controller ignores them, and the spread of blocks counts enforcement points only (P1-16, step 7).
+- The controller's stream carries no blocks ([RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md)): only enforcement points' streams do ([design note](P1-08-kill-switch.md#progress-notes), section 4), and the spread of blocks counts enforcement points only (P1-16, step 7).
 
-**Done when:** unit tests cover halts, releases, overlapping halts, a fleet halt, a controller restart and a lost connection, and a change that carries only blocks leaves every rule as it is.
+**Done when:** unit tests cover halts, releases, overlapping halts, a fleet halt, a selector halt that agents join later, a controller restart and a lost connection.
 
 ### 5. Acknowledgements, events and coverage
 
-- Acknowledge each halt, per agent, with the layer `network_quarantined`, the time the rule was accepted by the API server and the number of pods covered (P1-08 stores them in `halt_acks`).
+- Acknowledge each halt, per agent, with the layer `network_quarantined`, the time the rule was accepted by the API server and the number of pods covered (P1-08 stores them in `halt_layer_reports`).
 - Report honestly: the acknowledgement says the rule is in place, not that every connection is gone; the measurements of step 8 give the time to effective isolation.
 - Publish `quarantine.applied` and `quarantine.lifted` events.
 - Report per agent the pods found, so the console can show agents that run in the cluster without the label, or with no pods at all.
@@ -108,6 +114,7 @@ On kind with Cilium, with the core, the Python enforcement point (P1-09) or the 
 - a pod started after the halt is isolated from its start;
 - releasing the halt restores traffic;
 - a fleet halt isolates every labeled pod;
+- a selector halt over every agent isolates their pods through its one rule, once P1-08's selector halt, a Should, is merged;
 - restarting the controller, or cutting it off from the core, never lifts a quarantine;
 - whether a connection opened before the halt survives it; if it does on the reference CNI, the risk and its mitigation are recorded (see risks).
 
@@ -147,5 +154,5 @@ Measure the time from halt issued to effective isolation (p50, p95, p99, max) ag
 ## Notes for implementers
 
 - Never modify workloads: the controller only creates and deletes its own rules, which keeps it safe to run with narrow rights.
-- One rule per halted agent, with a deterministic name, keeps reconciliation simple and the evidence readable.
+- One rule per halt, with a deterministic name, keeps reconciliation simple and the evidence readable.
 - Selecting pods by the agent label, not by pod name, is what closes the race with pods started after the halt.

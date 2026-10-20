@@ -99,7 +99,7 @@ Implement the interface P1-04 uses: an agent can be activated only if it has at 
 - **Size.** The builder refuses, and alerts on, a bundle beyond the limits of step V1 (2 MiB, at most 1,000 files; contracts, section 7.4), rather than publish one that every enforcement point would reject.
 - **Rebuilds:** activating a global version rebuilds every agent's bundle, as a chunked background job; activating an agent-specific version rebuilds only that agent's bundle.
   - A change to an agent's catalog file (its enablement, its observations, or an entry it lists) rebuilds its bundle, coalesced per agent; a change to an entry that many agents list rebuilds theirs in the same chunked job (T-80). P1-16 asks for these rebuilds through an interface defined here.
-  - Each chunk's transaction writes the governance state last, so that it holds the global lock only to bump the version and commit (P1-07, step 5).
+  - Each chunk's transaction writes the governance state last, so that it holds the version counter only to bump the version and commit (P1-07, step 5).
   - Blocks never rebuild bundles: they travel in the watch stream (P1-16, step 7).
   - Suspended agents' bundles are rebuilt too, so that a disable or a global forbid made during a suspension holds at reinstatement ([lifecycle](../../architecture/lifecycle.md), section 9).
 
@@ -107,7 +107,7 @@ Implement the interface P1-04 uses: an agent can be activated only if it has at 
 
 ### 7. Distribution
 
-- In the same transaction that stores a bundle, the agent's governance state gets the new bundle reference (through `govstate`, P1-07).
+- In the same transaction that stores a bundle, the agent's governance state gets the new bundle reference (through `govstate`, P1-07). Rebuilds run in chunks of at most 100 agents per transaction, one job at a time. Each chunk first locks each agent's row and then its state row, in ascending ID order, with `FOR NO KEY UPDATE`, and only then calls `StateVersions.Next` (the [design note](P1-08-kill-switch.md#progress-notes) of the halt path, section 2).
 - `PolicyService.GetBundle` serves a bundle only to instances that serve that agent, with an ETag equal to the content hash.
 - Bundle public keys are published on the machine listener.
 

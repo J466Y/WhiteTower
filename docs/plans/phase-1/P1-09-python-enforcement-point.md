@@ -117,7 +117,7 @@ A change that carries a halt and blocks closes the gate first; the gate's acknow
 
 ### 7. Configuration and identity
 
-- Configuration: agent ID, core URL, credentials (a key file, or Kubernetes workload identity through P1-05), the bundle trust root and the buffer location, from a file or environment variables.
+- Configuration: agent ID, core URL, credentials (a key file, or Kubernetes workload identity through P1-05), the bundle trust root and the buffer location, from a file or environment variables. It names no environment: the enforcement point takes the environment of its credential from `RegisterInstanceResponse`, and puts it in the subject of every decision (contracts, section 6.2). The enforcement point never reads it from its access token, which RFC 9068 (section 6) forbids a client to inspect ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 7).
 - Invalid or incomplete configuration keeps the gate closed and says why; it never falls back to allowing. A private key file that other users can read is invalid configuration.
 - The owner's personal data never reaches the agent's process: the enforcement point knows the owner only by pseudonymous principal ID.
 
@@ -247,3 +247,10 @@ These numbers are evidence for the Phase 1 gate.
 - Treat the core's bundle keys as the trust root; ship them through configuration, never fetch them over an unauthenticated channel.
 - Keep framework-specific code in thin integration modules, so a framework upgrade touches one file.
 - Reconnect as spike S2 validated: backoff with full jitter, capped at a third of the lease TTL and reset once a session receives a renewal (I-4); HTTP/2 pings detect a dead connection before the lease expires.
+- Follow the contract clarifications of the halt path's [design note](P1-08-kill-switch.md#progress-notes) (section 13, decisions 2, 6 and 7):
+  - apply every agent state a change carries, whatever that state's own version: an agent that enters the scope keeps its older version;
+  - treat a failure of an established `Watch` stream as transient whatever its code, except `PERMISSION_DENIED`, and get a new token first after `UNAUTHENTICATED`: connect-go, for one, reports a stream cut in the middle of a message as `INVALID_ARGUMENT`;
+  - accept a renewal whose version skips versions that carried nothing for the stream: that is no gap;
+  - accept a snapshot in answer to any resumption, even at a version the core moved forward after a regression, and replace the state with it;
+  - apply every halt wherever the instance runs: a field the enforcement point does not know never narrows a halt, and the environment that `RegisterInstanceResponse` returns (step 7) never decides what a halt covers;
+  - decode JSON discarding unknown fields, as connect-go's codec does: Python's `json_format.Parse` refuses them by default, as Go's protojson does, so pass `ignore_unknown_fields=True`; otherwise S-13 fails (EP-10).
