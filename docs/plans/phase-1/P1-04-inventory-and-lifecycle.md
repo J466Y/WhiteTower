@@ -5,7 +5,7 @@
 | **Phase** | 1 Core MVP |
 | **Status** | In progress (3 of 8 pull requests) |
 | **Size** | L |
-| **Depends on** | P1-03 (and the P1-02 writer) |
+| **Depends on** | P1-03 (and the P1-02 writer); the first pull request of P1-07.1 for pull requests 4 to 8 |
 | **Unblocks** | P1-05, P1-06, P1-08, P1-10.2, P1-16 (steps 1 to 4) |
 | **Requirements** | INV-01 to INV-10, API-01 to API-03; backend of UI-02 (except its MCP and tools, which P1-16 serves), UI-03 and UI-09; the review's part of CAT-09 |
 | **Decisions** | ADR-0005, [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) (section 10) |
@@ -94,7 +94,7 @@ Compute C0 to C3 per agent:
 
 - **C1:** an active credential used recently.
 - **C2:** an instance with an active EP and decision events within the period.
-- **C3:** a confirmed halt or drill within the period, with data from P1-08.
+- **C3:** a halt or drill within the period for which the agent had at least one expected pair of instance and agent, each acknowledged within the maximum of its target (NFR-03 for an enforcement point, NFR-23 for a runtime-control module). It is read per agent through an interface that P1-08 implements ([design note](P1-08-kill-switch.md#progress-notes), section 7); until then, no agent reaches C3.
 
 Compute on read, or keep a table refreshed by a job if reads get expensive. Other domains read the level through the same function: P1-16 accepts declared tooling only for agents below C2 (CAT-08).
 
@@ -165,11 +165,11 @@ The plan lands in eight pull requests. The first agrees on the whole API before 
 | 1. API | 1; the permission `agent.ownership.reassign` | Done |
 | 2. Use cases and agents | 2, 4; the data categories; the ownership check that P1-16 reuses; each new agent's governance state, through P1-07's interface, stubbed | Done |
 | 3. Ownership | 3; the inbox items of transfers | Done |
-| 4. Lifecycle engine | 5, through P1-06's interface, stubbed; the property tests; ST-23; a token without the action's scope is refused (ST-19); `service_account` in `lifecycle_transitions.actor_type` | Not started |
-| 5. Reviews and the lifecycle guard job | 6, 7, through P1-16's interface, stubbed | Not started |
-| 6. Coverage, instances, search and export | 8, 9; ST-24, with cells that start after a `;` or with a tab or a carriage return | Not started |
+| 4. Lifecycle engine | 5, through P1-06's interface, stubbed; the property tests; ST-23; a token without the action's scope is refused (ST-19); `service_account` in `lifecycle_transitions.actor_type`; the entry point for the transitions White Tower makes, where T12 skips drills; the active selector halts in every write of the state record, through P1-08's interface, stubbed; the shared form of the selector halts' advisory lock, with the key of `internal/govstate`, taken first in T1 and `editAgent`; `state_version` in `whitetower.agent.updated.v1` when a change concerns what enforcement points see; after the first pull request of P1-07.1, and once the lifecycle and the requirements say that drills do not suspend ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 1) | Not started |
+| 5. Reviews and the lifecycle guard job | 6, 7, through P1-16's interface, stubbed; the guard job suspends one agent per transaction | Not started |
+| 6. Coverage, instances, search and export | 8, 9; ST-24, with cells that start after a `;` or with a tab or a carriage return; C3 through P1-08's interface, stubbed | Not started |
 | 7. Inbox and notifications | 10 | Not started |
-| 8. Bulk import | 11, with its operation | Not started |
+| 8. Bulk import | 11, with its operation; at most 100 agents per transaction, one import at a time, each transaction taking the shared form of the selector halts' advisory lock first | Not started |
 
 ### 2026-10-19: API (PR 1)
 
@@ -250,3 +250,17 @@ The plan lands in eight pull requests. The first agrees on the whole API before 
   - A pending transfer has no deadline: `ownership_transfers.status` allows `expired`, which nothing sets. A transfer whose recipient becomes inactive, or loses the owner role, waits until its requester or an operator cancels it. The lifecycle guard job (pull request 5) could expire both.
   - Retiring or rejecting an agent (pull request 4) should cancel its pending transfer, which can no longer be accepted.
   - Reassigning an agent to oneself is allowed, so that an operator or an advisory member who also holds the owner role can take over an agent whose owner left. The separation of duties of pull request 4 should therefore look at who owned the agent when it was submitted, not only at its current owners (open question of pull request 1).
+
+### 2026-10-20: the accepted design of the halt path
+
+The maintainer accepted the design note of the halt path on 2026-10-20 ([P1-08's progress notes](P1-08-kill-switch.md#progress-notes)). It binds every plan that changes what enforcement points see, this one included, and its section 14 says what changes here.
+
+- **The first pull request of P1-07.1 lands before pull request 4,** so that the lifecycle engine and the guard job are built and tested against the version counter (section 2) rather than a stub. It brings the writers of pull requests 2 and 3 under the lock rules of section 2: `LockAgent` takes `FOR NO KEY UPDATE` instead of `FOR UPDATE`, and `publishState` locks the agent's state row before `Next`. It removes `SequenceVersions` and the query `NextStateVersion`, and the evaluation seed writes each seeded agent's state row, as T1 does. That settles the follow-up of pull request 2 on the seed.
+- **Pull requests 4 to 8** add:
+  - the lifecycle engine's entry point for the transitions White Tower makes itself (T7, T8, T11, T12; section 8). It runs in its caller's transaction and at its version, checks no permission and no If-Match, never refuses, and gives the agent's row a new version. T12 skips drills, which do not suspend the agent (section 13, decision 1);
+  - the active selector halts that an agent matches, added after its version in every write of the state record, in `publishState`, through an interface of P1-08: the fold that `Propose` marks becomes a fold in every write;
+  - the shared form of the selector halts' advisory lock, with the key that `internal/govstate` defines, taken first in every writer that creates an agent or changes its labels or risk tier (T1, `editAgent` and the bulk import), since at read committed such a writer and a selector halt would otherwise miss each other (section 8);
+  - a guard job that suspends one agent per transaction (step 7);
+  - a bulk import that writes at most 100 agents per transaction (step 11);
+  - coverage C3 through an interface that P1-08 implements (step 8); until then, no agent reaches C3;
+  - `state_version` in `whitetower.agent.updated.v1`, required when a change concerns what enforcement points see.

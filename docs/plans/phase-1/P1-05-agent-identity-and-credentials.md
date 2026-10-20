@@ -99,7 +99,9 @@ Every issuance is an audit event. The volume (about 3 per second for 1,000 agent
 
 Standalone module instances use the same endpoint with their own identity (`spiffe://<trust-domain>/module/<module-id>`) and credentials, created when an operator approves the module (P1-07). An enforcement point embedded in an agent's process, as the Python enforcement point is (P1-09), authenticates **as the agent** and may only serve that agent. Document both cases for P0-03 and P1-07.
 
-**Done when:** both kinds of identity obtain tokens, and the claims tell them apart.
+The credentials of a module whose manifest declares the `enforcement-point` capability carry an environment, `production` or `non_production`, checked when they are created: the core gives it to the module's instances at registration, for the subject of their decisions ([P1-08's design note](P1-08-kill-switch.md#progress-notes), section 13, decision 7).
+
+**Done when:** both kinds of identity obtain tokens, the claims tell them apart, and an enforcement point's module credential cannot be created without an environment.
 
 ### 8. Kubernetes workload identity federation (Should)
 

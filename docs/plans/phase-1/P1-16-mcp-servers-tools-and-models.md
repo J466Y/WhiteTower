@@ -5,7 +5,7 @@
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
 | **Size** | L, in six pull requests, about five weeks (see [progress notes](#progress-notes)) |
-| **Depends on** | P1-04 for steps 1 to 4; RFC-0002 in the contracts ([P0-03](../phase-0/P0-03-module-contracts.md), step 12) and P1-06 for steps 5 and 6; P0-03 step 12, the blocks record and the mock module of P1-07 (steps 5 and 8), the harness of P1-08 (step 10) and the reviewed design of the halt path for step 7 |
+| **Depends on** | P1-04 for steps 1 to 4; RFC-0002 in the contracts ([P0-03](../phase-0/P0-03-module-contracts.md), step 12) and P1-06 for steps 5 and 6; P0-03 step 12, the blocks record and the mock module of P1-07 (steps 5 and 8), the harness of P1-08 (step 10) and the accepted design of the halt path for step 7 |
 | **Unblocks** | The wiring of tooling reports in P1-07 (its step 7), the catalog steps of P1-09, P1-10.6 and P1-10.7, the catalog commands of P1-11, the catalog flows of P1-12.2, P1-13, P1-14 |
 | **Requirements** | CAT-01 to CAT-10, NFR-24; backend of UI-10; the catalog part of API-04 |
 | **Decisions** | [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md), ADR-0005, ADR-0011 |
@@ -152,17 +152,17 @@ P1-06 builds the bundles; this plan supplies, through the interfaces P1-06 defin
 
 **Done when:** generated rules validate with `cedar-go` in strict mode, a hand-edited rule statement is refused through P1-06's check, and the vectors of transforms and missing arguments, shared with P1-09 (ST-79), pass on the core's compiler.
 
-### 7. Blocks (once RFC-0002 is in the contracts, and the design of the halt path is reviewed)
+### 7. Blocks (once RFC-0002 is in the contracts)
 
-Blocks travel on the halt path, which must never become a bottleneck (NFR-03). One design note covers them with P1-07's governance state service and acknowledgements and with P1-08's halts; it is written in [P1-08's](P1-08-kill-switch.md) progress notes and reviewed before any code ([AGENTS.md](../../../AGENTS.md), work reserved for the reviewer).
+Blocks travel on the halt path, which must never become a bottleneck (NFR-03). One design note covers them with P1-07's governance state service and acknowledgements and with P1-08's halts; it is in [P1-08's progress notes](P1-08-kill-switch.md#progress-notes), accepted on 2026-10-20, and changes to it are reserved for the reviewer ([AGENTS.md](../../../AGENTS.md)).
 
 - **Blocks** cover a server and its tools, a tool, a model, every model of a provider or every model of an endpoint, named by reference and published as the SHA-256 of the reference's string form (RFC-0002, section 6). A block takes effect at once, with a reason; lifting it needs an unblock request and the approval of someone else (step 1). At most 500 are active.
-- **Publication.** Blocks travel in their own record of the watch stream, never in the fleet record, through P1-07's governance state service. They take their versions from the global state sequence, and are committed without waiting for any bundle (CORE-12). They never change an entry's status and never rebuild a bundle.
+- **Publication.** Blocks travel in their own record of the watch stream, never in the fleet record, through P1-07's governance state service, and only enforcement points' streams carry them. As the halt path's [design note](P1-08-kill-switch.md#progress-notes) says (section 9), a block is issued or lifted in a transaction of its own, which stamps only its `catalog_blocks` row and never the fleet state or an agent's state. It takes its version from the version counter, through `StateVersions.Next`, and is committed without waiting for any bundle (CORE-12). The issuing transaction checks the cap of 500 active blocks after `Next`, under the version counter, where no concurrent issue can race it. The version columns of `catalog_blocks` get the version-check trigger of the note's section 2. Blocks never change an entry's status and never rebuild a bundle.
 - **Propagation.** Enforcement points acknowledge the state version that carries a block as soon as they apply it (EP-15). The spread of each block comes from `instance_agents.observed_state_version`, through P1-08's tracking keyed by state version, and counts enforcement points only.
 - **Break-glass** cannot block (step 1).
 - **Events:** `whitetower.catalog.blocked.v1` (actor: the issuer, with the reason) and `whitetower.catalog.unblocked.v1` (actor: the approver), each with the block's ID and the state version; `blocked` also carries the block's kind, the SHA-256 of what it covers and the key of the entry it covers when the catalog has one.
 
-**Done when:** ST-80 passes with the harness of P1-08: with 500 active blocks, a block reaches every mock enforcement point within NFR-24, and halts of one agent and of the fleet still meet NFR-03. Lifting needs a second person (ST-81).
+**Done when:** ST-80 passes with the harness of P1-08: the runs of P1-08 step 10, with their background load, run again with 100 block changes and 500 active blocks ([design note](P1-08-kill-switch.md#progress-notes), sections 11 and 14); a block reaches every mock enforcement point within NFR-24, and halts of one agent and of the fleet still meet NFR-03. Lifting needs a second person (ST-81).
 
 ### 8. Metrics
 
@@ -176,7 +176,7 @@ Blocks travel on the halt path, which must never become a bottleneck (NFR-03). O
 - A changed tool definition is denied and hidden until its new definition is approved (with P1-09, ST-76).
 - Nobody approves their own request to enable or to unblock (ST-81).
 - Usage rules made with the form validate in strict mode, and a hand-edited rule statement is refused.
-- A block reaches every connected enforcement point within NFR-24, and halts with 500 active blocks still meet NFR-03 (ST-80).
+- A block reaches every connected enforcement point within NFR-24, and halts with 500 active blocks still meet NFR-03 in the runs of P1-08 step 10, with their background load and 100 block changes (ST-80).
 - The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-16-mcp-servers-tools-and-models) pass: ST-75, ST-80 and ST-81.
 
 ## Risks and open questions
@@ -211,4 +211,4 @@ The plan lands in six pull requests.
 | 3. Observations and definitions | 4; ST-75 | Not started |
 | 4. Bundles | 5, with P1-06; needs P0-03 step 12 | Not started |
 | 5. Usage rules | 6, with P1-06 | Not started |
-| 6. Blocks and metrics | 7, 8; ST-80, ST-81 for unblocking; needs P1-07's blocks record and the reviewed design | Not started |
+| 6. Blocks and metrics | 7, 8; ST-80, ST-81 for unblocking; needs P1-07's blocks record and the accepted design | Not started |
