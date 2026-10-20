@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft v0.1, open for review |
-| **Date** | 2026-09-28; updated 2026-09-29 (ADR-0011, network quarantine), 2026-09-30 (threat model) and 2026-10-19 ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): MCP servers, tools and models) |
+| **Date** | 2026-09-28; updated 2026-09-29 (ADR-0011, network quarantine), 2026-09-30 (threat model), 2026-10-19 ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): MCP servers, tools and models) and 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): the halt tracker, halt acknowledgements, versions, renewals and reads, sections 3.1, 5.3, 6 and 9) |
 | **Related** | [Requirements](../requirements/mvp-requirements.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md), [Threat model](../security/threat-model.md) |
 
 This document describes how the MVP is built: its components, the interfaces between them, the flows that matter most, and how it is deployed. The reasons behind each choice are in the ADRs; this document only links to them. Normative details (exact schemas, messages and states) are produced by the Phase 0 plans and will replace the sketches marked as such here.
@@ -139,7 +139,7 @@ flowchart LR
 
 ### 3.1 Background jobs
 
-Jobs run on every replica but acquire a PostgreSQL advisory lock, so only one replica (the leader) runs each job.
+Jobs run on every replica but acquire a PostgreSQL advisory lock, so only one replica (the leader) runs each job. The halt tracker is the exception.
 
 | Job | Purpose | Requirement |
 | --- | --- | --- |
@@ -148,7 +148,7 @@ Jobs run on every replica but acquire a PostgreSQL advisory lock, so only one re
 | Lifecycle guard | Suspends agents whose owner is inactive or whose review is overdue; sends reminders | INV-05, INV-06 |
 | Bundle rebuilder | Rebuilds, in chunks, the bundles that an activated global policy version, a changed catalog entry or a change to an agent's tooling affects, coalesced per agent; blocks never rebuild bundles | POL-05, CAT-03 |
 | Tooling last use | Keeps when each enabled entry was last used, from the allowed decisions that enforcement points report, never with a write per decision | CAT-09 |
-| Lease watchdog | Marks instances as lost when their lease expires; raises alerts for unconfirmed halts | KIL-03, KIL-04 |
+| Halt tracker | Runs on every replica every second, with no leader ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 7). Marks as lost the connected instances not seen for longer than the shortest lease TTL in their scope, and moves halts between statuses (propagating, confirmed, partially confirmed, unconfirmed) with conditional updates, so replicas never contradict each other; the replica whose update succeeds raises the alert for a halt not confirmed in time | KIL-03, KIL-04 |
 | Retention | Drops expired audit partitions while keeping tree hashes | AUD-08 |
 | Key rotation | Rotates token, bundle and checkpoint signing keys on schedule | AID-05 |
 
@@ -275,11 +275,11 @@ sequenceDiagram
     EP->>C1: Acknowledge(halt, layers and times)
     QM->>QM: apply a deny rule to the agent's pods
     QM->>C1: Acknowledge(halt, network quarantined at)
-    C1->>DB: record acknowledgements and propagation time
+    C1->>DB: record halt acknowledgements and propagation time, in batches of their own
     Note over EP: If the stream is lost, the lease expires after its TTL and the EP halts anyway
 ```
 
-In the same transaction, token issuance for the agent stops, except for the module API tokens its enforcement point needs to acknowledge, deliver its evidence and learn of the release (DC-1 of the [threat model](../security/threat-model.md)). A fleet halt works the same way through a fleet-wide state, which also covers agents registered afterwards and leaves individual lifecycle states unchanged. Releasing a halt needs a request and an approval by two different people.
+In the same transaction, token issuance for the agent stops, except for the module API tokens its enforcement point needs to acknowledge, deliver its evidence and learn of the release (DC-1 of the [threat model](../security/threat-model.md)). A fleet halt works the same way through a fleet-wide state, which also covers agents registered afterwards and leaves individual lifecycle states unchanged. Each replica writes the halt acknowledgements it receives in batches, apart from state and bundle acknowledgements, so a burst of those never delays a halt's acknowledgements ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 6). Releasing a halt needs a request and an approval by two different people.
 
 Blocks (section 5.6) take the same path without enlarging it. A block is committed with its state version and streamed without waiting for any bundle (CORE-12), in a record of its own, never in the fleet state, so a fleet halt costs the same with 500 blocks active ([threat model](../security/threat-model.md), DC-9). Enforcement points acknowledge the state version that carries a block once they apply it (EP-15), and the console shows its spread as for halts (NFR-24). Lifting a block, like releasing a halt, needs two people.
 
@@ -313,9 +313,9 @@ The owners or operators of agents without an enforcement point (coverage C0 and 
 
 ## 6. Governance state and leases
 
-For every agent, the core maintains a governance state record: lifecycle state, halts, the effective bundle reference (version, manifest hash and size), the lease TTL, the halt mode, the attributes policies may use, and a version number taken from a global sequence. The fleet state, with its active fleet halts, is one more record. The active blocks of RFC-0002 are a third record, apart from the fleet state: each block carries its ID, its kind, the SHA-256 of what it covers and its issue time, and changes carry the blocks added and the IDs of those removed. At most 500 are active, about 40 KB in a snapshot, and they never enlarge the fleet record that fleet halts change ([threat model](../security/threat-model.md), DC-9).
+For every agent, the core maintains a governance state record: lifecycle state, halts, the effective bundle reference (version, manifest hash and size), the lease TTL, the halt mode, the attributes policies may use, and a version number. The version comes from one version counter, which a writer holds from its version to its commit, so changes commit in version order ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 2). The fleet state, with its active fleet halts, is one more record. The active blocks of RFC-0002 are a third record, apart from the fleet state: each block carries its ID, its kind, the SHA-256 of what it covers and its issue time, and changes carry the blocks added and the IDs of those removed. At most 500 are active, about 40 KB in a snapshot, and they never enlarge the fleet record that fleet halts change ([threat model](../security/threat-model.md), DC-9).
 
-- **Watch protocol.** An EP opens `Watch` with the last version it applied. The core replies with a snapshot if the EP is new or too far behind, then streams changes in version order. Lease renewals come at a third of the TTL, and at least every 30 seconds, only when the stream is current. The [module contracts](../contracts/module-contract-v0.1.md#5-governance-state-leases-and-halts) specify it.
+- **Watch protocol.** An EP opens `Watch` with the last version it applied. The core replies with a snapshot if the EP is new or too far behind, then streams changes in version order. Lease renewals come at a third of the TTL, and at least every 30 seconds, only when the stream is current. The [module contracts](../contracts/module-contract-v0.1.md#5-governance-state-leases-and-halts) specify it. A replica renews only while it is current itself: one whose last successful read of the database is 3 seconds old or more renews nothing, so leases run out rather than trust a replica that may have missed a halt ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 5).
 - **Lease expiry is computed by the EP** from its own monotonic clock at the moment it receives a renewal. Only a fresh renewal counts: one the core stamped more than a few seconds earlier, by the EP's clock, renews nothing, so a stream held back on its way lets leases run out instead of delaying halts ([threat model](../security/threat-model.md), DC-2). That check needs synchronized clocks, as token expiry does; the length of the lease does not.
 - **Obligations of an EP**, numbered EP-1 to EP-12 in the [contracts](../contracts/module-contract-v0.1.md#57-obligations-of-enforcement-points), and EP-13 to EP-19 once RFC-0002 is in them (P0-03 step 12):
   - allow nothing until it has a current state, a lease and a verified bundle;
@@ -443,7 +443,7 @@ An offline bundle contains the images as OCI archives, the Helm chart, SBOMs, si
 | Abuse protection | Rate limits on login, token endpoint, event ingestion and tooling reports; a bound on each agent's catalog entries waiting for review (threat model, DC-10); request size limits; backpressure on ingestion |
 | Observability | Prometheus metrics prefixed `whitetower_`; OpenTelemetry traces, exported only if configured; JSON logs with request and trace IDs |
 | Configuration | One YAML file plus `WT_`-prefixed environment variables; secrets always from files |
-| High availability | Stateless replicas; jobs elected through advisory locks; watch streams served by any replica and fed through `LISTEN/NOTIFY` |
+| High availability | Stateless replicas; jobs elected through advisory locks, except the halt tracker, which runs on every replica (section 3.1); watch streams served by any replica, which reads the governance state in one snapshot after each `LISTEN/NOTIFY` notification and at least every second |
 | Time | UTC everywhere; the server stamps ingestion time; leases use monotonic clocks, and only fresh renewals count, so hosts are NTP-synchronized (ASM-04) |
 | Errors | RFC 9457 problem details on the REST API; ConnectRPC error codes on the module API |
 | Localization | Console only (English and Spanish at MVP); the API returns stable error codes with English messages |

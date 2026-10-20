@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Version 0.3: the MCP servers, tools and models of agents join the MVP ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), decision of the maintainer of 2026-10-13). Version 0.2 was the Phase 0 gate's (2026-09-30): targets set from measurements, open questions Q1 to Q6 closed |
-| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)) and 2026-10-19 (RFC-0002; the permission matrix's row on reassigning an owner, plan P1-04) |
+| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)), 2026-10-19 (RFC-0002; the permission matrix's row on reassigning an owner, plan P1-04) and 2026-10-20 (HUM-04, KIL-02, KIL-05, KIL-06, KIL-09, the glossary's C3 and sections 5.1.1, 5.2.1 and 9: the maintainer's decisions on halts and drills, in [P1-08's design note](../plans/phase-1/P1-08-kill-switch.md#progress-notes)) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
 
@@ -55,7 +55,7 @@ The following are **not** part of the MVP (they belong to Phases 2 and 3): LLM g
 | --- | --- |
 | Adapter | Code that translates a product's API (for example Microsoft AGT) into the White Tower module contract. |
 | Capability | A function a module declares in its manifest, for example `policy-engine` or `runtime-control`. |
-| Coverage level | How deeply an agent is governed. **C0 Declared**: in the inventory with owner, use case and policy, no runtime integration. **C1 Identified**: authenticates with White Tower credentials. **C2 Governed**: an EP enforces White Tower policies and reports decisions to the audit log. **C3 Stoppable**: a halt or kill-switch drill on this agent was confirmed within the configured period (default 90 days). |
+| Coverage level | How deeply an agent is governed. **C0 Declared**: in the inventory with owner, use case and policy, no runtime integration. **C1 Identified**: authenticates with White Tower credentials. **C2 Governed**: an EP enforces White Tower policies and reports decisions to the audit log. **C3 Stoppable**: within the configured period (default 90 days), a halt or kill-switch drill covered this agent, the agent had at least one expected pair of instance and agent, and each of its pairs was acknowledged within the maximum of its target: 5 seconds for an enforcement point (NFR-03), 10 seconds for a runtime-control module (NFR-23) ([P1-08's design note](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 7). |
 | Effective policy set | The global policies plus the agent-specific policies that apply to one agent, distributed as a signed **policy bundle**, which also carries the agent's catalog file. |
 | Governance state | What the core tells EPs: for each agent, its lifecycle state, run state (running or halted), effective bundle reference and lease; for the whole organization, its active blocks. |
 | Halt | The action of the kill switch: stop an agent (or the fleet) that is running. |
@@ -119,7 +119,7 @@ stateDiagram-v2
 - **Periodic review** is a process, not a state: an active agent stays active while it is being reviewed. An overdue review past its grace period triggers automatic suspension (INV-05).
 - **Suspension** can also apply to `validated` and `ready` agents (for example when the owner leaves). Reinstating returns the agent to the state it had when it was suspended.
 - Agents in `draft`, `validated` or `ready` can be retired directly.
-- The **run state** (running or halted) is separate: a halt can hit any agent that has running instances, whatever its lifecycle state. A halt of one agent also moves it to `suspended`; a fleet halt does not change lifecycle states (KIL-06).
+- The **run state** (running or halted) is separate: a halt can hit any agent that has running instances, whatever its lifecycle state, and stops all of them, wherever they run (KIL-02). A halt of one agent, unless it is a drill (KIL-09), also moves it to `suspended`; a fleet halt does not change lifecycle states (KIL-06).
 - **Invariant:** an `active` agent always has an active owner, a validated use case and at least one approved agent-specific policy.
 - The **harness** is declared in the MVP (a descriptive record assigned during "policy and harness assignment"); enforcing it arrives with the harness module in Phase 2.
 - **Tooling** is enabled during "policy and harness assignment" as well: from `validated` on, the enforcement point reports the agent's tooling, and the owner requests enabling it (CAT-01, CAT-03). Enabling is not a guard of any transition: agents without an enforcement point have nothing to enable (INV-07), and an agent with nothing enabled is denied every tool and model call anyway.
@@ -131,7 +131,7 @@ stateDiagram-v2
 | HUM-01 | Humans authenticate only through the organization's IdP using OIDC (authorization code with PKCE). White Tower stores no human passwords. | M | Non-functional requirements |
 | HUM-02 | Roles are derived from IdP group claims through a configurable mapping; the platform administrator can also grant role bindings inside White Tower. | M | Non-functional requirements |
 | HUM-03 | Authorization is deny-by-default on every API operation and follows the permission matrix (5.2.1). | M | Principles |
-| HUM-04 | Separation of duties: nobody approves their own proposal, use case, policy version, request to enable tooling or request to unblock, nobody grants a role to themselves, and releasing a halt needs a second person. | M | New |
+| HUM-04 | Separation of duties: nobody approves their own proposal, use case, policy version, request to enable tooling or request to unblock, nobody grants a role to themselves, and releasing a halt, other than a drill's (KIL-09), needs a second person. | M | New |
 | HUM-05 | Principal status is kept current: administrators can deactivate principals (M), and the system accepts deprovisioning from the IdP through SCIM 2.0 Users (S). | M/S | Governance model |
 | HUM-06 | Break-glass: a sealed emergency credential allows halting agents and the fleet while the IdP is unavailable. Every use raises a critical audit event. | S | New |
 | HUM-07 | Service accounts and personal access tokens for automation, with scopes and expiry. | S | New |
@@ -158,8 +158,8 @@ stateDiagram-v2
 | Reinstate or retire an agent | | ✔ | retire own | | ✔ | | |
 | Manage agent credentials | | | own | | ✔ | | |
 | Halt an agent | ✔ | ✔ | own | | ✔ | | |
-| Halt the fleet | ✔ | | | | ✔ | | |
-| Request or approve a halt release (two different people; a fleet release is approved by steering or an operator) | ✔ | ✔ | request own | | ✔ | | |
+| Halt the fleet, or the agents a selector matches | ✔ | | | | ✔ | | |
+| Request or approve a halt release (two different people, and never a service account; a fleet or selector release is approved by steering or an operator; the system releases a drill) | ✔ | ✔ | request own | | ✔ | | |
 | Register and manage modules | | | | | ✔ | | |
 | View the catalog and agents' tooling | ✔ | ✔ | ✔ | | ✔ | ✔ | ✔ |
 | Approve or decline a catalog entry, a new tool definition or a new model digest, classify it, and declare the arguments policies see | | ✔ | | | | | |
@@ -234,14 +234,14 @@ The decision records the policy versions and rules that produced it, so the audi
 | ID | Requirement | Pri | Source |
 | --- | --- | --- | --- |
 | KIL-01 | Halting an agent stops it while it runs. **Guaranteed:** from the moment the enforcement point receives the halt, every further governed call and interaction (tool calls, model calls, inputs and outputs) is denied; revoking the next token is not enough. **Best effort:** the action already in flight is interrupted when the framework allows it, and the acknowledgement reports whether it was. Terminating the agent's process is not the default: it happens only when the agent's owner chooses the `terminate` halt mode (decision of 2026-09-29, after spike S1). | M | Non-functional requirements |
-| KIL-02 | Fleet-wide halt of all agents (M), or of a selector such as environment, label or risk tier (S). | M/S | Scope |
+| KIL-02 | Fleet-wide halt of all agents (M), or of the agents a selector of risk tiers and labels matches (S). Every halt stops the agents it covers in every environment; halts limited to one environment come with a later RFC, once each instance's environment comes from a verified identity rather than from a credential's label. | M/S | Scope |
 | KIL-03 | Every enforcement point of the target acknowledges the halt. The API and UI show per-instance status and the propagation time, which is also exported as a metric. | M | Non-functional requirements |
 | KIL-04 | Fail-closed backstop: an enforcement point that loses contact with the core for longer than its lease TTL denies every action and halts the agent. Only fresh lease renewals count, so a stream held back on its way counts as lost contact (module contracts, section 5.3). | M | Principles |
-| KIL-05 | Halting is available from the UI, the API and the CLI, requires a reason and takes effect without approval. Releasing a halt requires two different authorized people. | M | Governance model |
-| KIL-06 | Halting an agent blocks its token issuance, except for the module API (AID-04), and moves it to `suspended` with the halt as reason. A fleet or selector halt blocks token issuance, with the same exception, for every matching agent but leaves lifecycle states unchanged, so releasing it restores operation without reinstating agents one by one. | M | New |
+| KIL-05 | Halting is available from the UI, the API and the CLI, requires a reason and takes effect without approval. Releasing a halt, other than a drill's (KIL-09), requires two different authorized people. | M | Governance model |
+| KIL-06 | Halting an agent blocks its token issuance, except for the module API (AID-04), and, unless the halt is a drill (KIL-09), moves it to `suspended` with the halt as reason. A fleet or selector halt blocks token issuance, with the same exception, for every matching agent but leaves lifecycle states unchanged, so releasing it restores operation without reinstating agents one by one. | M | New |
 | KIL-07 | An enforcement point that connects or reconnects for a halted agent receives the halted state before it can allow any action. | M | New |
 | KIL-08 | Break-glass halting works while the IdP is unavailable (see HUM-06). | S | New |
-| KIL-09 | Kill-switch drills: test halts on designated agents, with measured timings. A successful drill within the configured period gives the agent coverage C3. | S | Success criteria |
+| KIL-09 | Kill-switch drills: test halts on designated agents, with measured timings. A drill closes the gate without suspending the agent, and the system releases it once it is confirmed or after a maximum duration. A successful drill within the configured period gives the agent coverage C3. | S | Success criteria |
 | KIL-10 | **Network quarantine on Kubernetes.** While an agent is halted, by an agent, selector or fleet halt, its workloads on Kubernetes are isolated at the network level, whatever the agent's code does: all traffic is denied except what the halt itself needs (reaching the core). Workloads started later for a halted agent are isolated from their start. The isolation is applied within seconds (NFR-23), reported as its own layer in the halt acknowledgement, and lifted when the halt is released. The workload keeps running, so it can be investigated. It requires a CNI that enforces deny rules, such as Cilium, Calico, Antrea or one implementing AdminNetworkPolicy (decision of 2026-09-29). | M | Principles (deny by default), New |
 
 ### 5.7 Modules and contracts (MOD)
@@ -382,6 +382,7 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 | Public third-party module SDK | 3 | Internal Go SDK and conformance kit built in the MVP |
 | Multi-tenancy | Not planned | Single organization per deployment (decision in P0-02) |
 | Hardware security modules and cloud KMS | 2 or later | Key access behind an interface |
+| Halts limited to one environment | 2 or later, through an RFC | Every halt stops its agents in every environment (KIL-02), and a field an instance does not know never narrows a halt, so an environment field can be added later and fails safe. The RFC waits until each instance's environment comes from a verified identity, such as one workload issuer or SPIFFE trust domain per environment (AID-07, AID-09), rather than from a credential's label |
 
 ## 10. What we need first
 
