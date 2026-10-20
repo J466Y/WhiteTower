@@ -71,6 +71,24 @@ message RegisterInstanceResponse {
   string contract_version = 2;
   // How often the instance must call Heartbeat.
   google.protobuf.Duration heartbeat_interval = 3;
+  // The environment recorded for the credential the instance registered with.
+  // An enforcement point puts it in the subject of every decision (contract,
+  // section 6.2).
+  Environment environment = 4;
+}
+
+// Environment is the environment recorded for a credential.
+enum Environment {
+  // None recorded. Only a module credential can have none, and the core
+  // refuses to register an enforcement point whose credential has none (MAN-5).
+  // An enforcement point that receives it, or a value it does not know, treats
+  // its registration as refused and allows nothing (I-7).
+  ENVIRONMENT_UNSPECIFIED = 0;
+  // Production: "production" in the subject of decisions.
+  ENVIRONMENT_PRODUCTION = 1;
+  // Any environment other than production: "non_production" in the subject of
+  // decisions.
+  ENVIRONMENT_NON_PRODUCTION = 2;
 }
 
 // Health is the health an instance reports about itself.

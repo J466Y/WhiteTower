@@ -232,3 +232,32 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Waits for RFC-0002's acceptance |
 | 2. Protobuf, schemas and examples | `api/proto`, `api/policy`, `api/manifest`, `api/events`, and the kit's fake core | Not started |
 | 3. Vectors on both stacks | The new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier | Not started |
+
+### 2026-10-20: changes from the halt-path design
+
+The maintainer accepted the [design of the halt path](../phase-1/P1-08-kill-switch.md#progress-notes) on 2026-10-20. Its decisions 2 and 6 change the contracts while RFC-0001 is in review, when changes are free (specification, section 10). The external review of RFC-0001 covers these changes like the rest:
+
+| Change | Source | Where |
+| --- | --- | --- |
+| A halt applies wherever the instance runs: no field of `Halt` limits where it applies, and an unknown field never narrows a halt. A new field that narrows halts stays in the version only because an instance that ignores it halts more | Decision 2 | Sections 5.1 and 10, EP-10, scenarios S-05, S-06 and S-13; the comments of `AgentState.halts`, `FleetState.halts` and `Halt` in `governance.proto` |
+| A selector halt names risk tiers and at most 16 labels, never an environment | Decision 2, and P1-08 step 1 for the bound | `$defs.selector` in `api/events/schemas/common.schema.json` |
+| An instance applies every agent state a change carries, whatever that state's own version, since an agent that enters the scope keeps its older version | Decision 6 | Section 5.2, EP-9, scenario S-12 |
+| A failure of an established `Watch` stream, one that has delivered its first message, is transient whatever its code, except `PERMISSION_DENIED`, and `UNAUTHENTICATED`, which needs a new token first. Before then, an error that the core sends follows the error table, while a failure that the instance's own library reports is transient, such as connect-go's `INVALID_ARGUMENT` for a stream cut in the middle of a message | Decision 6 | Section 4.6, EP-9, scenario S-12 |
+| A renewal's version may pass versions that carried nothing for the stream | Decision 6 | CORE-6, scenario S-12 |
+| The core may answer any resumption with a snapshot, including one at a version it moved forward after a regression | Decision 6 | CORE-5, scenario S-12 |
+
+RFC-0001 sums up the watch stream in words these changes keep true (Proposal, item 2), so that item does not change.
+
+Decision 7, of the same day, has the core tell each instance the environment of its credential. The external review of RFC-0001 covers it too:
+
+| Change | Source | Where |
+| --- | --- | --- |
+| The core returns, in `RegisterInstanceResponse`, the environment recorded for the credential the instance registered with, and refuses with `PERMISSION_DENIED` to register an enforcement point whose credential has none | Decision 7 | MAN-5, section 4.6 and appendix A; `RegisterInstanceResponse.environment` and the enum `Environment` in `registry.proto` |
+| An enforcement point puts in the subject of every decision the environment its registration returned, never one from its configuration or from its access token. It treats a registration that returns none, or one it does not know, as refused, and allows nothing | Decision 7 | I-7, section 6.2, and scenario S-25, numbered after RFC-0002's S-18 to S-24; the description of `environment` in `api/policy/decision-request.schema.json` |
+
+RFC-0001's count of scenarios (Proposal, item 7) becomes 18, with S-25, and the kit's [README](../../../test/conformance/README.md) counts sixteen designed scenarios rather than fifteen.
+
+Besides the core's side, which P1-07 builds with registration and P1-05 step 7 with module credentials, and the console's, which P1-10.5 builds (section 14 of the design), decision 7 leaves work for two plans:
+
+- **P1-07.2:** the kit's fake core returns the environment at registration, and the kit runs S-25. `WT_CONFORMANCE_ENVIRONMENT` in the [driver protocol](../../../test/conformance/driver-protocol.md), and `Config.Environment` of the stub enforcement point (`test/conformance/stubep`), give way to it, and the driver protocol's `POST /v1/decide` has the module build the subject from its state and its registration, not its credential.
+- **P1-09:** the enforcement point takes the environment of its decisions from its registration (I-7), never from its configuration or from its access token, and passes S-25.

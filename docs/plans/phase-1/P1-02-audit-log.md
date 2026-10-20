@@ -312,3 +312,12 @@ The sealer stored each checkpoint with the database's clock and, once it loaded 
   - `TestAuditQueryEndpoints`: covers filtering, keyset pagination, role scoping (steering, advisory, operator, auditor, owner, user, admin, anonymous), 404 handling, unsealed event handling, and cryptographic inclusion proof verification using `pkg/auditverify.CheckInclusion` and `pkg/auditverify.OpenCheckpoint`.
   - Security test ST-12: verifies that query and get operations record `whitetower.audit.read.v1` events in the database with accurate actor and query details.
 
+### 2026-10-20: follow-up from the halt-path design
+
+The design of the halt path, accepted on 2026-10-20 ([P1-08's progress notes](P1-08-kill-switch.md#progress-notes), sections 2 and 14), changes the two functions that manage the audit partitions, in a fix of its own before P1-08 step 2:
+
+- `ensure_audit_partitions` creates each new partition as a table, then attaches it, which takes only SHARE UPDATE EXCLUSIVE on the partitioned table;
+- `drop_audit_partition` drops with a `lock_timeout` of 100 ms, and `audit-retention` retries a drop that times out at its next run.
+
+Today both take ACCESS EXCLUSIVE on the partitioned tables, `audit_events` and `audit_event_ids`, about once a month: `ensure_audit_partitions` creates partitions with `CREATE TABLE ... PARTITION OF` (migration 1), and `drop_audit_partition` drops them with `DROP TABLE` (migration 3). A request for that lock waits until every transaction that reads the tables ends, and every later request for a lock on them, an insert's included, queues behind it. So an audit search or a backup that holds the tables would make every writer of an audit event wait. Every writer of the governance state writes its audit event while it holds the version counter, so every writer queued on the counter, halts included, would wait with it.
+

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md). Contract version `v1alpha1` |
-| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01) and 2026-10-09 (the core's request IDs in its events, from P1-02) |
+| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02) and 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |
 | **Conformance** | [`test/conformance/`](../../test/conformance/README.md) |
@@ -71,6 +71,7 @@ An operator registers a manifest and another step approves it (MOD-02). The core
 - **MAN-2.** The core MUST refuse the registration of an instance whose module is not approved, or whose `manifest_sha256` differs from the approved manifest's.
 - **MAN-3.** Any change to an approved manifest MUST be approved again before instances that run it can register.
 - **MAN-4.** Revoking a module MUST end its instances' streams and refuse their calls from then on.
+- **MAN-5.** The core MUST return, in `RegisterInstanceResponse`, the environment recorded for the credential the instance registered with. It MUST refuse, with `PERMISSION_DENIED`, the registration of an enforcement point whose credential has none, since every decision needs one (section 6.2).
 
 ### 3.3 Permissions
 
@@ -141,13 +142,15 @@ JSON examples of every method are in appendix A.
 | Code | Meaning | What the client does |
 | --- | --- | --- |
 | `UNAUTHENTICATED` | Token missing, expired or invalid | Get a new token, then retry |
-| `PERMISSION_DENIED` | Outside the instance's scope or permissions; module not approved or revoked | Do not retry until the configuration changes; stay closed |
+| `PERMISSION_DENIED` | Outside the instance's scope or permissions; module not approved or revoked; an enforcement point's credential without an environment (MAN-5) | Do not retry until the configuration changes; stay closed |
 | `INVALID_ARGUMENT` | Malformed request | Do not retry the same request |
 | `FAILED_PRECONDITION` | No common contract version; manifest hash mismatch; instance not registered | Fix the cause (for example register again), then retry |
 | `NOT_FOUND` | Unknown bundle version | Wait for the next state; do not retry the same version |
 | `RESOURCE_EXHAUSTED` | Rate limit or backpressure; or a message over the limits of section 4.8 | Retry with backoff, but never a message over the limits as it is |
 | `UNAVAILABLE`, `DEADLINE_EXCEEDED`, `ABORTED` | Transient | Retry with backoff |
 | `INTERNAL`, `UNKNOWN` | Server error | Retry with backoff |
+
+A failure of an established `Watch` stream is transient whatever its code, except `PERMISSION_DENIED`, and `UNAUTHENTICATED`, which needs a new token first: the instance reconnects with the backoff of section 4.7 and resumes. A stream is established once it has delivered its first message. Before then, an error that the core sends follows the table above, but a failure that the instance's own library reports, such as a cut in the middle of the first message, is transient. The code may come from the instance's own library rather than from the core: connect-go, for example, reports a stream cut in the middle of a message as `INVALID_ARGUMENT`, and `connect.IsWireError` tells the two apart.
 
 ### 4.7 Retries and backoff
 
@@ -175,6 +178,7 @@ A message's size is that of its encoding in the call, binary protobuf or JSON, o
 
 - **I-5.** An instance MUST register before any other call, and SHOULD deregister when it stops on purpose.
 - **I-6.** An instance MUST send heartbeats at the interval the core sets. A runtime-control instance reports as served agents those that have workloads it controls.
+- **I-7.** An enforcement point MUST put in the subject of every decision the environment its registration returned (MAN-5, section 6.2). It MUST NOT take the environment from its configuration, nor from its access token, which RFC 9068 (section 6) forbids a client to inspect. It MUST treat a registration that returns no environment, or one it does not know, as refused, and allow nothing (EP-1, EP-10).
 - **CORE-4.** The core MUST show an instance as lost once it has sent no heartbeat and held no stream for longer than its lease TTL, and MUST count it in the status of the halts it had to acknowledge.
 
 ## 5. Governance state, leases and halts
@@ -198,12 +202,14 @@ This section is the wire form of ADR-0005: the core publishes each agent's gover
 
 `FleetState` holds the active fleet halts. **An agent is halted when its `halts` list is not empty or the fleet's list is not empty.** A fleet halt changes one record, so enforcement points must always combine the two.
 
+A halt applies wherever the instance runs. An instance applies every halt in an agent's `halts` list, and every fleet halt, to that agent, whatever the instance's own environment, credential, cluster or configuration. No field of `Halt` limits where it applies. A later revision may add one: an instance that does not know it ignores it (EP-10) and applies the halt as before, so it halts more, never less.
+
 ### 5.2 The watch stream
 
-- **CORE-5.** When `since_version` is 0, or when the core cannot send every change since it, the core MUST start with a snapshot. It MAY send a snapshot at any time, and MUST NOT send a snapshot or a change older than `since_version`.
+- **CORE-5.** When `since_version` is 0, or when the core cannot send every change since it, the core MUST start with a snapshot. It MAY send a snapshot at any time, and MUST NOT send a snapshot or a change older than `since_version`. It MAY answer any resumption with a snapshot, including one at a version it moved forward after a regression, when a client resumes from a version above the core's latest state version (after an asynchronous failover or a restore). That snapshot replaces the client's state.
 - A **snapshot** is one or more `SnapshotPart` messages with the same version: the first has `first` set and carries the fleet state, the last has `last` set. Agents missing from a snapshot are out of scope.
-- **Changes** follow in strictly increasing version order. Each carries the complete new state of every agent that changed or entered the scope, the new fleet state when it changed, and the agents that left the scope.
-- **CORE-6.** The core MUST send a `LeaseRenewal` right after each complete snapshot, then at least at the renewal interval of section 4.8, and only when it has sent every change it knows of. A renewal therefore always means "your state is current". Every renewal carries `server_time`, the core's clock when it sends it (section 5.3).
+- **Changes** follow in strictly increasing version order. Each carries the complete new state of every agent that changed or entered the scope, the new fleet state when it changed, and the agents that left the scope. An instance applies every agent state a change carries, whatever that state's own `version`: an agent that enters the scope keeps the version of its last change, which may be older than the last version the instance applied.
+- **CORE-6.** The core MUST send a `LeaseRenewal` right after each complete snapshot, then at least at the renewal interval of section 4.8, and only when it has sent every change it knows of. A renewal therefore always means "your state is current". Its version may pass versions that carried nothing for the stream; that version is then the last version the instance applied (EP-9). Every renewal carries `server_time`, the core's clock when it sends it (section 5.3).
 - **CORE-7.** The core MUST end a stream it cannot keep up to date, for example a client too slow to read, rather than let it fall behind. The client's lease then expires if it cannot reconnect.
 
 ### 5.3 Leases
@@ -259,8 +265,8 @@ When no halt covers the agent any more, the gate reopens only if every other con
 - **EP-6. Lifecycle.** Open the gate only in the `validated`, `ready` and `active` states.
 - **EP-7. Bundles.** Fetch the bundle the state refers to, verify it (section 7.4), activate it atomically and acknowledge the outcome. Keep the last valid bundle when a new one is rejected, and never allow anything without one.
 - **EP-8. Evidence.** Record each decision durably before the action proceeds; publish events at least once, in order, from a stable source (section 8.4). Close the gate when the evidence buffer cannot accept another event.
-- **EP-9. Reconnection.** Reconnect with the backoff of section 4.7, resuming from the last version applied, and accept a snapshot at any time.
-- **EP-10. Unknown content.** Ignore unknown fields. Treat an unknown lifecycle state as closing the gate, an unknown halt scope as a halt, and an unknown halt mode as `interrupt`. Never let an unknown value open anything.
+- **EP-9. Reconnection.** Reconnect with the backoff of section 4.7 when an established stream fails (section 4.6), resuming from the last version applied. Apply every agent state a change carries, whatever that state's own version (section 5.2), and accept a snapshot at any time.
+- **EP-10. Unknown content.** Ignore unknown fields. An unknown field never narrows a halt. Treat an unknown lifecycle state as closing the gate, an unknown halt scope as a halt, and an unknown halt mode as `interrupt`. Never let an unknown value open anything.
 - **EP-11. Identity and trust.** An enforcement point inside an agent's process authenticates as that agent and serves it only. Take the core's trust anchors and the bundle keys from configuration.
 - **EP-12. State acknowledgements.** Acknowledge the state version applied at least every 60 seconds while it changes, so the console can show instances that lag behind.
 
@@ -309,13 +315,13 @@ A decision request is an **OpenID AuthZEN Authorization API 1.0** evaluation req
 
 ### 6.2 The subject
 
-The subject is always the agent (`type: agent`). The enforcement point builds it from its state and its credential, never from the agent's input:
+The subject is always the agent (`type: agent`). The enforcement point builds it from its state and its registration, never from the agent's input:
 
 | Property | Source | Cedar |
 | --- | --- | --- |
 | `id` | The agent ID | The principal's ID |
 | `slug`, `kind`, `risk_tier`, `data_categories`, `owner` | Governance state (`slug`, `attributes`) | Attributes of the same names |
-| `environment` | The environment of the credential the enforcement point runs with (`production` or `non_production`) | Attribute `environment` |
+| `environment` | The environment the core returned when the enforcement point registered, the one recorded for the credential it runs with (I-7, MAN-5): `production` or `non_production` | Attribute `environment` |
 | `labels` | Governance state (`attributes.labels`) | Entity tags: `principal.getTag("team")` |
 
 ### 6.3 Actions and resources
@@ -554,19 +560,22 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | S-02 Every gate condition denies, with its reason | EP-2, EP-6, fail-closed vectors | Designed |
 | S-03 The combination vectors give the expected decisions | EP-2, section 6 | Designed |
 | S-04 Lease expiry denies and halts within the TTL plus a tolerance | EP-3 | Designed |
-| S-05 A halt closes the gate and is acknowledged layer by layer, within the NFR-03 target | EP-4 | Designed |
-| S-06 A fleet halt halts the agent although its own state is unchanged | EP-4 | Designed |
+| S-05 A halt closes the gate and is acknowledged layer by layer, within the NFR-03 target. The kit runs it once with each environment that its fake core returns at registration, `production` and `non_production` | EP-4, section 5.1 | Designed |
+| S-06 A fleet halt halts the agent although its own state is unchanged. The kit runs it once with each environment that its fake core returns at registration, `production` and `non_production` | EP-4, section 5.1 | Designed |
 | S-07 Reconnecting while halted stays halted | EP-1, EP-4, EP-9 | Designed |
 | S-08 A release reopens only with a valid lease and bundle | EP-5 | Designed |
 | S-09 The bundle vectors are rejected with the right reasons, and the previous bundle stays active | EP-7 | Designed |
 | S-10 Events validate against the catalog, with a gapless `wtseq`, and survive a restart | EP-8 | Designed |
 | S-11 A full evidence buffer closes the gate | EP-8 | Designed |
-| S-12 Reconnection uses jittered backoff bounded by the lease, resets after a renewal, and resumes from the last version | EP-9, I-4 | Designed |
-| S-13 Unknown fields and values never open anything | EP-10 | Designed |
+| S-12 Reconnection uses jittered backoff bounded by the lease, resets after a renewal, and resumes from the last version applied, even when a renewal passed versions that carried nothing for the stream. The module reconnects after a stream cut in the middle of a message, the first one included. When it resumes, it applies a change that carries an agent state older than the version it resumed from, and a snapshot just past that version, which replaces its state | EP-9, I-4, sections 4.6 and 5.2 | Designed |
+| S-13 Unknown fields and values never open anything. A halt that carries an unknown field also closes the gate and is acknowledged, in the encoding the module uses (binary protobuf or JSON); the kit's fake core scripts it in P1-07.2 | EP-10 | Designed |
 | S-14 A runtime-control module never lifts a layer without a current state | RC-2, RC-3 | Designed |
 | S-15 A runtime-control module acknowledges per agent, with the workloads covered | RC-4 | Designed |
 | S-16 Registration refuses an unknown contract version | CORE-3, I-3 | Designed |
 | S-17 Stale renewals, a minute old or without the core's time, renew nothing: the lease runs out within its TTL, and a fresh renewal renews it again | EP-3, section 5.3 | Implemented |
+| S-25 An enforcement point puts in the subject of its decisions the environment its registration returned, which the fake core sets. The kit runs it once with each environment, `production` and `non_production`. With no environment, or one the module does not know, the module allows nothing | I-7 | Designed |
+
+S-18 to S-24 are reserved for [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which joins the contracts before `contracts/v0.1.0` is tagged ([P0-03](../plans/phase-0/P0-03-module-contracts.md), step 12).
 
 ## 10. Versioning and compatibility
 
@@ -575,7 +584,7 @@ The kit plays the core for a module under test: a fake core that speaks the modu
   - alpha: at least one minor release of the core with both versions;
   - beta: two minor releases or six months, whichever is longer;
   - `v1`: twelve months.
-- **Additive changes stay in the version:** new fields, enum values, methods, event types and optional event data. Readers ignore unknown fields; unknown enum values take their fail-closed meaning (EP-10).
+- **Additive changes stay in the version:** new fields, enum values, methods, event types and optional event data. Readers ignore unknown fields; unknown enum values take their fail-closed meaning (EP-10). A new field may narrow a halt within the version only because an instance that ignores it halts more (section 5.1); a change that would make such an instance halt less is a breaking change.
 - **An event type changes incompatibly only as a new type** (`.v2`); emitters may send both during a migration.
 - **Every change to `api/proto`, `api/events`, `api/manifest` or `api/policy` needs an RFC** (GOVERNANCE.md).
 - **Draft until tagged.** `v1alpha1` is a draft until RFC-0001 is accepted and `contracts/v0.1.0` is tagged. CI compares the protobuf files with the latest `contracts/v*` tag (`buf breaking`, FILE rules), so changes during the review are free and changes after it are checked.
@@ -633,7 +642,7 @@ Examples use the Connect protocol with JSON. Field names are the protobuf JSON n
 ```
 
 ```json
-{ "instanceId": "0192f1c2-9e00-7c4d-8e5f-000000000051", "contractVersion": "v1alpha1", "heartbeatInterval": "30s" }
+{ "instanceId": "0192f1c2-9e00-7c4d-8e5f-000000000051", "contractVersion": "v1alpha1", "heartbeatInterval": "30s", "environment": "ENVIRONMENT_PRODUCTION" }
 ```
 
 **`RegistryService.Heartbeat`**

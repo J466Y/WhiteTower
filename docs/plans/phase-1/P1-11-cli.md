@@ -72,7 +72,7 @@ A command-line tool for operators, owners and auditors that covers the day-to-da
 ### 6. Halts
 
 - `wtctl halt agent <id> --reason`.
-- `wtctl halt fleet --reason [--selector]`, which asks for explicit confirmation unless `--yes` is given.
+- `wtctl halt fleet --reason [--selector]`, which asks for explicit confirmation unless `--yes` is given. `--selector` names risk tiers and labels (P1-08, step 1); the API refuses an environment, and the CLI prints the problem's detail. Before it asks for confirmation, the CLI prints what the halt stops, from P1-08's preview, and says that the halt stops these agents in every environment ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 2).
 - `wtctl halt status <id> --watch`, with live propagation.
 - `wtctl halt release request` and `approve`.
 - Works with a break-glass session (KIL-08).
