@@ -37,7 +37,7 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | [P1-05](phase-1/P1-05-agent-identity-and-credentials.md) | Agent identity and credentials | L | P1-04 | AID-01 to AID-09 | Draft |
 | [P1-06](phase-1/P1-06-policy-model-and-distribution.md) | Policy model and distribution | L | P0-03, P1-04; P0-03 step 12 for its RFC-0002 parts | POL-01 to POL-10, CAT-03, CAT-05, CAT-06 | Draft |
 | [P1-07](phase-1/P1-07-module-registry-and-api.md) | Module registry and module API | XL, split into 2 subplans | P0-03, P1-01, P1-05; P0-03 step 12 for its RFC-0002 parts, and P1-16 step 4 for the wiring of tooling reports | MOD-01 to MOD-05, MOD-07, CAT-01, CAT-04; part of NFR-24 | Draft |
-| [P1-08](phase-1/P1-08-kill-switch.md) | Kill switch | L | P1-04, P1-05, P1-07 | KIL-01 to KIL-10, NFR-24 | Draft |
+| [P1-08](phase-1/P1-08-kill-switch.md) | Kill switch | L | P1-04, P1-05, P1-07 | KIL-01 to KIL-10, NFR-24 | Draft (design of the halt path in review) |
 | [P1-09](phase-1/P1-09-python-enforcement-point.md) | White Tower enforcement point (Python) | XL, split into 4 subplans | P0-05 (S1), P1-06, P1-07, P1-08; P0-03 step 12 for its tooling steps, and P1-16 for their end-to-end tests | MOD-06, CAT-01, CAT-04, CAT-05 to CAT-07, CAT-10 | Draft |
 | [P1-10](phase-1/P1-10-web-console.md) | Web console | XL, split into 8 subplans | P1-10.0 needs only the requirements; P1-10.1 needs P1-03; then each backend plan | UI-01 to UI-10 | Draft |
 | [P1-11](phase-1/P1-11-cli.md) | CLI (`wtctl`) | M | P1-03; P1-16 for the catalog commands | API-04 | Draft |
