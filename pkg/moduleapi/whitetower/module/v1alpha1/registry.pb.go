@@ -25,6 +25,63 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Environment is the environment recorded for a credential.
+type Environment int32
+
+const (
+	// None recorded. Only a module credential can have none, and the core
+	// refuses to register an enforcement point whose credential has none (MAN-5).
+	// An enforcement point that receives it, or a value it does not know, treats
+	// its registration as refused and allows nothing (I-7).
+	Environment_ENVIRONMENT_UNSPECIFIED Environment = 0
+	// Production: "production" in the subject of decisions.
+	Environment_ENVIRONMENT_PRODUCTION Environment = 1
+	// Any environment other than production: "non_production" in the subject of
+	// decisions.
+	Environment_ENVIRONMENT_NON_PRODUCTION Environment = 2
+)
+
+// Enum value maps for Environment.
+var (
+	Environment_name = map[int32]string{
+		0: "ENVIRONMENT_UNSPECIFIED",
+		1: "ENVIRONMENT_PRODUCTION",
+		2: "ENVIRONMENT_NON_PRODUCTION",
+	}
+	Environment_value = map[string]int32{
+		"ENVIRONMENT_UNSPECIFIED":    0,
+		"ENVIRONMENT_PRODUCTION":     1,
+		"ENVIRONMENT_NON_PRODUCTION": 2,
+	}
+)
+
+func (x Environment) Enum() *Environment {
+	p := new(Environment)
+	*p = x
+	return p
+}
+
+func (x Environment) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Environment) Descriptor() protoreflect.EnumDescriptor {
+	return file_whitetower_module_v1alpha1_registry_proto_enumTypes[0].Descriptor()
+}
+
+func (Environment) Type() protoreflect.EnumType {
+	return &file_whitetower_module_v1alpha1_registry_proto_enumTypes[0]
+}
+
+func (x Environment) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Environment.Descriptor instead.
+func (Environment) EnumDescriptor() ([]byte, []int) {
+	return file_whitetower_module_v1alpha1_registry_proto_rawDescGZIP(), []int{0}
+}
+
 // Health is the health an instance reports about itself.
 type Health int32
 
@@ -67,11 +124,11 @@ func (x Health) String() string {
 }
 
 func (Health) Descriptor() protoreflect.EnumDescriptor {
-	return file_whitetower_module_v1alpha1_registry_proto_enumTypes[0].Descriptor()
+	return file_whitetower_module_v1alpha1_registry_proto_enumTypes[1].Descriptor()
 }
 
 func (Health) Type() protoreflect.EnumType {
-	return &file_whitetower_module_v1alpha1_registry_proto_enumTypes[0]
+	return &file_whitetower_module_v1alpha1_registry_proto_enumTypes[1]
 }
 
 func (x Health) Number() protoreflect.EnumNumber {
@@ -80,7 +137,7 @@ func (x Health) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Health.Descriptor instead.
 func (Health) EnumDescriptor() ([]byte, []int) {
-	return file_whitetower_module_v1alpha1_registry_proto_rawDescGZIP(), []int{0}
+	return file_whitetower_module_v1alpha1_registry_proto_rawDescGZIP(), []int{1}
 }
 
 // RegisterInstanceRequest describes the instance.
@@ -253,8 +310,12 @@ type RegisterInstanceResponse struct {
 	ContractVersion string `protobuf:"bytes,2,opt,name=contract_version,json=contractVersion,proto3" json:"contract_version,omitempty"`
 	// How often the instance must call Heartbeat.
 	HeartbeatInterval *durationpb.Duration `protobuf:"bytes,3,opt,name=heartbeat_interval,json=heartbeatInterval,proto3" json:"heartbeat_interval,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// The environment recorded for the credential the instance registered with.
+	// An enforcement point puts it in the subject of every decision (contract,
+	// section 6.2).
+	Environment   Environment `protobuf:"varint,4,opt,name=environment,proto3,enum=whitetower.module.v1alpha1.Environment" json:"environment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RegisterInstanceResponse) Reset() {
@@ -306,6 +367,13 @@ func (x *RegisterInstanceResponse) GetHeartbeatInterval() *durationpb.Duration {
 		return x.HeartbeatInterval
 	}
 	return nil
+}
+
+func (x *RegisterInstanceResponse) GetEnvironment() Environment {
+	if x != nil {
+		return x.Environment
+	}
+	return Environment_ENVIRONMENT_UNSPECIFIED
 }
 
 // HeartbeatRequest reports the instance's health.
@@ -586,12 +654,13 @@ const file_whitetower_module_v1alpha1_registry_proto_rawDesc = "" +
 	"components\x1a=\n" +
 	"\x0fComponentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb0\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfb\x01\n" +
 	"\x18RegisterInstanceResponse\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12)\n" +
 	"\x10contract_version\x18\x02 \x01(\tR\x0fcontractVersion\x12H\n" +
-	"\x12heartbeat_interval\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x11heartbeatInterval\"\xd6\x01\n" +
+	"\x12heartbeat_interval\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x11heartbeatInterval\x12I\n" +
+	"\venvironment\x18\x04 \x01(\x0e2'.whitetower.module.v1alpha1.EnvironmentR\venvironment\"\xd6\x01\n" +
 	"\x10HeartbeatRequest\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12:\n" +
@@ -606,7 +675,11 @@ const file_whitetower_module_v1alpha1_registry_proto_rawDesc = "" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x1c\n" +
-	"\x1aDeregisterInstanceResponse*_\n" +
+	"\x1aDeregisterInstanceResponse*f\n" +
+	"\vEnvironment\x12\x1b\n" +
+	"\x17ENVIRONMENT_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16ENVIRONMENT_PRODUCTION\x10\x01\x12\x1e\n" +
+	"\x1aENVIRONMENT_NON_PRODUCTION\x10\x02*_\n" +
 	"\x06Health\x12\x16\n" +
 	"\x12HEALTH_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eHEALTH_HEALTHY\x10\x01\x12\x13\n" +
@@ -630,39 +703,41 @@ func file_whitetower_module_v1alpha1_registry_proto_rawDescGZIP() []byte {
 	return file_whitetower_module_v1alpha1_registry_proto_rawDescData
 }
 
-var file_whitetower_module_v1alpha1_registry_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_whitetower_module_v1alpha1_registry_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_whitetower_module_v1alpha1_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_whitetower_module_v1alpha1_registry_proto_goTypes = []any{
-	(Health)(0),                        // 0: whitetower.module.v1alpha1.Health
-	(*RegisterInstanceRequest)(nil),    // 1: whitetower.module.v1alpha1.RegisterInstanceRequest
-	(*InstanceInfo)(nil),               // 2: whitetower.module.v1alpha1.InstanceInfo
-	(*RegisterInstanceResponse)(nil),   // 3: whitetower.module.v1alpha1.RegisterInstanceResponse
-	(*HeartbeatRequest)(nil),           // 4: whitetower.module.v1alpha1.HeartbeatRequest
-	(*ServedAgents)(nil),               // 5: whitetower.module.v1alpha1.ServedAgents
-	(*HeartbeatResponse)(nil),          // 6: whitetower.module.v1alpha1.HeartbeatResponse
-	(*DeregisterInstanceRequest)(nil),  // 7: whitetower.module.v1alpha1.DeregisterInstanceRequest
-	(*DeregisterInstanceResponse)(nil), // 8: whitetower.module.v1alpha1.DeregisterInstanceResponse
-	nil,                                // 9: whitetower.module.v1alpha1.InstanceInfo.ComponentsEntry
-	(*durationpb.Duration)(nil),        // 10: google.protobuf.Duration
+	(Environment)(0),                   // 0: whitetower.module.v1alpha1.Environment
+	(Health)(0),                        // 1: whitetower.module.v1alpha1.Health
+	(*RegisterInstanceRequest)(nil),    // 2: whitetower.module.v1alpha1.RegisterInstanceRequest
+	(*InstanceInfo)(nil),               // 3: whitetower.module.v1alpha1.InstanceInfo
+	(*RegisterInstanceResponse)(nil),   // 4: whitetower.module.v1alpha1.RegisterInstanceResponse
+	(*HeartbeatRequest)(nil),           // 5: whitetower.module.v1alpha1.HeartbeatRequest
+	(*ServedAgents)(nil),               // 6: whitetower.module.v1alpha1.ServedAgents
+	(*HeartbeatResponse)(nil),          // 7: whitetower.module.v1alpha1.HeartbeatResponse
+	(*DeregisterInstanceRequest)(nil),  // 8: whitetower.module.v1alpha1.DeregisterInstanceRequest
+	(*DeregisterInstanceResponse)(nil), // 9: whitetower.module.v1alpha1.DeregisterInstanceResponse
+	nil,                                // 10: whitetower.module.v1alpha1.InstanceInfo.ComponentsEntry
+	(*durationpb.Duration)(nil),        // 11: google.protobuf.Duration
 }
 var file_whitetower_module_v1alpha1_registry_proto_depIdxs = []int32{
-	2,  // 0: whitetower.module.v1alpha1.RegisterInstanceRequest.info:type_name -> whitetower.module.v1alpha1.InstanceInfo
-	9,  // 1: whitetower.module.v1alpha1.InstanceInfo.components:type_name -> whitetower.module.v1alpha1.InstanceInfo.ComponentsEntry
-	10, // 2: whitetower.module.v1alpha1.RegisterInstanceResponse.heartbeat_interval:type_name -> google.protobuf.Duration
-	0,  // 3: whitetower.module.v1alpha1.HeartbeatRequest.health:type_name -> whitetower.module.v1alpha1.Health
-	5,  // 4: whitetower.module.v1alpha1.HeartbeatRequest.served_agents:type_name -> whitetower.module.v1alpha1.ServedAgents
-	10, // 5: whitetower.module.v1alpha1.HeartbeatResponse.heartbeat_interval:type_name -> google.protobuf.Duration
-	1,  // 6: whitetower.module.v1alpha1.RegistryService.RegisterInstance:input_type -> whitetower.module.v1alpha1.RegisterInstanceRequest
-	4,  // 7: whitetower.module.v1alpha1.RegistryService.Heartbeat:input_type -> whitetower.module.v1alpha1.HeartbeatRequest
-	7,  // 8: whitetower.module.v1alpha1.RegistryService.DeregisterInstance:input_type -> whitetower.module.v1alpha1.DeregisterInstanceRequest
-	3,  // 9: whitetower.module.v1alpha1.RegistryService.RegisterInstance:output_type -> whitetower.module.v1alpha1.RegisterInstanceResponse
-	6,  // 10: whitetower.module.v1alpha1.RegistryService.Heartbeat:output_type -> whitetower.module.v1alpha1.HeartbeatResponse
-	8,  // 11: whitetower.module.v1alpha1.RegistryService.DeregisterInstance:output_type -> whitetower.module.v1alpha1.DeregisterInstanceResponse
-	9,  // [9:12] is the sub-list for method output_type
-	6,  // [6:9] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	3,  // 0: whitetower.module.v1alpha1.RegisterInstanceRequest.info:type_name -> whitetower.module.v1alpha1.InstanceInfo
+	10, // 1: whitetower.module.v1alpha1.InstanceInfo.components:type_name -> whitetower.module.v1alpha1.InstanceInfo.ComponentsEntry
+	11, // 2: whitetower.module.v1alpha1.RegisterInstanceResponse.heartbeat_interval:type_name -> google.protobuf.Duration
+	0,  // 3: whitetower.module.v1alpha1.RegisterInstanceResponse.environment:type_name -> whitetower.module.v1alpha1.Environment
+	1,  // 4: whitetower.module.v1alpha1.HeartbeatRequest.health:type_name -> whitetower.module.v1alpha1.Health
+	6,  // 5: whitetower.module.v1alpha1.HeartbeatRequest.served_agents:type_name -> whitetower.module.v1alpha1.ServedAgents
+	11, // 6: whitetower.module.v1alpha1.HeartbeatResponse.heartbeat_interval:type_name -> google.protobuf.Duration
+	2,  // 7: whitetower.module.v1alpha1.RegistryService.RegisterInstance:input_type -> whitetower.module.v1alpha1.RegisterInstanceRequest
+	5,  // 8: whitetower.module.v1alpha1.RegistryService.Heartbeat:input_type -> whitetower.module.v1alpha1.HeartbeatRequest
+	8,  // 9: whitetower.module.v1alpha1.RegistryService.DeregisterInstance:input_type -> whitetower.module.v1alpha1.DeregisterInstanceRequest
+	4,  // 10: whitetower.module.v1alpha1.RegistryService.RegisterInstance:output_type -> whitetower.module.v1alpha1.RegisterInstanceResponse
+	7,  // 11: whitetower.module.v1alpha1.RegistryService.Heartbeat:output_type -> whitetower.module.v1alpha1.HeartbeatResponse
+	9,  // 12: whitetower.module.v1alpha1.RegistryService.DeregisterInstance:output_type -> whitetower.module.v1alpha1.DeregisterInstanceResponse
+	10, // [10:13] is the sub-list for method output_type
+	7,  // [7:10] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_whitetower_module_v1alpha1_registry_proto_init() }
@@ -675,7 +750,7 @@ func file_whitetower_module_v1alpha1_registry_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_whitetower_module_v1alpha1_registry_proto_rawDesc), len(file_whitetower_module_v1alpha1_registry_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
