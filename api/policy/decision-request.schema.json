@@ -23,7 +23,7 @@
             "kind": { "enum": ["in_house", "third_party"] },
             "risk_tier": { "enum": ["low", "medium", "high", "critical"] },
             "environment": {
-              "description": "The environment of the credential the enforcement point runs with.",
+              "description": "The environment the core returned at registration, recorded for the credential the enforcement point runs with (I-7).",
               "enum": ["production", "non_production"]
             },
             "data_categories": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },

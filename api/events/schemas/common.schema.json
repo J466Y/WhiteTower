@@ -193,17 +193,11 @@
       }
     },
     "selector": {
-      "description": "The agents a selector halt covers: every condition must hold.",
+      "description": "The agents a selector halt covers, in every environment: every condition must hold.",
       "type": "object",
       "minProperties": 1,
       "additionalProperties": false,
       "properties": {
-        "environment": {
-          "enum": [
-            "production",
-            "non_production"
-          ]
-        },
         "risk_tiers": {
           "type": "array",
           "minItems": 1,
@@ -220,6 +214,7 @@
         "labels": {
           "type": "object",
           "minProperties": 1,
+          "maxProperties": 16,
           "additionalProperties": {
             "type": "string"
           }

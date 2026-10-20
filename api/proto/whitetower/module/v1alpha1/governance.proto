@@ -99,7 +99,8 @@ message AgentState {
   // may open.
   LifecycleState lifecycle_state = 4;
   // Agent and selector halts that cover the agent. The agent is halted when
-  // this list is not empty or when the fleet is halted.
+  // this list is not empty or when the fleet is halted, wherever the instance
+  // runs (contract, section 5.1).
   repeated Halt halts = 5;
   // The agent's effective policy bundle. Absent while it has none.
   BundleRef bundle = 6;
@@ -115,7 +116,8 @@ message AgentState {
 message FleetState {
   // The state version of the fleet state's last change.
   uint64 version = 1;
-  // Active fleet halts. Every agent is halted while this list is not empty.
+  // Active fleet halts. Every agent is halted while this list is not empty,
+  // wherever the instance runs (contract, section 5.1).
   repeated Halt halts = 2;
 }
 
@@ -156,7 +158,8 @@ enum HaltScope {
 }
 
 // Halt identifies an active halt. Reasons are not sent to instances; operators
-// see them in the console.
+// see them in the console. No field limits where a halt applies: an instance
+// still applies a halt that carries a field it does not know (EP-10).
 message Halt {
   // The halt's identifier (UUIDv7).
   string halt_id = 1;

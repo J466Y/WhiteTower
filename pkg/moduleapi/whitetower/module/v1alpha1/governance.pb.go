@@ -771,7 +771,8 @@ type AgentState struct {
 	// may open.
 	LifecycleState LifecycleState `protobuf:"varint,4,opt,name=lifecycle_state,json=lifecycleState,proto3,enum=whitetower.module.v1alpha1.LifecycleState" json:"lifecycle_state,omitempty"`
 	// Agent and selector halts that cover the agent. The agent is halted when
-	// this list is not empty or when the fleet is halted.
+	// this list is not empty or when the fleet is halted, wherever the instance
+	// runs (contract, section 5.1).
 	Halts []*Halt `protobuf:"bytes,5,rep,name=halts,proto3" json:"halts,omitempty"`
 	// The agent's effective policy bundle. Absent while it has none.
 	Bundle *BundleRef `protobuf:"bytes,6,opt,name=bundle,proto3" json:"bundle,omitempty"`
@@ -883,7 +884,8 @@ type FleetState struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The state version of the fleet state's last change.
 	Version uint64 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
-	// Active fleet halts. Every agent is halted while this list is not empty.
+	// Active fleet halts. Every agent is halted while this list is not empty,
+	// wherever the instance runs (contract, section 5.1).
 	Halts         []*Halt `protobuf:"bytes,2,rep,name=halts,proto3" json:"halts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -934,7 +936,8 @@ func (x *FleetState) GetHalts() []*Halt {
 }
 
 // Halt identifies an active halt. Reasons are not sent to instances; operators
-// see them in the console.
+// see them in the console. No field limits where a halt applies: an instance
+// still applies a halt that carries a field it does not know (EP-10).
 type Halt struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The halt's identifier (UUIDv7).
