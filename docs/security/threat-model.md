@@ -1,9 +1,9 @@
-# Threat model v0.1.1
+# Threat model v0.1.2
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1.1: version 0.1, which the maintainer reviewed and accepted on 2026-09-30, and the additions of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which the RFC's review covers (section 10) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models) |
+| **Status** | Version 0.1.2: version 0.1, which the maintainer reviewed and accepted on 2026-09-30; the additions of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which the RFC's review covers; and the changes that follow [the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), which the maintainer accepted on 2026-10-20 (section 10) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models) and 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): T-31, AT-1 and DC-9) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md) |
 | **Models** | The MVP as designed: [architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [module contracts v0.1](../contracts/module-contract-v0.1.md), [domain model](../architecture/domain-model.md), [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) |
 | **Related** | [Framework mapping](framework-mapping.md), [security test catalog](security-tests.md), [SECURITY.md](../../SECURITY.md) |
@@ -250,7 +250,7 @@ Each table covers the flows of one boundary. The rating is likelihood / impact �
 | T-28 | S | An unapproved module, or a changed manifest, registers instances | L / H → M | MAN-1 to MAN-4: approval, manifest hash, re-approval of changes, revocation ending streams | Low |
 | T-29 | T | A forged or tampered bundle reaches an enforcement point | L / H → M | Signed with the bundle key; keys from the enforcement point's configuration (A-4); bound to the manifest hash in the state; checks V1 to V7 ([contracts section 7](../contracts/module-contract-v0.1.md#7-policy-bundles)) | Low |
 | T-30 | T | An older bundle is replayed | L / H → M | Versions only grow (V6); the state names the version and its hash (V3) | Low |
-| T-31 | T | A stale replica, or a replayed stream, undoes a halt | L / H → M | CORE-5 and CORE-6; versions committed in order under an advisory lock ([spike S2](../spikes/S2-watch-streams.md)) | Low |
+| T-31 | T | A stale replica, or a replayed stream, undoes a halt | L / H → M | CORE-5 and CORE-6; versions committed in order by one version counter, whose row lock orders commits; a replica renews leases only while its last successful read of the database is under 3 seconds old, and ends its streams once that read is 10 seconds old ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), sections 2 and 5) | Low |
 | **T-32** | T, D | A delayed stream. Something on the path (a proxy, a load balancer, a sidecar) buffers the `Watch` stream and releases it late. Renewals keep arriving at their usual pace, so leases never expire, while halts arrive as late as the attacker wants | L / H → M | Unacknowledged halts raise alerts (P1-08); **DC-2**: renewals carry the core's time, and one older than a tolerance on the instance's clock renews nothing | Low |
 | T-33 | S | A server impersonating the core keeps an enforcement point open or feeds it state | L / H → M | TLS with trust anchors from configuration (I-1, A-4); bundles still need the configured keys | Low |
 | T-34 | R, T | A compromised enforcement point acknowledges layers it did not apply | M / H → H | Layers reported separately, never overstated ([contracts 5.5](../contracts/module-contract-v0.1.md#55-halts)); network quarantine acknowledges independently on Kubernetes (KIL-10); halts stop tokens for other audiences; **DC-6**: the console flags allow decisions and executed actions after the gate was acknowledged closed | R-01 |
@@ -356,7 +356,7 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
   - cut the stream: the lease expires and the enforcement point fails closed within its TTL (T-69, KIL-04);
   - delay the stream while renewals keep the lease alive (T-32): **DC-2**;
   - slow the halt path with blocks, or with catalog changes that rebuild many bundles (T-80): **DC-9**, chunked rebuilds;
-  - serve older state from a stale replica (T-31): CORE-5 and CORE-6;
+  - serve older state from a stale replica (T-31): CORE-5 and CORE-6, one version counter, and renewals only while the replica's last successful read of the database is under 3 seconds old;
   - impersonate the core (T-33): I-1.
 - Make the enforcement point ignore the halt:
   - compromise the agent's process (T-40): network quarantine on Kubernetes; otherwise R-01;
@@ -481,7 +481,7 @@ The analysis found eight gaps in the design, and the analysis of RFC-0002 two mo
 | DC-6 | T-34, T-40 | "Activity after a halt" is defined precisely: an allow decision or an executed action whose time is after the gate was acknowledged closed. Buffered evidence delivered later (DC-1) is expected and not flagged | P1-08 step 4 | Applied |
 | DC-7 | T-46 | Quarantined pods get no DNS by default. The enforcement point reconnects to the core's last resolved addresses; a CNI with DNS-aware rules may allow the core's name only, as an option | P1-15 step 3, P1-09, contracts section 12 (the open question is closed) | Applied |
 | DC-8 | T-52 | A scheduled consistency check proves the current log extends the latest checkpoint the SIEM holds, and alerts on failure | P1-02 step 7, P1-12 step 9 | Applied |
-| DC-9 | T-80 | Organization-wide blocks travel in their own record of the watch stream, never in the fleet record that fleet halts change, nor in agents' records: a snapshot carries every active block, and changes carry those added and removed. A block carries its ID, its kind, the SHA-256 of what it covers and its issue time; references and reasons stay in the core. Blocks take their versions from the same sequence as the rest of the state, so a lease renewal still means that the state is current, and a block is committed without waiting for any bundle (CORE-12). At most 500 are active, about 40 KB of a snapshot, so a fleet halt costs the same with or without them | RFC-0002 section 6, which P0-03 step 12 brings into the contracts; conformance scenario S-20; CAT-04, NFR-24; P1-07 steps 5 and 6 (the blocks record, and acknowledgements); P1-08 (the design of the halt path, and the harness of step 10); P1-16 step 7; domain model section 3.9 | Proposed: applied once RFC-0002 is accepted |
+| DC-9 | T-80 | Organization-wide blocks travel in their own record of the watch stream, never in the fleet record that fleet halts change, nor in agents' records: a snapshot carries every active block, and changes carry those added and removed. A block carries its ID, its kind, the SHA-256 of what it covers and its issue time; references and reasons stay in the core. Blocks take their versions from the same version counter as the rest of the state ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 2), so a lease renewal still means that the state is current, and a block is committed without waiting for any bundle (CORE-12). At most 500 are active, about 40 KB of a snapshot, so a fleet halt costs the same with or without them | RFC-0002 section 6, which P0-03 step 12 brings into the contracts; conformance scenario S-20; CAT-04, NFR-24; P1-07 steps 5 and 6 (the blocks record, and acknowledgements); P1-08 (the design of the halt path, and the harness of step 10); P1-16 step 7; domain model section 3.9 | Proposed: applied once RFC-0002 is accepted |
 | DC-10 | T-74 | The core bounds, for each agent, what the agent's reports brought that still waits for review: new entries of each kind, and new definitions and digests of known entries, one report's worth by default, which administrators can change (CORE-13). Beyond the bound, it still records the report but leaves out what is new: a new entry stays unknown (`catalog.unknown`), and a new definition or digest is not stored, so the tool or the model stays denied. Reviewers free room by approving or declining, all of an agent's waiting entries at once if need be. A compromised agent therefore cannot make the catalog, or the reviewers' queue, grow faster than people decide, whatever the rate of its reports | RFC-0002 section 4.2, which P0-03 step 12 brings into the contracts; P1-16 step 4; domain model section 3.9 | Proposed: applied once RFC-0002 is accepted |
 
 ## 8. Accepted risks
@@ -512,10 +512,11 @@ The abuse cases above become tests in the [security test catalog](security-tests
 
 ## 10. Review and upkeep
 
-- **Review.** The maintainer, who did not write it, reviewed and accepted version 0.1 on 2026-09-30. The review of RFC-0002, by its external reviewer as well, covers the additions of version 0.1.1. An external security review is still planned before the pilot, with the release review of P1-13.
+- **Review.** The maintainer, who did not write it, reviewed and accepted version 0.1 on 2026-09-30. The review of RFC-0002, by its external reviewer as well, covers the additions of version 0.1.1. The changes of version 0.1.2 follow the design of the halt path, which the maintainer accepted on 2026-10-20 (plan P1-08). An external security review is still planned before the pilot, with the release review of P1-13.
 - **Upkeep.** As [GOVERNANCE.md](../../GOVERNANCE.md) sets out, the threat model is reviewed at every phase gate, whenever a trust boundary changes, and in the security section of every RFC. Plan P1-13 publishes version 0.2, checked against the implementation.
 
 | Version | Date | Change |
 | --- | --- | --- |
 | 0.1 | 2026-09-30 | First version (P0-04) |
 | 0.1.1 | 2026-10-19 | RFC-0002, MCP servers, tools and models (plan P1-16). Added: boundary TB-10 and flows F16 and F17, actor TA-11, assumption A-7, two assets, threats T-74 to T-82 and section 5.12 (the cross-cutting section becomes 5.13), attack tree AT-10, design changes DC-9 and DC-10, accepted risk R-15, and tests ST-75 to ST-83. Changed: the scope, A-6, the governance state asset, O-1, O-3, TB-1, TB-2, F6, F15, T-40, attack trees AT-1, AT-6, AT-7 and AT-8, and accepted risks R-01, R-02, R-10 and R-11 |
+| 0.1.2 | 2026-10-20 | The accepted design of the halt path (plan P1-08). Changed: T-31, attack tree AT-1 and design change DC-9. The security test catalog and the framework mapping are unchanged |

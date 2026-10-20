@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md)) |
-| **Date** | 2026-09-29; updated 2026-10-19 for RFC-0002 (section 3.9 and the rows that refer to it) |
+| **Date** | 2026-09-29; updated 2026-10-19 for RFC-0002 (section 3.9 and the rows that refer to it), and 2026-10-20 for the design of the halt path (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): sections 2, 3.3, 3.5, 3.6, 3.9, 4, 5 and 6) |
 | **Schema** | [`internal/platform/db/migrations/00001_init.sql`](../../internal/platform/db/migrations/00001_init.sql) |
 | **Related** | [Agent lifecycle](lifecycle.md), [architecture](mvp-architecture.md), [requirements](../requirements/mvp-requirements.md), [ADR-0003](../adr/0003-postgresql-only-stateful-dependency.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md), [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) |
 
@@ -46,7 +46,7 @@ One name per concept, used identically in code, API, console and documentation.
 | Enforcement point | An instance that applies governance to agents at runtime | `module_instances`, `instance_agents` |
 | Governance state | What the core publishes to enforcement points about each agent | `governance_state` |
 | Halt / release | The kill switch's stop, and its two-person reversal | `halts`, `halt_release_requests` |
-| Acknowledgement | An instance's report of what a halt achieved, layer by layer | `halt_acks` |
+| Acknowledgement | An instance's report of what a halt achieved, layer by layer | `halt_acks`, which P1-08 replaces with `halt_expectations` (the expected pairs of instance and agent) and `halt_layer_reports` (one row per layer) |
 | Lease | The time an enforcement point may keep deciding without hearing from the core | `governance_state.lease_ttl_seconds` |
 | Audit event / checkpoint | A record of evidence, and a signed statement of the audit log's state | `audit_events`, `audit_checkpoints` |
 | Coverage level | C0 to C3, computed from credentials, instances, decisions and drills (requirements, section 3) | Computed, not stored |
@@ -125,7 +125,7 @@ The full list of columns and constraints is in the schema file; the tables of se
 | Entity | Purpose | Invariants |
 | --- | --- | --- |
 | `signing_keys` | Public halves and status of the token, bundle and checkpoint keys | Private keys never enter the database (DB: a JWK with a private member is refused); one active key per purpose (DB) |
-| `machine_credentials` | Public keys of agents and standalone modules | Belongs to exactly one agent or one module (DB); agent keys carry an environment label (DB); no private keys (DB); revocation recorded (DB) |
+| `machine_credentials` | Public keys of agents and standalone modules | Belongs to exactly one agent or one module (DB); agent keys carry an environment label (DB), and so do the keys of a module whose manifest declares the `enforcement-point` capability, checked when they are created (domain, P1-05; [the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), decision 7); no private keys (DB); revocation recorded (DB) |
 | `workload_issuers`, `workload_identity_bindings` | Kubernetes clusters trusted for workload identity federation, and service account to agent mappings (AID-07) | One active binding per issuer and subject (DB) |
 | `used_assertions` | Replay protection for client assertions | Primary key on client and assertion ID (DB); rows expire within minutes |
 
@@ -143,21 +143,21 @@ The full list of columns and constraints is in the schema file; the tables of se
 | Entity | Purpose | Invariants |
 | --- | --- | --- |
 | `modules` | Registered modules and their manifests | Slug format (DB); approval and revocation recorded consistently (DB) |
-| `module_agent_bindings` | Which agents a standalone module may serve: named agents, or all agents, as the network quarantine module of a cluster is (KIL-10) | One active binding per module and agent, and at most one active binding to all agents per module (DB) |
-| `module_instances` | Connected, disconnected and lost instances, with lease TTL and contract version | An instance authenticated as an agent names that agent (DB); lease TTL between 10 and 300 seconds (DB) |
+| `module_agent_bindings` | Which agents a standalone module may serve: named agents, or all agents, as the network quarantine module of a cluster is (KIL-10). P1-07 adds `state_version` and `removed_version`, so a resumed stream learns of scope changes ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 12) | One active binding per module and agent, and at most one active binding to all agents per module (DB) |
+| `module_instances` | Connected, disconnected and lost instances, with lease TTL (the shortest in the instance's scope, P1-07) and contract version. P1-07 adds `environment`, the environment of the credential the instance registered with ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), decision 7) | An instance authenticated as an agent names that agent (DB); lease TTL between 10 and 300 seconds (DB) |
 | `instance_agents` | Per instance and agent: active bundle version, last observed state version | Drives drift detection (P1-06), halt tracking (P1-08) and the spread of blocks (P1-16) |
-| `governance_state` | One record per agent: lifecycle state, run state, agent-level halts, bundle, lease TTL, halt mode, policy attributes, state version | `halted` if and only if at least one halt covers the agent (DB); lease TTL bounds (DB); halt mode values (DB) |
+| `governance_state` | One record per agent: lifecycle state, run state, agent-level halts, bundle, lease TTL, halt mode, policy attributes, state version | `halted` if and only if at least one halt covers the agent (DB); lease TTL bounds (DB); halt mode values (DB); every agent has its row from its creation: T1 writes it in the agent's own transaction (domain) |
 | `fleet_state` | The single fleet-wide record | Exactly one row (DB); `halted` if and only if a fleet halt is active (DB); never carries blocks (domain, DC-9) |
 
-A fleet halt changes one row (`fleet_state`), not one row per agent, and blocks never add to that row (section 3.9). Selector halts are folded into each matching agent's `agent_halt_ids` when issued, and into agents registered later.
+A fleet halt changes one row (`fleet_state`), not one row per agent, and blocks never add to that row (section 3.9). Selector halts name risk tiers and labels. They are folded into each matching agent's `agent_halt_ids` when issued, and into agents that match later, when they are created or their labels or risk tier change (P1-08 step 3). Every halt covers its agents' instances in every environment, since the environment is only a label of each credential, which nothing verifies in the MVP ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), decision 2).
 
 ### 3.6 Kill switch
 
 | Entity | Purpose | Invariants |
 | --- | --- | --- |
-| `halts` | Agent, fleet and selector halts, with reason, issuer, status and state version | The target matches the scope (DB); drills target one agent (DB); only a human, break-glass or system issuer (DB); **released only through an approved release request, except drills** (DB trigger); never reopened once released (DB trigger) |
-| `halt_acks` | Per instance and agent: gate closed, interruption confirmed or not, process terminated, network quarantine applied and the number of workloads it covers | Layers reported separately, so an acknowledgement never overstates what stopped (S1 finding) |
-| `halt_release_requests` | Two-person release | Requester and approver are different people (DB, KIL-05); one pending request per halt (DB) |
+| `halts` | Agent, fleet and selector halts, with reason, issuer, status and state version. P1-08 adds `released_version`; `propagation` and `confirmed_at`, so that `status` only says whether the halt is active or released; and `covered_agent_ids`, which the release of a selector halt sets | The target matches the scope (DB); drills target one agent (DB); only a human, break-glass or system issuer (DB); **released only through an approved release request, except drills** (DB trigger); never reopened once released (DB trigger). P1-08 makes a halt immutable but for its release, its propagation outcome and `confirmed_at` (DB), makes the release trigger test the drill flag of the row as it was before the update (DB trigger), makes idempotency keys unique per issuer (DB), and accepts issuers that are service accounts |
+| `halt_acks` | Per instance and agent: gate closed, interruption confirmed or not, process terminated, network quarantine applied and the number of workloads it covers. P1-08 replaces it with `halt_expectations`, the expected pairs of instance and agent, and `halt_layer_reports`, one row per layer | Layers reported separately, so an acknowledgement never overstates what stopped (S1 finding) |
+| `halt_release_requests` | Two-person release | Requester and approver are different people (DB, KIL-05); one pending request per halt (DB). P1-08 adds: requester and approver are people, never service accounts (DB trigger); a decided request never changes (DB); a cancellation records who and when (DB) |
 
 ### 3.7 Audit
 
@@ -191,7 +191,7 @@ References and keys are those of the RFC, section 3; P1-16 step 2 fixes the key 
 | `catalog_tools` | Tools: key, kind; their server (MCP tools), their agent (the agent's own tools) or their provider and type (built-in tools); status, pinned definition hash, classification (`read_only`, `destructive`, `open_world`), and the arguments policies may see, with their types | An MCP tool names its server; the agent's own tools (kinds `function`, `http` and `other`) name their agent; a built-in tool names its provider and type (DB). One tool per server and name, per agent and name, or per provider and type (DB). Keys are unique in the catalog, except those of the agent's own tools (`agent/<name>`), which are unique within their agent, because the same name in two agents is different code (DB); a key never changes once the tool is approved (DB trigger). Status is `discovered` or `approved` (DB), and an MCP tool can be approved only once its server is (domain). An approved tool pins a stored definition, except a built-in tool, which has none (DB); the pin changes only through an approval, so a new definition waits for review (domain, CORE-10). A declaration that an active policy version reads cannot be withdrawn, and a declared argument's type cannot change while an active usage rule uses it (domain) |
 | `catalog_tool_definitions` | Each distinct definition reported, stored as the bytes of the RFC 8785 canonical JSON of its members, under the SHA-256 that the core computed from them, for review and diffs | One row per hash (DB); append-only: content and hash never change (DB). The canonical bytes are kept as received, never re-encoded, so every hash can be recomputed (domain). Stored only when one of the agent's reports names its hash (domain, RFC-0002 section 4.1). Descriptions at most 16 KiB and schemas at most 64 KiB (domain, RFC-0002 section 4.2). No description or schema reaches an audit event (domain, CORE-11) |
 | `catalog_models` | Models: key, provider, endpoint, name, status, the pinned digest of their weights, and a new digest waiting for review | Key unique in the catalog, and one model per provider, endpoint and name (DB); the key never changes once the model is approved (DB trigger). Status is `discovered` or `approved` (DB). Approving a self-hosted model pins the digest its runtime reported, if any; a new digest waits for review while the pinned one stays (domain, CORE-10) |
-| `catalog_blocks` | Organization-wide blocks of a server and its tools, a tool, a model, or every model of a provider or an endpoint: the kind, what the block covers in clear and the SHA-256 of its string form, the reason, the issuer, and the state versions that issued and lifted the block | Kind is `server`, `tool`, `model`, `provider` or `endpoint` (DB); an issuer and a reason are mandatory (DB); one active block per kind and reference (DB); at most 500 active (domain). The issuing and lifting versions come from `governance_state_version_seq`, in the transaction that issues or lifts the block (domain). **Lifted only through an approved unblock request** (DB trigger); never reopened once lifted (DB trigger). A block never changes an entry's status and never rebuilds a bundle (domain) |
+| `catalog_blocks` | Organization-wide blocks of a server and its tools, a tool, a model, or every model of a provider or an endpoint: the kind, what the block covers in clear and the SHA-256 of its string form, the reason, the issuer, and the state versions that issued and lifted the block | Kind is `server`, `tool`, `model`, `provider` or `endpoint` (DB); an issuer and a reason are mandatory (DB); one active block per kind and reference (DB); at most 500 active (domain). The issuing and lifting versions come from the version counter (section 4), in the transaction that issues or lifts the block (domain). **Lifted only through an approved unblock request** (DB trigger); never reopened once lifted (DB trigger). A block never changes an entry's status and never rebuilds a bundle (domain) |
 | `catalog_unblock_requests` | Two-person lifting of a block | Requester and approver are different people (DB, HUM-04); a reason is mandatory (DB); one pending request per block (DB); approved by the steering or advisory committee (domain) |
 | `agent_tooling` | The entries enabled for an agent, each from an approved request; disables, with their actor, reason and time; when each entry was last used (`last_used_at`, CAT-09) | Each row names exactly one tool or one model, since an agent is enabled to use tools and models (DB), and comes from an approved request (DB trigger); one enabled row per agent and entry (DB). Only approved entries are enabled, and never for a retired or rejected agent (domain). A disable takes effect at once and records its actor, reason and time (DB); a disabled row is never enabled again, so enabling again needs a new request (DB trigger). `last_used_at` is kept by a job from allowed decisions, never by a write per decision (domain). Enabled does not mean usable: the catalog check still denies what a block covers, and a definition or digest that changed since approval (RFC-0002, section 7.1) |
 | `tooling_requests` | Requests to enable tools and models for an agent, and their decisions | Decided once, and never changed afterwards (DB trigger); the approver is never the requester (DB trigger, HUM-04); a reason is mandatory (DB); at most one pending request per agent and entry (DB); only approved entries can be requested, and the advisory committee approves (domain). A request can name an MCP server, to enable its approved tools at once (domain) |
@@ -211,14 +211,14 @@ What the core publishes to enforcement points for each agent (ADR-0005). Its wir
 | Lifecycle state, which decides whether the gate may open ([lifecycle](lifecycle.md), section 1) | `governance_state.lifecycle_state` |
 | Effective run state | `halted` if `agent_halt_ids` is not empty or the fleet is halted |
 | Halt IDs, scopes and issue times; reasons stay in the core | `agent_halt_ids`, `fleet_state.halt_ids` → `halts` |
-| Organization-wide blocks: IDs, kinds, the SHA-256 of what each covers, and issue times; references and reasons stay in the core. A record of its own, outside every agent's record and the fleet record (DC-9) | `catalog_blocks` (active blocks), versions from `governance_state_version_seq` |
+| Organization-wide blocks: IDs, kinds, the SHA-256 of what each covers, and issue times; references and reasons stay in the core. A record of its own, outside every agent's record and the fleet record (DC-9) | `catalog_blocks` (active blocks), versions from the version counter |
 | Bundle reference: version, SHA-256, signature | `governance_state.bundle_id` → `policy_bundles` |
 | Lease TTL | `governance_state.lease_ttl_seconds`, from the risk tier (setting `killswitch.lease_ttl_seconds`) |
 | Halt mode chosen by the owner | `governance_state.halt_mode`, copied from `agents.halt_mode` |
-| Attributes for policies: slug, kind, risk tier, data categories, labels, owner ID. The environment is not here: it comes from each enforcement point's credential | `governance_state.attributes` |
-| State version | `governance_state.state_version`, from the global sequence `governance_state_version_seq` |
+| Attributes for policies: slug, kind, risk tier, data categories, labels, owner ID. The environment is not here: it is the environment recorded for each enforcement point's credential, which the core returns at registration ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), decision 7) | `governance_state.attributes` |
+| State version | `governance_state.state_version`, from the version counter, `next_governance_version()`, which P1-07.1 adds (below) |
 
-Every change takes a new number from the global sequence in the transaction that makes it, issuing and lifting a block included. Watch streams resume from the last version an instance saw, and fall back to a snapshot when the gap is too large.
+Every transaction that changes the governance state, issuing and lifting a block included, takes one version, and every record it changes carries that version. The first pull request of P1-07.1 adds the version counter: the function `next_governance_version()` moves the head, the single row of the table `governance_head`, whose lock, held until commit, orders commits by version ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 2). The same pull request takes the runtime role's use of the sequence away, and triggers refuse any state version that is not the transaction's, on every table that carries one (DB). Until then, versions come from the sequence `governance_state_version_seq`. Watch streams resume from the last version an instance saw, and fall back to a snapshot when the gap is too large.
 
 ## 5. Defaults
 
@@ -234,6 +234,7 @@ Initial values of `settings`, all editable by administrators:
 | `catalog.pending_entries_per_agent` | servers 256, tools 4,096, models 256, and as many new definitions and digests as tools: what one agent's reports may bring that waits for review at once; beyond it, what is new is left out (DC-10) |
 | `killswitch.lease_ttl_seconds` | low 60, medium 60, high 30, critical 15 (confirmed by spike S2) |
 | `killswitch.unconfirmed_after_seconds` | 10 |
+| `killswitch.drill_max_seconds` | 60; the system releases a drill once it is confirmed, or after this time (KIL-09). P1-08 adds this setting |
 | `audit.retention_months` | 6, the EU AI Act minimum (NFR-10) |
 | `inventory.data_categories` | public data, internal documents, customer data, employee data, personal data, special category data, financial data, health data, source code, credentials |
 
@@ -270,16 +271,16 @@ Every Must requirement of the inventory, identity, policy, audit and kill switch
 | AUD-04 verification | Canonical bytes kept in `audit_events.canonical` |
 | AUD-05 search | Indexes on agent, type and actor per partition |
 | AUD-06 export | `audit_export_cursors` |
-| KIL-01 to KIL-03 halts and acknowledgements | `halts`, `halt_acks`, `governance_state.run_state`, `fleet_state` |
+| KIL-01 to KIL-03 halts and acknowledgements | `halts`, `halt_acks` (P1-08: `halt_expectations` and `halt_layer_reports`), `governance_state.run_state`, `fleet_state` |
 | KIL-04 lease backstop | `governance_state.lease_ttl_seconds`, `module_instances.status` (`lost`) |
 | KIL-05 two-person release | `halt_release_requests` (DB), release trigger on `halts` (DB) |
 | KIL-06 halt suspends the agent | Transition T12 in [lifecycle](lifecycle.md) |
 | KIL-07 reconnecting instances start halted | `governance_state` snapshot sent before any action is allowed |
-| KIL-10 network quarantine | `module_agent_bindings` (scope `all`), `halt_acks.quarantined_at` and `quarantined_workloads` |
+| KIL-10 network quarantine | `module_agent_bindings` (scope `all`), `halt_acks.quarantined_at` and `quarantined_workloads` (P1-08: the quarantine layer's rows of `halt_layer_reports`, with the workloads they cover) |
 | CAT-01 reports never authorize | `tooling_observations` (source: an instance); new references as `discovered` rows of `catalog_servers`, `catalog_tools` and `catalog_models`; the agent that first brought each entry, for the bound on its entries waiting for review (DC-10) |
 | CAT-02 catalog, pinned definitions and digests | `catalog_servers`, `catalog_tools` (status, pinned definition hash), `catalog_tool_definitions` (append-only, DB), `catalog_models` (pinned digest, digest waiting for review) |
 | CAT-03 enablement by a second person | `tooling_requests` (DB trigger: the approver is never the requester), `agent_tooling` (DB trigger: only from an approved request) |
-| CAT-04 blocks at once, apart from halts | `catalog_blocks` (versions from `governance_state_version_seq`, never in `fleet_state`), `catalog_unblock_requests` (DB), `instance_agents.observed_state_version` |
+| CAT-04 blocks at once, apart from halts | `catalog_blocks` (versions from the version counter, never in `fleet_state`), `catalog_unblock_requests` (DB), `instance_agents.observed_state_version` |
 | CAT-05 catalog check before policies | Contract (RFC-0002, through P0-03 step 12); each bundle's catalog file, in `policy_bundles` |
 | CAT-06 usage rules | Statements annotated `@rule` in `policy_versions`; argument declarations in `catalog_tools` |
 | CAT-07 provider-run tools | Contract (RFC-0002); `catalog_tools.origin` (`provider`) |

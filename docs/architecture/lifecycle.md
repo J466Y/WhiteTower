@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md), step 4) |
-| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)); sections 3 and 4 updated on 2026-10-19 for shared use cases and the decisions on proposals (the maintainer's decisions, plan P1-04) |
+| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)); sections 3 and 4 updated on 2026-10-19 for shared use cases and the decisions on proposals (the maintainer's decisions, plan P1-04); sections 2, 3, 4 and 7 updated on 2026-10-20 for the design of the halt path and the maintainer's decisions on it (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes)) |
 | **Normative** | Yes. The machine-readable form is [agent-lifecycle.yaml](agent-lifecycle.yaml); plan P1-04 generates the transition guards from it, and the two must never disagree |
 | **Related** | [Requirements 5.1.1](../requirements/mvp-requirements.md#511-agent-lifecycle-initial-proposal-refined-in-plan-p0-02), [domain model](domain-model.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md) |
 
@@ -31,7 +31,7 @@ The lifecycle turns the charter's governance model into rules the system enforce
 The run state is separate from the lifecycle state:
 
 - **Values:** `running` or `halted`.
-- **Scope:** a halt can hit any agent that has running instances, whatever its lifecycle state.
+- **Scope:** a halt can hit any agent that has running instances, whatever its lifecycle state, and stops all of them, wherever they run and whatever credential they use ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), decision 2).
 - **Effective run state:** `halted` if an agent halt or a selector halt covers the agent (`governance_state.agent_halt_ids` is not empty), or the fleet is halted (`fleet_state`); otherwise `running`.
 
 ## 3. Transitions
@@ -51,7 +51,7 @@ The actors are the roles of the [permission matrix](../requirements/mvp-requirem
 | T9 | activate | ready | active | primary owner, delegate, operator | owner active, use case validated, agent policy active, harness declared, not halted | Sets `activated_at`; schedules the first review |
 | T10 | suspend | validated, ready, active | suspended | primary owner, delegate, advisory, operator | comment given | Remembers the previous state; reason `manual` |
 | T11 | auto_suspend | validated, ready, active | suspended | system | owner inactive, or review overdue past its grace period | Remembers the previous state; reason `owner_inactive` or `review_overdue`; notifies advisory and operators |
-| T12 | halt_suspend | validated, ready, active | suspended | system | an agent halt was issued for this agent | Remembers the previous state; reason `halt` |
+| T12 | halt_suspend | validated, ready, active | suspended | system | an agent halt that is not a drill is issued for this agent | Remembers the previous state; reason `halt` |
 | T13 | reinstate | suspended | previous state | advisory, operator | comment given, owner active, review not overdue, not halted, the previous state's invariants hold | Clears the suspension |
 | T14 | retire | draft, proposed, validated, ready, active, suspended | retired | primary owner, delegate, advisory, operator | comment given | Revokes every credential; retires the agent-specific policies; cancels the open review; sets `retired_at` |
 
@@ -62,8 +62,10 @@ The actors are the roles of the [permission matrix](../requirements/mvp-requirem
 Every transition:
 
 - writes a row in `lifecycle_transitions` and an audit event (`whitetower.agent.created.v1` or `whitetower.agent.lifecycle_changed.v1`) in the same transaction;
-- updates the agent's governance state and takes a new state version, so enforcement points learn about it within seconds;
-- is refused if the agent row changed since the caller read it (optimistic concurrency).
+- updates the agent's governance state at the state version of that transaction, so enforcement points learn about it within seconds;
+- when a caller asks for it, is refused if the agent row changed since the caller read it (optimistic concurrency).
+
+The transitions White Tower makes itself (T7, T8, T11 and T12) cannot be asked for. Each runs in the transaction of what causes it and at that transaction's state version, T12 in the halt's. They lock the agent's row instead of checking a caller's version, check no permission, and never refuse: an agent in a state they do not start from keeps it. Each gives the agent's row a new version, its ETag, so a change whose If-Match was read before it fails with `precondition_failed`: an edit never writes `active` over the `suspended` of T12 ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 8).
 
 ## 4. Guards
 
@@ -82,7 +84,7 @@ Every transition:
 | `agent_policy_or_harness_missing` | The opposite of `agent_policy_active` and `harness_declared` together |
 | `not_halted` | The effective run state is `running` |
 | `owner_inactive_or_review_overdue` | The primary owner is inactive, or the open review's grace period has ended |
-| `agent_halt_issued` | An agent-scoped halt for this agent was just committed |
+| `agent_halt_issued` | An agent-scoped halt for this agent, other than a drill, is issued in the same transaction |
 | `review_not_overdue` | No review of this agent is past its grace period |
 | `previous_state_invariants_hold` | Returning to the remembered state keeps its invariants, for example `active` still needs an active agent policy |
 
@@ -105,9 +107,10 @@ Every transition:
 
 ## 7. Halts and the lifecycle
 
-- **An agent halt** (scope `agent`) sets the run state to `halted` and, in the same transaction, moves an agent in `validated`, `ready` or `active` to `suspended` with reason `halt` (T12). Agents in other states keep their lifecycle state.
+- **An agent halt** (scope `agent`) sets the run state to `halted`. Unless it is a drill, it also moves an agent in `validated`, `ready` or `active` to `suspended` with reason `halt`, in the same transaction (T12). Agents in other states keep their lifecycle state.
+- **A drill** (KIL-09) is an agent halt that closes the gate like any other, and leaves the lifecycle state as it is. The system releases it, without a second person, once it is confirmed or after `killswitch.drill_max_seconds`, a setting that P1-08 adds (60 seconds by default). Coverage C3 needs, on each agent within its period, a drill or halt acknowledged within its targets, so drills that suspended would take every agent out of service until someone reinstated it ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), decision 1).
 - **A fleet or selector halt** blocks every matching agent through the run state and changes no lifecycle state (requirement KIL-06), so releasing it restores operation without reinstating agents one by one.
-- **Releasing a halt never reinstates an agent.** Release (two people, KIL-05) sets the run state back to `running`. For an agent halt, the agent stays `suspended` until someone reinstates it (T13), which forces a conscious decision to put it back into service.
+- **Releasing a halt never reinstates an agent.** Release (two people, KIL-05; the system, for a drill) sets the run state back to `running`. For an agent halt other than a drill, the agent stays `suspended` until someone reinstates it (T13), which forces a conscious decision to put it back into service.
 
 ## 8. Reviews
 
