@@ -2,7 +2,7 @@ module github.com/J466Y/WhiteTower/hack/spikes/s2
 
 go 1.26.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 require (
 	connectrpc.com/connect v1.21.0
