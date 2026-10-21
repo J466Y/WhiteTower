@@ -4,7 +4,7 @@
 | --- | --- |
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
-| **Size** | XL, split into two subplans before it starts, by a pull request of its own: **P1-07.1** (steps 1 to 7, about 5 weeks: generated code, authentication and authorization, registration, sessions, the governance state service with the blocks record, acknowledgements, event ingestion) and **P1-07.2** (steps 8 to 10, about 3 weeks: the wiring of tooling reports of step 7, once P1-16's pull request 3 is merged, then the mock module, the conformance kit with S-01 to S-25, the load test), each with its tests (step 11). The first pull request of P1-07.1 is the version mechanism of the halt path ([design note](P1-08-kill-switch.md#progress-notes), section 14), which needs nothing from P1-05 and lands ahead of it |
+| **Size** | XL, split into two subplans before it starts, by a pull request of its own: **P1-07.1** (steps 1 to 7, about 5 weeks: generated code, authentication and authorization, registration, sessions, the governance state service with the blocks record, acknowledgements, event ingestion) and **P1-07.2** (steps 8 to 10, about 3 weeks: the wiring of tooling reports of step 7, once P1-16's pull request 3 is merged, then the mock module, the conformance kit with S-01 to S-29, the load test), each with its tests (step 11). The first pull request of P1-07.1 is the version mechanism of the halt path ([design note](P1-08-kill-switch.md#progress-notes), section 14), which needs nothing from P1-05 and lands ahead of it |
 | **Depends on** | P0-03, P1-01, P1-05 (can start with stub authentication); P0-03 step 12 (RFC-0002 in the contracts) for the parts of RFC-0002; P1-16 step 4 for the wiring of tooling reports (step 7) |
 | **Unblocks** | P1-08, P1-09, P1-10.5; P1-04 pull request 4, through the first pull request of P1-07.1; P1-16 step 7, through the blocks record of step 5 and, for ST-80, the mock module of step 8 |
 | **Requirements** | MOD-01 to MOD-05, MOD-07, KIL-07, AUD-02 (ingestion wiring); the transport of CAT-01 and CAT-04, and part of NFR-24's budget |
@@ -24,7 +24,7 @@ The core side of the module contracts: modules are registered and approved, thei
 
 - `internal/modules`, `internal/govstate`, `internal/api/moduleapi`.
 - `modules/mock`: a Go reference enforcement point.
-- `test/conformance`: the conformance kit runner (`wt-conformance`) with every scenario of P0-03 and RFC-0002, S-01 to S-25.
+- `test/conformance`: the conformance kit runner (`wt-conformance`) with every scenario of P0-03 and RFC-0002, S-01 to S-29.
 - A load test report, with and without 500 active blocks.
 
 ## Steps
@@ -138,6 +138,8 @@ It serves tests, demos and load tests. It is also the reference implementation m
 Implement every P0-03 scenario in `test/conformance`. The `wt-conformance` runner plays the core against a module under test and produces JUnit XML plus a readable report. It runs in CI against the mock module and is documented for third-party authors.
 
 The kit's fake core returns, in `RegisterInstanceResponse`, the environment of the credential the instance registered with, as the core does (step 4), so the driver protocol's `WT_CONFORMANCE_ENVIRONMENT` and the environment in the configuration of the stub enforcement point (`test/conformance/stubep`) give way to it, and the driver protocol's `POST /v1/decide` has the module build the subject from its state and its registration, not its credential ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 7).
+
+The kit additions that scenarios S-26 to S-29 need are listed in [P0-03's progress notes](../phase-0/P0-03-module-contracts.md#progress-notes) of 2026-10-21.
 
 Once P0-03 step 12 has added RFC-0002's vectors, also implement the RFC's scenarios S-18 to S-24, which run those vectors through the module under test. The kit checks the module's side only: the core's side is tested in P1-16 (ST-75 for CORE-10, ST-80 for the spread of blocks). The [driver protocol](../../../test/conformance/driver-protocol.md) gains three endpoints for these scenarios, in its table "Planned for P1-07":
 

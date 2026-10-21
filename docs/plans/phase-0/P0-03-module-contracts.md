@@ -261,3 +261,33 @@ Besides the core's side, which P1-07 builds with registration and P1-05 step 7 w
 
 - **P1-07.2:** the kit's fake core returns the environment at registration, and the kit runs S-25. `WT_CONFORMANCE_ENVIRONMENT` in the [driver protocol](../../../test/conformance/driver-protocol.md), and `Config.Environment` of the stub enforcement point (`test/conformance/stubep`), give way to it, and the driver protocol's `POST /v1/decide` has the module build the subject from its state and its registration, not its credential.
 - **P1-09:** the enforcement point takes the environment of its decisions from its registration (I-7), never from its configuration or from its access token, and passes S-25.
+
+### 2026-10-21: a scenario for every module obligation
+
+The contract says that the obligations of modules each have a conformance scenario (section 1), and so did the notes of 2026-09-29 (step 4), but nine had none in the table of section 9.3: I-1, I-2, I-5, I-6, EP-11, EP-12, RC-1, RC-5 and RC-6. The maintainer asked on 2026-10-21 to close the gap before the external review of RFC-0001. Four new scenarios cover eight of them:
+
+| Scenario | What it checks | Obligations |
+| --- | --- | --- |
+| S-26 | The module calls only a core whose certificate chains to the trust anchors from its configuration, and an enforcement point inside an agent authenticates as that agent and serves it only | I-1, EP-11 |
+| S-27 | The module registers before any other call, also after a restart; it deregisters before the restart, and rolls its token over on a replacement stream | I-2, I-5 |
+| S-28 | The module's heartbeats follow the interval the core sets, and an enforcement point acknowledges the state version it applied at least every 60 seconds while that state changes | I-6, EP-12 |
+| S-29 | A runtime-control module applies its layer to every halted agent in scope, whether by an agent, a selector or a fleet halt, including a workload started after the halt, and emits its events when it applies or lifts the layer | RC-1, RC-5 |
+
+Two existing scenarios grow by a sentence each. S-15 also checks the ninth, RC-6, with the second sentence of I-6: a runtime-control module's heartbeats report as served agents those that have workloads it controls. S-09 also checks the bundle keys of EP-11: the fake core's `GetBundleKeys` lists the key that signs the `unknown-key` vector, and the module must still reject that vector.
+
+I-2, and the deregistration of I-5, are recommendations (SHOULD), so S-27 reports a module that does not follow them, and does not fail it. Every module obligation, I-1 to I-7, EP-1 to EP-12 and RC-1 to RC-6, now appears in the obligations of at least one scenario. RFC-0001's count of scenarios (Proposal, item 7) becomes 22, the kit's [README](../../../test/conformance/README.md) counts twenty designed scenarios rather than sixteen, and P1-07 builds the kit with S-01 to S-29. The external review of RFC-0001 covers these scenarios like the rest.
+
+The kit's skeleton cannot drive them yet. P1-07.2 adds what they need:
+
+| Addition | Scenarios |
+| --- | --- |
+| The fake core records every call it receives, with its time, its method, its instance, the identity of its token and what it carries, and when each stream ends. Today it keeps registrations, acknowledgements and events, without their times | S-15, S-26, S-27, S-28 |
+| The kit makes two certificate authorities: the trust anchor it names in `WT_CONFORMANCE_CA_FILE`, and another, which issues the certificate the fake core serves first. The skeleton's tests serve the fake core with the test certificate of Go's `net/http/httptest` | S-26 |
+| `GetBundleKeys` also lists the untrusted key of the bundle vectors. Today it lists only the trusted key | S-09 |
+| The fake token endpoint, which the [driver protocol](../../../test/conformance/driver-protocol.md) says P1-07 adds, issues tokens that expire within a minute. The fake core ends each stream with `UNAUTHENTICATED` when its token expires (CORE-1), and allows two streams per instance, ending a third with `ABORTED`, as the core does (P1-07 step 5) | S-26, S-27 |
+| The fake core sets the heartbeat interval at registration and changes it in heartbeat responses. Both are 30 seconds today | S-28 |
+| The fake core changes the fleet state, which never changes today | S-29 |
+| The driver protocol gains endpoints for runtime-control modules: start and stop a workload of an agent, and tell whether the module's layer covers it, as the platform shows it rather than as the module reports it | S-15, S-29 |
+| The kit's report shows, apart from failures, the recommendations a module does not follow, and the scenario still passes. The report that P1-07 step 9 plans, JUnit XML and a readable one, has no such outcome yet | S-27 |
+
+S-27 restarts the module through `POST /v1/restart`, which the driver protocol already plans.
