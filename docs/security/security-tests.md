@@ -71,7 +71,7 @@ An automated test names its entry in the comment above it, as `// Security test 
 
 | ID | Test | Covers | Kind |
 | --- | --- | --- | --- |
-| ST-31 | The author of a policy version can never approve it, through the API or directly in the database | T-04 | integration |
+| ST-31 | The author of a policy version can never approve it, through the API or directly in the database, nor can the person responsible for the service account that authored it; a version needs the quorum of its scope in distinct people | T-04 | integration |
 | ST-32 | The core never builds a bundle containing a policy version that is not approved, nor a bundle without its catalog file | T-29, T-82 | integration |
 | ST-33 | Bundles verify only with the bundle key, never with the token or checkpoint key | T-29 | unit |
 

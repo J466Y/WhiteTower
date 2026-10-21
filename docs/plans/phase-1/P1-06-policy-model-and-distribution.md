@@ -38,6 +38,7 @@ Global and agent-specific policies, written in a standard language, validated, a
 - The bundle builder and signer.
 - The per-agent Cedar schema and catalog file of each bundle.
 - The seeded global policies: the permit of the lifecycle actions and `wt-catalog`.
+- The setting `policy.approval_quorum`, with the migration that inserts its default (step 4).
 - Drift metrics and alerts.
 
 ## Steps
@@ -71,17 +72,24 @@ Write the OpenAPI operations for policies, versions, validation, approvals, diff
 ### 4. Approval workflow
 
 - Submitted versions are approved by the steering committee (global scope) or the advisory committee (agent scope).
-- Separation of duties: the author never approves; the quorum is configurable and 1 by default. Rejections need a comment.
-- Approval activates the version and supersedes the previous active one.
+- Separation of duties: the author never approves, and so never counts toward the quorum. Rejections need a comment.
+- **Quorum** (the maintainer's decision of 2026-10-21, on RFC-0002's unresolved question 2). A version is approved once the quorum of its scope has approved it.
+  - The setting `policy.approval_quorum` holds one value per scope, `{"global": 1, "agent": 1}` by default: the number of distinct people of the approving committee (POL-02) who must approve a version, from 1 to 5. It is a row of the `settings` table, which administrators edit at runtime (domain model, section 5): a migration of this plan inserts its default, and the core reads it from that table, not from `internal/platform/config`.
+  - The platform administrator sets it (`settings.manage`), and the change is audited like any change to a setting (AUD-01).
+  - Approvals are made by people, never by service accounts (`forbidden`), and a person and their own service account count once (P1-03's notes of 2026-10-19), as for the decisions on proposals (P1-04) and halt releases (P1-08). So the person responsible for a service account that authored a version cannot approve it.
+  - Submitting a version records the quorum of its scope then in force, and the version needs that quorum, so lowering the setting approves nothing already waiting.
+  - One rejection, with its comment, by a member of the approving committee rejects the version, whatever the quorum. Rejections, like approvals, come from people.
+  - A change of the quorum notifies the steering committee's inbox, as grants of steering, advisory or operator do (DC-4). The core refuses a quorum larger than the number of active people who hold the committee's role, since no version could reach it.
+- The approval that completes the quorum activates the version and supersedes the previous active one.
 - Rollback creates a new version with earlier content, which needs approval again (POL-08).
 - Approval runs the checks of step 3 again, against the catalog of that moment: a version that reads an argument no longer declared, or whose rule statements the generator no longer produces, cannot be approved.
-- Usage rules follow this workflow like any other statement, so adding one needs an approval too (RFC-0002, unresolved question 2).
+- Usage rules follow this workflow like any other statement, so adding one needs the quorum of its scope too (RFC-0002, unresolved question 2). An urgent restriction uses a disable or a block, which take effect at once (P1-16).
 - Seeded policies: the core seeds two global policies, once each, as submitted versions authored by the system. They are the permit of the lifecycle actions that the contracts expect (section 6.3), and `wt-catalog`, with the text of RFC-0002, section 7.1. The steering committee approves them like any global policy, and may narrow them. Until it does, the actions they permit are denied unless another policy permits them (`policy.no_permit`).
   - `policies.created_by` and `policy_versions.author_id` must reference a principal, and principals are humans or service accounts. A forward migration adds one reserved system principal, of a kind of its own that can hold no session, token or role, as `authn.BreakglassPrincipalID` is reserved for break-glass; it authors the seeded versions, and only them.
   - Seeding writes its audit event, whose actor is `system`, in the same transaction, and stays idempotent when two replicas start at once.
   - The database refuses an approval by the version's author (`reject_self_approval`), so any member of the steering committee can approve a seeded version.
 
-**Done when:** every path is tested, including an author trying to approve through any role they hold, and a fresh installation has the seeded versions waiting for the steering committee, seeded once even when two replicas start together.
+**Done when:** every path is tested, including an author trying to approve through any role they hold; a version with fewer distinct approvals than its quorum stays submitted; and a fresh installation has the seeded versions waiting for the steering committee, seeded once even when two replicas start together.
 
 ### 5. Activation guard
 
@@ -134,6 +142,7 @@ Evaluate a draft version, together with the current global set, against test inp
 ### 11. Tests
 
 - Separation of duties.
+- The quorum: a version with fewer distinct approvals than its quorum stays submitted.
 - The version state machine.
 - Seeding, idempotent when two replicas start at once.
 - The check of usage-rule statements: a hand-edited, missing or extra statement is refused, and so is a read of an argument policies cannot see.
