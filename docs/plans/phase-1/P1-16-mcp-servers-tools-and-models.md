@@ -50,14 +50,14 @@ The core knows which MCP servers, tools and models each governed agent has, incl
 
 ### 1. Decisions, permissions and API first
 
-- **Open questions of RFC-0002.** The maintainer confirms or changes these proposed answers before step 2, and the RFC records the decisions:
+- **Open questions of RFC-0002.** The maintainer answered them on 2026-10-21, and the RFC records the answers:
   - the advisory committee approves catalog entries (not the steering committee);
-  - adding a usage rule follows the normal approval of policies (an urgent restriction uses a disable or a block);
+  - adding a usage rule needs approval, like any policy text: how many distinct people of the approving committee must approve a version is the setting `policy.approval_quorum`, which the platform administrator sets, 1 by default for each scope and at most 5 (P1-06, step 4); an urgent restriction uses a disable or a block, which take effect at once;
   - no agent may use every approved entry without enabling each one, not even with non-production credentials;
   - the limits stay: 256 servers, 4,096 tools and 256 models per report, references of at most 2 KiB, one report's worth of each agent's entries waiting for review, 500 active blocks;
   - no context field is reserved now for stateful usage rules (Phase 2);
-  - the catalog neither imports tooling from endpoint security tools nor exports enabled tooling to coding agents' allowlists in the MVP;
-  - numbers in usage rules are integers.
+  - the catalog neither imports tooling from endpoint security tools nor exports enabled tooling to coding agents' allowlists in the MVP: both come later;
+  - numbers in usage rules are integers for now; the pilot's feedback decides whether decimals come later.
 - **Permissions.** Nine new permissions in `internal/authz`, named like the existing ones, with the rows of the permission matrix (requirements, section 5.2.1):
 
   | ID | Grants |
