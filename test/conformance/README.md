@@ -20,7 +20,7 @@ The kit plays the core. It serves the module API (registry, watch with scripted 
 
 A scenario scripts the core's side, then checks what the module decides and what reaches the core: registrations, acknowledgements and events. Scenarios never trust what a module says about its own state.
 
-Scenarios S-01, "start closed", and S-17, "stale renewals", run today against the stub enforcement point. The other sixteen scenarios of the specification are designed and are implemented in P1-07, each tied to the obligations it checks.
+Scenarios S-01, "start closed", and S-17, "stale renewals", run today against the stub enforcement point. The other twenty scenarios of the specification are designed and are implemented in P1-07, each tied to the obligations it checks.
 
 ## Running it
 
