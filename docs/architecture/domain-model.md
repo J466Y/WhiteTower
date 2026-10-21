@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md)) |
-| **Date** | 2026-09-29; updated 2026-10-19 for RFC-0002 (section 3.9 and the rows that refer to it), and 2026-10-20 for the design of the halt path (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): sections 2, 3.3, 3.5, 3.6, 3.9, 4, 5 and 6) |
+| **Date** | 2026-09-29; updated 2026-10-19 for RFC-0002 (section 3.9 and the rows that refer to it), 2026-10-20 for the design of the halt path (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): sections 2, 3.3, 3.5, 3.6, 3.9, 4, 5 and 6), and 2026-10-21 for the quorum of policy approvals (sections 3.4 and 5: the maintainer's answer to RFC-0002's unresolved question 2) |
 | **Schema** | [`internal/platform/db/migrations/00001_init.sql`](../../internal/platform/db/migrations/00001_init.sql) |
 | **Related** | [Agent lifecycle](lifecycle.md), [architecture](mvp-architecture.md), [requirements](../requirements/mvp-requirements.md), [ADR-0003](../adr/0003-postgresql-only-stateful-dependency.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md), [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) |
 
@@ -135,7 +135,7 @@ The full list of columns and constraints is in the schema file; the tables of se
 | --- | --- | --- |
 | `policies` | A named rule set, global or agent-specific, in Cedar or Rego | Agent scope if and only if an agent is referenced (DB) |
 | `policy_versions` | Immutable content, hash, tests, validation results, status | Content, hash, tests and author cannot change after submission (DB trigger); versions are never deleted (DB); one active version per policy (DB). A statement annotated `@rule` is exactly what the generator produces from its annotation, and no statement reads a tool argument that is neither declared in the catalog nor used by a usage rule (domain, checked at submission; RFC-0002, sections 7.5 and 8) |
-| `policy_approvals` | Decisions of the steering or advisory committee | The author can never decide on their own version (DB trigger, HUM-04); rejections need a comment (DB); append-only (DB) |
+| `policy_approvals` | Decisions of the steering or advisory committee | The author can never decide on their own version (DB trigger, HUM-04); rejections need a comment (DB); append-only (DB). A version is approved once the quorum of its scope has approved it: as many distinct people, never service accounts, as the setting `policy.approval_quorum` (section 5) required when the version was submitted (domain, P1-06) |
 | `policy_bundles` | Signed effective policy sets, versioned per agent | Monotonic version per agent (DB unique); append-only (DB); every bundle carries its agent's catalog file, empty when nothing is observed or enabled for the agent (domain, RFC-0002 section 5) |
 
 ### 3.5 Runtime
@@ -232,6 +232,7 @@ Initial values of `settings`, all editable by administrators:
 | `lifecycle.review_signoff_risk_tiers` | high, critical |
 | `lifecycle.review_unused_tooling_days` | 90; a review lists the enabled tooling unused for longer as candidates to disable (CAT-09) |
 | `catalog.pending_entries_per_agent` | servers 256, tools 4,096, models 256, and as many new definitions and digests as tools: what one agent's reports may bring that waits for review at once; beyond it, what is new is left out (DC-10) |
+| `policy.approval_quorum` | global 1, agent 1; the number of distinct people of the approving committee who must approve a policy version, from 1 to 5 (POL-02). P1-06 adds this setting |
 | `killswitch.lease_ttl_seconds` | low 60, medium 60, high 30, critical 15 (confirmed by spike S2) |
 | `killswitch.unconfirmed_after_seconds` | 10 |
 | `killswitch.drill_max_seconds` | 60; the system releases a drill once it is confirmed, or after this time (KIL-09). P1-08 adds this setting |
@@ -260,7 +261,7 @@ Every Must requirement of the inventory, identity, policy, audit and kill switch
 | AID-05 rotation and revocation | `machine_credentials.status`, `signing_keys.status` |
 | AID-06 module identities | `machine_credentials.module_id`, `module_instances.identity_kind` |
 | POL-01 versioned policies with scope | `policies`, `policy_versions` |
-| POL-02 approvals, author excluded | `policy_approvals` (DB trigger) |
+| POL-02 approvals, author excluded, quorum per scope | `policy_approvals` (DB trigger), the setting `policy.approval_quorum` (domain, P1-06) |
 | POL-03 combination semantics | Contract (P0-03); bundles record the algorithm in `policy_bundles.manifest` |
 | POL-04 active agent needs a policy | Guard `agent_policy_active` |
 | POL-05 signed bundles, drift | `policy_bundles`, `instance_agents.active_bundle_version` |

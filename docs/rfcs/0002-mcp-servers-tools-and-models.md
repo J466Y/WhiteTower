@@ -43,7 +43,7 @@ The maintainer decided on 2026-10-13:
 
 1. **Reports inform; they never authorize.** What an enforcement point reports about an agent's tooling fills the catalog. Only people, through approvals, make anything usable.
 2. **The catalog says what; policies say how.** A tool or model must be enabled for the agent before any policy is evaluated. Policies can forbid more; they can never reach what is not enabled.
-3. **Restricting takes effect at once; permitting needs a second person.** Blocking an entry, or disabling it for an agent, is immediate. Approving, enabling and unblocking need someone other than the person who asked (HUM-04).
+3. **Restricting takes effect at once; permitting needs a second person.** Blocking an entry, or disabling it for an agent, is immediate. Approving, enabling and unblocking need someone other than the person who asked (HUM-04). A usage rule restricts too, but it is policy text, so it waits for its policy's approval (section 8).
 4. **Blocks never slow halts.** Organization-wide blocks reach enforcement points through the watch stream, as halts do, but in their own record.
 5. **The enforcement point decides alone.** Everything it needs arrives in the signed bundle and the watch stream; it never calls the core to decide (EP-2).
 
@@ -377,7 +377,7 @@ forbid (
 };
 ```
 
-- **Ordinary policies.** Rules live in ordinary policies, global or agent-specific, and follow the same approval workflow. The console edits them as forms. Each statement carries its rule in the annotation, so the policy text is the only source of truth.
+- **Ordinary policies.** Rules live in ordinary policies, global or agent-specific, and follow the same approval workflow: adding a rule needs the same approvals as any other policy text (unresolved question 2). The console edits them as forms. Each statement carries its rule in the annotation, so the policy text is the only source of truth.
 - **Generated text is checked.** When a policy version is submitted, the core regenerates each statement that carries `@rule` from its annotation, and refuses the version unless the statement is exactly what the generator produces. A reviewer can therefore trust the form the console shows. The generator takes each argument's type from the catalog's declarations, because a condition compiles differently for a string and for a set.
 - **Evidence names the rule.** Decision events name each rule that decided by its policy and its rule ID (section 9), so the audit log says "denied by `no-push-to-main`".
 - **Limits.**
@@ -549,19 +549,19 @@ ST-80 runs with the measurement harness of P1-08; whether a block denies before 
 
 ## Unresolved questions
 
-Each question has a proposed answer, which plan P1-16 assumes until the maintainer decides (P1-16, step 1).
+The maintainer answered these questions on 2026-10-21. Plan P1-16 records the answers in its step 1, and plan P1-06 the quorum of answer 2 in its step 4.
 
-1. Who approves catalog entries: the advisory committee, as proposed, or the steering committee, as for accepted providers (POL-10)? Proposed: the advisory committee, which already validates use cases.
-2. Should adding a usage rule, which only restricts, take effect without approval, as blocks do? Proposed: no. Rules are policy text and follow the policies' approval; an urgent restriction uses a disable or a block, which take effect at once.
-3. Should an agent with non-production credentials be able to use every approved entry without enabling each one, to make onboarding easier? Proposed: no. The steering committee can still narrow `wt-catalog` by environment.
-4. Stateful rules (sequences of calls, counts per task, data flowing from one tool to another) are left to Phase 2. Which context fields should be reserved now? Proposed: none. Adding a context field is additive.
-5. Are the limits right: 256 servers, 4,096 tools and 256 models per report; references of at most 2 KiB; one report's worth of an agent's entries waiting for review; 500 active blocks? Proposed: yes, until the pilot shows otherwise.
+1. Who approves catalog entries: the advisory committee, as proposed, or the steering committee, as for accepted providers (POL-10)? Answer: the advisory committee, which already validates use cases.
+2. Should adding a usage rule, which only restricts, take effect without approval, as blocks do? Answer: no. Rules are policy text, and need approval like any policy version. How many distinct people of the approving committee must approve a version is a setting of the platform administrator, `policy.approval_quorum`: 1 by default for each scope, at most 5 (P1-06, step 4). An urgent restriction uses a disable or a block, which take effect at once.
+3. Should an agent with non-production credentials be able to use every approved entry without enabling each one, to make onboarding easier? Answer: no. The steering committee can still narrow `wt-catalog` by environment.
+4. Stateful rules (sequences of calls, counts per task, data flowing from one tool to another) are left to Phase 2. Which context fields should be reserved now? Answer: none. Adding a context field is additive.
+5. Are the limits right: 256 servers, 4,096 tools and 256 models per report; references of at most 2 KiB; one report's worth of an agent's entries waiting for review; 500 active blocks? Answer: yes. The limits stay: the maintainer finds them more than enough.
 6. For agents without the enforcement point:
    - should the catalog import tooling from endpoint security tools (Phase 3 discovery)?
    - should it export an agent's enabled tooling to the allowlists that coding agents support?
 
-   Proposed: neither in the MVP; both are candidates for Phase 3 discovery.
-7. Should usage rules support numbers that are not integers, through Cedar's `decimal`? Proposed: no, integers only in the MVP.
+   Answer: neither in the MVP. Both come later, as they are not critical to the core of the platform.
+7. Should usage rules support numbers that are not integers, through Cedar's `decimal`? Answer: no, integers only for now. The pilot's feedback decides whether decimals come later.
 
 ## Implementation plan
 
