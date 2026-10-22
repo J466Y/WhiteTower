@@ -168,7 +168,7 @@ The plan lands in eight pull requests. The first agrees on the whole API before 
 | 4. Lifecycle engine | 5, through P1-06's interface, stubbed; the property tests; ST-23; a token without the action's scope is refused (ST-19); `service_account` in `lifecycle_transitions.actor_type`; the entry point for the transitions White Tower makes, where T12 skips drills; the active selector halts in every write of the state record, through P1-08's interface, stubbed; the shared form of the selector halts' advisory lock, with the key of `internal/govstate`, taken first in T1 and `editAgent`; `state_version` in `whitetower.agent.updated.v1` when a change concerns what enforcement points see; after the first pull request of P1-07.1, and once the lifecycle and the requirements say that drills do not suspend ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 1) | Not started |
 | 5. Reviews and the lifecycle guard job | 6, 7, through P1-16's interface, stubbed; the guard job suspends one agent per transaction | Not started |
 | 6. Coverage, instances, search and export | 8, 9; ST-24, with cells that start after a `;` or with a tab or a carriage return; C3 through P1-08's interface, stubbed | Not started |
-| 7. Inbox and notifications | 10 | Not started |
+| 7. Inbox and notifications | 10; the dismissal of items that ask for no action, each member their own copy (P1-17 step 4, DC-4) | Not started |
 | 8. Bulk import | 11, with its operation; at most 100 agents per transaction, one import at a time, each transaction taking the shared form of the selector halts' advisory lock first | Not started |
 
 ### 2026-10-19: API (PR 1)
@@ -264,3 +264,22 @@ The maintainer accepted the design note of the halt path on 2026-10-20 ([P1-08's
   - a bulk import that writes at most 100 agents per transaction (step 11);
   - coverage C3 through an interface that P1-08 implements (step 8); until then, no agent reaches C3;
   - `state_version` in `whitetower.agent.updated.v1`, required when a change concerns what enforcement points see.
+
+### 2026-10-21: settings registered by P1-17
+
+On 2026-10-21 the maintainer decided that the settings get a plan of their own, [P1-17](P1-17-settings.md), with which each plan registers the keys it owns. P1-17 registers, on this plan's behalf and in `internal/inventory`, the five keys that the first migration seeds for it, with these rules (P1-17, step 6):
+
+| Key | Rules | A change notifies the steering committee |
+| --- | --- | --- |
+| `inventory.data_categories` | At least one category, distinct and not blank, each of at most 63 characters. A category stays while an agent that is neither retired nor rejected, or a use case that is neither validated nor rejected, names it, since the inventory refuses any edit of their categories that keeps one the setting lacks | No |
+| `lifecycle.review_interval_days` | The four risk tiers, none missing and no other, each 1 to 730 days | Yes |
+| `lifecycle.review_grace_days` | 0 to 90 days | Yes |
+| `lifecycle.review_reminder_days` | 1 to 10 distinct numbers of days before the due date, each 1 to 365 | No |
+| `lifecycle.review_signoff_risk_tiers` | Distinct risk tiers, which include `high` and `critical` (step 6) | No |
+
+- No plan gave the bounds of the intervals, the grace period and the reminders, or said which of these keys notify the steering committee: the maintainer accepted those above on 2026-10-22.
+- So that the rule of `inventory.data_categories` holds at read committed, P1-17 pull request 1 makes the inventory read the setting `FOR SHARE` where it checks categories (`checkCategories`): a removal and a proposal or an edit that names the category then wait for each other rather than miss each other (P1-17, step 6).
+- None of these keys needs an effect after commit: a review stores its due date, the end of its grace period and whether it needs a sign-off when it is scheduled, so a change of the interval, the grace period or the sign-off tiers applies to the reviews scheduled after it; the reminders and the categories are read at use.
+- Nothing reads the four `lifecycle.review_*` keys before pull request 5, which reads them at use and may tighten these rules in their registration.
+- `lifecycle.review_unused_tooling_days` is P1-16's: its pull request 2 adds it, and registers it with P1-17, or P1-17 registers it if P1-17 lands second (P1-16, step 3).
+- P1-17's notifications to the steering committee, like DC-4's notices of grants (P1-03, step 4), ask for no action, so no handling takes them out of the inbox. Pull request 7 adds a way for such an item to leave it: each member of the role the item is addressed to has their own copy, and dismissing it takes it out of that member's inbox only, with the record of who dismissed what (the maintainer's decision of 2026-10-22; P1-17, step 4).

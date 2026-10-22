@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md)) |
-| **Date** | 2026-09-29; updated 2026-10-19 for RFC-0002 (section 3.9 and the rows that refer to it), 2026-10-20 for the design of the halt path (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): sections 2, 3.3, 3.5, 3.6, 3.9, 4, 5 and 6), and 2026-10-21 for the quorum of policy approvals (sections 3.4 and 5: the maintainer's answer to RFC-0002's unresolved question 2) |
+| **Date** | 2026-09-29; updated 2026-10-19 for RFC-0002 (section 3.9 and the rows that refer to it), 2026-10-20 for the design of the halt path (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): sections 2, 3.3, 3.5, 3.6, 3.9, 4, 5 and 6), and 2026-10-21 for the quorum of policy approvals (sections 3.4 and 5: the maintainer's answer to RFC-0002's unresolved question 2) and for the settings of plan P1-17 (sections 3.8 and 5) |
 | **Schema** | [`internal/platform/db/migrations/00001_init.sql`](../../internal/platform/db/migrations/00001_init.sql) |
 | **Related** | [Agent lifecycle](lifecycle.md), [architecture](mvp-architecture.md), [requirements](../requirements/mvp-requirements.md), [ADR-0003](../adr/0003-postgresql-only-stateful-dependency.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md), [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) |
 
@@ -174,8 +174,8 @@ A fleet halt changes one row (`fleet_state`), not one row per agent, and blocks 
 
 | Entity | Purpose |
 | --- | --- |
-| `settings` | Configurable defaults (section 5), edited by administrators, versioned |
-| `outbox` | Events to publish after commit (notifications, webhooks) |
+| `settings` | Configurable defaults (section 5), versioned. Plan [P1-17](../plans/phase-1/P1-17-settings.md) serves them and changes them: the domain that owns a key validates each change, and each change is audited |
+| `outbox` | Events to publish after commit (notifications, webhooks), and the effects of setting changes (plan P1-17) |
 | `job_state` | Last run of each background job, for health and metrics |
 | `inbox_items` | Pending work per person or per role (UI-09): validations, approvals, reviews, releases, and the catalog's reviews and requests (section 3.9) |
 
@@ -222,7 +222,7 @@ Every transaction that changes the governance state, issuing and lifting a block
 
 ## 5. Defaults
 
-Initial values of `settings`, all editable by administrators:
+Initial values of `settings`. Administrators read them through the API of plan [P1-17](../plans/phase-1/P1-17-settings.md), and change each one once it is registered there, by the plan that owns it or by P1-17 on that plan's behalf; until then, a key that has its row is listed read-only. The reference that P1-17 generates from its registry, `docs/reference/settings.md`, gives each key's owner, default and bounds, and whether a change notifies the steering committee.
 
 | Setting | Default |
 | --- | --- |
@@ -236,7 +236,6 @@ Initial values of `settings`, all editable by administrators:
 | `killswitch.lease_ttl_seconds` | low 60, medium 60, high 30, critical 15 (confirmed by spike S2) |
 | `killswitch.unconfirmed_after_seconds` | 10 |
 | `killswitch.drill_max_seconds` | 60; the system releases a drill once it is confirmed, or after this time (KIL-09). P1-08 adds this setting |
-| `audit.retention_months` | 6, the EU AI Act minimum (NFR-10) |
 | `inventory.data_categories` | public data, internal documents, customer data, employee data, personal data, special category data, financial data, health data, source code, credentials |
 
 Risk tiers are `low`, `medium`, `high` and `critical`. The EU AI Act classification, on agents and use cases, is `prohibited`, `high_risk`, `limited`, `minimal` or `not_assessed`.
