@@ -2,8 +2,8 @@
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1.2, with [threat model v0.1.3](threat-model.md) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models) and 2026-10-21 (plan P1-17: settings) |
+| **Status** | Version 0.1.3, with [threat model v0.1.4](threat-model.md) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings) and 2026-10-22 (the review of RFC-0001: ST-35, ST-38 and ST-86) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 8 |
 
 Each test turns an abuse case of the threat model into a check that fails if the control it covers is missing. Each has one owner plan: its acceptance criteria require the test to pass, and it runs in CI from then on. Plan [P1-13](../plans/phase-1/P1-13-security-hardening-and-release.md) runs the whole catalog before the first release.
@@ -80,10 +80,10 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ID | Test | Covers | Kind |
 | --- | --- | --- | --- |
 | ST-34 | Registration is refused for an unapproved module or a different manifest hash; revoking a module ends its streams and refuses its calls (MAN-1 to MAN-4) | T-28 | integration |
-| ST-35 | Every method, `ReportTooling` and `ReportDefinitions` included, refuses agents outside the caller's scope, on every call and not only at registration (CORE-2); only instances of modules that declare the `enforcement-point` capability can call those two | T-27, T-74 | integration |
+| ST-35 | Every method, `ReportTooling` and `ReportDefinitions` included, refuses agents outside the caller's scope, and every call that names an instance refuses one that the caller's principal did not register, on every call and not only at registration (CORE-2); only instances of modules that declare the `enforcement-point` capability can call those two | T-27, T-74 | integration |
 | ST-36 | A `Watch` stream ends when its token expires (CORE-1), and a reader that falls behind is dropped (CORE-7) | T-37 | integration |
 | ST-37 | No replica ever sends state older than the client's version, including after a failover to another replica (CORE-5) | T-31 | integration |
-| ST-38 | Message size limits and per-instance stream limits are enforced (contracts section 4.8), and so are the message limits of tooling reports and definitions (RFC-0002 section 4) | T-36, T-37, T-74 | integration |
+| ST-38 | Message size limits are enforced, and a replica keeps at most two streams per instance, ending the oldest when a third opens (contracts section 4.8, CORE-16); so are the message limits of tooling reports and definitions (RFC-0002 section 4) | T-36, T-37, T-74 | integration |
 | ST-39 | Every lease renewal carries the core's time | T-32, DC-2 | integration |
 
 ## P1-08: Kill switch
@@ -96,6 +96,7 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-43 | A halted agent's enforcement point keeps delivering evidence and acknowledgements after its first token expires, and learns of the release | T-25, DC-1 | e2e |
 | ST-44 | Under a network partition, the enforcement point fails closed when its lease expires (fault injection) | T-69 | e2e |
 | ST-45 | A halt that stays unacknowledged raises an alert after the timeout | T-32 | integration |
+| ST-86 | A resumption from a version the core never issued gets a snapshot, is recorded, and raises no alert that changes were lost; claims move the version counter at most once a minute per instance, and one more than a million versions ahead is refused; a halt's pair whose instance deregistered before acknowledging shows as not acknowledged | T-84 | integration |
 
 ## P1-09: Python enforcement point
 

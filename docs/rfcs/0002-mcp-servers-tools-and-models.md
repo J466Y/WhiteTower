@@ -139,7 +139,7 @@ A report is complete: it replaces the instance's previous report for that agent.
   - A report holds at most 256 servers, 4,096 tools and 256 models.
   - References and display forms are at most 2 KiB each, and names at most 256 bytes, so a full report fits in the 4 MiB message limit.
   - Each description is at most 16 KiB, and each schema at most 64 KiB.
-  - The core MAY refuse, with `RESOURCE_EXHAUSTED`, more than one report per instance and agent every 10 seconds.
+  - The core MAY refuse, with `RESOURCE_EXHAUSTED`, more than one report per instance and agent every 10 seconds. The instance retries a refused report with the backoff of the contracts' other calls, no sooner than the error's `RetryInfo` says (contracts, section 4.7).
 
 ### 5. The catalog in the bundle
 

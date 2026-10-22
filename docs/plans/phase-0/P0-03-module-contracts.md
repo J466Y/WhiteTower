@@ -284,7 +284,7 @@ The kit's skeleton cannot drive them yet. P1-07.2 adds what they need:
 | The fake core records every call it receives, with its time, its method, its instance, the identity of its token and what it carries, and when each stream ends. Today it keeps registrations, acknowledgements and events, without their times | S-15, S-26, S-27, S-28 |
 | The kit makes two certificate authorities: the trust anchor it names in `WT_CONFORMANCE_CA_FILE`, and another, which issues the certificate the fake core serves first. The skeleton's tests serve the fake core with the test certificate of Go's `net/http/httptest` | S-26 |
 | `GetBundleKeys` also lists the untrusted key of the bundle vectors. Today it lists only the trusted key | S-09 |
-| The fake token endpoint, which the [driver protocol](../../../test/conformance/driver-protocol.md) says P1-07 adds, issues tokens that expire within a minute. The fake core ends each stream with `UNAUTHENTICATED` when its token expires (CORE-1), and allows two streams per instance, ending a third with `ABORTED`, as the core does (P1-07 step 5) | S-26, S-27 |
+| The fake token endpoint, which the [driver protocol](../../../test/conformance/driver-protocol.md) says P1-07 adds, issues tokens that expire within a minute. The fake core ends each stream with `UNAUTHENTICATED` when its token expires (CORE-1), and keeps two streams per instance, ending the oldest with `ABORTED` when a third opens, as the core does (CORE-16, P1-07 step 5) | S-26, S-27 |
 | The fake core sets the heartbeat interval at registration and changes it in heartbeat responses. Both are 30 seconds today | S-28 |
 | The fake core changes the fleet state, which never changes today | S-29 |
 | The driver protocol gains endpoints for runtime-control modules: start and stop a workload of an agent, and tell whether the module's layer covers it, as the platform shows it rather than as the module reports it | S-15, S-29 |
@@ -305,9 +305,50 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | Pull request | Content | Status |
 | --- | --- | --- |
 | 1. Provisional review | The rule in GOVERNANCE.md, the status and review period of both RFCs, and the governance part of point 38 | Done |
-| 2 and later. Corrections | The other points, the rest of point 38 included, and the editorial corrections, in small pull requests: the specification text first (the reviewer's), then `api/`, the vectors and the code that follow it, as parts for the coding agents | Not started |
+| 2. The watch stream, leases and instances | Points 1, 5, 11, 18, 25, 26 and 29 | Done |
+| 3. Authentication, authorization and transport | Points 4, 6, 8, 23 and 30 | Not started |
+| 4. Decision profile and policies | Points 2, 15, 17, 19, 24, 31, 32 and 37 | Not started |
+| 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Not started |
+| 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Not started |
+| 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Not started |
+| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | Not started |
 | Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Not started |
 
 RFC-0002's review follows, the same way.
 
 The governance part of point 38 comes with the rule: GOVERNANCE.md, CONTRIBUTING.md, the index of RFCs and section 10 name `api/policy` and what the vectors expect among the changes that need an RFC. The rest of point 38, in RFC-0001 and the specification, is a correction like the others. The RFC template gains a section for the record of the review, and gate G0 of the roadmap asks for both RFCs accepted, provisionally while the rule applies. The comment at the top of `.github/CODEOWNERS` still names three directories, and is the maintainer's to change.
+
+### 2026-10-22: corrections, part 1: the watch stream, leases and instances
+
+The first part of the corrections changes the specification where the halt path meets the module API, as the maintainer decided points 1, 5, 11, 18, 25, 26 and 29 of the review:
+
+| Point | Change | Where |
+| --- | --- | --- |
+| 1 | An instance keeps the highest version it applied, across all its streams, and never lowers it, so the two streams of a token rollover cannot undo a halt, even on two replicas. A lease belongs to the instance, not to a stream, and outlives a reconnection; "session" is gone. The core renews right after a resumed stream catches up, and may withhold renewals while it cannot show that it is current. The parts of a snapshot are consecutive | I-2, I-3, sections 5.2 and 5.3, CORE-6, EP-9, RC-2 and section 11; KIL-07, aligned with S-07; RFC-0001's reading of ADR-0005, decision 6 |
+| 5 | An instance is one process: its key is unique to the process and stays the same across restarts (I-8), and appendix A no longer uses a host name. An instance belongs to the principal that registered it, and every call that names an instance must be that principal's (CORE-2). The core keeps at least two streams per instance and may end the oldest when another opens (CORE-16), the maintainer's option B, so that a dead stream it has not noticed never refuses a live reconnection | Sections 4.3, 4.4, 4.6, 4.8, 4.9 and 5.2, appendix A |
+| 11 | A stream silent for the renewal interval plus 5 seconds has failed, and the instance reconnects on a new connection (I-9). The core accepts client PINGs every 10 seconds (CORE-14), and no rate limit refuses a halt acknowledgement (CORE-15). I-4 bounds the session calls, a library's own backoff included, and the other calls get a backoff of their own, capped at 60 seconds. `RESOURCE_EXHAUSTED` may carry `RetryInfo`, unary calls carry deadlines, and tokens are renewed between half and four fifths of their lifetime | Sections 4.1, 4.2, 4.6, 4.7, 4.8, 5.2 and 5.8; RFC-0002, section 4 |
+| 18 | A renewal more than the tolerance before or after the instance's clock renews nothing, and the tolerance is at most 30 seconds | Sections 4.8, 5.3 and 11 |
+| 25 | An instance bounds what the core sends: a lease TTL above 300 seconds counts as 300, and a zero or absent one renews nothing; a snapshot whose first part lacks the fleet state is malformed; a missing heartbeat interval keeps the one in force; a state that stops naming a bundle closes the gate; and the backoff's cap never falls below its first step | I-4, I-6, sections 5.2 and 5.3, EP-7; scenario S-30 |
+| 26 | Loss depends on the kind of instance: one that watches, with an agent in scope, is lost once it has held no stream for the shortest TTL in its scope, whatever its heartbeats; any other after three heartbeat intervals without a heartbeat or a stream. A heartbeat carries the served agents when they changed since the last call the core accepted | CORE-4, section 4.4 |
+| 29 | An enforcement point closes its gate before it deregisters (I-5). A version claimed above the core's is no evidence of lost changes | I-5, section 4.4 and section 11 |
+
+The scenarios follow. S-12 adds a core black-holed by a TCP proxy, and a core that refuses connections for over two minutes. S-17 adds a renewal from the future. S-27 adds two replicas of the core one read apart, in both orders, a deregistration that closes the gate, and the keys of two processes of the module. S-30 is new, for values out of range. The new obligations of modules have their scenarios: I-8 in S-27, and I-9 in S-12. RFC-0001 counts 23 scenarios, and the kit's README twenty-one designed.
+
+The design note of the halt path follows in [P1-08](../phase-1/P1-08-kill-switch.md#progress-notes) (its note of 2026-10-22), and so do P1-07 (the key per module and principal, the instance check on every call, the heartbeat interval in every response, pings, `RetryInfo`, and the columns that lost instances need) and P1-09 (a key per process, the version applied, the silence of a stream, the two backoffs and the bounds). The threat model becomes version 0.1.4: T-31, T-32 and T-37 change, T-84 is new, AT-1, AT-6 and AT-7 gain leaves, and DC-2 checks both ways. The security test catalog becomes version 0.1.3: ST-35 and ST-38 change, and ST-86 is new, for P1-08.
+
+What follows in `api/` and the conformance kit is a part for the coding agents ([AGENTS.md](../../../AGENTS.md), work queue):
+
+- comments only in `governance.proto` and `registry.proto`, then `task gen`: `WatchResponse.version` (the version applied never goes back), `LeaseRenewal.server_time` (the tolerance both ways), the agent state's `lease_ttl` (its bounds), the ends of a `Watch` stream and their codes (section 4.6, CORE-1, CORE-7, CORE-16), `instance_key` (unique to the process, the same across restarts, a random ID rather than a pod name), the heartbeat interval (in every response), the served agents (when they changed since the last call the core accepted), and `DeregisterInstance` (the gate closes first);
+- the stub enforcement point (`test/conformance/stubep`) follows sections 5.2 and 5.3 and EP-7: it never lowers the version it applied, checks `server_time` both ways, bounds the lease TTL, refuses a snapshot whose first part lacks the fleet state, and deactivates its bundle when the state stops naming one;
+- S-17 gains the renewal from the future.
+
+P1-07.2 adds to the kit what the other scenarios need:
+
+| Addition | Scenarios |
+| --- | --- |
+| A TCP proxy between the module and the fake core, which can drop traffic without closing connections, and refuse new ones | S-12 |
+| The fake core plays two replicas one read apart, each serving its own stream | S-27 |
+| The driver protocol gains an endpoint that starts one more process of the module, with an evidence buffer of its own, as a deployment that scales out would | S-27 |
+| The fake core sends values out of range: a lease TTL of an hour, zero and absent TTLs, a snapshot whose first part lacks the fleet state, heartbeat responses without an interval or with zero, and a state that stops naming a bundle | S-30 |
+
+Step 12 extends two of these rules to what RFC-0002 adds: the first part of a snapshot also carries the blocks, and CORE-2's check of the instance covers `ReportTooling` and `ReportDefinitions`.
