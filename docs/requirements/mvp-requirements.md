@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Version 0.3: the MCP servers, tools and models of agents join the MVP ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), decision of the maintainer of 2026-10-13). Version 0.2 was the Phase 0 gate's (2026-09-30): targets set from measurements, open questions Q1 to Q6 closed |
-| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)), 2026-10-19 (RFC-0002; the permission matrix's row on reassigning an owner, plan P1-04), 2026-10-20 (HUM-04, KIL-02, KIL-05, KIL-06, KIL-09, the glossary's C3 and sections 5.1.1, 5.2.1 and 9: the maintainer's decisions on halts and drills, in [P1-08's design note](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (POL-02 and questions Q8 to Q10: the maintainer's answers to RFC-0002's open questions) and 2026-10-22 (KIL-07, aligned with conformance scenario S-07: the maintainer's decision in the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)) |
+| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)), 2026-10-19 (RFC-0002; the permission matrix's row on reassigning an owner, plan P1-04), 2026-10-20 (HUM-04, KIL-02, KIL-05, KIL-06, KIL-09, the glossary's C3 and sections 5.1.1, 5.2.1 and 9: the maintainer's decisions on halts and drills, in [P1-08's design note](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (POL-02 and questions Q8 to Q10: the maintainer's answers to RFC-0002's open questions) and 2026-10-22 (KIL-07, aligned with conformance scenario S-07, and POL-01, with Rego in Phase 2: the maintainer's decisions in the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
 
@@ -190,7 +190,7 @@ stateDiagram-v2
 
 | ID | Requirement | Pri | Source |
 | --- | --- | --- | --- |
-| POL-01 | Policies are stored as immutable, versioned documents with a declared language (Cedar in the MVP; Rego for engines that run it natively) and a scope: global or agent-specific. | M | Scope |
+| POL-01 | Policies are stored as immutable, versioned documents with a declared language (Cedar in the MVP; Rego, for engines that run it natively, in Phase 2) and a scope: global or agent-specific. | M | Scope |
 | POL-02 | Approval workflow: global policies are approved by the steering committee and agent-specific policies by the advisory committee; the author cannot approve. The platform administrator sets how many distinct people of the approving committee must approve a version, for each scope: one by default, at most five (the maintainer's decision of 2026-10-21). | M | Governance model |
 | POL-03 | The combination semantics (5.4.1) are part of the contract, and every policy engine adapter must pass the conformance tests for them. | M | Principles |
 | POL-04 | An agent cannot become active without at least one approved agent-specific policy. | M | Governance model |

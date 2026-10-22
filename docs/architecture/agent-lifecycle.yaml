@@ -1,13 +1,16 @@
 # Agent lifecycle, machine-readable form (normative text: lifecycle.md).
 # Plan P1-04 generates the transition guards, and checks the documentation,
 # from this file. Guard, effect and actor names are defined in lifecycle.md.
+# enforcement_gate is open, closed, or non_production: open only for an
+# enforcement point whose registration returned non_production (contracts,
+# section 5.4).
 version: 1
 
 states:
   draft:     { terminal: false, credentials: none,           enforcement_gate: closed }
   proposed:  { terminal: false, credentials: none,           enforcement_gate: closed }
-  validated: { terminal: false, credentials: non_production, enforcement_gate: open }
-  ready:     { terminal: false, credentials: non_production, enforcement_gate: open }
+  validated: { terminal: false, credentials: non_production, enforcement_gate: non_production }
+  ready:     { terminal: false, credentials: non_production, enforcement_gate: non_production }
   active:    { terminal: false, credentials: all,            enforcement_gate: open }
   suspended: { terminal: false, credentials: none,           enforcement_gate: closed }
   retired:   { terminal: true,  credentials: none,           enforcement_gate: closed }

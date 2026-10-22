@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md), step 4) |
-| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)); sections 3 and 4 updated on 2026-10-19 for shared use cases and the decisions on proposals (the maintainer's decisions, plan P1-04); sections 2, 3, 4 and 7 updated on 2026-10-20 for the design of the halt path and the maintainer's decisions on it (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes)) |
+| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)); sections 3 and 4 updated on 2026-10-19 for shared use cases and the decisions on proposals (the maintainer's decisions, plan P1-04); sections 2, 3, 4 and 7 updated on 2026-10-20 for the design of the halt path and the maintainer's decisions on it (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes)); sections 1 and 9 updated on 2026-10-22 for the gate in production (the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)) |
 | **Normative** | Yes. The machine-readable form is [agent-lifecycle.yaml](agent-lifecycle.yaml); plan P1-04 generates the transition guards from it, and the two must never disagree |
 | **Related** | [Requirements 5.1.1](../requirements/mvp-requirements.md#511-agent-lifecycle-initial-proposal-refined-in-plan-p0-02), [domain model](domain-model.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md) |
 
@@ -15,8 +15,8 @@ The lifecycle turns the charter's governance model into rules the system enforce
 | --- | --- | --- | --- |
 | `draft` | The owner is preparing the proposal | None | Closed |
 | `proposed` | Waiting for the advisory committee to validate the use case | None | Closed |
-| `validated` | Use case validated; the owner prepares the agent-specific policy, declares the harness and requests enabling the agent's tooling | Non-production only | Open |
-| `ready` | Agent-specific policy approved and harness declared; can be activated | Non-production only | Open |
+| `validated` | Use case validated; the owner prepares the agent-specific policy, declares the harness and requests enabling the agent's tooling | Non-production only | Open for non-production only |
+| `ready` | Agent-specific policy approved and harness declared; can be activated | Non-production only | Open for non-production only |
 | `active` | Running in production under monitoring | Production and non-production | Open |
 | `suspended` | Temporarily barred; remembers the state it came from | None | Closed |
 | `retired` | Permanently out of service; kept for the record | None, and all credentials revoked | Closed |
@@ -24,7 +24,7 @@ The lifecycle turns the charter's governance model into rules the system enforce
 
 **What "gate open" means.** The enforcement point may evaluate the agent's policies; it still denies everything while the lease is expired, the bundle is missing or invalid, or the agent is halted (ADR-0005). "Gate closed" means it denies everything regardless of policy.
 
-**Production versus non-production** is enforced where credentials are issued (requirement AID-04), not by the enforcement point. An agent that is not `active` cannot obtain a production token.
+**Production versus non-production** is enforced twice. Where credentials are issued, an agent that is not `active` cannot obtain a production token (requirement AID-04). At the gate, an enforcement point whose registration returned `production` keeps the gate closed for an agent in `validated` or `ready` ([contracts](../contracts/module-contract-v0.1.md), section 5.4). The gate covers the enforcement points that authenticate as their module, whose credential's environment says nothing about each agent's lifecycle.
 
 ## 2. Run state
 
@@ -127,7 +127,7 @@ The transitions White Tower makes itself (T7, T8, T11 and T12) cannot be asked f
 | State | Token issuance | Policy bundles | Governance state sent to enforcement points |
 | --- | --- | --- | --- |
 | draft, proposed | Refused | Not built | Published (gate closed) |
-| validated, ready | Non-production credentials only | Built from the active global and agent-specific versions, with the agent's catalog file; with no agent-specific policy yet, only global policies apply, under default deny | Published (gate open) |
+| validated, ready | Non-production credentials only | Built from the active global and agent-specific versions, with the agent's catalog file; with no agent-specific policy yet, only global policies apply, under default deny | Published (gate open for non-production only) |
 | active | All credentials | Built | Published (gate open) |
 | suspended | Refused, except module API tokens for its enforcement point; credentials kept for reinstatement | Kept, and rebuilt when their inputs change (policy versions, the agent's catalog file), so reinstatement never restores a stale bundle | Published (gate closed) |
 | retired | Refused, credentials revoked | Not built | Published (gate closed) so connected instances stop |

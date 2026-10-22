@@ -34,7 +34,7 @@ Global and agent-specific policies, written in a standard language, validated, a
 ## Deliverables
 
 - `internal/policy` with its OpenAPI operations.
-- Built-in validators for Cedar and Rego.
+- A built-in validator for Cedar; Rego's waits for Phase 2 (contracts, section 6.7).
 - The bundle builder and signer.
 - The per-agent Cedar schema and catalog file of each bundle.
 - The seeded global policies: the permit of the lifecycle actions and `wt-catalog`.
@@ -52,7 +52,7 @@ Write the OpenAPI operations for policies, versions, validation, approvals, diff
 ### 2. Policies and versions
 
 - A policy has a scope (global, or agent-specific with its agent) and a language.
-- Supported languages are those with a built-in validator (Cedar and Rego) that at least one approved enforcement module declares. The seeded versions of step 4 are exempt: they are Cedar, the primary language of the decision profile, and a fresh installation has no approved module yet.
+- Supported languages are those with a built-in validator that at least one approved enforcement module declares: Cedar, the only language of the contracts' `v1alpha1`. The seeded versions of step 4 are exempt, since a fresh installation has no approved module yet. A policy's record of its language may keep `rego` for Phase 2.
 - Versions are immutable: content, SHA-256, author, creation time and a change note. The seeded versions of step 4 have the system as their author.
 - Version states: draft, submitted, approved, active, superseded, rejected, withdrawn.
 - Usage rules (RFC-0002, section 8) are Cedar `forbid` statements of ordinary policies, global or agent-specific, each annotated with its rule (`@rule`). They have no table, version or workflow of their own: the policy text is the only source of truth.
@@ -62,12 +62,13 @@ Write the OpenAPI operations for policies, versions, validation, approvals, diff
 ### 3. Validation
 
 - **Cedar:** parse with `cedar-go`, and validate in strict mode against a schema generated from the catalog: the profile's schema, whose `ToolArgs` holds one record per tool with the arguments policies may see, typed as the catalog declares them (RFC-0002, sections 7.5 and 7.6). An agent-specific version validates against its agent's schema, and a global version against one schema that covers the whole catalog. The arguments of the agent's own tools (`agent/<name>`) are only in their agent's schema, so a global version cannot read them (RFC-0002, section 7.5). This replaces the deployment-wide `ToolArgs` extension of the contracts (section 6.7).
-- **Rego:** compile with the OPA Go library against the published input document.
+- **Rego** waits for Phase 2, with the mapping that section 12 of the contracts lists.
+- **Fixed values must be valid.** A version is refused when a Cedar statement compares an attribute whose values the profile fixes with a literal outside its set, through `==`, `!=` or `like`, or through `contains`, `containsAny` or `containsAll` on set literals. The sets are read from `decision-request.schema.json`, so RFC-0002's attributes are covered as soon as the schema has them. Tests use `non-production`, `Critical`, `third-party` and `MCP`: strict Cedar validation lets each through, and the comparison would silently never match, or always (contracts, section 6.7).
 - **Policy tests (Should, POL-07):** optional test files with expected decisions run in the core. Results are attached to the version, and a version with failing tests cannot be submitted.
 - **Arguments must be visible.** A version is refused when one of its Cedar statements reads a tool argument outside the sets policies see: those a reviewer declared, and those usage rules use. Enforcement points fill only those (EP-19), so such a condition never holds, and strict validation does not report it when `has` guards the read.
 - **Usage-rule statements.** At submission, every statement annotated `@rule` is regenerated from its annotation, and the version is refused unless each rule's statements are exactly the generator's output: one per tool, none missing, none added, the annotation in canonical JSON. The generator is P1-16's compiler of usage rules, behind an interface defined here: what a rule compiles to depends on the types of its arguments, which the catalog holds. Until P1-16 lands, a version with an `@rule` statement is refused.
 
-**Done when:** syntax errors are reported with line and column, failing tests block submission, a hand-edited, missing or extra rule statement is refused, and so is a statement that reads an argument policies cannot see.
+**Done when:** syntax errors are reported with line and column, failing tests block submission, a hand-edited, missing or extra rule statement is refused, and so are a statement that reads an argument policies cannot see and a comparison with a fixed value outside the profile's set.
 
 ### 4. Approval workflow
 
@@ -160,7 +161,7 @@ Evaluate a draft version, together with the current global set, against test inp
 - An approved global policy and agent-specific policy produce a signed bundle that a connected mock enforcement point receives and activates within 5 seconds of approval; the version it runs is visible through the API.
 - Drift is flagged when an instance does not activate a bundle.
 - Activating a global version rebuilds 1,000 bundles, each with its catalog file and schema, in under 60 seconds.
-- Validation rejects Cedar and Rego syntax errors with positions.
+- Validation rejects Cedar syntax errors with positions.
 - No path lets an author approve their own version (tests).
 - Every bundle carries its agent's catalog file and Cedar schema, both covered by the signed manifest; the mock enforcement point activates it, and an enforcement point without catalogs rejects it, keeping its last valid bundle or, with none, staying closed.
 - A fresh installation has the seeded policies waiting for the steering committee; until they are approved, the actions they permit are denied unless another policy permits them.

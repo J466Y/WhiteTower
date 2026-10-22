@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md). Contract version `v1alpha1` |
-| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)) and 2026-10-22 (from the review of RFC-0001: changes to what the conformance vectors expect need an RFC; one applied version per instance, leases that belong to the instance, liveness and retries, what an instance is, bounds on what the core sends, the name in the core's certificate, refusals of a call or of one item, token requests, how `Watch` travels, and revoking keys) |
+| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)) and 2026-10-22 (changes to what the conformance vectors expect need an RFC, and the corrections from the review of RFC-0001, which [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) list) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |
 | **Conformance** | [`test/conformance/`](../../test/conformance/README.md) |
@@ -30,7 +30,7 @@ A module declares one or more capabilities in its manifest. Four are specified i
 | Capability | Status in `v1alpha1` | What the core expects from it | Module API it uses | Events it emits |
 | --- | --- | --- | --- | --- |
 | `enforcement-point` | Specified | Applies governance to the agents it serves at runtime: a gate before every governed call, policy decisions, halts, evidence | All services | Decisions, actions, halts, bundles, leases |
-| `policy-engine` | Specified | Evaluates decision requests with the profile and the combining algorithm of section 6. Embedded in an enforcement point, or a decision point that others call through AuthZEN | None when embedded | None of its own |
+| `policy-engine` | Specified | Evaluates decision requests with the profile and the combining algorithm of section 6, embedded in an enforcement point: it serves only that module's enforcement points, and evaluates exactly the bundle they verified. Decision points that others call through AuthZEN wait for `v1beta1` (section 6.8) | None | None of its own |
 | `runtime-control` | Specified | Acts on halts outside the agents' processes, for example the network quarantine of KIL-10. Evaluates no policy | Registry, `Watch`, `Acknowledge`, `Publish` | Quarantine events, leases |
 | `event-source` | Specified | Publishes the event types its manifest declares | Registry, `Publish` | Those it declares |
 | `mcp-gateway` | Reserved, Phase 2 | An enforcement point for tool calls through MCP | | |
@@ -42,7 +42,7 @@ A module declares one or more capabilities in its manifest. Four are specified i
 | `compliance` | Reserved, Phase 3 | Evidence packages and GRC export | | |
 | `discovery` | Reserved, Phase 3 | Finds agents that are not in the inventory | | |
 
-The charter's eight module types all have a place: the policy engine is `policy-engine`; the MCP and LLM gateways are `mcp-gateway` and `llm-gateway`, and will also declare `enforcement-point`; the skills repository, observability, compliance and discovery have their own names; the harness or sandbox is `harness`, and will also declare `runtime-control`.
+The charter's eight module types all have a place: the policy engine is `policy-engine`; the MCP and LLM gateways are `mcp-gateway` and `llm-gateway`, and will also declare `enforcement-point`, with the actions each must evaluate; the skills repository, observability, compliance and discovery have their own names; the harness or sandbox is `harness`, and will also declare `runtime-control`.
 
 ## 3. Module manifest
 
@@ -208,7 +208,7 @@ A message's size is that of its encoding in the call, binary protobuf or JSON, o
 An **instance** is one process of a module, with its own leases, streams and evidence buffer, and, for an enforcement point, its own gate.
 
 - **I-5.** An instance MUST register before any other call, and SHOULD deregister when it stops on purpose. Before an enforcement point deregisters, it MUST close its gate for every agent it serves, and allow nothing afterwards.
-- **I-6.** An instance MUST send heartbeats at the interval the core sets, which every `RegisterInstanceResponse` and `HeartbeatResponse` carries. An instance that receives none, or one that is not positive, keeps the interval in force: 30 seconds before the first. A runtime-control instance reports as served agents those that have workloads it controls.
+- **I-6.** An instance MUST send heartbeats at the interval the core sets, which every `RegisterInstanceResponse` and `HeartbeatResponse` carries. An instance that receives none, or one that is not positive, keeps the interval in force: 30 seconds before the first. A runtime-control instance reports as served agents those that have workloads it controls, and an enforcement point that serves several agents those in its scope for which it holds an active bundle. Served agents never authorize anything, and the core ignores those outside the scope.
 - **I-7.** An enforcement point MUST put in the subject of every decision the environment its registration returned (MAN-5, section 6.2). It MUST NOT take the environment from its configuration, nor from its access token, which RFC 9068 (section 6) forbids a client to inspect. It MUST treat a registration that returns no environment, or one it does not know, as refused, and allow nothing (EP-1, EP-10).
 - **I-8.** An instance's key MUST be unique to its process, and SHOULD stay the same across the process's restarts: a random ID, created with the evidence buffer and stored in it, is RECOMMENDED. A host or pod name is not enough, since several processes, or the same agent in two environments, may share it.
 - **CORE-4.** The core MUST show an instance as lost:
@@ -243,7 +243,7 @@ A halt applies wherever the instance runs. An instance applies every halt in an 
 ### 5.2 The watch stream
 
 - **CORE-5.** When `since_version` is 0, or when the core cannot send every change since it, the core MUST start with a snapshot. It MAY send a snapshot at any time, and MUST NOT send a snapshot or a change older than `since_version`. It MAY answer any resumption with a snapshot, including one at a version it moved forward after a regression, when a client resumes from a version above the core's latest state version (after an asynchronous failover or a restore). That snapshot replaces the client's state.
-- A **snapshot** is one or more `SnapshotPart` messages with the same version, consecutive on one stream: the first has `first` set and carries the fleet state, the last has `last` set. Agents missing from a snapshot are out of scope. A snapshot whose first part lacks the fleet state is malformed: the instance keeps its current state (at start it has none, so its gate stays closed with `gate.no_state`), and reconnects with the backoff of I-4.
+- A **snapshot** is one or more `SnapshotPart` messages with the same version, consecutive on one stream: the first has `first` set and carries the fleet state, the last has `last` set. Agents missing from a snapshot are out of scope. An instance MAY apply the halts that a snapshot part carries as soon as the part arrives. A snapshot whose first part lacks the fleet state is malformed: the instance keeps its current state (at start it has none, so its gate stays closed with `gate.no_state`), and reconnects with the backoff of I-4.
 - **Changes** follow in strictly increasing version order. Each carries the complete new state of every agent that changed or entered the scope, the new fleet state when it changed, and the agents that left the scope. An instance applies every agent state a change carries, whatever that state's own `version`: an agent that enters the scope keeps the version of its last change, which may be older than the last version the instance applied.
 - **The version applied never goes back.** An instance keeps the highest `WatchResponse.version` it has applied, across all its streams, and never lowers it. It ignores a change, or a whole snapshot, whose version is below it. A fresh renewal renews its leases whichever stream carries it, but never lowers that version. The agent states inside a change it applies are still applied, whatever their own version. So the two streams of a token rollover (I-2), even on two replicas of the core that are not equally current, can never undo a halt.
 - **I-11.** An agent that leaves the scope, because a snapshot does not carry it or a change lists it as removed, MUST lose its state and its lease at once, and the instance drops the acknowledgements it has queued for it. An enforcement point's gate for that agent closes with `gate.no_state`.
@@ -257,11 +257,11 @@ A halt applies wherever the instance runs. An instance applies every halt in an 
 - A renewal renews the lease of every agent in scope. Each lease then lasts that agent's `lease_ttl`, measured on the client's **monotonic clock** from the moment it received the renewal. A `lease_ttl` above 300 seconds counts as 300; one that is zero, negative or absent renews nothing; one under 10 seconds is applied as it is, never lengthened.
 - **Only a fresh renewal counts.** An instance ignores a renewal without `server_time`, or whose `server_time` is more than a tolerance before or after its own clock: 5 seconds by default, and at most 30 (section 4.8). Such a renewal renews nothing, and while an instance receives only those, it SHOULD report `HEALTH_DEGRADED` in its heartbeats. A renewal from the future counts as stale too, since an instance whose clock is behind the core's would otherwise accept renewals as old as the tolerance plus its lag. Something on the path that holds the stream back can then delay it by the tolerance at most: beyond that, leases run out and the gate closes, instead of halts arriving late ([threat model](../security/threat-model.md), T-32). The check relies on clocks synchronized within the tolerance (ASM-04), far tighter than token expiry needs; the lease itself is still measured on the monotonic clock.
 - **A lease belongs to the instance,** not to a stream. The end of a stream, a reconnection, or a new registration with the same key neither renews a lease nor ends it: only a fresh renewal renews it, and only its TTL ends it. So an enforcement point that reconnects within its lease keeps deciding on the last state it applied. There is no lease before the first fresh renewal after the instance starts. An agent that enters the scope through a change gets its lease from the next renewal; the core SHOULD send one right after such a change.
-- **When a lease expires, the agent is treated as halted**: the enforcement point denies everything and applies the agent's halt mode (KIL-04), and emits `whitetower.lease.expired.v1`. It opens again when it has a current state and a new lease.
+- **When a lease expires, the agent is treated as halted**: the enforcement point denies everything and applies the agent's halt mode (KIL-04), and emits `whitetower.lease.expired.v1`, one event per agent, with that agent as subject. A denial of `agent.stop` never keeps the agent from stopping (section 6.3). The gate opens again when the instance has a current state and a new lease.
 
 ### 5.4 The gate
 
-An enforcement point checks its gate before every governed call and interaction, then evaluates policies (section 6). The gate is closed, with the first reason that applies in this order:
+An enforcement point checks its gate when each governed call or interaction is made, then evaluates policies (section 6). It never holds a governed call waiting for the core (NFR-02). The gate is closed, with the first reason that applies in this order:
 
 | Order | Condition | Reason |
 | --- | --- | --- |
@@ -269,7 +269,7 @@ An enforcement point checks its gate before every governed call and interaction,
 | 2 | The agent's lease has expired, or it never had one | `gate.lease_expired` |
 | 3 | An agent or selector halt covers the agent | `gate.halted` |
 | 4 | A fleet halt is active | `gate.fleet_halted` |
-| 5 | The lifecycle state is not `validated`, `ready` or `active`, including unknown values | `gate.lifecycle` |
+| 5 | The lifecycle state is not `validated`, `ready` or `active`, including unknown values; or it is `validated` or `ready` and the registration returned `production` | `gate.lifecycle` |
 | 6 | No verified bundle is active for the agent | `gate.no_bundle` |
 | 7 | The evidence buffer cannot accept another event | `gate.evidence_full` |
 
@@ -279,7 +279,7 @@ The [fail-closed vectors](../../test/conformance/vectors/fail-closed.json) cover
 
 When an agent becomes halted, the enforcement point:
 
-1. **Closes the gate at once**, before anything else and before acknowledging. From then on, every governed call and interaction is denied (KIL-01).
+1. **Closes the gate at once**, before anything else and before acknowledging. From then on, every governed call and interaction is denied (KIL-01), though a denial of `agent.stop` never keeps the agent from stopping (section 6.3).
 2. **Applies the halt mode** to work already in flight:
    - `block`: nothing more; the work in flight finishes.
    - `interrupt`: interrupts the work in flight through the framework's own cancellation, where the framework allows it.
@@ -299,16 +299,16 @@ When no halt covers the agent any more, the gate reopens only if every other con
 
 - **EP-1. Start closed.** Allow nothing until the instance has registered, applied a complete snapshot, received a lease renewal and activated a verified bundle for the agent.
 - **EP-2. Decide locally, gate first.** For every governed call and interaction, check the gate (section 5.4), then evaluate the agent's bundle with the profile and the combining algorithm of section 6. Never call the core synchronously to decide.
-- **EP-3. Leases.** Keep one lease per agent on a monotonic clock, renewed only by fresh renewals; when it expires, deny everything and apply the halt mode (section 5.3).
+- **EP-3. Leases.** Keep one lease per agent on a monotonic clock, renewed only by fresh renewals; when it expires, deny everything, without keeping the agent from stopping, and apply the halt mode (section 5.3).
 - **EP-4. Halts.** When the agent or the fleet is halted, close the gate at once, apply the halt mode, and acknowledge each layer honestly (section 5.5).
 - **EP-5. Releases.** Reopen only when no halt covers the agent and every other gate condition holds (section 5.6).
-- **EP-6. Lifecycle.** Open the gate only in the `validated`, `ready` and `active` states.
+- **EP-6. Lifecycle.** Open the gate only in the `active` state, and in `validated` and `ready` only when the registration returned `non_production`: no decision is labeled production for an agent that is not active (section 5.4, row 5).
 - **EP-7. Bundles.** Fetch the bundle the state refers to, verify it (section 7.4), activate it atomically and acknowledge the outcome. Keep the last valid bundle when a new one is rejected, and never allow anything without one. When the state stops referring to a bundle, deactivate the active one, so that the gate closes with `gate.no_bundle`, and keep its version as the floor of V6 for the next one.
 - **EP-8. Evidence.** Record each decision durably before the action proceeds; publish events at least once, in order, from a stable source (section 8.4). Close the gate when the evidence buffer cannot accept another event.
 - **EP-9. Reconnection.** Reconnect with the backoff of section 4.7 when an established stream fails (section 4.6) or falls silent (I-9), resuming from the last version applied. Never lower that version, whichever stream a message comes on, and apply every agent state a change carries, whatever that state's own version (section 5.2). Accept a snapshot at any time, unless it is below the version applied.
 - **EP-10. Unknown content.** Ignore unknown fields. An unknown field never narrows a halt. Treat an unknown lifecycle state as closing the gate, an unknown halt scope as a halt, and an unknown halt mode as `interrupt`. Never let an unknown value open anything.
-- **EP-11. Identity and trust.** An enforcement point inside an agent's process authenticates as that agent and serves it only. Take the core's trust anchors and the bundle keys from configuration. When the configured bundle keys change, verify the active bundle again (section 7.3).
-- **EP-12. State acknowledgements.** Acknowledge the state version applied at least every 60 seconds while it changes, so the console can show instances that lag behind.
+- **EP-11. Identity and trust.** An enforcement point inside an agent's process authenticates as that agent and serves it only. One that authenticates as its module establishes the agent of each call without trusting its caller: it originates the call itself, or the caller presents a White Tower access token issued to that agent for the enforcement point's own audience, never the module API's, which it verifies against the core's keys ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)); never a header, a parameter or an address. A call it cannot attribute to an agent in its scope is denied with `error.unknown_agent`. Take the core's trust anchors and the bundle keys from configuration. When the configured bundle keys change, verify the active bundle again (section 7.3).
+- **EP-12. State acknowledgements.** Acknowledge the state version applied at least every 60 seconds while it changes, so the console can show instances that lag behind. An instance that serves several agents acknowledges it per agent, up to 100 per request (section 4.8).
 
 ### 5.8 Obligations of runtime-control modules
 
@@ -325,6 +325,7 @@ Besides the obligations of the core in sections 4 and 5.2 (CORE-1 to CORE-7, and
 
 - **CORE-8.** A halt is committed, and the stream updated, without waiting for any module. Token issuance for the halted agents stops in the same transaction, except for tokens for the module API, which their enforcement points still need to acknowledge the halt, deliver their evidence and learn of the release ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)).
 - **CORE-9.** Governance state carries no personal data other than the owner's pseudonymous principal ID.
+- **CORE-17.** The subject properties that an enforcement point builds from the state (section 6.2) MUST always match [`decision-request.schema.json`](../../api/policy/decision-request.schema.json): labels, for one, follow its syntax.
 
 ## 6. Decision profile
 
@@ -359,10 +360,12 @@ The subject is always the agent (`type: agent`). The enforcement point builds it
 
 | Property | Source | Cedar |
 | --- | --- | --- |
-| `id` | The agent ID | The principal's ID |
-| `slug`, `kind`, `risk_tier`, `data_categories`, `owner` | Governance state (`slug`, `attributes`) | Attributes of the same names |
+| `id` | The agent ID. For an enforcement point that serves several agents, one in its scope, established without trusting the caller (EP-11) | The principal's ID |
+| `slug`, `kind` (`in_house` or `third_party`), `risk_tier` (`low`, `medium`, `high` or `critical`), `data_categories`, `owner` | Governance state (`slug`, `attributes`) | Attributes of the same names |
 | `environment` | The environment the core returned when the enforcement point registered, the one recorded for the credential it runs with (I-7, MAN-5): `production` or `non_production` | Attribute `environment` |
 | `labels` | Governance state (`attributes.labels`) | Entity tags: `principal.getTag("team")` |
+
+An enforcement point need not validate what it takes from the state (CORE-17). One that does, and finds it invalid, denies with `error.invalid_request`.
 
 ### 6.3 Actions and resources
 
@@ -381,14 +384,47 @@ The eight actions match the intervention points agents actually have. Microsoft 
 
 An enforcement point declares the actions it evaluates in its manifest. Every action is denied by default, so a deployment that evaluates the lifecycle actions usually permits them with a global policy (plan P1-06 seeds one).
 
+**What a denial does.** A denial means the step does not take effect. The enforcement point tells the agent through the framework's own error or refusal, and whether the run goes on is the framework's choice:
+
+| Action | A denial |
+| --- | --- |
+| `agent.start` | The agent does not begin work |
+| `input.receive` | The input is not passed to the agent |
+| `model.invoke`, `tool.invoke` | The call is not made |
+| `model.result`, `tool.result` | The result never reaches the agent or its model; the call's effects stand |
+| `output.emit` | The output is not delivered |
+| `agent.stop` | Nothing: a denial never keeps an agent from stopping, so `agent.stop` is evaluated for the evidence only |
+
+An enforcement point that evaluates `agent.start` SHOULD meet EP-1 before it lets the framework start the agent, waiting at most a configurable time before any decision. No event records that wait, which counts neither in `evaluation_us` nor against the deadline of EP-2.
+
 | Resource type | ID | Properties |
 | --- | --- | --- |
 | `tool` | The tool's name as the agent sees it | `kind` (required: `function`, `mcp`, `http` or `other`), `server` (the MCP server's ID, for MCP tools) |
-| `model` | The model's name | `provider` |
+| `model` | The model's name | `provider`: the lowercase identifier of the service that serves the model, from the table below |
 | `agent` | The requesting agent's ID: an agent action concerns the agent itself | None |
 | `mcp_server`, `dataset`, `skill`, `url` | Reserved for later actions | None |
 
 A request whose resource type does not match its action, or whose agent action names another agent, is invalid and denied (`error.invalid_request`).
+
+**Model providers.** `provider` takes a value of this table, or, for any other provider, a lowercase name of its own, such as `ollama` for a model that Ollama serves locally. The table copies the well-known values of OpenTelemetry's `gen_ai.provider.name` in semantic conventions v1.41.1. They are pinned here, because OpenTelemetry's values are still in development and have been renamed since; a new row is an additive change.
+
+| `provider` | Service |
+| --- | --- |
+| `anthropic` | Anthropic |
+| `aws.bedrock` | Amazon Bedrock |
+| `azure.ai.inference` | Azure AI Inference |
+| `azure.ai.openai` | Azure OpenAI |
+| `cohere` | Cohere |
+| `deepseek` | DeepSeek |
+| `gcp.gemini` | The Gemini API of Google AI Studio |
+| `gcp.gen_ai` | Another generative AI endpoint of Google |
+| `gcp.vertex_ai` | Vertex AI |
+| `groq` | Groq |
+| `ibm.watsonx.ai` | IBM watsonx.ai |
+| `mistral_ai` | Mistral AI |
+| `openai` | OpenAI |
+| `perplexity` | Perplexity |
+| `x_ai` | xAI |
 
 ### 6.4 The context
 
@@ -396,9 +432,9 @@ A request whose resource type does not match its action, or whose agent action n
 | --- | --- |
 | `time` | Required: when the request was made, on the enforcement point's clock. Policies can use it, for example for business hours |
 | `task_id` | The task or run the request belongs to |
-| `trace_id` | The W3C trace ID, 32 hexadecimal characters |
-| `on_behalf_of` | Reserved for per-task delegated credentials (AID-08). MUST be absent in `v1alpha1` |
-| `args` | Tool actions only. The arguments a deployment declares in its `ToolArgs` extension of the Cedar schema (section 6.7), and nothing else. Values are strings, booleans, integers, arrays and objects |
+| `trace_id` | The W3C trace ID, 32 hexadecimal characters. When present, it is the trace ID of the `traceparent` of the event that records the decision (section 8.2), whose span is one of the enforcement point's spans in that trace |
+| `on_behalf_of` | Reserved for per-task delegated credentials (AID-08). MUST be absent in `v1alpha1`: a request that carries it, even empty, is invalid |
+| `args` | Tool actions only. The arguments a deployment declares in its `ToolArgs` extension of the Cedar schema (section 6.7), and nothing else. Values are strings, booleans, signed 64-bit integers (Cedar's `Long`), and arrays or objects of these, never null. A number with a fraction or an exponent, or outside that range, makes the request invalid: numbers are decoded exactly, never through a floating-point type |
 
 ### 6.5 The combining algorithm `wt-deny-overrides-v1`
 
@@ -415,7 +451,7 @@ For every request, the applicable global policies and the agent-specific policie
 
 ### 6.6 Responses and reasons
 
-`decision` is `true` only with reason `policy.permit`. The `context` always carries a `reason` and the list of determining `policies` (White Tower policy IDs), and carries `bundle_version` whenever policies were evaluated. `obligations` is reserved and always empty: decisions are booleans in `v1alpha1`.
+`decision` is `true` only with reason `policy.permit`. The `context` always carries a `reason` and the list of determining `policies` (White Tower policy IDs, each once, in ascending order), and carries `bundle_version` whenever policies were evaluated. `obligations` is reserved and always empty: decisions are booleans in `v1alpha1`.
 
 | Reason | Decision | Meaning | Determining policies |
 | --- | --- | --- | --- |
@@ -425,24 +461,28 @@ For every request, the applicable global policies and the agent-specific policie
 | `gate.no_state`, `gate.lease_expired`, `gate.halted`, `gate.fleet_halted`, `gate.lifecycle`, `gate.no_bundle`, `gate.evidence_full` | deny | The gate is closed (section 5.4) | None |
 | `error.evaluation` | deny | The evaluation reported an error | The policies that failed |
 | `error.timeout` | deny | The evaluation exceeded its deadline | None |
-| `error.unknown_agent` | deny | The request is for an agent the bundle is not for | None |
+| `error.unknown_agent` | deny | The request is for an agent the bundle is not for, or the enforcement point cannot establish an agent in its scope (EP-11) | None |
 | `error.invalid_request` | deny | The request does not match the profile | None |
+
+- **Requests outside the profile.** Before it evaluates, an enforcement point checks that the request is inside the profile: its schema, and sections 6.2 to 6.4 and 6.7. It denies a request outside it with `error.invalid_request`, even when the engine would detect it.
+- **Which reason wins.** After the gate (section 5.4) come, in this order: `error.unknown_agent`, which a subject whose type is not `agent` also gets; then `error.invalid_request`; then `error.timeout`, once the deadline has passed; then rules 1 to 4 of section 6.5. A check that a later section adds runs after the gate and before the evaluation, in the order that section gives.
 
 ### 6.7 Policy languages
 
-**Cedar is the primary language** (open question Q5, spike S1): its "forbid overrides permit" and default deny are exactly rules 1 to 3, and both engines tested, `cedar-go` and `cedarpy`, give the same results on every vector.
+**`v1alpha1` is Cedar only** (open question Q5, spike S1, and the review of RFC-0001): its "forbid overrides permit" and default deny are exactly rules 1 to 3, and both engines tested, `cedar-go` and `cedarpy`, give the same results on every vector. Cedar runs inside the enforcement point, or beside it in an embedded policy engine (section 2).
 
 - **Schema.** [`whitetower.cedarschema`](../../api/policy/whitetower.cedarschema), namespace `WhiteTower`, declares the entity types (`Agent`, `Tool`, `Model`, and the reserved `McpServer`, `Dataset`, `Skill`, `Url`), the eight actions and the context types.
-- **Mapping.** The principal is `WhiteTower::Agent::"<agent-id>"`, with the subject's properties as attributes and its labels as tags. The action is `WhiteTower::Action::"<name>"`. The resource is the entity type of its resource type, with its ID and properties; for agent actions, it is the principal itself. The context holds `time` as a `datetime`, the optional strings, and `args` as a record. A number that is not an integer makes the request invalid.
+- **Mapping.** The principal is `WhiteTower::Agent::"<agent-id>"`, with the subject's properties as attributes and its labels as tags. The action is `WhiteTower::Action::"<name>"`. The resource is the entity type of its resource type, with its ID and properties; for agent actions, it is the principal itself. The context holds `time` as a `datetime`, the optional strings, and `args` as a record. A number that is not an integer in the range of Cedar's `Long` makes the request invalid (section 6.4).
 - **One policy set per bundle.** The enforcement point parses every policy of the bundle into one Cedar policy set, once per bundle, and reports each Cedar statement as its policy's White Tower ID.
+- **Fixed values.** The core refuses a policy that compares an attribute whose values the profile fixes, such as `risk_tier` or `environment`, with a value outside them (plan P1-06): such a comparison would silently never match, or always.
 - **Agent-specific policies need not name their agent.** A bundle holds only its agent's specific policies, so they apply to that agent alone. The validator warns when an agent-specific policy names another principal.
 - **`ToolArgs` is the one extension point.** The base schema declares it empty. A deployment declares the arguments its policies need, for example `type ToolArgs = { recipient_domain?: String };`, and enforcement points fill only those. The core validates policies against the extended schema, in strict mode, before approval (POL-07), and ships the schema in the bundle.
 
-**Rego is the second language**, for engines that run it natively (Phase 2). Each policy is one package under `data.whitetower.policies`, with boolean rules `deny` and `allow`; the input document is the AuthZEN request. The standard wrapper [`decision.rego`](../../api/policy/rego/decision.rego) implements the combining algorithm and produces the response; checked with OPA 1.21. An evaluation error, or an undefined response, is a denial.
+**Rego waits for Phase 2.** The review of RFC-0001 found the wrapper drafted for it failing open in several cases on OPA 1.21, so `v1alpha1` has no Rego, and section 12 lists what its mapping must settle. The wrapper leaves `api/policy`, whose files are normative (section 1), and stays as a sketch for that work.
 
 ### 6.8 Decision points
 
-A `policy-engine` module that is not embedded in an enforcement point is a decision point. It MUST expose the AuthZEN Access Evaluation API (`POST /access/v1/evaluation`, with discovery at `/.well-known/authzen-configuration`) with this profile, and declare it as an endpoint (`protocol: authzen-1.0`) in its manifest. The enforcement point that calls it still checks its own gate first, and treats an unreachable decision point as a denial (`error.timeout`). No MVP component needs a decision point; the Phase 2 gateways will.
+A decision point is a `policy-engine` module that others call, rather than one embedded in an enforcement point. **`v1alpha1` has none:** a policy engine's manifest declares `embedded: true`. What follows is an informative preview of `v1beta1`, where the Phase 2 gateways need decision points. A decision point exposes the AuthZEN Access Evaluation API (`POST /access/v1/evaluation`, with discovery at `/.well-known/authzen-configuration`) with this profile, and declares it as an endpoint (`protocol: authzen-1.0`) in its manifest. The enforcement point that calls it still checks its own gate first, and treats an unreachable decision point as a denial (`error.timeout`). Section 12 lists what `v1beta1` must settle first.
 
 ## 7. Policy bundles
 
@@ -456,11 +496,11 @@ A bundle is a manifest, its signature and its files (format `whitetower.bundle.v
 | `agent_id`, `version` | The agent, and a version that only grows |
 | `created_at` | When the core built it |
 | `combining_algorithm` | `wt-deny-overrides-v1` |
-| `language` | `cedar` or `rego`: every policy of a bundle has the same language |
+| `language` | `cedar`, the only language of `v1alpha1` (section 6.7) |
 | `cedar_schema` | The Cedar schema the policies were validated against, at `schema.cedarschema` |
 | `policies` | Each policy's ID, name, version, scope (`global` or `agent`), path and SHA-256 |
 
-Policy files live at `policies/<scope>/<policy-id>.<language>`. A bundle holds no other files.
+Policy files live at `policies/<scope>/<policy-id>.cedar`. A bundle holds no other files.
 
 ### 7.2 Signature
 
@@ -591,14 +631,14 @@ They pass on two independent stacks: Go with `cedar-go` 1.8.0 (`go test ./test/c
 
 ### 9.2 The kit
 
-The kit plays the core for a module under test: a fake core that speaks the module API (registry, watch with scripted state and leases, bundles, acknowledgements, events) and a driver that exercises the module through the small HTTP protocol of [`driver-protocol.md`](../../test/conformance/driver-protocol.md). Because the kit speaks the module API over the network, it tests a module written in any language. The skeleton in [`test/conformance/kit`](../../test/conformance/README.md) runs scenarios S-01 and S-17 end to end against a stub enforcement point in Go; plan P1-07 completes it.
+The kit plays the core for a module under test: a fake core that speaks the module API (registry, watch with scripted state and leases, bundles, acknowledgements, events) and a driver that exercises the module through the small HTTP protocol of [`driver-protocol.md`](../../test/conformance/driver-protocol.md). Because the kit speaks the module API over the network, it tests a module written in any language. The skeleton in [`test/conformance/kit`](../../test/conformance/README.md) runs scenarios S-01 and S-17 end to end against a stub enforcement point in Go; plan P1-07 completes it. For an enforcement point that serves several agents, the kit runs the halt, lease and bundle scenarios with two agents in scope, and the driver names the agent of each decision.
 
 ### 9.3 Scenarios
 
 | Scenario | Obligations | Status |
 | --- | --- | --- |
 | S-01 Start closed: nothing is allowed before state, lease and a verified bundle | EP-1, EP-7 | Implemented |
-| S-02 Every gate condition denies, with its reason. The kit also removes the agent from the state while its lease is valid, and brings it back before the next renewal: the module allows nothing in between, and allows again only after a renewal once the agent is back | EP-2, EP-6, I-11, fail-closed vectors | Designed |
+| S-02 Every gate condition denies, with its reason. The kit runs it once with each environment that its fake core returns at registration: with `production`, a `validated` or `ready` agent stays closed with `gate.lifecycle`. The kit also removes the agent from the state while its lease is valid, and brings it back before the next renewal: the module allows nothing in between, and allows again only after a renewal once the agent is back | EP-2, EP-6, I-11, fail-closed vectors | Designed |
 | S-03 The combination vectors give the expected decisions | EP-2, section 6 | Designed |
 | S-04 Lease expiry denies and halts within the TTL plus a tolerance | EP-3 | Designed |
 | S-05 A halt closes the gate and is acknowledged layer by layer, within the NFR-03 target. The kit runs it once with each environment that its fake core returns at registration, `production` and `non_production` | EP-4, section 5.1 | Designed |
@@ -670,8 +710,8 @@ The [threat model](../security/threat-model.md) (plan P0-04) analyzes these boun
 | Which tool arguments may policies see? | Only those a deployment declares in `ToolArgs`; how deployments manage that extension is settled in P1-06 |
 | Do quarantined pods keep cluster DNS? | Decided by the [threat model](../security/threat-model.md) (DC-7): no, by default. The enforcement point reconnects to the core's last resolved addresses; where the CNI has DNS-aware rules, an option may allow the core's name only |
 | Stable URLs for `dataschema`, and the Kubernetes label prefix | Depend on the project's domain (open question Q6) |
-| When do decision points become mandatory for gateways? | With the Phase 2 gateways, in `v1beta1` |
-| Rego package naming and a Rego engine | Phase 2, with the second policy engine |
+| What must decision points settle before `v1beta1`? | Where a decision point gets its bundles, and how it is bound to the enforcement points it serves; how they authenticate to it; the reasons for an answer other than 200 and for one outside the response schema; and its scenarios |
+| What must a Rego mapping settle before Phase 2? | One package per file, named by the policy's ID and checked at V7; a `deny` that is defined and not `false` forbids; strict errors from built-in functions; a rule for writing policies about missing members; the response checked against its schema; one bundle per evaluation; the version of Rego's syntax; and Rego vectors on both reference stacks |
 
 ## Appendix A. JSON examples
 

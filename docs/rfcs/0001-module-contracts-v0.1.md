@@ -22,12 +22,12 @@ The normative text is [module-contract-v0.1.md](../contracts/module-contract-v0.
 1. **Four services on ConnectRPC** (registry, governance, policy, events), plus server information. A module can use a gRPC library or plain HTTP with JSON, over HTTP/2 for `Watch`, and gets its tokens through one profile of the OAuth client credentials grant.
 2. **Governance state is pushed, with leases.** A snapshot, then changes in version order; renewals only when the stream is current. When the lease expires, the enforcement point denies everything and halts the agent. Reconnection backoff is bounded by a third of the lease TTL, so a returning core has every instance back within one renewal interval; spike S2 measured the difference on 1,000 enforcement points. A lease belongs to the instance and outlives a reconnection, and the version an instance applied never goes back, whichever stream brings a message. This is how the contract reads decision 6 of [ADR-0005](../adr/0005-edge-enforcement-with-leases.md): an enforcement point that connects starts closed, and one that reconnects keeps deciding on the last state it applied, never on an older one.
 3. **Halts in layers, reported honestly.** Gate closed at once; work in flight interrupted where the framework allows it; the process ended only in the `terminate` mode; network quarantine by runtime-control modules. Each layer is acknowledged separately, never overstated.
-4. **Decisions shaped as AuthZEN evaluations**, with eight actions matching the intervention points agents have, a gate checked before policies, and the combining algorithm `wt-deny-overrides-v1`. **Cedar is the primary language**; Rego is supported through a standard wrapper. Any evaluation error denies, which is stricter than Cedar.
+4. **Decisions shaped as AuthZEN evaluations**, with eight actions matching the intervention points agents have, a gate checked before policies, and the combining algorithm `wt-deny-overrides-v1`. **`v1alpha1` is Cedar only**, evaluated inside the enforcement point or beside it: the review found the Rego wrapper failing open and decision points unspecified, so both wait for Phase 2. Any evaluation error denies, which is stricter than Cedar.
 5. **Signed bundles**: an RFC 8785 canonical manifest, a detached JWS with Ed25519, and seven ordered verification steps with rejection reasons. No rollback.
 6. **Evidence as CloudEvents 1.0**, with a per-source sequence (`wtseq`) to detect gaps, at-least-once delivery, and data minimization: no argument values, prompts or outputs.
 7. **Conformance first**: 48 language-neutral vectors that pass on `cedar-go` and on `cedarpy`, a kit that plays the core over the network, and a catalog of 24 scenarios tied to numbered obligations.
 
-The contracts were mapped onto Microsoft AGT, OPA, Cedar and engines with native AuthZEN; no gap is blocking ([engine-mappings.md](../contracts/engine-mappings.md)).
+The contracts were mapped onto Microsoft AGT, OPA, Cedar and engines with native AuthZEN ([engine-mappings.md](../contracts/engine-mappings.md)). The review found two gaps that the mapping had missed, in the Rego wrapper and in decision points; with both out of `v1alpha1`, no gap is blocking.
 
 ## Compatibility and versioning
 
@@ -56,7 +56,7 @@ The [threat model](../security/threat-model.md) (plan P0-04) analyzes these boun
 
 ## Unresolved questions
 
-Listed in section 12 of the specification: learning rotated bundle keys from the core, how deployments manage tool arguments visible to policies, stable URLs and label prefixes (which depend on the project's domain), when decision points become mandatory, and Rego naming. The [threat model](../security/threat-model.md) settled DNS during network quarantine, and added one rule before the review: a lease renewal counts only if it is fresh, so that a stream held back on its way cannot delay halts (section 5.3, DC-2).
+Listed in section 12 of the specification: learning rotated bundle keys from the core, how deployments manage tool arguments visible to policies, stable URLs and label prefixes (which depend on the project's domain), and what decision points and a Rego mapping must settle before Phase 2 brings them. The [threat model](../security/threat-model.md) settled DNS during network quarantine, and added one rule before the review: a lease renewal counts only if it is fresh, so that a stream held back on its way cannot delay halts (section 5.3, DC-2).
 
 ## Implementation plan
 
