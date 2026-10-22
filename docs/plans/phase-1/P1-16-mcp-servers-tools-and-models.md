@@ -184,7 +184,7 @@ Blocks travel on the halt path, which must never become a bottleneck (NFR-03). O
 | Risk or question | Mitigation or owner |
 | --- | --- |
 | RFC-0002 changes in its review | Steps 1 to 4 do not touch the contracts; steps 5 to 7 wait for P0-03 step 12 |
-| The RFC's review (two weeks and an external reviewer) delays steps 5 to 7 | Announce it now, and review it together with RFC-0001, which is also waiting for its external review |
+| The RFC's review delays steps 5 to 7 | The maintainer reviews it provisionally right after RFC-0001 is accepted, with no minimum period ([GOVERNANCE.md](../../../GOVERNANCE.md#rfc-process)) |
 | Reports flood the catalog, or reviewers | Limits, rate limits and the bound on each agent's entries waiting for review (CORE-13, DC-10); discovered entries stay inert; approving a server can approve its tools at once, each definition still shown (T-74, T-75) |
 | The Go core and the Python enforcement point compute different definition hashes (number formatting, Unicode, key order) | Definition-hash vectors run on both stacks (P0-03 step 12); the core recomputes every hash |
 | Blocks slow halts | Their own record, hashes, a cap, no bundle rebuilds, and measurement with P1-08's harness (T-80, DC-9) |

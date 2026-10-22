@@ -2,9 +2,9 @@
 
 | | |
 | --- | --- |
-| **Status** | Draft, In review, Accepted, Rejected or Withdrawn |
+| **Status** | Draft, In review, Accepted, Accepted provisionally, Rejected or Withdrawn |
 | **Authors** | <GitHub handles> |
-| **Review period** | <start date> to <end date, at least two weeks later> |
+| **Review period** | <start date> to <end date, at least two weeks later; under provisional acceptance, the dates of the maintainer's review> |
 | **Related** | <issues, ADRs, plans, requirements> |
 
 ## Summary
@@ -38,3 +38,7 @@ What is left to decide during the review.
 ## Implementation plan
 
 The plans and steps that will implement the RFC once it is accepted.
+
+## Review record
+
+Filled in when the review ends: each point the review raised, and how it was resolved. Under provisional acceptance ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)), it also says that the maintainer alone reviewed the RFC.

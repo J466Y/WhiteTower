@@ -29,7 +29,7 @@ A contributor with a sustained record of good contributions and reviews can be n
 
 ## RFC process
 
-Changes to the module contracts (`api/proto`, `api/events`, `api/manifest`) affect every module author, so they follow a stricter path.
+Changes to the module contracts (`api/proto`, `api/events`, `api/manifest`, `api/policy`, and what the conformance vectors in `test/conformance/vectors` expect) affect every module author, so they follow a stricter path.
 
 1. Copy [the template](docs/rfcs/0000-template.md) to `docs/rfcs/NNNN-short-title.md` and open a pull request labeled `rfc`.
 2. Announce it where the community follows the project.
@@ -37,6 +37,12 @@ Changes to the module contracts (`api/proto`, `api/events`, `api/manifest`) affe
 4. **Every RFC has a security section**, and the threat model is updated if the RFC changes a trust boundary.
 5. **Acceptance needs two maintainer approvals.** While the project has a single maintainer, it needs that maintainer plus one external reviewer.
 6. The accepted RFC is merged, and the contract changes land afterwards in their own pull requests, checked by the breaking-change tools in CI.
+
+**Provisional acceptance.** Rules 3 and 5 assume people to wait for. While the project has a single maintainer, and neither an external reviewer nor a community that follows its RFCs, a review period brings no comments and nobody can give the second approval. Until one of them appears:
+
+- The maintainer reviews the RFC, decides every point the review raises, and then accepts it provisionally, with no minimum review period.
+- The RFC keeps the record of that review: each point, how it was resolved, and that the maintainer alone reviewed it.
+- From the day a second maintainer, an external reviewer or a community appears, rules 3 and 5 apply again. In any case, every RFC accepted provisionally goes through a review under rules 3 and 5 before the contracts leave alpha (`v1beta1`).
 
 ## Security
 
@@ -69,4 +75,4 @@ Rules only protect the project if nobody works around them, maintainers included
 
 ## Changes to this document
 
-Changes to this document follow the RFC review rules: two weeks of review and two maintainer approvals (or one maintainer and one external reviewer while there is a single maintainer).
+Changes to this document follow the RFC review rules: two weeks of review and two maintainer approvals (or one maintainer and one external reviewer while there is a single maintainer), or provisional acceptance while it applies. The rule of provisional acceptance was itself accepted that way, by the maintainer's decision of 2026-10-21.

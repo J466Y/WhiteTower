@@ -176,7 +176,7 @@ P1-07 now takes eight weeks, and so does P1-09 with its halt integration: both a
 3. **Prepare the pilot during P1-13:** environment, IdP integration and SIEM export ready before the release.
 4. **Keep the console on generated mocks,** so it never waits for the backend.
 
-**What must not be cut:** the drills in the pilot, the tamper and fail-closed tests, and the external review of the contracts. They are what makes White Tower trustworthy.
+**What must not be cut:** the drills in the pilot, the tamper and fail-closed tests, and the external review of the contracts before they leave alpha. They are what makes White Tower trustworthy.
 
 ## 7. Scaling the team
 
@@ -210,7 +210,7 @@ P1-07 now takes eight weeks, and so does P1-09 with its halt integration: both a
 - [x] ADR-0001 to ADR-0010 accepted or amended: accepted by the maintainer (2026-09-30); ADR-0011 was accepted before.
 - [x] Requirements v0.2: NFR targets set from measurements (P0-05); open questions Q1 to Q6 closed (2026-09-30).
 - [x] Data model v0.1 and lifecycle specification approved (P0-02, 2026-09-29).
-- [ ] RFC-0001 and RFC-0002 accepted, each with at least one external review; RFC-0002 in the contracts (P0-03 step 12); then the tag `contracts/v0.1.0` (P0-03), so that RFC-0002's changes that are not additive need no `v1alpha2` (RFC-0002, Compatibility and versioning). RFC-0001 was approved by the maintainer (2026-09-30), and its external review is pending; RFC-0002's review is not open yet.
+- [ ] RFC-0001 and RFC-0002 accepted, provisionally by the maintainer while the project has no external reviewer ([GOVERNANCE.md](../GOVERNANCE.md#rfc-process)); RFC-0002 in the contracts (P0-03 step 12); then the tag `contracts/v0.1.0` (P0-03), so that RFC-0002's changes that are not additive need no `v1alpha2` (RFC-0002, Compatibility and versioning). RFC-0001 was approved by the maintainer (2026-09-30), and the maintainer decided every point of its review on 2026-10-22; RFC-0002's review follows RFC-0001's acceptance.
 - [x] Threat model v0.1 reviewed by the security reviewer (P0-04): reviewed and accepted by the maintainer (2026-09-30); an external review is planned before the pilot (P1-13).
 - [x] Go or no-go on AGT recorded: no-go, White Tower builds its own enforcement point (P0-05 S1, ADR-0011).
 - [ ] CI, release pipeline and development environment working on the three operating systems (P0-01). CI runs on every pull request; the release pipeline is deferred to the MVP (maintainer, 2026-09-30); the development environment still has to be tested on macOS and Linux.

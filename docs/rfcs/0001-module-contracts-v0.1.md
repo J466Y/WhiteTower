@@ -2,9 +2,9 @@
 
 | | |
 | --- | --- |
-| **Status** | In review: approved by the maintainer on 2026-09-30; acceptance needs an external review too ([GOVERNANCE.md](../../GOVERNANCE.md)) |
+| **Status** | In review, provisionally ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)): approved by the maintainer on 2026-09-30, and every point of the maintainer's review decided on 2026-10-22. It is accepted once the corrections are in the specification and `api/` |
 | **Authors** | @J466Y |
-| **Review period** | At least two weeks from the day it is announced, with at least one external reviewer |
+| **Review period** | 2026-10-21 to 2026-10-22: the maintainer's provisional review, with no external reviewer. A review of at least two weeks, with an external reviewer, follows before the contracts leave alpha (`v1beta1`) |
 | **Related** | Plan [P0-03](../plans/phase-0/P0-03-module-contracts.md); MOD-01 to MOD-05, MOD-08, POL-03, POL-05, POL-06, KIL-03, KIL-04, KIL-07, KIL-10, AUD-02; [ADR-0004](../adr/0004-api-and-contract-formats.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md), [ADR-0011](../adr/0011-own-python-enforcement-point.md) |
 
 ## Summary
