@@ -19,13 +19,13 @@ White Tower's value is a coordinating layer across tools that already exist (arc
 
 The normative text is [module-contract-v0.1.md](../contracts/module-contract-v0.1.md); its syntax is in `api/`: the [protobuf services](../../api/proto/whitetower/module/v1alpha1/), the [manifest schema](../../api/manifest/module-manifest.schema.json), the [event catalog](../../api/events/catalog.json) and the [decision profile](../../api/policy/README.md). The main choices:
 
-1. **Four services on ConnectRPC** (registry, governance, policy, events), plus server information. A module can use a gRPC library or plain HTTP with JSON.
+1. **Four services on ConnectRPC** (registry, governance, policy, events), plus server information. A module can use a gRPC library or plain HTTP with JSON, over HTTP/2 for `Watch`, and gets its tokens through one profile of the OAuth client credentials grant.
 2. **Governance state is pushed, with leases.** A snapshot, then changes in version order; renewals only when the stream is current. When the lease expires, the enforcement point denies everything and halts the agent. Reconnection backoff is bounded by a third of the lease TTL, so a returning core has every instance back within one renewal interval; spike S2 measured the difference on 1,000 enforcement points. A lease belongs to the instance and outlives a reconnection, and the version an instance applied never goes back, whichever stream brings a message. This is how the contract reads decision 6 of [ADR-0005](../adr/0005-edge-enforcement-with-leases.md): an enforcement point that connects starts closed, and one that reconnects keeps deciding on the last state it applied, never on an older one.
 3. **Halts in layers, reported honestly.** Gate closed at once; work in flight interrupted where the framework allows it; the process ended only in the `terminate` mode; network quarantine by runtime-control modules. Each layer is acknowledged separately, never overstated.
 4. **Decisions shaped as AuthZEN evaluations**, with eight actions matching the intervention points agents have, a gate checked before policies, and the combining algorithm `wt-deny-overrides-v1`. **Cedar is the primary language**; Rego is supported through a standard wrapper. Any evaluation error denies, which is stricter than Cedar.
 5. **Signed bundles**: an RFC 8785 canonical manifest, a detached JWS with Ed25519, and seven ordered verification steps with rejection reasons. No rollback.
 6. **Evidence as CloudEvents 1.0**, with a per-source sequence (`wtseq`) to detect gaps, at-least-once delivery, and data minimization: no argument values, prompts or outputs.
-7. **Conformance first**: 48 language-neutral vectors that pass on `cedar-go` and on `cedarpy`, a kit that plays the core over the network, and a catalog of 23 scenarios tied to numbered obligations.
+7. **Conformance first**: 48 language-neutral vectors that pass on `cedar-go` and on `cedarpy`, a kit that plays the core over the network, and a catalog of 24 scenarios tied to numbered obligations.
 
 The contracts were mapped onto Microsoft AGT, OPA, Cedar and engines with native AuthZEN; no gap is blocking ([engine-mappings.md](../contracts/engine-mappings.md)).
 
@@ -47,7 +47,7 @@ The [threat model](../security/threat-model.md) (plan P0-04) analyzes these boun
 
 ## Alternatives
 
-- **gRPC only.** Simpler to specify, but every module would need an HTTP/2 gRPC stack; ConnectRPC serves the same definitions over plain HTTP too.
+- **gRPC only.** Simpler to specify, but every module would need an HTTP/2 gRPC stack; ConnectRPC serves the same definitions over plain HTTP too, with an HTTP/2 client for `Watch`.
 - **Polling instead of a watch stream.** Easier for simple modules, but a halt would wait for the next poll (ADR-0005).
 - **Reusing OPA's bundle format.** Well known, but tied to one engine; its signature scheme does not bind a bundle to the governance state.
 - **A custom decision format.** Rejected for AuthZEN, a final OpenID specification since January 2026.

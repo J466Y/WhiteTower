@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md). Contract version `v1alpha1` |
-| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)) and 2026-10-22 (from the review of RFC-0001: changes to what the conformance vectors expect need an RFC; one applied version per instance, leases that belong to the instance, liveness and retries, what an instance is, and bounds on what the core sends) |
+| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)) and 2026-10-22 (from the review of RFC-0001: changes to what the conformance vectors expect need an RFC; one applied version per instance, leases that belong to the instance, liveness and retries, what an instance is, bounds on what the core sends, the name in the core's certificate, refusals of a call or of one item, token requests, how `Watch` travels, and revoking keys) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |
 | **Conformance** | [`test/conformance/`](../../test/conformance/README.md) |
@@ -88,19 +88,32 @@ An enforcement point needs all four; a runtime-control module needs `governance.
 
 ### 4.1 Transport
 
-- The module API is served by the core's machine listener with **ConnectRPC**. The Connect, gRPC and gRPC-Web protocols are equivalent; messages may be binary protobuf or JSON. The definitions are in [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/).
-- The listener uses TLS 1.2 or later (1.3 preferred) and HTTP/2, which `Watch` needs. Mutual TLS is optional.
+- The module API is served by the core's machine listener with **ConnectRPC**: the Connect protocol (version 1), gRPC over HTTP/2 and gRPC-Web, which are equivalent. Messages may be binary protobuf or JSON. The definitions are in [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/).
+- The listener uses TLS 1.2 or later (1.3 preferred). Mutual TLS is optional.
+- **`Watch` MUST use HTTP/2,** and the core refuses it over HTTP/1.x: the core's cut-off of slow clients (CORE-7) and its check of dead peers need HTTP/2. Unary calls may use HTTP/1.1 or HTTP/2.
 - **CORE-14.** The core MUST accept HTTP/2 PING frames from a client as often as every 10 seconds, and MUST NOT end a connection because of them.
 - Instances SHOULD send HTTP/2 PINGs, to find a dead connection early (I-9): for example through Go's `http.HTTP2Config` (`SendPingTimeout` and `PingTimeout`), grpc-go's `keepalive.ClientParameters` with a `Time` of at least 10 seconds, or grpcio's `grpc.keepalive_time_ms` and `grpc.keepalive_timeout_ms`.
-- **I-1.** An instance MUST verify the core's certificate against trust anchors from its configuration.
+- **I-1.** An instance MUST verify the core's certificate as HTTPS requires (RFC 9110, section 4.3.4): it chains to trust anchors from the instance's configuration, and it is valid for the host of the core's configured URL, a DNS name or, only when the URL names one, an IP address. An instance that connects to an address kept from an earlier resolution still checks the certificate against that host, never against the address.
+- Intermediaries between an instance and the core, such as proxies and ingress controllers, need to pass each `Watch` message as it arrives: one that buffers the stream makes every renewal stale and every lease run out (section 5.3). The operations guide (plan P1-12) gives the settings of the supported ones.
 
 ### 4.2 Authentication
 
-- Every call carries `Authorization: Bearer <access token>`. Tokens come from the core's token endpoint (`/oauth2/token`): the client credentials grant with `private_key_jwt` client authentication (RFC 7523), for the module API as audience (resource indicator, RFC 8707). They are JWTs (RFC 9068) valid for 5 minutes by default and 15 at most ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)).
+- Every call carries `Authorization: Bearer <access token>`. Tokens come from the core's token endpoint (`/oauth2/token`): the client credentials grant with `private_key_jwt` client authentication (RFC 7523), for the module API as audience (resource indicator, RFC 8707). They are JWTs (RFC 9068) valid for 5 minutes by default and 15 at most ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)). **Token requests**, below, give the profile.
 - An instance SHOULD request its next token at a random point between half and four fifths of its current token's lifetime, so that the instances of a fleet spread their requests.
 - **Identities.** An enforcement point that runs inside an agent's process (`identity: agent`) authenticates **as that agent** (`spiffe://<trust-domain>/agent/<agent-id>`). Any other instance authenticates as its module (`spiffe://<trust-domain>/module/<module-id>`).
 - **CORE-1.** The core MUST end a `Watch` stream, with `UNAUTHENTICATED`, no later than the expiry of the token that opened it.
 - **I-2.** An instance SHOULD open a replacement stream with a fresh token before its token expires, resuming from the last version it applied, and close the old stream once the new one has delivered a message at or above that version. Messages from both streams follow the rule of section 5.2: the version the instance applied never goes back.
+
+**Token requests.**
+
+- **I-10.** An instance MUST request its tokens as the rest of this list says, and the core's token endpoint follows the same profile.
+- **The issuer.** The core's configured base URL is its issuer identifier. Its metadata is at `/.well-known/oauth-authorization-server` (RFC 8414), and an instance refuses metadata whose `issuer` is any other value.
+- **The client.** The client ID is the agent ID for `identity: agent`, and the module ID, the UUID in the module's SPIFFE ID, for any other instance: never the ID of a credential. The SPIFFE ID is the access token's `sub`.
+- **The assertion** (`private_key_jwt`, RFC 7523). `iss` and `sub` are the client ID. `aud` is the issuer identifier alone, as a single string: the core refuses any other value, the token endpoint's URL included. `exp` is at most 5 minutes after `iat`; `iat` and `nbf` are within 60 seconds of the core's clock; `jti` is unique; `kid` is the ID of the registered key. `typ` SHOULD be `client-authentication+jwt`, which the core never requires.
+- **The request.** `grant_type=client_credentials`, the assertion, and `resource`, the module API's identifier: the issuer identifier followed by `/module-api`, with no contract version, since a token comes before the version is negotiated (CORE-3). The core MAY publish protected resource metadata for it (RFC 9728).
+- **The response.** The core MUST return `expires_in`, from which the instance schedules its next token and the rollover of I-2.
+- **Errors.** An OAuth error with HTTP status 400 or 401 (RFC 6749, section 5.2) is logged and retried at the cap of I-4's session calls, since only a change on the core's side ends it. A 429, a 5xx or a network failure follows section 4.7.
+- **Workload identity,** such as a Kubernetes service account token used as the assertion, is outside `v1alpha1` until plan P1-05 profiles it (its step 8).
 
 ### 4.3 Authorization
 
@@ -118,7 +131,7 @@ An instance belongs to the principal whose token registered it. Its key is uniqu
 | `EventService.Publish` | Types in `emits`, from a source under `/agents/<its agent>/ep/`, about its agent | Types in `emits`, from a source under `/modules/<module>/`, about agents in their scope |
 | `MetaService.GetServerInfo` | Yes | Yes |
 
-- **CORE-2.** The core MUST answer `PERMISSION_DENIED` to any call outside these rules, and to any call that names an instance its caller's principal did not register (`Heartbeat`, `DeregisterInstance`, `Watch`, `Acknowledge` and `Publish`). It MUST check both on every call, not only at registration.
+- **CORE-2.** The core MUST check these rules on every call, not only at registration. A failure of the call itself MUST refuse the whole call with `PERMISSION_DENIED`: the caller's identity or permission, a module not approved or revoked, an enforcement point's credential without an environment (MAN-5), a bundle of an agent outside the scope (`GetBundle`), or an instance that the caller's principal did not register (`Heartbeat`, `DeregisterInstance`, `Watch`, `Acknowledge` and `Publish`). A failure of one item decides that item only: an `Acknowledge` item about an agent outside the scope is not recorded and is counted, as one about an unknown halt is, and a `Publish` event outside these rules is rejected on its own, with its reason (section 8.4).
 
 ### 4.4 Services
 
@@ -147,15 +160,15 @@ JSON examples of every method are in appendix A.
 | Code | Meaning | What the client does |
 | --- | --- | --- |
 | `UNAUTHENTICATED` | Token missing, expired or invalid | Get a new token, then retry |
-| `PERMISSION_DENIED` | Outside the instance's scope or permissions; module not approved or revoked; an enforcement point's credential without an environment (MAN-5) | Do not retry until the configuration changes; stay closed |
+| `PERMISSION_DENIED` | A failure of the call (CORE-2): outside the instance's scope or permissions; module not approved or revoked; an enforcement point's credential without an environment (MAN-5); an instance that the caller's principal did not register | From `RegisterInstance` or `Watch`: end every lease at once (an enforcement point denies everything and applies the halt mode; a runtime-control module keeps its layers), then register again with the backoff of section 4.7, never treating the code as final. From another call: do not retry that call until a registration succeeds again |
 | `INVALID_ARGUMENT` | Malformed request | Do not retry the same request |
-| `FAILED_PRECONDITION` | No common contract version; manifest hash mismatch; instance not registered | Fix the cause (for example register again), then retry |
+| `FAILED_PRECONDITION` | No common contract version; manifest hash mismatch; instance not registered | Not registered: register again, then retry. A version or a manifest hash that registration refuses: as `PERMISSION_DENIED` from `RegisterInstance`, since an operator's action ends it |
 | `NOT_FOUND` | Unknown bundle version | Wait for the next state; do not retry the same version |
 | `RESOURCE_EXHAUSTED` | Rate limit or backpressure; or a message over the limits of section 4.8 | Retry with backoff, no sooner than its `RetryInfo` says (section 4.7), but never a message over the limits as it is |
 | `UNAVAILABLE`, `DEADLINE_EXCEEDED`, `ABORTED` | Transient | Retry with backoff |
 | `INTERNAL`, `UNKNOWN` | Server error | Retry with backoff |
 
-A failure of an established `Watch` stream is transient whatever its code, except `PERMISSION_DENIED`, and `UNAUTHENTICATED`, which needs a new token first: the instance reconnects with the backoff of section 4.7 and resumes. A stream is established once it has delivered its first message. Before then, an error that the core sends follows the table above, but a failure that the instance's own library reports, such as a cut in the middle of the first message, is transient. The code may come from the instance's own library rather than from the core: connect-go, for example, reports a stream cut in the middle of a message as `INVALID_ARGUMENT`, and `connect.IsWireError` tells the two apart.
+A failure of an established `Watch` stream is transient whatever its code, except `UNAUTHENTICATED`, which needs a new token first, and `PERMISSION_DENIED`, which ends every lease at once (the table above): the instance then registers again, and reconnects, with the backoff of section 4.7, and resumes. A stream is established once it has delivered its first message. Before then, an error that the core sends follows the table above, but a failure that the instance's own library reports, such as a cut in the middle of the first message, is transient. The code may come from the instance's own library rather than from the core: connect-go, for example, reports a stream cut in the middle of a message as `INVALID_ARGUMENT`, and `connect.IsWireError` tells the two apart. The error the core sends on a stream is in its end-of-stream message (Connect) or in its trailers (gRPC and gRPC-Web): a body that ends without one is a cut, and is transient. An instance sets no deadline on `Watch`.
 
 A stream that the core ends with `ABORTED`, because its instance opened another (CORE-16), is not reconnected while the instance holds a newer stream. A stream that falls silent has failed too (I-9).
 
@@ -233,6 +246,7 @@ A halt applies wherever the instance runs. An instance applies every halt in an 
 - A **snapshot** is one or more `SnapshotPart` messages with the same version, consecutive on one stream: the first has `first` set and carries the fleet state, the last has `last` set. Agents missing from a snapshot are out of scope. A snapshot whose first part lacks the fleet state is malformed: the instance keeps its current state (at start it has none, so its gate stays closed with `gate.no_state`), and reconnects with the backoff of I-4.
 - **Changes** follow in strictly increasing version order. Each carries the complete new state of every agent that changed or entered the scope, the new fleet state when it changed, and the agents that left the scope. An instance applies every agent state a change carries, whatever that state's own `version`: an agent that enters the scope keeps the version of its last change, which may be older than the last version the instance applied.
 - **The version applied never goes back.** An instance keeps the highest `WatchResponse.version` it has applied, across all its streams, and never lowers it. It ignores a change, or a whole snapshot, whose version is below it. A fresh renewal renews its leases whichever stream carries it, but never lowers that version. The agent states inside a change it applies are still applied, whatever their own version. So the two streams of a token rollover (I-2), even on two replicas of the core that are not equally current, can never undo a halt.
+- **I-11.** An agent that leaves the scope, because a snapshot does not carry it or a change lists it as removed, MUST lose its state and its lease at once, and the instance drops the acknowledgements it has queued for it. An enforcement point's gate for that agent closes with `gate.no_state`.
 - **CORE-6.** The core MUST send a `LeaseRenewal` right after each complete snapshot, right after a resumed stream has sent every change since `since_version`, and then at least at the renewal interval of section 4.8. It sends one only when it has sent every change it knows of, and MAY withhold them while it cannot show that it is current, for example while a replica cannot read its database: leases then run out, rather than trust a core that may have missed a halt. A renewal therefore always means "your state is current". Its version may pass versions that carried nothing for the stream; that version is then the last version the instance applied (EP-9). Every renewal carries `server_time`, the core's clock when it sends it (section 5.3).
 - **CORE-7.** The core MUST end a stream it cannot keep up to date, for example a client too slow to read, rather than let it fall behind. The client's lease then expires if it cannot reconnect.
 - **CORE-16.** The core MUST NOT refuse a `Watch` stream because its instance holds others. It keeps at least two per instance, for the rollover of I-2. When an instance opens more, the core MAY end the oldest with `ABORTED`, so that a dead stream it has not noticed never refuses a live reconnection.
@@ -251,7 +265,7 @@ An enforcement point checks its gate before every governed call and interaction,
 
 | Order | Condition | Reason |
 | --- | --- | --- |
-| 1 | No complete snapshot applied since the instance started | `gate.no_state` |
+| 1 | No complete snapshot applied since the instance started, or the agent is not in the state applied (I-11) | `gate.no_state` |
 | 2 | The agent's lease has expired, or it never had one | `gate.lease_expired` |
 | 3 | An agent or selector halt covers the agent | `gate.halted` |
 | 4 | A fleet halt is active | `gate.fleet_halted` |
@@ -293,7 +307,7 @@ When no halt covers the agent any more, the gate reopens only if every other con
 - **EP-8. Evidence.** Record each decision durably before the action proceeds; publish events at least once, in order, from a stable source (section 8.4). Close the gate when the evidence buffer cannot accept another event.
 - **EP-9. Reconnection.** Reconnect with the backoff of section 4.7 when an established stream fails (section 4.6) or falls silent (I-9), resuming from the last version applied. Never lower that version, whichever stream a message comes on, and apply every agent state a change carries, whatever that state's own version (section 5.2). Accept a snapshot at any time, unless it is below the version applied.
 - **EP-10. Unknown content.** Ignore unknown fields. An unknown field never narrows a halt. Treat an unknown lifecycle state as closing the gate, an unknown halt scope as a halt, and an unknown halt mode as `interrupt`. Never let an unknown value open anything.
-- **EP-11. Identity and trust.** An enforcement point inside an agent's process authenticates as that agent and serves it only. Take the core's trust anchors and the bundle keys from configuration.
+- **EP-11. Identity and trust.** An enforcement point inside an agent's process authenticates as that agent and serves it only. Take the core's trust anchors and the bundle keys from configuration. When the configured bundle keys change, verify the active bundle again (section 7.3).
 - **EP-12. State acknowledgements.** Acknowledge the state version applied at least every 60 seconds while it changes, so the console can show instances that lag behind.
 
 ### 5.8 Obligations of runtime-control modules
@@ -458,6 +472,7 @@ Policy files live at `policies/<scope>/<policy-id>.<language>`. A bundle holds n
 
 - Governance state refers to the bundle by version, manifest hash and size; `GetBundle` returns it.
 - **EP-11** requires the bundle keys to come from configuration: that is the enforcement point's trust root. `GetBundleKeys` lists the active, next and retired keys, so operators can distribute the next key before a rotation. An enforcement point MUST NOT trust a key only because `GetBundleKeys` lists it.
+- Removing a key from an enforcement point's configuration revokes it there. Whenever the configured keys change, at start or on a reload, the enforcement point MUST verify its active bundle again, and a bundle that no configured key verifies does not stay active: the gate closes with `gate.no_bundle`.
 
 ### 7.4 Verification
 
@@ -535,7 +550,7 @@ Events are minimized by design (NFR-20, domain model section 7):
 - **At least once.** The core de-duplicates on source and ID; a retried batch is safe.
 - **In order.** An instance publishes each source's events in `wtseq` order. The core records a gap in a source's sequence as an audit finding (AUD-02).
 - **Stable sources.** A source identifies an evidence stream, not a process: an instance that keeps its buffer across restarts keeps its source and continues its sequence. A new buffer starts a new source at 1.
-- **Results.** `ACCEPTED` and `DUPLICATE` events leave the buffer. A `REJECTED` event can never be accepted: the instance MUST NOT retry it, MUST log it and SHOULD report `HEALTH_DEGRADED`. The gap it leaves stays visible in the audit log.
+- **Results.** The core decides each event on its own. It checks de-duplication first, so a retry of an event it accepted stays `DUPLICATE`, even once its agent has left the scope. An event outside the rules of section 4.3, of a type the module does not emit, from a source it does not own or about an agent outside its scope, is `REJECTED` with its reason, and the other events of the batch are still decided. `ACCEPTED` and `DUPLICATE` events leave the buffer. A `REJECTED` event can never be accepted: the instance MUST NOT retry it, MUST log it and SHOULD report `HEALTH_DEGRADED`. The gap it leaves stays visible in the audit log.
 - **Durability (EP-8).** An enforcement point writes each decision to a durable local buffer before the action proceeds, sized for at least 24 hours at 10 events per second (NFR-08), and closes its gate when the buffer is full.
 
 ### 8.5 Catalog
@@ -583,28 +598,29 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | Scenario | Obligations | Status |
 | --- | --- | --- |
 | S-01 Start closed: nothing is allowed before state, lease and a verified bundle | EP-1, EP-7 | Implemented |
-| S-02 Every gate condition denies, with its reason | EP-2, EP-6, fail-closed vectors | Designed |
+| S-02 Every gate condition denies, with its reason. The kit also removes the agent from the state while its lease is valid, and brings it back before the next renewal: the module allows nothing in between, and allows again only after a renewal once the agent is back | EP-2, EP-6, I-11, fail-closed vectors | Designed |
 | S-03 The combination vectors give the expected decisions | EP-2, section 6 | Designed |
 | S-04 Lease expiry denies and halts within the TTL plus a tolerance | EP-3 | Designed |
 | S-05 A halt closes the gate and is acknowledged layer by layer, within the NFR-03 target. The kit runs it once with each environment that its fake core returns at registration, `production` and `non_production` | EP-4, section 5.1 | Designed |
 | S-06 A fleet halt halts the agent although its own state is unchanged. The kit runs it once with each environment that its fake core returns at registration, `production` and `non_production` | EP-4, section 5.1 | Designed |
 | S-07 Reconnecting while halted stays halted | EP-1, EP-4, EP-9 | Designed |
 | S-08 A release reopens only with a valid lease and bundle | EP-5 | Designed |
-| S-09 The bundle vectors are rejected with the right reasons, and the previous bundle stays active. The fake core's `GetBundleKeys` also lists the untrusted key that signs the `unknown-key` vector, and the module must still reject that vector with `unknown_key` | EP-7, EP-11 | Designed |
+| S-09 The bundle vectors are rejected with the right reasons, and the previous bundle stays active. The fake core's `GetBundleKeys` also lists the untrusted key that signs the `unknown-key` vector, and the module must still reject that vector with `unknown_key`. When the driver reloads the module's bundle keys without the key that signed the active bundle, the module verifies its bundle again and closes its gate with `gate.no_bundle` | EP-7, EP-11 | Designed |
 | S-10 Events validate against the catalog, with a gapless `wtseq`, and survive a restart | EP-8 | Designed |
 | S-11 A full evidence buffer closes the gate | EP-8 | Designed |
-| S-12 Reconnection uses jittered backoff bounded by the lease, resets after a renewal, and resumes from the last version applied, even when a renewal passed versions that carried nothing for the stream. The module reconnects after a stream cut in the middle of a message, the first one included. When it resumes, it applies a change that carries an agent state older than the version it resumed from, and a snapshot just past that version, which replaces its state. A reconnection within the lease keeps deciding on the last state applied. The kit also black-holes the core, through a TCP proxy that drops traffic without closing the connection, and then refuses connections for over two minutes: the module finds the silent stream and reconnects on a new connection, and its retries stay within the cap of I-4 | EP-9, I-4, I-9, sections 4.6 and 5.2 | Designed |
+| S-12 Reconnection uses jittered backoff bounded by the lease, resets after a renewal, and resumes from the last version applied, even when a renewal passed versions that carried nothing for the stream. The module reconnects after a stream cut in the middle of a message, the first one included. When it resumes, it applies a change that carries an agent state older than the version it resumed from, and a snapshot just past that version, which replaces its state. A reconnection within the lease keeps deciding on the last state applied. The kit also black-holes the core, through a TCP proxy that drops traffic without closing the connection, and then refuses connections for over two minutes: the module finds the silent stream and reconnects on a new connection, and its retries stay within the cap of I-4. The fake core also refuses a registration with `PERMISSION_DENIED` and then accepts it, and ends an established stream with `PERMISSION_DENIED` and then accepts the next: the module ends its leases at once, allows nothing meanwhile, and is back within the cap of I-4. A stream body that ends without an end-of-stream message is a cut, and the module resumes | EP-9, I-4, I-9, sections 4.6 and 5.2 | Designed |
 | S-13 Unknown fields and values never open anything. A halt that carries an unknown field also closes the gate and is acknowledged, in the encoding the module uses (binary protobuf or JSON); the kit's fake core scripts it in P1-07.2 | EP-10 | Designed |
 | S-14 A runtime-control module never lifts a layer without a current state | RC-2, RC-3 | Designed |
 | S-15 A runtime-control module acknowledges per agent, with the workloads covered. As the driver starts and stops workloads, the module's heartbeats report as served agents those that have workloads it controls | RC-4, RC-6, I-6 | Designed |
 | S-16 Registration refuses an unknown contract version | CORE-3, I-3 | Designed |
 | S-17 Stale renewals, a minute old, a minute in the future or without the core's time, renew nothing: the lease runs out within its TTL, and a fresh renewal renews it again | EP-3, section 5.3 | Implemented; the renewal from the future is designed |
 | S-25 An enforcement point puts in the subject of its decisions the environment its registration returned, which the fake core sets. The kit runs it once with each environment, `production` and `non_production`. With no environment, or one the module does not know, the module allows nothing | I-7 | Designed |
-| S-26 The module calls only a core whose certificate chains to the trust anchors from its configuration. The fake core first serves a certificate that does not chain to the anchor in `WT_CONFORMANCE_CA_FILE`, then one that does: a call made while it serves the first, or no registration once it serves the second, fails the module. An enforcement point inside an agent authenticates as that agent and serves it only. A call without a token that the fake token endpoint issued to that agent, or one that concerns a second agent that the kit adds to the state, fails the module | I-1, EP-11 | Designed |
+| S-26 The module calls only a core whose certificate chains to the trust anchors from its configuration. The fake core first serves a certificate that does not chain to the anchor in `WT_CONFORMANCE_CA_FILE`, then one that does: a call made while it serves the first, or no registration once it serves the second, fails the module. An enforcement point inside an agent authenticates as that agent and serves it only. A call without a token that the fake token endpoint issued to that agent, or one that concerns a second agent that the kit adds to the state, fails the module. The fake core then serves a certificate that chains to the anchor but is not valid for the host of `WT_CONFORMANCE_CORE_URL`: a call made while it serves it fails the module | I-1, EP-11 | Designed |
 | S-27 The module registers before any other call, and again after the driver restarts it: a call before a registration fails it. The kit's tokens expire within a minute, and the fake core ends each stream when its token expires (CORE-1). The kit reports whether the module follows two recommendations, and fails it on neither. One is to deregister before the restart. The other is to open a replacement stream with a fresh token before the old token expires, resuming from the last version applied, and close the old stream once the new one has delivered a message at or above that version. An enforcement point that deregisters closes its gate first: a call it allows after its deregistration fails it. While the module rolls its token over, the fake core also plays two replicas one read apart, in both orders: a module whose gate reopens after a halt, or whose state acknowledgement goes backwards, fails. The driver starts a second process of the module, and the two must register with different keys; after the restart, the kit reports a module whose key changed, without failing it | I-2, I-5, I-8, section 5.2 | Designed |
 | S-28 The module sends heartbeats at the interval the core sets. The fake core sets a short interval at registration and a shorter one in a heartbeat response: a heartbeat that comes later than the interval in force, plus a tolerance, fails the module. While the kit changes the agent's state for more than a minute, an enforcement point acknowledges the state version it applied at least every 60 seconds: a longer gap, or a version above the last one the kit sent, fails it | I-6, EP-12 | Designed |
 | S-29 A runtime-control module applies its layer to every halted agent in scope, and emits its events, valid against the catalog, when it applies or lifts the layer. With three agents in scope, each running a workload, the kit halts the first with an agent halt, the second with a selector halt, then all three with a fleet halt. It has the driver start a workload for a halted agent after its halt, then releases every halt. A workload of a halted agent left uncovered beyond a tolerance, or a layer applied or lifted without its event, fails the module | RC-1, RC-5 | Designed |
 | S-30 Values out of range never open anything. The fake core sends a lease TTL of an hour, which lasts 300 seconds; a zero and an absent one, which renew nothing; a snapshot whose first part lacks the fleet state, which the module refuses, keeping its state and reconnecting; heartbeat responses without an interval or with zero, after which the module keeps the interval in force; and a state that stops naming a bundle, which closes the gate with `gate.no_bundle` | I-6, EP-7, sections 5.2 and 5.3 | Designed |
+| S-31 The module gets its tokens as section 4.2 says, from the kit's fake token endpoint: it reads the issuer's metadata and refuses metadata with another issuer, sends the client ID of its identity and an assertion whose `aud` is the issuer identifier alone, and asks for the module API's resource. When the endpoint refuses an assertion with a 400, the module logs the error and retries at the cap of I-4; when it answers 503, the module retries with the backoff of section 4.7 | I-10 | Designed |
 
 S-18 to S-24 are reserved for [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which joins the contracts before `contracts/v0.1.0` is tagged ([P0-03](../plans/phase-0/P0-03-module-contracts.md), step 12).
 
@@ -630,10 +646,11 @@ S-18 to S-24 are reserved for [RFC-0002](../rfcs/0002-mcp-servers-tools-and-mode
 | Threat | What the contracts do |
 | --- | --- |
 | A compromised enforcement point lies in its acknowledgements or evidence | Layers are reported separately and never overstate (section 5.5); halts also stop token issuance for every audience but the module API (CORE-8); network quarantine acts outside the agent's process (RC-1); the console flags instances that keep emitting actions after a halt (P1-08) |
-| Stolen agent credentials | The thief can act only as that agent: its scope is one agent, its state carries no personal data (CORE-9), its halts stop token issuance for every audience but the module API, and revoking the credential stops that too |
+| Stolen agent credentials | The thief can act only as that agent: its scope is one agent, its state carries no personal data (CORE-9), its halts stop token issuance for every audience but the module API, and revoking the credential stops new tokens for the module API too. Tokens already issued stay valid until they expire, as at every audience ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)), so the credential's instances stop within a token's remaining lifetime plus the lease TTL |
 | A forged or tampered bundle | Signed with a key from the enforcement point's configuration (section 7.3), bound to the state's hash, verified step by step (section 7.4) |
 | Replaying an older bundle | Versions only grow, and the state names the one to use (V3, V6) |
-| Impersonating the core | TLS with trust anchors from configuration (I-1) |
+| Impersonating the core | TLS with trust anchors from configuration, and a certificate valid for the host of the core's configured URL, also when the instance dials an address it kept (I-1) |
+| A stolen bundle key | Removing it from each enforcement point's configuration revokes it, and an enforcement point verifies its active bundle again whenever its keys change (section 7.3). Using the key also needs a way to deliver bundles |
 | Cutting enforcement points off the core | They fail closed when their lease expires (section 5.3): an attacker can stop agents, never free them. This trade-off is accepted in ADR-0005 |
 | Holding the stream back, so that renewals keep leases alive while halts arrive late | Renewals carry the core's time, and an instance ignores one more than its tolerance before or after its own clock (section 5.3): past the tolerance, leases run out |
 | A stale replica, or the second stream of a token rollover, undoing a halt | The core never sends state older than the client's (CORE-5), and renewals mean "current" (CORE-6); an instance never lowers the version it applied, whichever stream or replica a message comes from (section 5.2) |
@@ -649,7 +666,7 @@ The [threat model](../security/threat-model.md) (plan P0-04) analyzes these boun
 
 | Question | Proposal |
 | --- | --- |
-| Should enforcement points learn rotated bundle keys from the core? | Not in `v1alpha1`: keys come from configuration. A key rollover statement signed by the current key could come in `v1beta1` |
+| Should enforcement points learn rotated bundle keys from the core? | Not in `v1alpha1`: keys come from configuration. If enforcement points learn keys from the core in `v1beta1`, a new key is never trusted on the word of the online key alone: it needs an offline root, with a threshold and an expiry, as in TUF, or a hold-down period, as in RFC 5011 |
 | Which tool arguments may policies see? | Only those a deployment declares in `ToolArgs`; how deployments manage that extension is settled in P1-06 |
 | Do quarantined pods keep cluster DNS? | Decided by the [threat model](../security/threat-model.md) (DC-7): no, by default. The enforcement point reconnects to the core's last resolved addresses; where the CNI has DNS-aware rules, an option may allow the core's name only |
 | Stable URLs for `dataschema`, and the Kubernetes label prefix | Depend on the project's domain (open question Q6) |
@@ -658,7 +675,7 @@ The [threat model](../security/threat-model.md) (plan P0-04) analyzes these boun
 
 ## Appendix A. JSON examples
 
-Examples use the Connect protocol with JSON. Field names are the protobuf JSON names, 64-bit integers are strings, durations are strings such as `"30s"`, and enumerations are their names. Every call carries `Authorization: Bearer <token>` and `Content-Type: application/json`.
+Examples use the Connect protocol (version 1) with JSON. Field names are the protobuf JSON names, 64-bit integers are strings, durations are strings such as `"30s"`, and enumerations are their names. Every call carries `Authorization: Bearer <token>`. A unary call is a `POST` with `Content-Type: application/json` and its message as the body; a method without side effects may also be called with `GET`. `Watch`, a server stream, is a `POST` over HTTP/2 with `Content-Type: application/connect+json`: its request and each of its messages travel in an envelope, a flags byte and a four-byte length before each JSON message, and the stream ends with an end-of-stream envelope that carries the error, if any, and the trailers, under HTTP status 200. The examples show each message without its envelope. The Connect wire writes the codes of section 4.6 in lower snake case, such as `permission_denied`.
 
 **`RegistryService.RegisterInstance`**, `POST /whitetower.module.v1alpha1.RegistryService/RegisterInstance`
 
@@ -751,6 +768,12 @@ Then the stream's messages, in order: a snapshot in one part, a renewal, and a h
     }]
   }
 }
+```
+
+When the token that opened the stream expires (CORE-1), the stream ends with this end-of-stream message:
+
+```json
+{ "error": { "code": "unauthenticated", "message": "token expired" } }
 ```
 
 **`GovernanceService.Acknowledge`**: the gate at once, then the interruption's outcome.

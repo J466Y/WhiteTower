@@ -123,6 +123,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 - Key rotation, scaling and troubleshooting.
 - A security configuration guide for what the [threat model](../../security/threat-model.md) assumes: MFA at the IdP; checkpoints exported to the SIEM, with a scheduled consistency check against its latest one that alerts on failure (DC-8); the database's own audit log sent to the SIEM; production resources that accept White Tower tokens requiring `wt_env=production` (R-14); agents' MCP clients that verify TLS, and local MCP servers launched through `npx`, `uvx`, `pipx run` or `bunx` pinned to exact versions, which the catalog flags otherwise (A-6, T-77).
 - Time synchronization: every host that runs the core, a module or an agent keeps its clock within a few seconds of the others. An enforcement point whose clock is more than 5 seconds off ignores lease renewals and fails closed (contracts section 5.3).
+- Intermediaries on the machine listener's path: each supported proxy and ingress controller passes every `Watch` message as it arrives, with the settings that it takes; one that buffers the stream makes every lease renewal stale and every lease run out (contracts, section 4.1).
 - The halting runbooks of P1-08.
 - The catalog runbooks: blocking a server, a tool, a model, or every model of a provider or an endpoint, effective at once, following the block's spread, and lifting it with a second person; handling a tool denied as `catalog.definition_changed`.
 - The fifteen-minute demo, finalized (step 2): onboard an agent and enable its tooling, watch decisions arrive, including one denied by a usage rule, halt the agent, verify the audit log. The seed approves the seeded `wt-catalog` policy and enables no tooling, because enablement comes only from an approved request: the demo agent's report fills the catalog, the advisory committee approves its entries, the owner requests enabling them, and the advisory committee approves the request.
@@ -147,7 +148,7 @@ The three latest Kubernetes minor versions (kind, with Cilium as the CNI so the 
 
 | Risk or question | Mitigation or owner |
 | --- | --- |
-| Ingress controllers cut the machine listener's HTTP/2 streams | Document supported controllers and timeouts; allow a separate LoadBalancer Service for the machine listener |
+| Ingress controllers cut the machine listener's HTTP/2 streams, or buffer them | Document supported controllers, their timeouts, and their settings to pass `Watch` messages unbuffered (step 9); allow a separate LoadBalancer Service for the machine listener |
 | The pilot organization cannot run Kubernetes | Compose profile hardened for a single host, with documented limits (no high availability) |
 
 ## Notes for implementers

@@ -268,7 +268,7 @@ A replica is current while its last successful read is less than 3 seconds old, 
 
 P1-07 step 6.
 
-- **Validation.** Every item must concern an agent in the caller's scope, or the whole request is refused (CORE-2). An acknowledgement of a halt that is unknown or does not cover the agent is not recorded and is counted, but it does not fail the request, so a valid acknowledgement in the same request is never lost (ST-40). An acknowledgement of a released halt is recorded only for an expected pair, so that a drill's later layers are still measured; it changes nothing else, neither the run state, nor the release, nor the propagation outcome.
+- **Validation.** A failure of the call refuses the whole request (CORE-2), such as an instance that the caller's principal did not register. An item about an agent outside the caller's scope, like an acknowledgement of a halt that is unknown or does not cover the agent, is not recorded and is counted, but it does not fail the request, so a valid acknowledgement in the same request is never lost (ST-40). An acknowledgement of a released halt is recorded only for an expected pair, so that a drill's later layers are still measured; it changes nothing else, neither the run state, nor the release, nor the propagation outcome.
 - **Halt acknowledgements** go to the replica's halt writer, which collects them for 10 ms, or up to 100, and writes them in one transaction on the halt path's own connections (section 11). The response goes out once its items are committed, so "recorded" holds. A fleet halt's 500 acknowledgements take a handful of batches, instead of one commit each: spike S2's 1,000 commits per fleet halt dominated its latency.
 - **Merging layers.** Each report is kept per halt, instance, agent and layer. A report replaces an earlier one only when its `after_receipt` is larger, so retries and duplicates change nothing, and a layer moves from `not_done` to `done` as the instance reports it.
 - **State and bundle acknowledgements** are coalesced per instance and agent, keeping the highest version, and flushed every 250 ms on the main pool; their requests return after the flush. They never share a batch with halt acknowledgements, so a burst of them, after a block for example, never delays a halt's.
@@ -441,12 +441,13 @@ The maintainer took these decisions on 2026-10-20.
 
 ### 2026-10-22: changes from the review of RFC-0001
 
-The maintainer decided the points of RFC-0001's review on 2026-10-21 and 2026-10-22 ([P0-03's progress notes](../phase-0/P0-03-module-contracts.md#progress-notes)). Five of them change the design note above, which the reviewer changes before any code depends on it:
+The maintainer decided the points of RFC-0001's review on 2026-10-21 and 2026-10-22 ([P0-03's progress notes](../phase-0/P0-03-module-contracts.md#progress-notes)). Six of them change the design note above, which the reviewer changes before any code depends on it:
 
 | Section | Change | Point |
 | --- | --- | --- |
 | 4 | A replica keeps two streams per instance, and ends the oldest when a third opens, rather than the newest, so that a dead stream it has not noticed never refuses a live reconnection (CORE-16, the maintainer's option B) | 5 |
 | 5 | A replica whose clock is the odd one out, more than a second from the database's while the other replica's is not, is stale: instances now ignore a renewal from the future as well as an old one | 18 |
+| 6 | An item about an agent outside the caller's scope no longer fails the whole request: it is counted and not recorded, as an acknowledgement of an unknown halt is (CORE-2) | 6 |
 | 7 | Loss depends on the kind of instance (CORE-4), and a pair whose instance deregistered before it acknowledged shows as not acknowledged | 26, 29 |
 | 10 | A hub that reads a head below its own `applied` ends its streams and raises the alert; a resumption from a version no hub applied is a claim, recorded, bounded and no evidence of lost changes; one beyond a million versions is refused | 1, 29 |
 

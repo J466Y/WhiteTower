@@ -180,7 +180,7 @@ The specification text is reserved for the reviewer ([AGENTS.md](../../../AGENTS
 | The contracts end up shaped like White Tower's own enforcement point (ADR-0011), or like AGT | Step 9 maps them onto AGT, OPA, Cedar and an AuthZEN engine before the RFC |
 | Over-specifying later capabilities | Only reserve identifiers for Phase 2 and 3 capabilities |
 | AGT's policy runtime changes its verdict set (allow, deny, transform) before GA | Keep `transform` and approval flows out of v0.1 (reserved obligations field); decisions stay booleans |
-| Streaming is hard for simple modules | The Connect protocol allows plain HTTP; the conformance kit documents a minimal client |
+| Streaming is hard for simple modules | The Connect protocol allows plain HTTP, with HTTP/2 for `Watch`; appendix A shows its framing, and the kit documents a minimal client (P1-07 step 9) |
 
 ## Notes for implementers
 
@@ -306,7 +306,7 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | --- | --- | --- |
 | 1. Provisional review | The rule in GOVERNANCE.md, the status and review period of both RFCs, and the governance part of point 38 | Done |
 | 2. The watch stream, leases and instances | Points 1, 5, 11, 18, 25, 26 and 29 | Done |
-| 3. Authentication, authorization and transport | Points 4, 6, 8, 23 and 30 | Not started |
+| 3. Authentication, authorization and transport | Points 4, 6, 8, 23 and 30 | Done |
 | 4. Decision profile and policies | Points 2, 15, 17, 19, 24, 31, 32 and 37 | Not started |
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Not started |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Not started |
@@ -352,3 +352,40 @@ P1-07.2 adds to the kit what the other scenarios need:
 | The fake core sends values out of range: a lease TTL of an hour, zero and absent TTLs, a snapshot whose first part lacks the fleet state, heartbeat responses without an interval or with zero, and a state that stops naming a bundle | S-30 |
 
 Step 12 extends two of these rules to what RFC-0002 adds: the first part of a snapshot also carries the blocks, and CORE-2's check of the instance covers `ReportTooling` and `ReportDefinitions`.
+
+### 2026-10-22: corrections, part 2: authentication, authorization and transport
+
+The second part follows the maintainer's decisions on points 4, 6, 8, 23 and 30 of the review:
+
+| Point | Change | Where |
+| --- | --- | --- |
+| 4 | An instance checks the core's certificate as HTTPS does: it chains to the configured anchors and is valid for the host of the core's configured URL, also when the instance dials an address it kept | I-1, section 11; S-26 |
+| 6 | A failure of the call refuses the whole call, and a failure of one item decides that item only: an `Acknowledge` item about an agent outside the scope is counted and not recorded, and a `Publish` event outside the rules is rejected on its own. An agent that leaves the scope loses its state and its lease at once (I-11), and the gate closes with `gate.no_state`. `PERMISSION_DENIED` from `RegisterInstance` or `Watch` ends every lease at once, and the instance registers again with backoff, never treating the code as final; a version or a manifest hash that registration refuses follows the same rule | CORE-2, sections 4.6, 5.2, 5.4 and 8.4; S-02 and S-12 |
+| 8 | Token requests follow one profile (I-10): the issuer and its metadata, the client ID of each identity, an assertion whose `aud` is the issuer identifier alone, the module API's resource, `expires_in`, and what an OAuth error means. Workload identity stays out of `v1alpha1` until P1-05 profiles it | Section 4.2; scenario S-31 |
+| 23 | `Watch` uses HTTP/2, and the core refuses it over HTTP/1.x. The contract names the version of the Connect protocol, says where a stream's error travels, and that a body without an end-of-stream message is a cut; appendix A shows the framing. An intermediary that buffers streams makes every lease run out | Sections 4.1 and 4.6, appendix A; RFC-0001 |
+| 30 | Revoking a credential stops new tokens, and tokens already issued stay valid until they expire. Removing a bundle key from an enforcement point's configuration revokes it, and the enforcement point verifies its active bundle again when its keys change. Keys learned from the core, if `v1beta1` brings them, need an offline root | Sections 7.3, 11 and 12, EP-11; S-09 |
+
+RFC-0001 counts 24 scenarios, and the kit's README twenty-two designed. The new obligations of modules have their scenarios: I-10 in S-31, and I-11 in S-02.
+
+P1-05 follows: the assertion's audience, the module API's resource and `expires_in` in step 4, the client ID of module identities in step 7, and the audience of workload identity in step 8. So do P1-07 (`Watch` refuses HTTP/1.x, the validation of acknowledgements, the kit's minimal client, and a risk for proxies that buffer), P1-08 (the validation of acknowledgements, in section 6 of the design note), P1-09, P1-12 (the settings of intermediaries in the operations guide, and the same risk) and P1-13 (a bundle key rotated with no overlap). The threat model changes T-20, T-33 and AT-1, and the security test catalog ST-35, ST-40, ST-49 and ST-51.
+
+Two changes of the core wait for the fix of P1-02 that the fifth part brings with point 3: the ingester checks de-duplication before scope, so that a retry of an accepted event stays `DUPLICATE`, and it decides the evidence about an agent recently unbound from a module with the delivery period that P1-05 step 5 decides.
+
+What follows in `api/` and the vectors is a part for the coding agents ([AGENTS.md](../../../AGENTS.md), work queue):
+
+- comments only in `governance.proto` and `events.proto`, then `task gen`: an `Acknowledge` item about an agent outside the scope is counted and not recorded, and a `Publish` event outside the rules is rejected with its reason;
+- the manifest example `ep-python.yaml` loses `workloadIdentityTokenFile`, since workload identity is outside `v1alpha1`;
+- a fail-closed vector F-14, an agent missing from the state applied, with a new input `agent_in_state`, in both stacks: `profile.go`, `fail-closed.json` and `check_vectors.py`;
+- the stub enforcement point drops an agent's state and lease when the agent leaves the scope (I-11), and on `PERMISSION_DENIED` from `RegisterInstance` or `Watch` ends every lease at once, then registers again with backoff.
+
+The counts of vectors in the specification (section 9.1) and in RFC-0001 (its item 7) follow the new vector in the pull request that accepts RFC-0001.
+
+P1-07.2 adds to the kit what the scenarios need:
+
+| Addition | Scenarios |
+| --- | --- |
+| The fake core removes an agent from the state while its lease is valid, and brings it back before the next renewal | S-02 |
+| The driver protocol gains an endpoint that reloads the module's bundle keys | S-09 |
+| The fake core refuses a registration, and ends an established stream, with `PERMISSION_DENIED`, then accepts; and it ends a stream body without an end-of-stream message | S-12 |
+| The kit's certificate authority also issues a certificate for another host | S-26 |
+| The fake token endpoint follows section 4.2: the issuer's metadata, the client IDs, the assertion's `aud`, the module API's resource and `expires_in`; it can refuse an assertion with a 400, and answer 503 | S-31 |

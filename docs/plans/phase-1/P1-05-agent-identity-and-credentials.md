@@ -58,12 +58,12 @@ A `keys` interface (sign, public JWK, key ID, rotation state) with a file backen
 
 - signed by a registered, active key, found by `kid`;
 - `iss` and `sub` equal to the client ID;
-- `aud` equal to the token endpoint;
+- `aud` equal to the issuer identifier alone, as a single string, and never the token endpoint's URL, as draft-ietf-oauth-rfc7523bis and FAPI 2.0 require (contracts, section 4.2);
 - expiry no more than 5 minutes away;
 - `iat` and `nbf` within ±60 seconds of clock skew;
 - a `jti` never seen before (a replay cache in the database, cleaned by a job).
 
-The requested `resource` (RFC 8707) must be a configured audience, such as the module API; it becomes the token's `aud`.
+The requested `resource` (RFC 8707) must be a configured audience, such as the module API, whose identifier is the issuer identifier followed by `/module-api` (contracts, section 4.2); it becomes the token's `aud`. The response always carries `expires_in`.
 
 **Done when:** the positive path works and every negative case of step 10 is rejected.
 
@@ -77,7 +77,7 @@ The gate runs in the same transaction as issuance, or on a consistent read. It d
 - a non-production credential is used by an agent that is not `validated`, `ready` or `active`;
 - the credential is revoked or expired.
 
-**One exception keeps the halt path whole:** a token for the module API is still issued to a suspended or halted agent, whose enforcement point needs it to acknowledge the halt, deliver its evidence and learn of the release (AID-04; [threat model](../../security/threat-model.md), DC-1). It is refused for a retired agent, and for a revoked or expired credential. Decide here whether a retired agent's enforcement point gets a short period to deliver its remaining evidence.
+**One exception keeps the halt path whole:** a token for the module API is still issued to a suspended or halted agent, whose enforcement point needs it to acknowledge the halt, deliver its evidence and learn of the release (AID-04; [threat model](../../security/threat-model.md), DC-1). It is refused for a retired agent, and for a revoked or expired credential. Decide here whether a retired agent's enforcement point gets a short period to deliver its remaining evidence. The same decision covers the evidence about an agent recently unbound from a module: the ingestion of P1-02 accepts it within that period, if there is one (P0-03's progress notes, 2026-10-22).
 
 The caller gets a generic OAuth error; the detailed reason goes to the audit log.
 
@@ -97,7 +97,7 @@ Every issuance is an audit event. The volume (about 3 per second for 1,000 agent
 
 ### 7. Module identities
 
-Standalone module instances use the same endpoint with their own identity (`spiffe://<trust-domain>/module/<module-id>`) and credentials, created when an operator approves the module (P1-07). An enforcement point embedded in an agent's process, as the Python enforcement point is (P1-09), authenticates **as the agent** and may only serve that agent. Document both cases for P0-03 and P1-07.
+Standalone module instances use the same endpoint with their own identity (`spiffe://<trust-domain>/module/<module-id>`) and credentials, created when an operator approves the module (P1-07). Their client ID is the module ID, the UUID in that SPIFFE ID, never the ID of one of its credentials (contracts, section 4.2). An enforcement point embedded in an agent's process, as the Python enforcement point is (P1-09), authenticates **as the agent** and may only serve that agent. Document both cases for P0-03 and P1-07.
 
 The credentials of a module whose manifest declares the `enforcement-point` capability carry an environment, `production` or `non_production`, checked when they are created: the core gives it to the module's instances at registration, for the subject of their decisions ([P1-08's design note](P1-08-kill-switch.md#progress-notes), section 13, decision 7).
 
@@ -107,7 +107,8 @@ The credentials of a module whose manifest declares the `enforcement-point` capa
 
 - Trust configuration per cluster: the issuer URL, or a static JWKS for air-gapped clusters.
 - Mapping rules from namespace and service account to agent ID.
-- A projected service account token, with the token endpoint as audience, is accepted as the client assertion. It goes through the same governance gate.
+- A projected service account token, with the issuer identifier as audience, as for a key's assertion, is accepted as the client assertion. It goes through the same governance gate.
+- The contracts leave workload identity out of `v1alpha1` until this step profiles it (contracts, section 4.2): the profile goes into the contracts, through an RFC, before an instance relies on it.
 
 **Done when:** an agent in a kind cluster gets tokens without any static key (end-to-end test).
 

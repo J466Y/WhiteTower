@@ -83,6 +83,7 @@ Everything is audited.
 - The hub reads after each notification, every second, and whenever a stream asks for a version above what it has read, so a lost notification delays a change by one second at most. Once its last successful read is 10 seconds old, a replica ends its streams with `UNAVAILABLE` and reports not ready, so enforcement points move to a healthy replica ([design note](P1-08-kill-switch.md#progress-notes), sections 3 and 5).
 - Each stream holds one pending change, into which new changes merge, so a slow consumer never slows the hub or another stream. Each send has a deadline of 5 seconds: a stream that misses it is ended (CORE-7), and its enforcement point resumes elsewhere or receives a snapshot. State is never dropped silently.
 - A stream ends with the code of its cause: `UNAUTHENTICATED` at token expiry (CORE-1), `PERMISSION_DENIED` at revocation (MAN-4), `UNAVAILABLE` for a slow client, a stale replica or a drain, and `ABORTED` for the oldest stream of an instance that opens a third on the replica, since two are allowed for the token rollover of I-2, and a dead stream the replica has not noticed must never refuse a live reconnection (CORE-16).
+- `Watch` refuses HTTP/1.x (contracts, section 4.1): the cut-off of slow clients (CORE-7) and the check of dead peers rely on HTTP/2.
 - `module_instances.lease_ttl_seconds` keeps the shortest TTL in the instance's scope, and nothing when the scope has no agent, so a migration drops its `NOT NULL`. The instance's row also keeps the heartbeat interval the core last set for it, and `last_heartbeat_at`, the time of its last heartbeat, apart from `last_seen_at`, which only a replica that streams the instance refreshes. P1-08's tracker finds lost instances from them, by the two rules of CORE-4.
 - **Blocks** (RFC-0002, section 6) are a third record, beside the agents' and the fleet's, and never enter the fleet record. P1-16 writes them through this service (its step 7), each issue or lift in a transaction of its own that stamps only its `catalog_blocks` row. They take their versions from the same version counter, so a lease renewal still means "your state is current" (CORE-6), and they are committed without waiting for any bundle (CORE-12). A lifted block keeps the version that lifted it, so catching up on every change after a version never misses a removal.
 - Snapshots carry every active block, and changes carry the blocks added and the IDs of those removed. A block carries its ID, its kind, the SHA-256 of the string form of what it covers and its issue time; references and reasons stay in the core. At most 500 are active, about 40 KB of a snapshot.
@@ -97,7 +98,7 @@ Everything is audited.
 
 `Acknowledge` receives halt acknowledgements (with each layer reported separately), bundle activations and observed states. It is idempotent on the instance, subject and version. It feeds drift detection (P1-06) and halt propagation tracking (P1-08). As the halt path's [design note](P1-08-kill-switch.md#progress-notes) says (section 6):
 
-- **Validation** follows CORE-2: every item must concern an agent in the caller's scope, or the whole request is refused. An acknowledgement of a halt that is unknown or does not cover the agent is counted, not recorded, and does not fail the request, so a valid acknowledgement beside it is never lost (ST-40). One of a released halt is recorded only for an expected pair of instance and agent, so that a drill's later layers are still measured; it changes nothing else.
+- **Validation** follows CORE-2. A failure of the call refuses the whole request, such as an instance that the caller's principal did not register. An item about an agent outside the caller's scope, or an acknowledgement of a halt that is unknown or does not cover the agent, is counted, not recorded, and does not fail the request, so a valid acknowledgement beside it is never lost (ST-40). One of a released halt is recorded only for an expected pair of instance and agent, so that a drill's later layers are still measured; it changes nothing else.
 - **Halt acknowledgements** go to the replica's halt writer, which collects them for 10 ms, or up to 100, and writes them in one transaction on the halt path's own connections. The response goes out once its items are committed.
 - **Layer reports** are kept per halt, instance, agent and layer. A report replaces an earlier one only when its `after_receipt` is larger, so retries and duplicates change nothing, and a layer moves from `not_done` to `done` as the instance reports it.
 - **State and bundle acknowledgements** are coalesced per instance and agent, keeping the highest version, and flushed every 250 ms on the main pool; their requests return after the flush. They never share a batch with halt acknowledgements.
@@ -105,7 +106,7 @@ Everything is audited.
 
 A state acknowledgement at or after the version that carries a block means the instance applied the block (EP-15). P1-16 shows the block's spread from `instance_agents.observed_state_version`, through the tracking of P1-08, counting enforcement points only. Since state acknowledgements never share a batch with halt acknowledgements, the burst of acknowledgements that a block causes never delays a halt's, where NFR-03 is measured.
 
-**Done when:** duplicates are harmless, acknowledgements about an agent outside the caller's scope are rejected, and halt acknowledgements never wait for state acknowledgements.
+**Done when:** duplicates are harmless, acknowledgements about an agent outside the caller's scope are counted and never recorded while the valid items beside them are, and halt acknowledgements never wait for state acknowledgements.
 
 ### 7. Event ingestion and tooling reports
 
@@ -138,7 +139,7 @@ It serves tests, demos and load tests. It is also the reference implementation m
 
 ### 9. Conformance kit (MOD-05, subplan candidate)
 
-Implement every P0-03 scenario in `test/conformance`. The `wt-conformance` runner plays the core against a module under test and produces JUnit XML plus a readable report. It runs in CI against the mock module and is documented for third-party authors.
+Implement every P0-03 scenario in `test/conformance`. The `wt-conformance` runner plays the core against a module under test and produces JUnit XML plus a readable report. It runs in CI against the mock module and is documented for third-party authors. Its documentation shows a minimal client in plain HTTP, as P0-03 promised: the unary calls, the Connect framing of a `Watch` stream and its end-of-stream message (contracts, appendix A), and the token requests of section 4.2.
 
 The kit's fake core returns, in `RegisterInstanceResponse`, the environment of the credential the instance registered with, as the core does (step 4), so the driver protocol's `WT_CONFORMANCE_ENVIRONMENT` and the environment in the configuration of the stub enforcement point (`test/conformance/stubep`) give way to it, and the driver protocol's `POST /v1/decide` has the module build the subject from its state and its registration, not its credential ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 7).
 
@@ -197,7 +198,7 @@ Build the load test to take new scenarios, as the halt path's [design note](P1-0
 
 | Risk or question | Mitigation or owner |
 | --- | --- |
-| Load balancers cut long-lived HTTP/2 streams | Keepalives, a documented idle timeout, and resumption from the last version on reconnect |
+| Load balancers cut long-lived HTTP/2 streams, or buffer them | Keepalives, a documented idle timeout, and resumption from the last version on reconnect. A proxy that buffers makes every renewal stale, so the operations guide gives each supported one's settings to pass messages as they arrive (P1-12 step 9) |
 | Fan-out storms when a global policy changes every agent's state | Coalescing in the hub (only the latest version per agent is sent), and a chunked bundle rebuild in P1-06 |
 | The mock module drifts from the specification | It is the reference: every contract change updates it and the kit in the same pull request |
 | Blocks slow the halt path (T-80, DC-9) | A record of their own, at most 500 active and hashed (about 40 KB in a snapshot); block changes merged per stream; the version counter held only until commit; halt acknowledgements in batches of their own; the halt path's design reviewed before code; measured in step 10, and by P1-16 with the harness of P1-08 (ST-80) |

@@ -250,7 +250,7 @@ These numbers are evidence for the Phase 1 gate.
 - Reconnect as spike S2 validated, with the session backoff of I-4: full jitter, capped at a third of the lease TTL and reset once the instance receives a fresh renewal, the client library's own reconnect backoff included (for grpcio, `grpc.initial_reconnect_backoff_ms` and `grpc.max_reconnect_backoff_ms`). `Publish` and the reports use the backoff of the other calls, capped at 60 seconds. HTTP/2 pings every 10 seconds or more (for grpcio, `grpc.keepalive_time_ms` and `grpc.keepalive_timeout_ms`), and the silence rule of I-9, find a dead connection before the lease expires.
 - Follow the contract clarifications of the halt path's [design note](P1-08-kill-switch.md#progress-notes) (section 13, decisions 2, 6 and 7):
   - apply every agent state a change carries, whatever that state's own version: an agent that enters the scope keeps its older version;
-  - treat a failure of an established `Watch` stream as transient whatever its code, except `PERMISSION_DENIED`, and get a new token first after `UNAUTHENTICATED`: connect-go, for one, reports a stream cut in the middle of a message as `INVALID_ARGUMENT`;
+  - treat a failure of an established `Watch` stream as transient whatever its code, except `PERMISSION_DENIED`, which ends every lease at once before the enforcement point registers again with backoff, and get a new token first after `UNAUTHENTICATED`: connect-go, for one, reports a stream cut in the middle of a message as `INVALID_ARGUMENT`;
   - accept a renewal whose version skips versions that carried nothing for the stream: that is no gap;
   - accept a snapshot in answer to any resumption, even at a version the core moved forward after a regression, and replace the state with it;
   - apply every halt wherever the instance runs: a field the enforcement point does not know never narrows a halt, and the environment that `RegisterInstanceResponse` returns (step 7) never decides what a halt covers;
@@ -261,4 +261,8 @@ These numbers are evidence for the Phase 1 gate.
   - count a lease TTL above 300 seconds as 300, and a zero or absent one as renewing nothing (section 5.3);
   - refuse a snapshot whose first part lacks the fleet state, keeping the current state (section 5.2);
   - keep the heartbeat interval in force when a response carries none, or one that is not positive (I-6);
-  - deactivate the bundle when the state stops naming one, keeping its version as the floor of V6 (EP-7).
+  - deactivate the bundle when the state stops naming one, keeping its version as the floor of V6 (EP-7);
+  - lose at once the state and the lease of an agent that leaves the scope, and drop the acknowledgements queued for it (I-11);
+  - verify the active bundle again whenever the configured bundle keys change (section 7.3);
+  - request tokens as the profile of section 4.2 says (I-10): the issuer's metadata, the agent ID as client ID, the issuer identifier alone as the assertion's `aud`, and the module API's resource;
+  - use HTTP/2 for `Watch`, and set no deadline on it (sections 4.1 and 4.6).
