@@ -2,8 +2,8 @@
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1.1, with [threat model v0.1.1](threat-model.md) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models) |
+| **Status** | Version 0.1.2, with [threat model v0.1.3](threat-model.md) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models) and 2026-10-21 (plan P1-17: settings) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 8 |
 
 Each test turns an abuse case of the threat model into a check that fails if the control it covers is missing. Each has one owner plan: its acceptance criteria require the test to pass, and it runs in CI from then on. Plan [P1-13](../plans/phase-1/P1-13-security-hardening-and-release.md) runs the whole catalog before the first release.
@@ -168,6 +168,13 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-75 | A tooling report never approves, enables or unblocks anything: new entries stay discovered, a changed definition or digest stays unapproved, and nothing becomes usable; beyond the bound on an agent's entries waiting for review, a report's new entries are left out and stay denied | T-74, DC-10 | integration |
 | ST-80 | With 500 active blocks, a block reaches every mock enforcement point within NFR-24, and halts of one agent and of the fleet still meet NFR-03, measured with the harness of P1-08 | T-80, DC-9 | integration |
 | ST-81 | Nobody approves their own request to enable tooling or to unblock, through the API or directly in the database | T-81 | integration |
+
+## P1-17: Settings
+
+| ID | Test | Covers | Kind |
+| --- | --- | --- | --- |
+| ST-84 | Only a holder of `settings.manage` reads or changes a setting: every other role, a token without that scope and a break-glass session are refused, and so is a key that the `settings` table does not hold | T-03, T-12, T-83 | integration |
+| ST-85 | A change is validated by the key's owner, refused at a stale version, and written with its audit event in one transaction; a change of a key that can weaken a control notifies the steering committee | T-07, T-08, T-83, DC-11 | integration |
 
 ## P1-14: Pilot and gate
 

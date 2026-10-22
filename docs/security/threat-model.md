@@ -1,9 +1,9 @@
-# Threat model v0.1.2
+# Threat model v0.1.3
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1.2: version 0.1, which the maintainer reviewed and accepted on 2026-09-30; the additions of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which the RFC's review covers; and the changes that follow [the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), which the maintainer accepted on 2026-10-20 (section 10) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models) and 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): T-31, AT-1 and DC-9) |
+| **Status** | Version 0.1.3: version 0.1, which the maintainer reviewed and accepted on 2026-09-30; the additions of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which the RFC's review covers; the changes that follow [the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), which the maintainer accepted on 2026-10-20; and the threat and the design change of [plan P1-17](../plans/phase-1/P1-17-settings.md) (settings), which follow the maintainer's decision of 2026-10-21 that settings get a plan of their own (section 10) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): T-31, AT-1 and DC-9) and 2026-10-21 (settings, plan [P1-17](../plans/phase-1/P1-17-settings.md): T-83 and DC-11) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md) |
 | **Models** | The MVP as designed: [architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [module contracts v0.1](../contracts/module-contract-v0.1.md), [domain model](../architecture/domain-model.md), [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) |
 | **Related** | [Framework mapping](framework-mapping.md), [security test catalog](security-tests.md), [SECURITY.md](../../SECURITY.md) |
@@ -228,6 +228,7 @@ Each table covers the flows of one boundary. The rating is likelihood / impact �
 | **T-16** | E | A platform administrator grants themselves, or an accomplice, an approval role through local bindings (HUM-02) | M / H → H | Binding changes are audited (P1-03 step 4); **DC-4**: nobody grants a role to themselves, and grants of steering, advisory or operator reach the steering committee | R-11 |
 | T-17 | S | A stolen API token or personal access token, for example from a CI log | M / M → M | Stored hashed; a recognizable prefix for secret scanners; scoped; 90 days at most; last use recorded; revoked with the principal (P1-03 step 6); CLI tokens last 12 hours | Low |
 | T-18 | D | A stolen SCIM token deactivates owners, whose agents are then suspended automatically | L / M → L | Token read from a file and rotated; deactivations audited and reversible; suspension fails safe | Low |
+| **T-83** | T, E | A platform administrator weakens a control through a setting: a quorum of one for policy approvals, longer leases or a later alert for unconfirmed halts, rarer reviews, or more of an agent's reports left waiting for review | M / H → H | Each setting's owner bounds its values, and a key whose effect is not built stays read-only; every change is audited with its actor and reason (AUD-01); **DC-11**: a change of a key that can weaken a control reaches the steering committee (P1-17) | Low |
 | T-19 | E | Roles removed at the IdP stay in open sessions until the next login | M / M → M | Local binding changes and deactivations revoke sessions at once; sessions last 12 hours at most; SCIM deprovisioning (HUM-05) | R-13 |
 
 ### 5.3 TB-2: machine identity, the token endpoint (F6, F8)
@@ -469,7 +470,7 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 
 ## 7. Design changes
 
-The analysis found eight gaps in the design, and the analysis of RFC-0002 two more. The first eight changes are applied in the documents listed; DC-9 and DC-10 apply once RFC-0002 is accepted.
+The analysis found eight gaps in the design, the analysis of RFC-0002 two more, and plan P1-17 (settings) one more. The first eight changes are applied in the documents listed; DC-9 and DC-10 apply once RFC-0002 is accepted; DC-11 is applied in plan P1-17.
 
 | ID | Threats | Change | Where | Status |
 | --- | --- | --- | --- | --- |
@@ -483,6 +484,7 @@ The analysis found eight gaps in the design, and the analysis of RFC-0002 two mo
 | DC-8 | T-52 | A scheduled consistency check proves the current log extends the latest checkpoint the SIEM holds, and alerts on failure | P1-02 step 7, P1-12 step 9 | Applied |
 | DC-9 | T-80 | Organization-wide blocks travel in their own record of the watch stream, never in the fleet record that fleet halts change, nor in agents' records: a snapshot carries every active block, and changes carry those added and removed. A block carries its ID, its kind, the SHA-256 of what it covers and its issue time; references and reasons stay in the core. Blocks take their versions from the same version counter as the rest of the state ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 2), so a lease renewal still means that the state is current, and a block is committed without waiting for any bundle (CORE-12). At most 500 are active, about 40 KB of a snapshot, so a fleet halt costs the same with or without them | RFC-0002 section 6, which P0-03 step 12 brings into the contracts; conformance scenario S-20; CAT-04, NFR-24; P1-07 steps 5 and 6 (the blocks record, and acknowledgements); P1-08 (the design of the halt path, and the harness of step 10); P1-16 step 7; domain model section 3.9 | Proposed: applied once RFC-0002 is accepted |
 | DC-10 | T-74 | The core bounds, for each agent, what the agent's reports brought that still waits for review: new entries of each kind, and new definitions and digests of known entries, one report's worth by default, which administrators can change (CORE-13). Beyond the bound, it still records the report but leaves out what is new: a new entry stays unknown (`catalog.unknown`), and a new definition or digest is not stored, so the tool or the model stays denied. Reviewers free room by approving or declining, all of an agent's waiting entries at once if need be. A compromised agent therefore cannot make the catalog, or the reviewers' queue, grow faster than people decide, whatever the rate of its reports | RFC-0002 section 4.2, which P0-03 step 12 brings into the contracts; P1-16 step 4; domain model section 3.9 | Proposed: applied once RFC-0002 is accepted |
+| DC-11 | T-83 | A change of a setting that can weaken a control (the quorum of policy approvals, the kill switch's leases and the timeout of unconfirmed halts, the review intervals and their grace period, the bound of what agents' reports leave waiting for review, and the period of unused tooling) reaches the steering committee's inbox, as grants of approval roles do (DC-4). Every change of a setting carries a reason and writes its audit event in the same transaction, each setting's owner bounds its values, and a key whose effect is not built yet stays read-only | [P1-17](../plans/phase-1/P1-17-settings.md) steps 2 to 4 and 6; P1-06 step 4, P1-08 step 6, P1-16 step 3 | Applied |
 
 ## 8. Accepted risks
 
@@ -512,7 +514,7 @@ The abuse cases above become tests in the [security test catalog](security-tests
 
 ## 10. Review and upkeep
 
-- **Review.** The maintainer, who did not write it, reviewed and accepted version 0.1 on 2026-09-30. The review of RFC-0002, by its external reviewer as well, covers the additions of version 0.1.1. The changes of version 0.1.2 follow the design of the halt path, which the maintainer accepted on 2026-10-20 (plan P1-08). An external security review is still planned before the pilot, with the release review of P1-13.
+- **Review.** The maintainer, who did not write it, reviewed and accepted version 0.1 on 2026-09-30. The review of RFC-0002 covers the additions of version 0.1.1. The changes of version 0.1.2 follow the design of the halt path, which the maintainer accepted on 2026-10-20 (plan P1-08). Version 0.1.3 adds the threat and the design change of plan P1-17 (settings), which follow the maintainer's decision of 2026-10-21 that settings get a plan of their own. An external security review is still planned before the pilot, with the release review of P1-13.
 - **Upkeep.** As [GOVERNANCE.md](../../GOVERNANCE.md) sets out, the threat model is reviewed at every phase gate, whenever a trust boundary changes, and in the security section of every RFC. Plan P1-13 publishes version 0.2, checked against the implementation.
 
 | Version | Date | Change |
@@ -520,3 +522,4 @@ The abuse cases above become tests in the [security test catalog](security-tests
 | 0.1 | 2026-09-30 | First version (P0-04) |
 | 0.1.1 | 2026-10-19 | RFC-0002, MCP servers, tools and models (plan P1-16). Added: boundary TB-10 and flows F16 and F17, actor TA-11, assumption A-7, two assets, threats T-74 to T-82 and section 5.12 (the cross-cutting section becomes 5.13), attack tree AT-10, design changes DC-9 and DC-10, accepted risk R-15, and tests ST-75 to ST-83. Changed: the scope, A-6, the governance state asset, O-1, O-3, TB-1, TB-2, F6, F15, T-40, attack trees AT-1, AT-6, AT-7 and AT-8, and accepted risks R-01, R-02, R-10 and R-11 |
 | 0.1.2 | 2026-10-20 | The accepted design of the halt path (plan P1-08). Changed: T-31, attack tree AT-1 and design change DC-9. The security test catalog and the framework mapping are unchanged |
+| 0.1.3 | 2026-10-21 | Settings (plan P1-17). Added: threat T-83 and design change DC-11. The security test catalog gains ST-84 and ST-85; the framework mapping is unchanged |
