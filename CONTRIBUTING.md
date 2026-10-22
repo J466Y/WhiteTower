@@ -10,7 +10,7 @@ Please follow the [code of conduct](CODE_OF_CONDUCT.md). **Never report security
 | --- | --- |
 | What the MVP must do, or how well | A pull request to the [requirements](docs/requirements/mvp-requirements.md) |
 | An architectural decision | An [ADR](docs/adr/README.md) |
-| A module contract (`api/proto`, `api/events`, `api/manifest`) | An [RFC](docs/rfcs/README.md), before any code |
+| A module contract (`api/proto`, `api/events`, `api/manifest`, `api/policy`, or what a conformance vector in `test/conformance/vectors` expects) | An [RFC](docs/rfcs/README.md), before any code |
 | The public REST API (`api/openapi`) | A pull request that updates the OpenAPI document first |
 | How work is planned | The [implementation plans](docs/plans/README.md) |
 

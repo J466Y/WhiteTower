@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md). Contract version `v1alpha1` |
-| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)) and 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)) |
+| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)) and 2026-10-22 (changes to what the conformance vectors expect need an RFC, from the review of RFC-0001) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |
 | **Conformance** | [`test/conformance/`](../../test/conformance/README.md) |
@@ -590,7 +590,7 @@ S-18 to S-24 are reserved for [RFC-0002](../rfcs/0002-mcp-servers-tools-and-mode
   - `v1`: twelve months.
 - **Additive changes stay in the version:** new fields, enum values, methods, event types and optional event data. Readers ignore unknown fields; unknown enum values take their fail-closed meaning (EP-10). A new field may narrow a halt within the version only because an instance that ignores it halts more (section 5.1); a change that would make such an instance halt less is a breaking change.
 - **An event type changes incompatibly only as a new type** (`.v2`); emitters may send both during a migration.
-- **Every change to `api/proto`, `api/events`, `api/manifest` or `api/policy` needs an RFC** (GOVERNANCE.md).
+- **Every change to `api/proto`, `api/events`, `api/manifest` or `api/policy`, or to what a conformance vector expects, needs an RFC** (GOVERNANCE.md). A new vector for a rule this specification already states needs none.
 - **Draft until tagged.** `v1alpha1` is a draft until RFC-0001 is accepted and `contracts/v0.1.0` is tagged. CI compares the protobuf files with the latest `contracts/v*` tag (`buf breaking`, FILE rules), so changes during the review are free and changes after it are checked.
 - **Compatibility matrix.** Each release documents, for the core and for each module, the contract versions supported:
 

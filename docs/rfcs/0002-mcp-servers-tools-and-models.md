@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Draft |
 | **Authors** | @J466Y |
-| **Review period** | At least two weeks from the day it is announced, with at least one external reviewer |
+| **Review period** | The maintainer's provisional review ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)), after RFC-0001 is accepted. A review of at least two weeks, with an external reviewer, follows before the contracts leave alpha (`v1beta1`) |
 | **Related** | [RFC-0001](0001-module-contracts-v0.1.md) and its open question on tool arguments; [module contracts](../contracts/module-contract-v0.1.md), sections 4 to 8; requirements INV-07, POL-05, POL-06, MOD-06, KIL-01, UI-02, and the area this RFC adds: CAT-01 to CAT-10, NFR-24 and UI-10 ([requirements](../requirements/mvp-requirements.md#511-mcp-servers-tools-and-models-cat)); plans [P0-03](../plans/phase-0/P0-03-module-contracts.md) (step 12), [P1-16](../plans/phase-1/P1-16-mcp-servers-tools-and-models.md), [P1-06](../plans/phase-1/P1-06-policy-model-and-distribution.md), [P1-07](../plans/phase-1/P1-07-module-registry-and-api.md), [P1-08](../plans/phase-1/P1-08-kill-switch.md), [P1-09](../plans/phase-1/P1-09-python-enforcement-point.md), [P1-10](../plans/phase-1/P1-10-web-console.md), [P1-11](../plans/phase-1/P1-11-cli.md); [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0011](../adr/0011-own-python-enforcement-point.md); [threat model](../security/threat-model.md) |
 
 ## Summary

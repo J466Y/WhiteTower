@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: the review of RFC-0001 and, once RFC-0002 is accepted, step 12 remain (see [progress notes](#progress-notes)) |
+| **Status** | In progress: the corrections from the review of RFC-0001 and its acceptance, then, once RFC-0002 is accepted, step 12 remain (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
@@ -145,9 +145,9 @@ Rules for `v1alpha1`, `v1beta1` and `v1`: deprecation windows, the `buf breaking
 
 ### 11. RFC-0001, "Module contracts v0.1"
 
-Write the RFC and circulate it to the maintainers and at least one external reviewer, ideally someone who runs AGT or builds a gateway. Hold a review period of at least two weeks, resolve every comment, and accept it. The tag `contracts/v0.1.0` waits for step 12.
+Write the RFC and review it as [GOVERNANCE.md](../../../GOVERNANCE.md#rfc-process) says: resolve every point the review raises, and accept it. While the project has a single maintainer and no external reviewer, the maintainer reviews it and accepts it provisionally, with no minimum period, and the RFC keeps the record of the review (the maintainer's decision of 2026-10-21). An external reviewer, ideally someone who runs AGT or builds a gateway, reviews it before the contracts leave alpha (`v1beta1`). The tag `contracts/v0.1.0` waits for step 12.
 
-**Done when:** RFC-0001 is accepted; with step 12 and the tag, this closes the main criterion of gate G0.
+**Done when:** RFC-0001 is accepted, provisionally while the project has no external reviewer; with step 12 and the tag, this closes the main criterion of gate G0.
 
 ### 12. RFC-0002 in the contracts (once RFC-0002 is accepted, before the tag)
 
@@ -166,7 +166,7 @@ The specification text is reserved for the reviewer ([AGENTS.md](../../../AGENTS
 
 ## Acceptance criteria
 
-- RFC-0001 accepted by the maintainers, with at least one external review.
+- RFC-0001 accepted as GOVERNANCE.md's RFC process says: provisionally by the maintainer while the project has no external reviewer, with the record of the review in the RFC.
 - RFC-0002, once accepted, is in the specification, `api/` and the vectors before the tag, and both stacks pass its vectors.
 - `buf lint` passes; manifest and event examples validate against their schemas in CI.
 - The test vectors cover every combination rule and every fail-closed condition.
@@ -291,3 +291,23 @@ The kit's skeleton cannot drive them yet. P1-07.2 adds what they need:
 | The kit's report shows, apart from failures, the recommendations a module does not follow, and the scenario still passes. The report that P1-07 step 9 plans, JUnit XML and a readable one, has no such outcome yet | S-27 |
 
 S-27 restarts the module through `POST /v1/restart`, which the driver protocol already plans.
+
+### 2026-10-22: a provisional review of RFC-0001
+
+Nobody outside the project follows its RFCs yet: there is no second maintainer, no external reviewer and no community. A review period would bring no comments, and nobody could give the second approval. So on 2026-10-21 the maintainer decided that, until one of them appears, RFCs are accepted provisionally ([GOVERNANCE.md](../../../GOVERNANCE.md#rfc-process)):
+
+- the maintainer reviews the RFC and decides every point the review raises, with no minimum review period;
+- the RFC keeps the record of that review: each point, and how it was resolved;
+- once a second maintainer, an external reviewer or a community appears, RFCs go back to a review of at least two weeks with an external reviewer, and every RFC accepted provisionally gets that review before the contracts leave alpha (`v1beta1`).
+
+The review of RFC-0001 covered the specification as it stands, with every change since the approval of 2026-09-30, from seven perspectives: a module author, security, a policy engine, operations, standards, an implementer, and consistency with the other documents. It raised 39 points, 3 of them blocking, 13 major and 23 minor, and 11 editorial corrections. The maintainer decided every point on 2026-10-21 and 2026-10-22, each time with the recommended option, except for point 5: the core ends the oldest of an instance's three streams, so that a dead stream it has not noticed never refuses a live reconnection.
+
+| Pull request | Content | Status |
+| --- | --- | --- |
+| 1. Provisional review | The rule in GOVERNANCE.md, the status and review period of both RFCs, and the governance part of point 38 | Done |
+| 2 and later. Corrections | The other points, the rest of point 38 included, and the editorial corrections, in small pull requests: the specification text first (the reviewer's), then `api/`, the vectors and the code that follow it, as parts for the coding agents | Not started |
+| Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Not started |
+
+RFC-0002's review follows, the same way.
+
+The governance part of point 38 comes with the rule: GOVERNANCE.md, CONTRIBUTING.md, the index of RFCs and section 10 name `api/policy` and what the vectors expect among the changes that need an RFC. The rest of point 38, in RFC-0001 and the specification, is a correction like the others. The RFC template gains a section for the record of the review, and gate G0 of the roadmap asks for both RFCs accepted, provisionally while the rule applies. The comment at the top of `.github/CODEOWNERS` still names three directories, and is the maintainer's to change.
