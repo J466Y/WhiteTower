@@ -321,3 +321,11 @@ The design of the halt path, accepted on 2026-10-20 ([P1-08's progress notes](P1
 
 Today both take ACCESS EXCLUSIVE on the partitioned tables, `audit_events` and `audit_event_ids`, about once a month: `ensure_audit_partitions` creates partitions with `CREATE TABLE ... PARTITION OF` (migration 1), and `drop_audit_partition` drops them with `DROP TABLE` (migration 3). A request for that lock waits until every transaction that reads the tables ends, and every later request for a lock on them, an insert's included, queues behind it. So an audit search or a backup that holds the tables would make every writer of an audit event wait. Every writer of the governance state writes its audit event while it holds the version counter, so every writer queued on the counter, halts included, would wait with it.
 
+### 2026-10-21: settings registered by P1-17
+
+On 2026-10-21 the maintainer decided that the settings get a plan of their own, [P1-17](P1-17-settings.md), with which each plan registers the keys it owns. P1-17 registers none of this plan's keys:
+
+- The first migration seeds `audit.retention_months` (6), but nothing reads it: the retention job takes its period from `audit.retention.days` in the file configuration, at least 180 days unless `audit.retention.allow_short` is set (2026-10-14).
+- Registered, the setting would let the platform administrator change a value that changes nothing, so P1-17 lists it read-only.
+- On 2026-10-22 the maintainer decided to retire it: P1-17 pull request 1 deletes the row with a migration, and the retention period stays in the file configuration, so shortening it still needs access to the server's configuration (P1-17, step 6).
+

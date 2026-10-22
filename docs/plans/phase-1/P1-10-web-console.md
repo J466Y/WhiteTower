@@ -97,11 +97,11 @@ Each subplan gets its own file in `phase-1/P1-10-web-console/` when work starts.
 
 **Done when:** an operator halts an agent and the fleet, follows the confirmations live, and a second person releases them, all in the console.
 
-### P1-10.6: Dashboard, inbox and settings (M; depends on P1-04, P1-08 and P1-16)
+### P1-10.6: Dashboard, inbox and settings (M; depends on P1-04, P1-08, P1-16 and P1-17)
 
 - **Home dashboard:** agents by state, overdue reviews, coverage distribution, active halts and blocks, tooling waiting for review, module health, sealing lag.
 - **Personal inbox:** pending approvals, including requests to enable tooling or to unblock, the entries and definitions waiting for review, and reviews due.
-- **Administration settings:** review intervals, lease TTL per risk tier, the quorum of policy approvals per scope (P1-06 step 4), view of role mappings, API tokens, notification settings.
+- **Administration settings:** the runtime settings, through P1-17's API, each with its bounds (review intervals, lease TTL per risk tier, the quorum of policy approvals per scope of P1-06 step 4); view of role mappings, API tokens, notification settings.
 
 **Done when:** each role's home page shows what needs their attention.
 

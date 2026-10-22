@@ -31,9 +31,11 @@ The first release, v0.1.0, is secure enough to govern real agents in a pilot: ev
 
 ### 1. Threat model refresh
 
-Compare the implementation with threat model v0.1.2: new trust boundaries, mitigations actually built, residual risks. Publish v0.2.
+Compare the implementation with threat model v0.1.3: new trust boundaries, mitigations actually built, residual risks. Publish v0.2.
 
 Since version 0.1.1, the threat model includes RFC-0002: tooling reports and blocks across TB-2, what agents report shown to people across TB-1, the agent's MCP servers and model providers across the new TB-10 (flows F16 and F17), actor TA-11, assumption A-7, threats T-74 to T-82, attack tree AT-10, DC-9, DC-10 and R-15.
+
+Version 0.1.3 adds threat T-83 and design change DC-11 (plan P1-17).
 
 **Done when:** reviewed by the security reviewer.
 
@@ -45,7 +47,7 @@ Walk the checklist for the console and the API, fix gaps in the owning plans, an
 
 ### 3. Security testing
 
-- The full [security test catalog](../../security/security-tests.md) of P0-04, with RFC-0002's ST-75 to ST-83.
+- The full [security test catalog](../../security/security-tests.md) of P0-04, with RFC-0002's ST-75 to ST-83 and P1-17's ST-84 and ST-85.
 - Dynamic scans in CI against the Compose stack: OWASP ZAP baseline, plus an API scan driven by the OpenAPI document.
 - The complete permission matrix tests.
 - Longer fuzzing campaigns on the assertion, CloudEvents, manifest and bundle parsers, and on what RFC-0002 parses: tooling reports and definitions (validation, the hashes the core recomputes, and the core's redaction, CAT-10), the bundle's catalog file, the usage-rule compiler and its check at submission, and the argument transforms (T-78).

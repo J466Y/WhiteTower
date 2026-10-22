@@ -5,7 +5,7 @@
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
 | **Size** | L |
-| **Depends on** | P1-04, P1-05, P1-07 |
+| **Depends on** | P1-04, P1-05, P1-07; P1-17 for step 6 |
 | **Unblocks** | P1-09, P1-10.5, P1-15 (end-to-end tests), P1-14; P1-16 step 7, through the accepted design of the halt path and the harness of step 10 |
 | **Requirements** | KIL-01 to KIL-10, NFR-03 to NFR-05, NFR-24 (the harness that measures it) |
 | **Decisions** | ADR-0005, ADR-0010, [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) |
@@ -97,7 +97,7 @@ After commit, notify the other replicas. Token issuance is blocked at once for e
 ### 6. Lease policy
 
 - Lease TTL per risk tier comes from the settings, with defaults from P0-05; renewals are sent every third of the shortest TTL in scope, and at least every 30 seconds (P1-07; the design note, section 4), and only while the replica is current (section 5).
-- An edit of `killswitch.lease_ttl_seconds` is refused unless every tier's lease is 10 to 300 seconds, and re-publishes the agents whose lease changed, at most 100 per transaction.
+- This plan registers `killswitch.lease_ttl_seconds` and `killswitch.unconfirmed_after_seconds`, the timeout of step 4, with P1-17, which lists them read-only until then. The timeout's validator refuses a value outside 5 to 60 seconds: below NFR-03's maximum of 5 seconds, a halt still within its target would raise the alert, and above a minute an unconfirmed halt would wait too long for it. The lease's validator refuses an edit unless it holds the four risk tiers, none missing and no other, each 10 to 300 seconds, and its effect re-publishes the agents whose lease changed, at most 100 per transaction, one job at a time (P1-17, step 5). `publishState` reads `killswitch.lease_ttl_seconds` `FOR SHARE` before `Next`: a change of the lease then waits for the writers under way, and its effect sees what they wrote. The transitions White Tower makes itself keep the lease that the state row holds, so a halt reads no setting under the head (the design note, section 8). A change of either key notifies the steering committee (P1-17, step 4).
 - The core cannot see an enforcement point's clock, so it treats an instance as **lost** once it has sent no heartbeat and held no stream for longer than the shortest TTL in its scope (CORE-4; the design note, section 7). The console shows a lost enforcement point as "failed closed (lost contact)", and a runtime-control module lost before it acknowledged a halt, for that halt, as "lost contact: layer not applied" (the design note, section 7).
 
 **Done when:** the tracker of every replica marks lost instances (the design note, section 7), and they are counted in the halt status.
@@ -111,7 +111,7 @@ The break-glass session of P1-03 can call the halt endpoints and nothing else. T
 ### 8. Drills (Should)
 
 - A drill is a halt with `drill=true` on an agent that its owner marked as eligible. It closes the gate like any halt, but **does not suspend the agent** (no T12), so the agent is back in service when the drill ends (the design note, section 13, decision 1).
-- It is released automatically once confirmed, or after `killswitch.drill_max_seconds` (60 by default; an edit outside 10 to 300 seconds is refused). The release is a system action, without the two-person rule, and is audited.
+- It is released automatically once confirmed, or after `killswitch.drill_max_seconds` (60 by default; an edit outside 10 to 300 seconds is refused). The release is a system action, without the two-person rule, and is audited. This step registers the key with P1-17, with that bound; a change of it notifies no one, since it only changes how long an eligible agent's drill can last.
 - Timings are recorded. A drill, like any halt, gives the agent coverage C3 under the design note's per-agent rule (section 7; INV-08).
 - Drills can be scheduled.
 
@@ -296,7 +296,7 @@ Step 4 of this plan, reused for blocks.
 - **An agent halt** (step 2).
   - The body checks the request, takes `issued_at` from `clock.Clock`, and locks the agent's row and its state row with `FOR NO KEY UPDATE`. It fails if the state row is missing (section 2).
   - After `Next`, it inserts the halt, adds it to the agent's state, gives the agent's row a new version (`agents.version`, its ETag) and writes `halt.issued`.
-  - Unless the halt is a drill (section 13, decision 1), it then applies T12 through the lifecycle engine's entry point for the transitions White Tower makes itself (T7, T8, T11, T12; P1-04). That entry point runs in the halt's transaction and at its version, never takes one of its own, checks no permission and no If-Match (the halt endpoint already authorized `halt.agent.issue`), and never refuses. It moves an agent in `validated`, `ready` or `active` to `suspended` with reason `halt`, writes its `lifecycle_transitions` row and `agent.lifecycle_changed` as the system, and leaves an agent in any other state as it is.
+  - Unless the halt is a drill (section 13, decision 1), it then applies T12 through the lifecycle engine's entry point for the transitions White Tower makes itself (T7, T8, T11, T12; P1-04). That entry point runs in the halt's transaction and at its version, never takes one of its own, checks no permission and no If-Match (the halt endpoint already authorized `halt.agent.issue`), and never refuses. It moves an agent in `validated`, `ready` or `active` to `suspended` with reason `halt`, writes its `lifecycle_transitions` row and `agent.lifecycle_changed` as the system, and leaves an agent in any other state as it is. It changes only the lifecycle state of the state row, and keeps the lease and the attributes the row holds, so a halt reads no setting under the head.
   - A halt never fails because of a concurrent change: it locks rather than checks a version. A change whose If-Match was read before the halt fails instead, with `precondition_failed`, so an edit never writes `active` over the `suspended` of T12. The notification follows the commit.
 - **A fleet halt** locks and stamps `fleet_state` only, whatever the number of agents or blocks.
 - **A selector halt** (Should).
