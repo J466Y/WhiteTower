@@ -74,7 +74,7 @@ Review, and fix in the owning plans:
 Rehearse the generation, storage and rotation of the three keys, and write the compromise procedures:
 
 - **token key:** rotate, and outstanding tokens expire within minutes;
-- **bundle key:** rotate, rebuild every bundle, and roll the new trust root out to enforcement points through the overlap period;
+- **bundle key:** keep a next key configured on every enforcement point in advance; to rotate, sign with it, rebuild every bundle, then remove the old key from every configuration, with no overlap, since for a compromised key an overlap keeps the thief's key trusted (contracts, sections 7.3 and 12);
 - **checkpoint key:** rotate; old checkpoints stay verifiable with the old public key.
 
 **Done when:** each rotation was rehearsed in the Kubernetes test environment.

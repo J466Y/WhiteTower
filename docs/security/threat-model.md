@@ -1,9 +1,9 @@
-# Threat model v0.1.3
+# Threat model v0.1.4
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1.3: version 0.1, which the maintainer reviewed and accepted on 2026-09-30; the additions of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which the RFC's review covers; the changes that follow [the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), which the maintainer accepted on 2026-10-20; and the threat and the design change of [plan P1-17](../plans/phase-1/P1-17-settings.md) (settings), which follow the maintainer's decision of 2026-10-21 that settings get a plan of their own (section 10) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): T-31, AT-1 and DC-9) and 2026-10-21 (settings, plan [P1-17](../plans/phase-1/P1-17-settings.md): T-83 and DC-11) |
+| **Status** | Version 0.1.4: version 0.1, which the maintainer reviewed and accepted on 2026-09-30; the additions of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which the RFC's review covers; the changes that follow [the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), which the maintainer accepted on 2026-10-20; the threat and the design change of [plan P1-17](../plans/phase-1/P1-17-settings.md) (settings), which follow the maintainer's decision of 2026-10-21 that settings get a plan of their own; and the changes from the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md), which the maintainer decided on 2026-10-21 and 2026-10-22 (section 10) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): T-31, AT-1 and DC-9), 2026-10-21 (settings, plan [P1-17](../plans/phase-1/P1-17-settings.md): T-83 and DC-11) and 2026-10-22 (the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md): T-20, T-31, T-32, T-33, T-37, T-84, AT-1, AT-6, AT-7 and DC-2) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md) |
 | **Models** | The MVP as designed: [architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [module contracts v0.1](../contracts/module-contract-v0.1.md), [domain model](../architecture/domain-model.md), [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) |
 | **Related** | [Framework mapping](framework-mapping.md), [security test catalog](security-tests.md), [SECURITY.md](../../SECURITY.md) |
@@ -235,7 +235,7 @@ Each table covers the flows of one boundary. The rating is likelihood / impact �
 
 | ID | STRIDE | Threat | Rating | Mitigations | Residual |
 | --- | --- | --- | --- | --- | --- |
-| T-20 | S | A client assertion (`private_key_jwt`) is replayed | M / H → H | Single-use `jti` in a replay cache; audience equal to the token endpoint; expiry within 5 minutes; bounded clock skew (P1-05 step 4) | Low |
+| T-20 | S | A client assertion (`private_key_jwt`) is replayed | M / H → H | Single-use `jti` in a replay cache; audience equal to the issuer identifier alone, never the token endpoint's URL (contracts, section 4.2); expiry within 5 minutes; bounded clock skew (P1-05 step 4) | Low |
 | T-21 | S | Algorithm or key confusion: `none`, HMAC keyed with a public key, an algorithm that does not match the registered key | M / H → H | The registered key's type fixes the algorithm; `go-jose`; negative tests and fuzzing ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md), P1-05) | Low |
 | T-22 | S | Audience confusion: a token issued for one resource is replayed to another | M / M → M | Resource indicators (RFC 8707) become `aud`; the module API accepts only its own audience (P1-05, P1-07) | Low |
 | T-23 | S | A stolen agent private key lets an attacker act as that agent: tokens, events, acknowledgements | M / M → M | White Tower never holds agent keys (AID-02); the scope is that one agent (contracts 4.3); rotation and revocation (AID-05); halts stop tokens for other audiences (KIL-06); workload identity on Kubernetes avoids static keys (AID-07) | R-04 |
@@ -251,17 +251,18 @@ Each table covers the flows of one boundary. The rating is likelihood / impact �
 | T-28 | S | An unapproved module, or a changed manifest, registers instances | L / H → M | MAN-1 to MAN-4: approval, manifest hash, re-approval of changes, revocation ending streams | Low |
 | T-29 | T | A forged or tampered bundle reaches an enforcement point | L / H → M | Signed with the bundle key; keys from the enforcement point's configuration (A-4); bound to the manifest hash in the state; checks V1 to V7 ([contracts section 7](../contracts/module-contract-v0.1.md#7-policy-bundles)) | Low |
 | T-30 | T | An older bundle is replayed | L / H → M | Versions only grow (V6); the state names the version and its hash (V3) | Low |
-| T-31 | T | A stale replica, or a replayed stream, undoes a halt | L / H → M | CORE-5 and CORE-6; versions committed in order by one version counter, whose row lock orders commits; a replica renews leases only while its last successful read of the database is under 3 seconds old, and ends its streams once that read is 10 seconds old ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), sections 2 and 5) | Low |
-| **T-32** | T, D | A delayed stream. Something on the path (a proxy, a load balancer, a sidecar) buffers the `Watch` stream and releases it late. Renewals keep arriving at their usual pace, so leases never expire, while halts arrive as late as the attacker wants | L / H → M | Unacknowledged halts raise alerts (P1-08); **DC-2**: renewals carry the core's time, and one older than a tolerance on the instance's clock renews nothing | Low |
-| T-33 | S | A server impersonating the core keeps an enforcement point open or feeds it state | L / H → M | TLS with trust anchors from configuration (I-1, A-4); bundles still need the configured keys | Low |
+| T-31 | T | A stale replica, a replayed stream, or the second stream of a token rollover undoes a halt | L / H → M | CORE-5 and CORE-6; an instance never lowers the version it applied, whichever of its streams, or of the core's replicas, a message comes from (contracts, section 5.2); versions committed in order by one version counter, whose row lock orders commits; a replica renews leases only while its last successful read of the database is under 3 seconds old and its clock is not the odd one out among its own, the other replica's and the database's, and ends its streams once that read is 10 seconds old ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), sections 2 and 5) | Low |
+| **T-32** | T, D | A delayed stream. Something on the path (a proxy, a load balancer, a sidecar) buffers the `Watch` stream and releases it late, or, across the two connections of a token rollover, delivers the older stream's messages after the newer one's. Renewals keep arriving at their usual pace, so leases never expire, while halts arrive as late as the attacker wants | L / H → M | Unacknowledged halts raise alerts (P1-08); **DC-2**: renewals carry the core's time, and one more than a tolerance before or after the instance's clock renews nothing; an instance never lowers the version it applied, so an older stream's messages change nothing (contracts, section 5.2) | Low |
+| T-33 | S | A server impersonating the core keeps an enforcement point open or feeds it state | L / H → M | TLS with trust anchors from configuration, and a certificate valid for the host of the core's configured URL, also on an address kept for reconnecting without DNS (I-1, A-4, DC-7); bundles still need the configured keys | Low |
 | T-34 | R, T | A compromised enforcement point acknowledges layers it did not apply | M / H → H | Layers reported separately, never overstated ([contracts 5.5](../contracts/module-contract-v0.1.md#55-halts)); network quarantine acknowledges independently on Kubernetes (KIL-10); halts stop tokens for other audiences; **DC-6**: the console flags allow decisions and executed actions after the gate was acknowledged closed | R-01 |
 | T-35 | R | An enforcement point withholds events, or reports decisions that differ from what happened | M / M → M | Sequence numbers per source make gaps visible (AUD-02); from ingestion on, evidence is tamper-evident | R-03 |
 | T-36 | D | An instance floods events; backpressure then slows every enforcement point until their buffers fill and their gates close | M / H → H | Message limits (contracts 4.8); per-instance rate limits and backpressure (P1-02 step 5); 24 hours of buffer (NFR-08) | Low |
-| T-37 | D | Many streams, or slow readers, exhaust a replica | M / M → M | CORE-7 ends streams that fall behind; per-instance limits; about 50 KiB per stream (spike S2) | Low |
+| T-37 | D | Many streams, or slow readers, exhaust a replica | M / M → M | CORE-7 ends streams that fall behind; per-instance limits, such as at most two streams per instance on a replica, the oldest ended when a third opens (contracts 4.8, CORE-16); about 50 KiB per stream (spike S2) | Low |
 | T-38 | I | Governance state tells modules more than they need | L / L → L | No personal data but the owner's pseudonymous ID (CORE-9); halt reasons never leave the core | Low |
 | T-39 | T | A replayed acknowledgement confirms a newer halt | L / M → L | Acknowledgements name the halt and carry an idempotency key (contracts 4.4) | Low |
 | **T-74** | S, T, D | An agent reports tooling it does not have, or hides tooling it has, to mislead reviewers or flood the catalog | M / M → M | Reports never authorize (CAT-01, CORE-10), and only enforcement points report, for the agents in their scope (CORE-2); new entries stay inert until reviewed. The limits of a report (RFC-0002 section 4.2), a rate limit per instance and agent (P1-16 step 4) and **DC-10**, a bound on each agent's entries waiting for review, bound the catalog's growth. Hiding a tool gains nothing: the enforcement point resolves every call by its reference when it happens, and denies what is unknown (EP-16) | R-01 |
 | **T-80** | D | Blocks or catalog changes slow halts, or flood enforcement points: blocks carried in the record that fleet halts change would enlarge every fleet halt, a burst of blocks would crowd the watch stream, and a catalog change that rebuilds many bundles at once would send every enforcement point to fetch one | M / H → H | **DC-9**: blocks travel in their own record of the watch stream, as additions and removals, each named by the SHA-256 of what it covers; at most 500 are active, about 40 KB of a snapshot; a block is committed without waiting for any bundle (CORE-12), and never rebuilds one. Catalog changes rebuild bundles in chunks (P1-06 step 6). Halts are measured with 500 active blocks, with the harness of P1-08 step 10 (NFR-24) | Low |
+| T-84 | T, D | An instance feeds the halt path inputs it controls. It resumes from a version the core never issued, so that the core moves its version counter, which every halt waits on, and alerts that changes were lost; or it deregisters with its gate still open, and keeps acting on its lease while later halts read confirmed without it | M / M → M | A claim gets a snapshot and is no evidence of lost changes: only the core's own evidence raises the alert, advances of the counter are coalesced per read and bounded per instance, and a claim beyond a million versions is refused ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 10); an enforcement point closes its gate before it deregisters (contracts, I-5), its pair of a halt it did not acknowledge shows as not acknowledged (the same design, section 7), and with no stream its lease runs out within its TTL | Low |
 
 ### 5.5 Inside the agent's process (F7, F15)
 
@@ -355,16 +356,17 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 
 - Stop the halt from reaching the enforcement point:
   - cut the stream: the lease expires and the enforcement point fails closed within its TTL (T-69, KIL-04);
-  - delay the stream while renewals keep the lease alive (T-32): **DC-2**;
+  - delay the stream while renewals keep the lease alive (T-32): **DC-2**, which ignores a renewal more than the tolerance before or after the instance's clock, so setting that clock behind gains nothing. An attacker who controls both the host's time and the path defeats DC-2 whichever way the check runs, and then only the alert on unconfirmed halts remains (P1-08);
   - slow the halt path with blocks, or with catalog changes that rebuild many bundles (T-80): **DC-9**, chunked rebuilds;
-  - serve older state from a stale replica (T-31): CORE-5 and CORE-6, one version counter, and renewals only while the replica's last successful read of the database is under 3 seconds old;
-  - impersonate the core (T-33): I-1.
+  - serve older state from a stale replica, or through the second stream of a token rollover (T-31): CORE-5 and CORE-6, one version counter, renewals only while the replica's last successful read of the database is under 3 seconds old, and a version applied that never goes back (contracts, section 5.2);
+  - impersonate the core, even with a certificate from the configured anchors but for another name (T-33): I-1 checks the name, also on an address kept for reconnecting without DNS (DC-7).
 - Make the enforcement point ignore the halt:
   - compromise the agent's process (T-40): network quarantine on Kubernetes; otherwise R-01;
   - act through calls the hooks do not see (T-41): network quarantine; otherwise R-02;
   - send values it does not know (T-42): EP-10.
 - Escape the network quarantine (T-45 to T-50): admission policies, **DC-5**, **DC-7**; the rest is R-09.
 - Fake the confirmation so nobody escalates (T-34): layered acknowledgements, the independent quarantine layer, **DC-6**.
+- Leave the tracking: deregister while still acting on the lease, so that later halts read confirmed without the instance (T-84): it closes its gate before it deregisters (I-5), its pair of a halt it did not acknowledge shows as not acknowledged, and, with no stream, its lease runs out within its TTL.
 - Release the halt without authority:
   - alone: the database trigger requires an approved request from a second person (T-04);
   - with two colluding or compromised accounts: R-11;
@@ -420,19 +422,21 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 - Withhold events (T-35): sequence gaps.
 - Act for an agent it does not serve (T-27): CORE-2.
 - Claim a state version it has not applied: its lag shows in the console (EP-12).
+- Claim a version the core never issued, so that the core alerts that changes were lost (T-84): a claim is no evidence, and only the core's own evidence raises the alert.
 - Report tooling the agent does not have, or hide tooling it has (T-74): reports never authorize, and unknown tooling is denied; R-01.
 
 ### AT-7: turn fail-closed into a fleet-wide denial of service
 
 - Cut the network between enforcement points and the core (T-69): R-08.
 - Take the core down through its listeners (T-11, T-26, T-36, T-37, T-72): rate limits, per-instance limits, separate listeners.
+- Load the halt path by resuming, again and again, from versions the core never issued, each of which would move the version counter that every halt waits on (T-84): advances are coalesced per read and bounded per instance.
 - Take the database down (T-70): high availability; R-08.
 - Fill the enforcement points' buffers through backpressure (T-36): per-instance backpressure.
 - Issue a fleet halt as an insider or break-glass holder (T-71): R-12.
 - Block servers or models widely, or disable tooling, as an insider (T-81): only roles that can already halt or suspend, with a reason, audited; break-glass cannot block.
 - Flood the catalog through tooling reports (T-74): the limits of a report, the rate limit, **DC-10**.
 - Deactivate owners in bulk through SCIM (T-18): reversible, audited.
-- Skew a host's clock so that fresh renewals look stale (DC-2): needs control of the host's time (A-2); the enforcement point reports the stale renewals.
+- Skew a host's clock, ahead or behind, so that fresh renewals look stale (DC-2): needs control of the host's time (A-2); the enforcement point reports the stale renewals. A replica whose clock is the odd one out among the replicas' and the database's stops renewing and hands its streams over, so its skew fails no instance closed.
 
 ### AT-8: compromise the supply chain
 
@@ -475,7 +479,7 @@ The analysis found eight gaps in the design, the analysis of RFC-0002 two more, 
 | ID | Threats | Change | Where | Status |
 | --- | --- | --- | --- | --- |
 | DC-1 | T-25 | The enforcement point of a halted or suspended agent keeps getting tokens for the module API, and only for it: it can still acknowledge, deliver its evidence and learn of a release, while every other audience stays closed. Retired agents get none; P1-05 decides whether a retired agent gets a short delivery-only period | AID-04, KIL-06, [ADR-0010](../adr/0010-built-in-agent-token-issuer.md), CORE-8 and contracts section 11, architecture section 5.3, P1-05 step 5, P1-08 step 2 | Applied |
-| DC-2 | T-32 | Lease renewals carry the core's time. An instance ignores a renewal older than a tolerance on its own clock (5 seconds by default, configurable), so a delayed stream lets leases expire instead of delaying halts. This relies on A-2, which tokens already need | Contracts sections 4.8, 5.2 (CORE-6), 5.3 and 11; the `LeaseRenewal` message; conformance scenario S-17; KIL-04 and ASM-04 | Applied |
+| DC-2 | T-32 | Lease renewals carry the core's time. An instance ignores a renewal more than a tolerance before or after its own clock (5 seconds by default, configurable up to 30), so a delayed stream lets leases expire instead of delaying halts, and a clock set behind the core's gains nothing. This relies on A-2: tokens need synchronized clocks too, but only within minutes, while this check needs them within the tolerance | Contracts sections 4.8, 5.2 (CORE-6), 5.3 and 11; the `LeaseRenewal` message; conformance scenario S-17; KIL-04 and ASM-04 | Applied |
 | DC-3 | T-54 | Migrations run in their own step, `whitetower migrate` (an init container on Kubernetes, a one-off service in Compose), with the migration role. The serving process holds only the runtime role's credentials | OPS-07, architecture section 8.2, P1-01 step 4, P1-12 step 3 | Applied |
 | DC-4 | T-16 | Nobody grants a role to themselves. Grants of steering, advisory or operator notify the steering committee's inbox | HUM-04, P1-03 step 4 | Applied |
 | DC-5 | T-45 | Pods carrying an agent label may not use the host's network, which deny rules cannot reach | P1-15 step 6 | Applied |
@@ -514,7 +518,7 @@ The abuse cases above become tests in the [security test catalog](security-tests
 
 ## 10. Review and upkeep
 
-- **Review.** The maintainer, who did not write it, reviewed and accepted version 0.1 on 2026-09-30. The review of RFC-0002 covers the additions of version 0.1.1. The changes of version 0.1.2 follow the design of the halt path, which the maintainer accepted on 2026-10-20 (plan P1-08). Version 0.1.3 adds the threat and the design change of plan P1-17 (settings), which follow the maintainer's decision of 2026-10-21 that settings get a plan of their own. An external security review is still planned before the pilot, with the release review of P1-13.
+- **Review.** The maintainer, who did not write it, reviewed and accepted version 0.1 on 2026-09-30. The review of RFC-0002 covers the additions of version 0.1.1. The changes of version 0.1.2 follow the design of the halt path, which the maintainer accepted on 2026-10-20 (plan P1-08). Version 0.1.3 adds the threat and the design change of plan P1-17 (settings), which follow the maintainer's decision of 2026-10-21 that settings get a plan of their own. Version 0.1.4 records the changes from the review of RFC-0001, which the maintainer decided on 2026-10-21 and 2026-10-22. An external security review is still planned before the pilot, with the release review of P1-13.
 - **Upkeep.** As [GOVERNANCE.md](../../GOVERNANCE.md) sets out, the threat model is reviewed at every phase gate, whenever a trust boundary changes, and in the security section of every RFC. Plan P1-13 publishes version 0.2, checked against the implementation.
 
 | Version | Date | Change |
@@ -523,3 +527,4 @@ The abuse cases above become tests in the [security test catalog](security-tests
 | 0.1.1 | 2026-10-19 | RFC-0002, MCP servers, tools and models (plan P1-16). Added: boundary TB-10 and flows F16 and F17, actor TA-11, assumption A-7, two assets, threats T-74 to T-82 and section 5.12 (the cross-cutting section becomes 5.13), attack tree AT-10, design changes DC-9 and DC-10, accepted risk R-15, and tests ST-75 to ST-83. Changed: the scope, A-6, the governance state asset, O-1, O-3, TB-1, TB-2, F6, F15, T-40, attack trees AT-1, AT-6, AT-7 and AT-8, and accepted risks R-01, R-02, R-10 and R-11 |
 | 0.1.2 | 2026-10-20 | The accepted design of the halt path (plan P1-08). Changed: T-31, attack tree AT-1 and design change DC-9. The security test catalog and the framework mapping are unchanged |
 | 0.1.3 | 2026-10-21 | Settings (plan P1-17). Added: threat T-83 and design change DC-11. The security test catalog gains ST-84 and ST-85; the framework mapping is unchanged |
+| 0.1.4 | 2026-10-22 | The review of RFC-0001 (plan P0-03). Added: threat T-84. Changed: T-20, T-31, T-32, T-33, T-37, attack trees AT-1, AT-6 and AT-7, and design change DC-2. The security test catalog gains ST-86, and ST-35, ST-38, ST-40, ST-49 and ST-51 change; the framework mapping is unchanged |
