@@ -308,8 +308,8 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 2. The watch stream, leases and instances | Points 1, 5, 11, 18, 25, 26 and 29 | Done |
 | 3. Authentication, authorization and transport | Points 4, 6, 8, 23 and 30 | Done |
 | 4. Decision profile and policies | Points 2, 15, 17, 19, 24, 31, 32 and 37 | Done |
-| 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Not started |
-| 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Not started |
+| 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Done |
+| 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Done |
 | 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Not started |
 | Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | Not started |
 | Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Not started |
@@ -419,3 +419,61 @@ P1-07.2 adds to the kit what the scenarios need:
 | --- | --- |
 | The fake core returns each environment at registration for S-02, as it does for S-05 and S-06; S-05 and S-06 use an `active` agent, since a `validated` or `ready` one stays closed in production | S-02, S-05, S-06 |
 | The driver's `POST /v1/decide` gains an optional `agent_id`, and the kit runs the halt, lease and bundle scenarios with two agents in scope for an enforcement point that serves several | S-04, S-05, S-09 |
+
+### 2026-10-23: corrections, part 4: manifests, bundles and versions
+
+The fourth part follows the maintainer's decisions on points 9, 13, 14, 16, 20, 21 and 39 of the review, the answer on `action.executed` included:
+
+| Point | Change | Where |
+| --- | --- | --- |
+| 9 | Section 10 tells open documents (protobuf messages, the extension attributes of CloudEvents), whose readers ignore what they do not know, from closed ones (event data and types, the module manifest, the bundle manifest, the decision documents), which change in a stated order: the core first, so a module's release is never newer than its core's, and the bundle manifest only through a new format. An additive change only fails closed. EP-10 is scoped to protobuf; section 4.6 gains `UNIMPLEMENTED`, `CANCELED` and a default; section 4.5 states the order of versions and the bootstrap; EP-7 states what keeping the last valid bundle costs | Sections 4.5, 4.6, 4.8 and 10, EP-7, EP-10; S-13, S-16; RFC-0001's reading of ADR-0005, decision 4, and of NFR-01 |
+| 13 | A module has a set of approved manifests: an instance registers with any of them, a new one is approved on its own, and an operator retires the old ones | Section 3.2, MAN-2, MAN-3 |
+| 14 | Canonical JSON applies to I-JSON, and a manifest that is not I-JSON is refused. A YAML manifest is read under YAML 1.2 Core, without ambiguous scalars, anchors, aliases, merge keys or tags, and JSON is recommended. An instance takes its manifest's hash from its release | Sections 1, 3.1, 3.2 and 8.2, MAN-2 |
+| 16 | The bundle versions the core sends never go back, also after a restore or a failover, after which the core re-issues every bundle at a higher version (CORE-18). A rejected version may be retried once the bundle keys change | Sections 5.9, 7.6 and 11 |
+| 20 | Two verifiers agree: V4 checks in a stated order, V5 builds each path from its entry, and V7 accepts static Cedar policies only and never rejects a bundle for the core's validation. `cedar_schema` is required, the JWS header has exactly its three members in any order, `EdDSA` stays under RFC 9864's exception, and bundle keys come as a JWK Set | Sections 6.7 and 7.1 to 7.4 |
+| 21 | Capabilities bind what a module needs and emits: runtime control needs `events.publish`; the obligations name the events they emit, `whitetower.action.executed.v1` included (EP-8, AUD-02, the maintainer's decision); the catalog's emitters bind (MAN-6); and the core records layer reports only for declared layers (CORE-19) | Sections 2, 3.1, 3.3 and 8.5, EP-3, EP-4, EP-7, EP-8; S-10 |
+| 39 | The manifest's version follows the expression of semver.org, with at most 64 characters | `module-manifest.schema.json` only |
+
+The documents follow: RFC-0001 and RFC-0002 (what keeping the last valid bundle means), P1-06 (versions that survive a restore), P1-07 (the set of manifests, the checks of MAN-1 and MAN-6, the reference tool for hashes, the order of versions, layer reports, and the mock module's manifest), P1-08 (a regression also re-issues the bundles, in section 10 of its design note), P1-09 (its manifest's hash from its release, the validation of policies for diagnostics only, and bundle keys as a JWK Set), P1-10.5 (the instances of each manifest) and P1-12 (the order of upgrades, and the re-issue of bundles after a restore). The threat model changes T-30, and records the cost of keeping the last valid bundle as accepted risk R-16.
+
+Three follow-ups are recorded: a revision field, with the first additive change after the tag; a new contract version, or a method added within one, served only once every replica serves it (P1-07 step 4); and a check of the compatibility of JSON schemas in CI, which the maintainer adds, since workflows are protected. Appendix A shows ep-python's real manifest hash in the pull request that accepts RFC-0001, once the examples are final.
+
+What follows is for the coding agents ([AGENTS.md](../../../AGENTS.md), work queue), in two parts:
+
+- **The manifest.** In `module-manifest.schema.json`, `contractVersions` accepts any well-formed version; runtime control needs `governance.watch`, `governance.acknowledge` and `events.publish`, and a non-empty `emits` needs `events.publish`; an enforcement point must emit `decision.made`, `action.executed`, `instance.halted`, `bundle.activated`, `bundle.rejected` and `lease.expired`, and runtime control `lease.expired`, with the quarantine events when it declares the `network_quarantined` layer; `identity: agent` goes only with `enforcement-point`; each capability appears once; and the version takes the numbered-group form of semver.org's expression, written with `[0-9]`, with at most 64 characters. An invalid manifest covers each rule, `1.0.0-01`, `1.0.0-a..b` and a version of 65 characters among them. The catalog's `lease.expired` requires its subject, and the mock module's example declares `action.executed` and its runtime-control role. Manifest vectors give the three examples with their canonical JSON and SHA-256, and invalid YAML manifests (an enumeration `[on, off]`, a date, an integer beyond 2^53), checked in Go and in Python. Comments say, in `registry.proto`, that `manifest_sha256` is the hash of one of the module's approved manifests, taken from the release, and in `governance.proto`, that unspecified outcomes and layers never count as done; then `task gen`.
+- **Bundles and both verifiers.** `bundle-manifest.schema.json` requires `cedar_schema`, takes the UUID form in its path pattern, and loses or recomputes `maxItems`. About twenty generated vectors: a template; a policy that fails validation, which is activated; no schema; unknown members at the top level and in a policy entry, and missing members; malformed, duplicate and mismatched paths; a misplaced schema; unsupported values; and header cases (`alg` `none`, `HS256` keyed with the public key, the algorithm name `Ed25519`, another `typ`, an extra `b64` with `crit`, no `kid`). Both verifiers, `bundle.go` and `check_vectors.py`, follow V4's order, build paths from entries, refuse unknown members, and parse static policies only. The driver protocol passes the trusted bundle keys as a JWK Set file.
+
+The counts of vectors in the specification and in RFC-0001 follow the new vectors in the pull request that accepts RFC-0001.
+
+### 2026-10-23: corrections, part 5: events and halt reports
+
+The fifth part follows the maintainer's decisions on points 3, 7, 10, 12, 22, 27, 28, 35 and 36 of the review:
+
+| Point | Change | Where |
+| --- | --- | --- |
+| 3 | A source names a module by its slug, and an evidence buffer by a random stream ID of at least 64 bits, never a host, pod, cluster or instance name. A source has one writer, and a `wtseq` that repeats under a new event ID is a finding | Sections 4.3, 8.2 and 8.4 |
+| 7 | `terminate` ends the process only if work still runs at the end of the grace period, and a release during it cancels the end. A process that starts while its agent is halted stays up and closed, and never ends itself for that halt. The process that ends reports `process_terminated` `done` just before, as its last report, and `after_receipt` runs from the receipt by that process | Section 5.5, EP-4; S-05, S-07 |
+| 10 | The fields of `decision.made` depend on its reason: an environment only when policies were evaluated, since none exists before a registration (I-7), and `bundle_version` by reason, in the response too. A resource ID has 1 to 512 characters; `instance.halted` may leave out a scope it does not know; a quarantine applied at lease expiry is reported by `lease.expired`; and a denial with `gate.evidence_full` is the one decision not recorded | Sections 3.2 (MAN-5), 4.9 (I-7), 5.5, 5.8 (RC-3), 6.3, 6.6, 8.3, 8.5 and 10, EP-8; S-03, S-10 |
+| 12 | At most one `Publish` call per source is in flight, and after a failure the same events go first (I-12). The core records a gap at once, and recognizes an event for at least 28 days | Sections 4.7 and 8.4; S-10 |
+| 22 | The hashed mode of arguments is a defined HMAC, with its key's ID. Values copied from a framework follow the first rule of section 8.3, a run or thread ID is recorded only when declared opaque, and `detail` fields carry fixed text or codes. CORE-9 says what the core can promise | Sections 5.9, 8.2 and 8.3; the domain model's section 7 |
+| 27 | An instance delivers its buffer before it deregisters or ends itself (SHOULD), and its health reports an old backlog | Sections 4.9 and 8.4; S-10, S-11 |
+| 28 | Health says whether the instance can do what the state asks, and `lease.expired` says why the lease ran out and what the halt mode did | Sections 4.9 and 5.3 |
+| 35 | `Publish` holds 500 events within the message limit, and an event's size is that of its CloudEvent's JSON | Section 4.8; RFC-0002 |
+| 36 | The envelope's rules that are narrower than CloudEvents are listed; `datacontenttype` becomes optional, and `traceparent` takes any version but `ff` | Section 8.2 |
+
+Points 10, 27 and 28 each gave a health for a full evidence buffer. Section 4.9 settles it as `HEALTH_UNHEALTHY`, since an instance whose buffer is full cannot enforce what the state asks.
+
+The documents follow: P1-02 (a fix of ingestion, before P1-07 serves `Publish`), P1-08 (in section 6 of its design note, how reports merge across a restart, and the receipt time that coverage C3 keeps), P1-09 (the `terminate` mode, the evidence buffer and the HMAC's key), P1-12 (where buffers live), RFC-0002 (the limit of definitions, and `bundle_version` with the catalog's reasons) and the domain model (the fields copied into evidence). The threat model changes T-35 and AT-6, and its assets gain the HMAC's key.
+
+What follows is for the coding agents ([AGENTS.md](../../../AGENTS.md), work queue):
+
+- **Schemas and references.** `decision.made` requires `environment` only with `policy.permit`, `policy.forbid`, `policy.no_permit`, `error.evaluation` and `error.timeout`, and `bundle_version` as section 6.6 says, as `decision-response.schema.json` does; it marks a resource ID or an argument name recorded as its SHA-256, and its `arguments` gain an optional `key_id`. `instance.halted` makes `scope` optional, and `lease.expired` gains the optional `cause` (`no_renewal` or `stale_renewals`), `halt_mode` and `layers`. `cloudevent.schema.json` makes `datacontenttype` optional, and accepts any `traceparent` version but `ff`. Comments change in `events.proto` (one call per source in flight, de-duplication for 28 days), in `governance.proto` (`HALT_LAYER_PROCESS_TERMINATED` and `LAYER_OUTCOME_DONE`) and in `registry.proto` (health); then `task gen`. Both references deny a resource ID over 512 characters with `error.invalid_request`, with a combination vector, and check `bundle_version` by reason. An HMAC vector (arguments, key, expected value) runs on both stacks, and the `ep-python` example gains the key's file and ID in its evidence settings.
+- **Ingestion,** in a fix of P1-02 (its progress notes of 2026-10-23), with the pattern of sources in `cloudevent.schema.json` and every example's source.
+
+P1-07.2 adds to the kit what the scenarios need:
+
+| Addition | Scenarios |
+| --- | --- |
+| The fake core checks sources as the core does, holds a `Publish` response, and fails a call with `RESOURCE_EXHAUSTED` or `UNAVAILABLE` | S-10 |
+| The driver protocol gains endpoints that replace the module's evidence buffer and that stop the module, and the driver survives the end of the module's process | S-05, S-07, S-10 |
+| The kit makes the fake core unreachable while the module restarts | S-10 |

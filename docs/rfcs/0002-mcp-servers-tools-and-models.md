@@ -118,7 +118,7 @@ A new method of the registry service, idempotent. Only an instance of a module t
 
 A report is complete: it replaces the instance's previous report for that agent. Its response lists the definition hashes the core does not have.
 
-**`RegistryService.ReportDefinitions`**, also idempotent and called by the same instances, sends those definitions: for each, the members that section 3 hashes, as the server or the framework presents them, at most 4 MiB per call. The core recomputes each hash and stores the definition under it; a definition whose hash matches none that the agent's reports name is refused. Definitions are content-addressed, so each is sent once, whatever the number of agents, instances and restarts. They travel apart from reports because a report carrying every description and schema could exceed the message limit many times over.
+**`RegistryService.ReportDefinitions`**, also idempotent and called by the same instances, sends those definitions: for each, the members that section 3 hashes, as the server or the framework presents them, within the contracts' message limit (section 4.8). The core recomputes each hash and stores the definition under it; a definition whose hash matches none that the agent's reports name is refused. Definitions are content-addressed, so each is sent once, whatever the number of agents, instances and restarts. They travel apart from reports because a report carrying every description and schema could exceed the message limit many times over.
 
 - **EP-13. Report tooling.** Report the agent's tooling as soon as it is known; the first report SHOULD come before the gate first opens. Report again whenever it changes, for example when:
   - an MCP server connects, or announces a changed tool list (`notifications/tools/list_changed`);
@@ -214,7 +214,7 @@ For `tool.invoke`, `tool.expose` (section 7.3) and `model.invoke`, an enforcemen
 
 Blocks come first, so they also cover entries the bundle does not list. A catalog denial carries the bundle's version, because the catalog is part of the bundle.
 
-- **EP-16. Catalog check.** Apply the catalog check to every `tool.invoke`, `tool.expose` and `model.invoke`. Resolve the tool or the model by its reference at the time of the call, never by its name alone. Anything that cannot be resolved is `catalog.unknown`.
+- **EP-16. Catalog check.** Apply the catalog check to every `tool.invoke`, `tool.expose` and `model.invoke`. Resolve the tool or the model by its reference at the time of the call, never by its name alone. Anything that cannot be resolved is `catalog.unknown`. A decision with a `catalog.*` reason carries `bundle_version`, as the policy reasons do (contracts, section 6.6).
 
 What passes the check is enabled for the agent. P1-06 seeds a global policy, named `wt-catalog`, that permits the tool and model actions, so that an enabled entry is usable unless a policy forbids it:
 
@@ -485,7 +485,7 @@ New scenarios:
   - `tool.expose` among the actions an enforcement point's manifest must declare, with `tool.invoke` and `model.invoke`;
   - a `decision_id` that `action.executed` may leave out.
 
-  An enforcement point that does not support them rejects the new bundles, and keeps its last valid bundle or, with none, stays closed: incompatible, but safe.
+  An enforcement point that does not support them rejects the new bundles. It keeps deciding with its last valid bundle, under policies the core has since replaced, or, with none, stays closed, and it reports `HEALTH_DEGRADED` while the core flags the drift (contracts, EP-7): incompatible, and safe in that it never allows what a bundle it verified did not.
 - **When it lands.** No module verifies bundles or decides on tools yet (P1-09 has not started). This RFC therefore proposes to land in `v1alpha1` before `contracts/v0.1.0` is tagged (contracts, section 10: changes before the tag are free). Plan P0-03 lands it, in a step of its own (step 12), and puts the new text in new sections (4.10, 5.10, 6.9 to 6.11 and 7.7), so that no section that other documents cite changes its number. If the tag comes first, the changes that are not additive make `v1alpha2`, served next to `v1alpha1`.
 - **Vectors.** The `v1alpha1` combination vectors that use a tool or a model are rewritten with per-tool records and a catalog.
 

@@ -58,7 +58,11 @@ REST operations for operators:
 - bind a module to agents;
 - list the modules.
 
-Everything is audited.
+Everything is audited. The manifests follow the contracts' section 3:
+
+- A module has a set of approved manifests (MAN-2, MAN-3): a migration adds a table of manifests per module, and `manifest_sha256` on `module_instances`. Approving a new manifest leaves the others in force; an operator retires one explicitly, which ends the streams of its instances, and the console shows the instances of each manifest (P1-10.5).
+- MAN-1 reads a YAML manifest under the YAML 1.2 Core schema and checks its tree of nodes, refusing ambiguous scalars, anchors, aliases, merge keys and tags, and input that is not I-JSON. MAN-6 refuses an `emits` type that the catalog does not have, that only the core emits, or whose emitters exclude the manifest's capabilities.
+- A reference tool computes a manifest's hash, which module releases embed at build time, and `wtctl` exposes it (P1-11). On a refused registration, the console and `wtctl` show both hashes, and the error carries only the hash presented.
 
 **Done when:** a module goes from manifest upload to approved and connected, and revoking it disconnects its instances.
 
@@ -69,6 +73,7 @@ Everything is audited.
 - `/api/v1/agents/{id}/instances` and a module's instance list show them.
 - `RegisterInstanceResponse` returns the environment recorded for the credential the instance registered with. `module_instances` keeps it, in a column that this plan adds, and the public API's instance lists show it: `environment` joins the OpenAPI document's `Instance` schema, an additive change made before the code that serves it. The core refuses to register an instance of a module whose manifest declares the `enforcement-point` capability when the instance's credential has no environment, since every decision needs one. A module that authenticates as itself takes its module credential's environment, which P1-05 step 7 requires of such modules. The environment serves decisions and the console's grouping of instances (P1-10), and never decides what a halt covers ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 7). The field is not this plan's to add: it comes with the change to the contracts and RFC-0001 that the note's section 14 lists for decision 7, and step 1 generates it.
 
+- Contract versions follow the order of the contracts (section 4.5). A new contract version, or a method added within one, is served only once every replica serves it, so a rolling upgrade never offers what one replica would refuse.
 - **What an instance is** (contracts, sections 4.3 and 4.9). An instance belongs to the principal whose token registered it, and its key is unique per module and principal: a migration replaces `UNIQUE (module_id, instance_key)` with a key on the module, the principal and the instance key, where `identity_agent_id` is NULL for module identities (so `NULLS NOT DISTINCT`, or two partial indexes). Every call that names an instance checks that the caller's principal registered it (CORE-2, ST-35). Every `RegisterInstanceResponse` and `HeartbeatResponse` sets the heartbeat interval (I-6).
 - Rate limits answer `RESOURCE_EXHAUSTED` with a `google.rpc.RetryInfo` detail, and never refuse an `Acknowledge` that carries a halt acknowledgement (CORE-15). The machine listener accepts client HTTP/2 PINGs as often as every 10 seconds (CORE-14).
 
@@ -100,7 +105,7 @@ Everything is audited.
 
 - **Validation** follows CORE-2. A failure of the call refuses the whole request, such as an instance that the caller's principal did not register. An item about an agent outside the caller's scope, or an acknowledgement of a halt that is unknown or does not cover the agent, is counted, not recorded, and does not fail the request, so a valid acknowledgement beside it is never lost (ST-40). One of a released halt is recorded only for an expected pair of instance and agent, so that a drill's later layers are still measured; it changes nothing else.
 - **Halt acknowledgements** go to the replica's halt writer, which collects them for 10 ms, or up to 100, and writes them in one transaction on the halt path's own connections. The response goes out once its items are committed.
-- **Layer reports** are kept per halt, instance, agent and layer. A report replaces an earlier one only when its `after_receipt` is larger, so retries and duplicates change nothing, and a layer moves from `not_done` to `done` as the instance reports it.
+- **Layer reports** are kept per halt, instance, agent and layer. A report replaces an earlier one only when its `after_receipt` is larger, so retries and duplicates change nothing, and a layer moves from `not_done` to `done` as the instance reports it. Only the layers that a capability of the instance's manifest declares are recorded; the others are counted and dropped (contracts, CORE-19).
 - **State and bundle acknowledgements** are coalesced per instance and agent, keeping the highest version, and flushed every 250 ms on the main pool; their requests return after the flush. They never share a batch with halt acknowledgements.
 - No rate limit refuses a halt acknowledgement.
 
@@ -110,7 +115,7 @@ A state acknowledgement at or after the version that carries a block means the i
 
 ### 7. Event ingestion and tooling reports
 
-Wire `EventService.Publish` to the ingestion logic of P1-02 (step 5), with per-instance rate limits and counters used as health signals. The agents an instance may publish about are its scope (contracts, section 4.3), not the agents it reports as served.
+Wire `EventService.Publish` to the ingestion logic of P1-02 (step 5), with per-instance rate limits and counters used as health signals. The agents an instance may publish about are its scope (contracts, section 4.3), not the agents it reports as served. An event of a type that the instance's manifest may not emit, by the catalog's emitters, is rejected (contracts, MAN-6).
 
 Once P1-16 step 4 is merged, wire `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions` to its logic the same way:
 
@@ -129,6 +134,7 @@ Once P1-16 step 4 is merged, wire `RegistryService.ReportTooling` and `RegistryS
 - it simulates actions at a configurable rate and publishes events through a durable file buffer;
 - it halts and acknowledges each layer;
 - it also plays a runtime-control module, which acknowledges the `network_quarantined` layer for the agents it reports as served (I-6), for the tests of P1-08 step 4;
+- its manifest declares each role it plays, the runtime-control one included, with the events each must emit (contracts, section 3.3), `whitetower.action.executed.v1` among them (EP-8);
 - it can also authenticate as the agent it serves, as an enforcement point inside an agent does, so that P1-08 step 3 can halt one agent's instances on a production and a non-production credential;
 - once RFC-0002 is in the contracts, its manifest declares `tool.expose`, and it plays the enforcement point's side of RFC-0002: it reports scripted, configurable tooling (servers, tools and models, with canary secrets it redacts, definitions that change on demand, and hostile reported text: markup, script, bidirectional and invisible characters, 16 KiB descriptions) through `ReportTooling` and `ReportDefinitions`; applies blocks by the SHA-256 of the string forms of what they cover, and denies every tool and model call while a block of a kind it does not know is active; checks the catalog before policies; fills per-tool arguments with their transforms; evaluates `tool.expose` on scripted model requests; and narrows provider-run tools;
 - flags inject faults: drop acknowledgements, delay them, crash, lie; and, for RFC-0002, report secrets unredacted, ignore blocks, skip the catalog check, expose a denied or changed tool, acknowledge blocks late.
@@ -209,7 +215,7 @@ Build the load test to take new scenarios, as the halt path's [design note](P1-0
 - `connect-go` server streams map to plain `http.Handler`s, so TLS and middleware stay shared with the rest of the machine listener.
 - Send the snapshot and later changes through the stream's one pending change and its one writer, to avoid races between them ([design note](P1-08-kill-switch.md#progress-notes), section 4).
 - Enforcement points start closed. The contract (and the kit) makes the "no action before state" rule testable (KIL-07).
-- An instance that does not know blocks ignores them (EP-10). That is safe because every bundle now carries a catalog file, which such an instance rejects at step V4 (`invalid_manifest`): it keeps its last valid bundle or, with none, stays closed, and never activates a bundle built after RFC-0002 (contracts, section 7.6).
+- An instance that does not know blocks ignores them (EP-10). That is safe because every bundle now carries a catalog file, which such an instance rejects at step V4 (`invalid_manifest`): it keeps deciding with its last valid bundle, under policies the core has since replaced, or, with none, stays closed, and never activates a bundle built after RFC-0002 (contracts, section 7.6). It reports `HEALTH_DEGRADED`, and the core flags the drift (EP-7).
 - From spike S2, which ran this design with 1,000 enforcement points ([report](../../spikes/S2-watch-streams.md)):
   - serialize every governance state change, so versions commit in order, as the version counter does (the spike used a transaction-level advisory lock); otherwise a replica reading "every change after V" can skip one that commits late;
   - register a stream before reading its snapshot, then skip changes the snapshot already holds;

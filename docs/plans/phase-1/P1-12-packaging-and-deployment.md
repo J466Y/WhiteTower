@@ -98,6 +98,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 
 ### 7. Upgrades (OPS-07, NFR-06)
 
+- The core is upgraded before its modules: a module's release is never newer than its core's, because the core reads the closed documents that modules send (contracts, section 10).
 - An upgrade test from version N-1 to N with data (`helm upgrade`).
 - Documentation that migrations are forward-only, so a rollback means restoring a backup.
 - A rolling upgrade with 500 mock instances connected must cause no lease expiry and lose no state: halts, active blocks and enablement still hold on every instance afterwards (the mock module of P1-07 applies catalogs and blocks).
@@ -110,6 +111,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 - A scripted restore drill.
 - After a restore, the audit log still verifies, and a consistency check against a checkpoint exported before the backup passes.
 - A restore to an earlier point loses the halts, blocks and disables issued after it. The runbook shows how to find them in the SIEM (`whitetower.halt.issued.v1`, `whitetower.catalog.blocked.v1`, `whitetower.tooling.disabled.v1`) and issue them again. A block names the key of what it covers, or its hash, which is matched against the restored catalog's references; a block of a reference the restored catalog never had cannot be rebuilt from events.
+- After a restore, the runbook re-issues every agent's bundle at a higher version, even when its content is unchanged, so that no enforcement point that kept running holds a bundle the restored core no longer names (contracts, CORE-18; P1-06 step 6).
 - A key compromise procedure.
 
 **Done when:** the drill passes once and is documented.
@@ -124,6 +126,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 - A security configuration guide for what the [threat model](../../security/threat-model.md) assumes: MFA at the IdP; checkpoints exported to the SIEM, with a scheduled consistency check against its latest one that alerts on failure (DC-8); the database's own audit log sent to the SIEM; production resources that accept White Tower tokens requiring `wt_env=production` (R-14); agents' MCP clients that verify TLS, and local MCP servers launched through `npx`, `uvx`, `pipx run` or `bunx` pinned to exact versions, which the catalog flags otherwise (A-6, T-77).
 - Time synchronization: every host that runs the core, a module or an agent keeps its clock within a few seconds of the others. An enforcement point whose clock is more than 5 seconds off ignores lease renewals and fails closed (contracts section 5.3).
 - Intermediaries on the machine listener's path: each supported proxy and ingress controller passes every `Watch` message as it arrives, with the settings that it takes; one that buffers the stream makes every lease renewal stale and every lease run out (contracts, section 4.1).
+- Evidence buffers: enforcement points and runtime-control modules keep theirs on storage that outlives their containers, such as a volume; a buffer that lives only as long as its pod loses what it has not delivered when the pod is deleted (contracts, I-5 and section 8.4).
 - The halting runbooks of P1-08.
 - The catalog runbooks: blocking a server, a tool, a model, or every model of a provider or an endpoint, effective at once, following the block's spread, and lifting it with a second person; handling a tool denied as `catalog.definition_changed`.
 - The fifteen-minute demo, finalized (step 2): onboard an agent and enable its tooling, watch decisions arrive, including one denied by a usage rule, halt the agent, verify the audit log. The seed approves the seeded `wt-catalog` policy and enables no tooling, because enablement comes only from an approved request: the demo agent's report fills the catalog, the advisory committee approves its entries, the owner requests enabling them, and the advisory committee approves the request.
