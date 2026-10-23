@@ -20,6 +20,7 @@ The contracts have six parts: the capability taxonomy (section 2), the module ma
 - **Keywords.** MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in BCP 14 (RFC 2119 and RFC 8174) when, and only when, they appear in capitals.
 - **Obligations are numbered**, so tests and reviews can name them: `I-n` for every module instance, `EP-n` for enforcement points, `RC-n` for runtime-control modules, `MAN-n` for how the core handles manifests, and `CORE-n` for what the core guarantees in return. The obligations of modules each have a conformance scenario (section 9.3).
 - **Formats.** JSON is UTF-8. Timestamps are RFC 3339, in UTC, with milliseconds (`2026-09-29T10:15:02.118Z`). Identifiers are lowercase UUIDs (UUIDv7 when White Tower creates them). Hashes are lowercase hexadecimal SHA-256.
+- **Canonical JSON** is RFC 8785, which applies to I-JSON (RFC 7493): member names are unique, and numbers are exactly representable as IEEE 754 doubles, so integers have a magnitude of at most 2^53 - 1. Each use says what happens to other input: a manifest that is not I-JSON is refused (MAN-1), never rounded.
 - **Terms** are those of the [domain model](../architecture/domain-model.md#2-glossary).
 - **The machine-readable files are normative for syntax, and this document for behavior.** A disagreement between them is a bug in the contract. Until it is fixed, implementations follow whichever reading denies more.
 
@@ -32,7 +33,7 @@ A module declares one or more capabilities in its manifest. Four are specified i
 | `enforcement-point` | Specified | Applies governance to the agents it serves at runtime: a gate before every governed call, policy decisions, halts, evidence | All services | Decisions, actions, halts, bundles, leases |
 | `policy-engine` | Specified | Evaluates decision requests with the profile and the combining algorithm of section 6, embedded in an enforcement point: it serves only that module's enforcement points, and evaluates exactly the bundle they verified. Decision points that others call through AuthZEN wait for `v1beta1` (section 6.8) | None | None of its own |
 | `runtime-control` | Specified | Acts on halts outside the agents' processes, for example the network quarantine of KIL-10. Evaluates no policy | Registry, `Watch`, `Acknowledge`, `Publish` | Quarantine events, leases |
-| `event-source` | Specified | Publishes the event types its manifest declares | Registry, `Publish` | Those it declares |
+| `event-source` | Specified | Publishes the event types its manifest declares | Registry, `Publish` | Those it declares, among the types the catalog lists for event sources (MAN-6) |
 | `mcp-gateway` | Reserved, Phase 2 | An enforcement point for tool calls through MCP | | |
 | `llm-gateway` | Reserved, Phase 2 | An enforcement point for model calls, with quotas and cost | | |
 | `skills-repository` | Reserved, Phase 2 | Reviewed, signed skills for agents | | |
@@ -50,14 +51,16 @@ The charter's eight module types all have a place: the policy engine is `policy-
 
 A manifest is a YAML or JSON document with `apiVersion: whitetower/v1alpha1` and `kind: ModuleManifest`, validated by [`module-manifest.schema.json`](../../api/manifest/module-manifest.schema.json). [Examples](../../api/manifest/examples/) exist for the mock module, the Python enforcement point and the network quarantine module.
 
+A JSON manifest is used as it is, and JSON manifests are RECOMMENDED. A YAML manifest is read under the YAML 1.2 Core schema, and MAN-1 also refuses in it anchors, aliases, merge keys and explicit tags, and any unquoted scalar that would not be a plain string under both YAML 1.1 and YAML 1.2, unless it is `true`, `false`, `null` or a plain decimal number: `yes`, `no`, `on`, `off`, `y` and `n`, octal, binary and sexagesimal forms, numbers with underscores or exponents, and dates. The core checks the document's tree of nodes rather than trusting its decoder.
+
 | Field | Meaning |
 | --- | --- |
 | `metadata.name` | The module's slug, unique in a deployment |
 | `metadata.version`, `vendor`, `license`, `homepage`, `description`, `displayName` | What the console shows; the version is SemVer 2.0 and the license an SPDX expression |
-| `spec.contractVersions` | Contract versions the module implements |
-| `spec.identity` | `agent`: instances run inside an agent's process and authenticate as that agent. `module`: instances authenticate with the module's own identity |
+| `spec.contractVersions` | Contract versions the module implements: any well-formed version, from which the core chooses at registration (CORE-3) |
+| `spec.identity` | `agent`: instances run inside an agent's process and authenticate as that agent; only an enforcement point may declare it. `module`: instances authenticate with the module's own identity |
 | `spec.agents` | Which agents instances serve: `self` (the agent they run in), `bound` (agents an operator binds to the module), `all` (every agent, through one binding to all agents) |
-| `spec.capabilities` | The capabilities, each with its own settings: intervention points, halt modes and layers for an enforcement point; languages and combining algorithms for a policy engine; layers and platforms for runtime control |
+| `spec.capabilities` | The capabilities, each at most once, with its own settings: intervention points, halt modes and layers for an enforcement point; languages and combining algorithms for a policy engine; layers and platforms for runtime control |
 | `spec.events.emits`, `spec.events.consumes` | Event types the module publishes, and consumes (always empty in `v1alpha1`) |
 | `spec.permissions` | What instances may do through the module API (section 3.3) |
 | `spec.endpoints` | Endpoints others may call, such as an AuthZEN decision point (section 6.8). None are required in `v1alpha1` |
@@ -65,13 +68,14 @@ A manifest is a YAML or JSON document with `apiVersion: whitetower/v1alpha1` and
 
 ### 3.2 Registration and approval
 
-An operator registers a manifest and another step approves it (MOD-02). The core stores the manifest and the SHA-256 of its RFC 8785 canonical JSON. Instances present that hash when they register.
+A module has a set of approved manifests, typically one for each release it runs. An operator registers a manifest and another step approves it (MOD-02). The core stores each manifest and the SHA-256 of its canonical JSON (section 1). Instances present that hash when they register, and the core applies to each instance the manifest it registered with: its permissions, the types it emits and its capabilities. An instance takes the hash from its release, a constant that the reference tool computes from the manifest the release ships, never from its configuration, which would let it present a manifest it does not run.
 
 - **MAN-1.** The core MUST refuse a manifest that does not validate against the schema, which includes one that declares a reserved capability.
-- **MAN-2.** The core MUST refuse the registration of an instance whose module is not approved, or whose `manifest_sha256` differs from the approved manifest's.
-- **MAN-3.** Any change to an approved manifest MUST be approved again before instances that run it can register.
+- **MAN-2.** The core MUST refuse the registration of an instance whose module is not approved, or whose `manifest_sha256` is not the hash of one of the module's approved manifests. The error carries only the hash presented; the console and `wtctl` show both.
+- **MAN-3.** A changed manifest is a new manifest of the module, which MUST be approved on its own before instances that run it can register; its registration leaves the approved ones in force. An operator retires a manifest explicitly, which ends the streams of the instances registered with it and refuses their calls, as MAN-4 does. Every manifest of a module keeps the same `metadata.name`, `spec.identity` and `spec.agents`.
 - **MAN-4.** Revoking a module MUST end its instances' streams and refuse their calls from then on.
 - **MAN-5.** The core MUST return, in `RegisterInstanceResponse`, the environment recorded for the credential the instance registered with. It MUST refuse, with `PERMISSION_DENIED`, the registration of an enforcement point whose credential has none, since every decision needs one (section 6.2).
+- **MAN-6.** The core MUST refuse a manifest whose `spec.events.emits` lists a type that the catalog (section 8.5) does not have, that only the core emits, or whose emitters include none of the manifest's capabilities, and MUST check the same when it ingests an event. The catalog's emitters bind; adding an emitter to a type later is an additive change.
 
 ### 3.3 Permissions
 
@@ -82,7 +86,7 @@ An operator registers a manifest and another step approves it (MOD-02). The core
 | `policy.bundles.read` | `GetBundle` for the agents in the instance's scope, and `GetBundleKeys` |
 | `events.publish` | `Publish` for the types in `spec.events.emits` |
 
-An enforcement point needs all four; a runtime-control module needs `governance.watch` and `governance.acknowledge`; an event source needs `events.publish`. The schema enforces these combinations.
+An enforcement point needs all four; a runtime-control module needs `governance.watch`, `governance.acknowledge` and `events.publish`, since it emits its events (RC-3, RC-5); an event source needs `events.publish`; and so does any manifest whose `spec.events.emits` is not empty. The schema enforces these combinations, and requires the types that each capability must emit: for an enforcement point, those of EP-3, EP-4, EP-7 and EP-8; for runtime control, `whitetower.lease.expired.v1`, and the quarantine events when it declares the `network_quarantined` layer.
 
 ## 4. Module API
 
@@ -154,6 +158,7 @@ JSON examples of every method are in appendix A.
 - The protobuf package carries the contract version: `whitetower.module.v1alpha1`.
 - **CORE-3.** `RegisterInstance` MUST select the highest version that both sides support and return it. With no common version, the core MUST answer `FAILED_PRECONDITION`, listing the versions it supports.
 - **I-3.** An instance MUST use only the selected version until it registers again.
+- **Order and bootstrap.** Versions are ordered as Kubernetes orders API versions: a stable version above every beta, a beta above every alpha, and a higher number above a lower one within each (`v1`, then `v1beta2`, `v1beta1`, `v1alpha2` and `v1alpha1`). An instance registers through the package of a version it supports, listing every version it supports; every later call uses the package of the selected version, in which the instance ID is valid.
 
 ### 4.6 Errors
 
@@ -167,6 +172,10 @@ JSON examples of every method are in appendix A.
 | `RESOURCE_EXHAUSTED` | Rate limit or backpressure; or a message over the limits of section 4.8 | Retry with backoff, no sooner than its `RetryInfo` says (section 4.7), but never a message over the limits as it is |
 | `UNAVAILABLE`, `DEADLINE_EXCEEDED`, `ABORTED` | Transient | Retry with backoff |
 | `INTERNAL`, `UNKNOWN` | Server error | Retry with backoff |
+| `UNIMPLEMENTED` | The core does not serve the method | On `RegisterInstance`: register through another version the instance supports, and with none left, stay closed and retry with backoff. On a method added within the version: carry on without it. Otherwise: retry with backoff |
+| `CANCELED` | The call was cancelled | Transient: retry with backoff |
+
+Any other code is handled as `INTERNAL`.
 
 A failure of an established `Watch` stream is transient whatever its code, except `UNAUTHENTICATED`, which needs a new token first, and `PERMISSION_DENIED`, which ends every lease at once (the table above): the instance then registers again, and reconnects, with the backoff of section 4.7, and resumes. A stream is established once it has delivered its first message. Before then, an error that the core sends follows the table above, but a failure that the instance's own library reports, such as a cut in the middle of the first message, is transient. The code may come from the instance's own library rather than from the core: connect-go, for example, reports a stream cut in the middle of a message as `INVALID_ARGUMENT`, and `connect.IsWireError` tells the two apart. The error the core sends on a stream is in its end-of-stream message (Connect) or in its trailers (gRPC and gRPC-Web): a body that ends without one is a cut, and is transient. An instance sets no deadline on `Watch`.
 
@@ -189,6 +198,7 @@ A message's size is that of its encoding in the call, binary protobuf or JSON, o
 | Limit | `v1alpha1` |
 | --- | --- |
 | Size of a request or response message | 4 MiB |
+| Compression of messages | `gzip`, or none |
 | Size of a `Watch` message | 1 MiB; the core splits larger snapshots into parts |
 | Acknowledgements per request | 100 |
 | Events per `Publish` | 500, and 4 MiB in total |
@@ -299,14 +309,14 @@ When no halt covers the agent any more, the gate reopens only if every other con
 
 - **EP-1. Start closed.** Allow nothing until the instance has registered, applied a complete snapshot, received a lease renewal and activated a verified bundle for the agent.
 - **EP-2. Decide locally, gate first.** For every governed call and interaction, check the gate (section 5.4), then evaluate the agent's bundle with the profile and the combining algorithm of section 6. Never call the core synchronously to decide.
-- **EP-3. Leases.** Keep one lease per agent on a monotonic clock, renewed only by fresh renewals; when it expires, deny everything, without keeping the agent from stopping, and apply the halt mode (section 5.3).
-- **EP-4. Halts.** When the agent or the fleet is halted, close the gate at once, apply the halt mode, and acknowledge each layer honestly (section 5.5).
+- **EP-3. Leases.** Keep one lease per agent on a monotonic clock, renewed only by fresh renewals; when it expires, deny everything, without keeping the agent from stopping, apply the halt mode and emit `whitetower.lease.expired.v1` (section 5.3).
+- **EP-4. Halts.** When the agent or the fleet is halted, close the gate at once, apply the halt mode, acknowledge each layer honestly and emit `whitetower.instance.halted.v1` (section 5.5).
 - **EP-5. Releases.** Reopen only when no halt covers the agent and every other gate condition holds (section 5.6).
 - **EP-6. Lifecycle.** Open the gate only in the `active` state, and in `validated` and `ready` only when the registration returned `non_production`: no decision is labeled production for an agent that is not active (section 5.4, row 5).
-- **EP-7. Bundles.** Fetch the bundle the state refers to, verify it (section 7.4), activate it atomically and acknowledge the outcome. Keep the last valid bundle when a new one is rejected, and never allow anything without one. When the state stops referring to a bundle, deactivate the active one, so that the gate closes with `gate.no_bundle`, and keep its version as the floor of V6 for the next one.
-- **EP-8. Evidence.** Record each decision durably before the action proceeds; publish events at least once, in order, from a stable source (section 8.4). Close the gate when the evidence buffer cannot accept another event.
+- **EP-7. Bundles.** Fetch the bundle the state refers to, verify it (section 7.4), activate it atomically, acknowledge the outcome, and emit `whitetower.bundle.activated.v1` or `whitetower.bundle.rejected.v1`. Keep the last valid bundle when a new one is rejected, and never allow anything without one. While the active bundle is not the one the state names, report `HEALTH_DEGRADED`: the core flags the drift (POL-05), and a halt is the tool for an emergency that the rejected bundle would have handled. When the state stops referring to a bundle, deactivate the active one, so that the gate closes with `gate.no_bundle`, and keep its version as the floor of V6 for the next one.
+- **EP-8. Evidence.** Record each decision (`whitetower.decision.made.v1`) durably before the action proceeds, and each allowed call's outcome once it finishes (`whitetower.action.executed.v1`, AUD-02); publish events at least once, in order, from a stable source (section 8.4). Close the gate when the evidence buffer cannot accept another event.
 - **EP-9. Reconnection.** Reconnect with the backoff of section 4.7 when an established stream fails (section 4.6) or falls silent (I-9), resuming from the last version applied. Never lower that version, whichever stream a message comes on, and apply every agent state a change carries, whatever that state's own version (section 5.2). Accept a snapshot at any time, unless it is below the version applied.
-- **EP-10. Unknown content.** Ignore unknown fields. An unknown field never narrows a halt. Treat an unknown lifecycle state as closing the gate, an unknown halt scope as a halt, and an unknown halt mode as `interrupt`. Never let an unknown value open anything.
+- **EP-10. Unknown content.** Ignore the unknown fields of protobuf messages, in either encoding, and read an unknown enum value with its fail-closed meaning; the bundle manifest is the exception, since V4 refuses its unknown members (section 10). An unknown field never narrows a halt. Treat an unknown lifecycle state as closing the gate, an unknown halt scope as a halt, and an unknown halt mode as `interrupt`. Never let an unknown value open anything.
 - **EP-11. Identity and trust.** An enforcement point inside an agent's process authenticates as that agent and serves it only. One that authenticates as its module establishes the agent of each call without trusting its caller: it originates the call itself, or the caller presents a White Tower access token issued to that agent for the enforcement point's own audience, never the module API's, which it verifies against the core's keys ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)); never a header, a parameter or an address. A call it cannot attribute to an agent in its scope is denied with `error.unknown_agent`. Take the core's trust anchors and the bundle keys from configuration. When the configured bundle keys change, verify the active bundle again (section 7.3).
 - **EP-12. State acknowledgements.** Acknowledge the state version applied at least every 60 seconds while it changes, so the console can show instances that lag behind. An instance that serves several agents acknowledges it per agent, up to 100 per request (section 4.8).
 
@@ -326,6 +336,8 @@ Besides the obligations of the core in sections 4 and 5.2 (CORE-1 to CORE-7, and
 - **CORE-8.** A halt is committed, and the stream updated, without waiting for any module. Token issuance for the halted agents stops in the same transaction, except for tokens for the module API, which their enforcement points still need to acknowledge the halt, deliver their evidence and learn of the release ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)).
 - **CORE-9.** Governance state carries no personal data other than the owner's pseudonymous principal ID.
 - **CORE-17.** The subject properties that an enforcement point builds from the state (section 6.2) MUST always match [`decision-request.schema.json`](../../api/policy/decision-request.schema.json): labels, for one, follow its syntax.
+- **CORE-18.** The bundle reference that the core sends for an agent MUST never name a version lower than one it may have sent before, nor the same version with another manifest hash, also after a restore or an asynchronous failover. After either, the core re-issues every agent's bundle at a higher version, even when its content is unchanged.
+- **CORE-19.** The core MUST record a layer report only for a layer that a capability of the instance's manifest declares, MUST count and drop the others, and judges each capability's layers on their own. A report whose layer or outcome is unspecified never counts as done, nor a bundle acknowledgement whose outcome is unspecified as an activation.
 
 ## 6. Decision profile
 
@@ -469,7 +481,7 @@ For every request, the applicable global policies and the agent-specific policie
 
 ### 6.7 Policy languages
 
-**`v1alpha1` is Cedar only** (open question Q5, spike S1, and the review of RFC-0001): its "forbid overrides permit" and default deny are exactly rules 1 to 3, and both engines tested, `cedar-go` and `cedarpy`, give the same results on every vector. Cedar runs inside the enforcement point, or beside it in an embedded policy engine (section 2).
+**`v1alpha1` is Cedar only** (open question Q5, spike S1, and the review of RFC-0001): its "forbid overrides permit" and default deny are exactly rules 1 to 3, and both engines tested, `cedar-go` and `cedarpy`, give the same results on every vector. Cedar runs inside the enforcement point, or beside it in an embedded policy engine (section 2). Policies are static Cedar policies, with entity tags and the `datetime` and `duration` extensions, as `cedar-go` 1.8.0 and `cedarpy` 4.12.1 implement them, and no templates.
 
 - **Schema.** [`whitetower.cedarschema`](../../api/policy/whitetower.cedarschema), namespace `WhiteTower`, declares the entity types (`Agent`, `Tool`, `Model`, and the reserved `McpServer`, `Dataset`, `Skill`, `Url`), the eight actions and the context types.
 - **Mapping.** The principal is `WhiteTower::Agent::"<agent-id>"`, with the subject's properties as attributes and its labels as tags. The action is `WhiteTower::Action::"<name>"`. The resource is the entity type of its resource type, with its ID and properties; for agent actions, it is the principal itself. The context holds `time` as a `datetime`, the optional strings, and `args` as a record. A number that is not an integer in the range of Cedar's `Long` makes the request invalid (section 6.4).
@@ -497,21 +509,23 @@ A bundle is a manifest, its signature and its files (format `whitetower.bundle.v
 | `created_at` | When the core built it |
 | `combining_algorithm` | `wt-deny-overrides-v1` |
 | `language` | `cedar`, the only language of `v1alpha1` (section 6.7) |
-| `cedar_schema` | The Cedar schema the policies were validated against, at `schema.cedarschema` |
+| `cedar_schema` | Required: the Cedar schema the policies were validated against, at `schema.cedarschema` |
 | `policies` | Each policy's ID, name, version, scope (`global` or `agent`), path and SHA-256 |
 
-Policy files live at `policies/<scope>/<policy-id>.cedar`. A bundle holds no other files.
+Policy files live at `policies/<scope>/<policy-id>.cedar`. A bundle holds no files other than those its manifest lists.
 
 ### 7.2 Signature
 
 - The signed bytes are the **RFC 8785 canonical JSON** of the manifest, transported exactly as signed.
-- The signature is a **JWS compact serialization with a detached payload** (RFC 7515, appendix F): `<protected header>..<signature>`. The protected header is exactly `{"alg":"EdDSA","kid":"<key ID>","typ":"whitetower-bundle+jws"}`, with an Ed25519 key (RFC 8037). The key ID is RECOMMENDED to be the key's RFC 7638 thumbprint.
+- The signature is a **JWS compact serialization with a detached payload** (RFC 7515, appendix F): `<protected header>..<signature>`. The protected header has exactly three members, in any order: `alg` (`EdDSA`), `kid` (the key ID) and `typ` (`whitetower-bundle+jws`), with an Ed25519 key (RFC 8037). The key ID is RECOMMENDED to be the key's RFC 7638 thumbprint.
+- `EdDSA` stays, although RFC 9864 deprecates it for the fully specified `Ed25519`, under that RFC's exception for a key fixed to one curve: the key here is always Ed25519, and go-jose and most JOSE libraries accept only `EdDSA`. A later version may move to `Ed25519` through `BundleKey.algorithm`.
 - The core signs with its bundle key, separate from its token and checkpoint keys.
 
 ### 7.3 Delivery and keys
 
 - Governance state refers to the bundle by version, manifest hash and size; `GetBundle` returns it.
 - **EP-11** requires the bundle keys to come from configuration: that is the enforcement point's trust root. `GetBundleKeys` lists the active, next and retired keys, so operators can distribute the next key before a rotation. An enforcement point MUST NOT trust a key only because `GetBundleKeys` lists it.
+- Enforcement points SHOULD take their bundle keys as a JWK Set (RFC 7517) of `OKP` keys on the `Ed25519` curve (RFC 8037).
 - Removing a key from an enforcement point's configuration revokes it there. Whenever the configured keys change, at start or on a reload, the enforcement point MUST verify its active bundle again, and a bundle that no configured key verifies does not stay active: the gate closes with `gate.no_bundle`.
 
 ### 7.4 Verification
@@ -521,10 +535,10 @@ An enforcement point verifies a bundle with these steps, in this order, and acti
 1. **V1. Size.** The size announced in the state and the actual size are at most 2 MiB, in at most 1,000 files.
 2. **V2. Signature.** The signature is a detached JWS whose header is exactly as in section 7.2, its key ID is trusted, and it verifies over the manifest bytes as received.
 3. **V3. Reference.** The SHA-256 of the manifest bytes equals the one in the governance state.
-4. **V4. Manifest.** The manifest parses with no unknown field; its format, combining algorithm and language are supported; its agent and version are those of the state.
-5. **V5. Files.** Every policy path has the expected form, scope and extension, with no duplicates; every listed file is present with its hash; no other file is present.
+4. **V4. Manifest.** In this order: a manifest that is not an object, that has an unknown or a missing member, or a member of the wrong type, is `invalid_manifest`; a format, combining algorithm or language that is not supported is `unsupported`, even when the schema's constant also fails; an agent or a version other than the state's is `invalid_manifest`. A Cedar manifest names its schema (`cedar_schema`).
+5. **V5. Files.** Each policy's path is built from its entry's own ID and scope and the language, `policies/<scope>/<policy-id>.cedar`, with no duplicates, and the Cedar schema sits at `schema.cedarschema` only: any other path is malformed. Every listed file is present with its hash, and no other file is present.
 6. **V6. No rollback.** The version is newer than the active one. The same version with the same manifest hash is already active: there is nothing to do.
-7. **V7. Policies.** Every policy parses. An enforcement point MAY also validate them against the bundled schema.
+7. **V7. Policies.** Every policy parses as a static policy of the Cedar that section 6.7 names; a template is `parse_error`. Validating policies against the Cedar schema is the core's job (POL-07): an enforcement point MUST NOT reject a bundle because a policy fails that validation, and it may log it and SHOULD report `HEALTH_DEGRADED`.
 
 The [bundle vectors](../../test/conformance/vectors/bundles/README.md) cover each step with signed examples.
 
@@ -545,7 +559,7 @@ The [bundle vectors](../../test/conformance/vectors/bundles/README.md) cover eac
 - The new bundle replaces the old one atomically: a decision uses one bundle or the other, never a mix.
 - The outcome is acknowledged (`BundleAcknowledgement`) and emitted as `whitetower.bundle.activated.v1` or `whitetower.bundle.rejected.v1`.
 - A rejected bundle leaves the previous one active; with none, the gate stays closed (`gate.no_bundle`).
-- An enforcement point MUST NOT retry a rejected version with the same manifest hash: it waits for a new reference in the state.
+- An enforcement point MUST NOT retry a rejected version with the same manifest hash: it waits for a new reference in the state, unless its bundle keys have changed since it rejected that version (section 7.3).
 
 ## 8. Events
 
@@ -555,7 +569,7 @@ Every event ends in the tamper-evident audit log: sealed into its Merkle tree, c
 
 ### 8.2 Envelope
 
-Events are **CloudEvents 1.0 in the JSON format**, validated by [`cloudevent.schema.json`](../../api/events/cloudevent.schema.json):
+Events are **CloudEvents 1.0 in the JSON format**, and I-JSON (section 1), validated by [`cloudevent.schema.json`](../../api/events/cloudevent.schema.json):
 
 | Attribute | Rule |
 | --- | --- |
@@ -603,7 +617,7 @@ Events are minimized by design (NFR-20, domain model section 7):
 | `whitetower.instance.halted.v1` | Enforcement points | Required | A halt was applied, layer by layer |
 | `whitetower.bundle.activated.v1` | Enforcement points | Required | A bundle was verified and activated |
 | `whitetower.bundle.rejected.v1` | Enforcement points | Required | A bundle was refused |
-| `whitetower.lease.expired.v1` | Enforcement points, runtime control | Optional | An instance lost the core for longer than its lease |
+| `whitetower.lease.expired.v1` | Enforcement points, runtime control | Required | An instance lost the core for longer than an agent's lease: one event per agent |
 | `whitetower.quarantine.applied.v1` | Runtime control | Required | A halted agent's workloads were isolated |
 | `whitetower.quarantine.lifted.v1` | Runtime control | Required | The isolation was removed after a release |
 | `whitetower.agent.created.v1` | Core | Required | Lifecycle transition T1 |
@@ -613,7 +627,7 @@ Events are minimized by design (NFR-20, domain model section 7):
 | `whitetower.halt.released.v1` | Core | For agent halts | A halt was released |
 | `whitetower.audit.checkpoint.v1` | Core | None | The audit log signed a checkpoint |
 
-The core emits more types, for every other state change (AUD-01). They follow the same envelope and are defined by the plans that own them; modules do not consume events in `v1alpha1`.
+Who emits each type binds: a module emits only the types whose emitters include one of its capabilities (MAN-6). The core emits more types, for every other state change (AUD-01). They follow the same envelope and are defined by the plans that own them; modules do not consume events in `v1alpha1`.
 
 ## 9. Conformance
 
@@ -646,13 +660,13 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | S-07 Reconnecting while halted stays halted | EP-1, EP-4, EP-9 | Designed |
 | S-08 A release reopens only with a valid lease and bundle | EP-5 | Designed |
 | S-09 The bundle vectors are rejected with the right reasons, and the previous bundle stays active. The fake core's `GetBundleKeys` also lists the untrusted key that signs the `unknown-key` vector, and the module must still reject that vector with `unknown_key`. When the driver reloads the module's bundle keys without the key that signed the active bundle, the module verifies its bundle again and closes its gate with `gate.no_bundle` | EP-7, EP-11 | Designed |
-| S-10 Events validate against the catalog, with a gapless `wtseq`, and survive a restart | EP-8 | Designed |
+| S-10 Events validate against the catalog, with a gapless `wtseq`, and survive a restart. Every allowed call that finishes yields `whitetower.action.executed.v1` | EP-8 | Designed |
 | S-11 A full evidence buffer closes the gate | EP-8 | Designed |
 | S-12 Reconnection uses jittered backoff bounded by the lease, resets after a renewal, and resumes from the last version applied, even when a renewal passed versions that carried nothing for the stream. The module reconnects after a stream cut in the middle of a message, the first one included. When it resumes, it applies a change that carries an agent state older than the version it resumed from, and a snapshot just past that version, which replaces its state. A reconnection within the lease keeps deciding on the last state applied. The kit also black-holes the core, through a TCP proxy that drops traffic without closing the connection, and then refuses connections for over two minutes: the module finds the silent stream and reconnects on a new connection, and its retries stay within the cap of I-4. The fake core also refuses a registration with `PERMISSION_DENIED` and then accepts it, and ends an established stream with `PERMISSION_DENIED` and then accepts the next: the module ends its leases at once, allows nothing meanwhile, and is back within the cap of I-4. A stream body that ends without an end-of-stream message is a cut, and the module resumes | EP-9, I-4, I-9, sections 4.6 and 5.2 | Designed |
-| S-13 Unknown fields and values never open anything. A halt that carries an unknown field also closes the gate and is acknowledged, in the encoding the module uses (binary protobuf or JSON); the kit's fake core scripts it in P1-07.2 | EP-10 | Designed |
+| S-13 Unknown fields and values never open anything. A halt that carries an unknown field also closes the gate and is acknowledged, in the encoding the module uses (binary protobuf or JSON); the kit's fake core scripts it in P1-07.2. For a runtime-control module, an unknown field in a halt never lifts or narrows its layer | EP-10, RC-2 | Designed |
 | S-14 A runtime-control module never lifts a layer without a current state | RC-2, RC-3 | Designed |
 | S-15 A runtime-control module acknowledges per agent, with the workloads covered. As the driver starts and stops workloads, the module's heartbeats report as served agents those that have workloads it controls | RC-4, RC-6, I-6 | Designed |
-| S-16 Registration refuses an unknown contract version | CORE-3, I-3 | Designed |
+| S-16 Registration refuses an unknown contract version. When the fake core answers `UNIMPLEMENTED` for the version the module tries first, the module registers through another version it supports, or stays closed and retries | CORE-3, I-3, section 4.6 | Designed |
 | S-17 Stale renewals, a minute old, a minute in the future or without the core's time, renew nothing: the lease runs out within its TTL, and a fresh renewal renews it again | EP-3, section 5.3 | Implemented; the renewal from the future is designed |
 | S-25 An enforcement point puts in the subject of its decisions the environment its registration returned, which the fake core sets. The kit runs it once with each environment, `production` and `non_production`. With no environment, or one the module does not know, the module allows nothing | I-7 | Designed |
 | S-26 The module calls only a core whose certificate chains to the trust anchors from its configuration. The fake core first serves a certificate that does not chain to the anchor in `WT_CONFORMANCE_CA_FILE`, then one that does: a call made while it serves the first, or no registration once it serves the second, fails the module. An enforcement point inside an agent authenticates as that agent and serves it only. A call without a token that the fake token endpoint issued to that agent, or one that concerns a second agent that the kit adds to the state, fails the module. The fake core then serves a certificate that chains to the anchor but is not valid for the host of `WT_CONFORMANCE_CORE_URL`: a call made while it serves it fails the module | I-1, EP-11 | Designed |
@@ -671,7 +685,10 @@ S-18 to S-24 are reserved for [RFC-0002](../rfcs/0002-mcp-servers-tools-and-mode
   - alpha: at least one minor release of the core with both versions;
   - beta: two minor releases or six months, whichever is longer;
   - `v1`: twelve months.
-- **Additive changes stay in the version:** new fields, enum values, methods, event types and optional event data. Readers ignore unknown fields; unknown enum values take their fail-closed meaning (EP-10). A new field may narrow a halt within the version only because an instance that ignores it halts more (section 5.1); a change that would make such an instance halt less is a breaking change.
+- **Additive changes stay in the version:** new fields, enum values, methods, event types and optional event data. What a reader does with what it does not know depends on the document:
+  - **Open documents:** protobuf messages, in both encodings, and the extension attributes of CloudEvents. Readers ignore unknown fields. A JSON decoder discards unknown fields and unknown enum names, and a discarded enum reads as its `UNSPECIFIED` value, with that value's stated meaning (EP-10).
+  - **Closed documents:** each JSON document with a schema, whose reader refuses what it does not know. Event data, event types and the module manifest are read by the core, which gets a change first: a module sends one only to a core that has it, so a module's release is never newer than its core's (the compatibility matrix below). The bundle manifest gains a member only as `whitetower.bundle.v2`, or in a new contract version, since V4 refuses unknown members. In the decision documents, an unknown member or value denies.
+- **Additive changes only fail closed.** A new field, record or value may add a restriction, or narrow a halt, within the version only if an instance that ignores it denies or halts more (section 5.1); a change that would make such an instance allow or halt less is a breaking change. So is a new enum value whose fail-closed meaning would stop the instances that do not know it, such as an environment, or a lifecycle state that opens the gate. A method added within a version is optional for modules.
 - **An event type changes incompatibly only as a new type** (`.v2`); emitters may send both during a migration.
 - **Every change to `api/proto`, `api/events`, `api/manifest` or `api/policy`, or to what a conformance vector expects, needs an RFC** (GOVERNANCE.md). A new vector for a rule this specification already states needs none.
 - **Draft until tagged.** `v1alpha1` is a draft until RFC-0001 is accepted and `contracts/v0.1.0` is tagged. CI compares the protobuf files with the latest `contracts/v*` tag (`buf breaking`, FILE rules), so changes during the review are free and changes after it are checked.
@@ -688,7 +705,7 @@ S-18 to S-24 are reserved for [RFC-0002](../rfcs/0002-mcp-servers-tools-and-mode
 | A compromised enforcement point lies in its acknowledgements or evidence | Layers are reported separately and never overstate (section 5.5); halts also stop token issuance for every audience but the module API (CORE-8); network quarantine acts outside the agent's process (RC-1); the console flags instances that keep emitting actions after a halt (P1-08) |
 | Stolen agent credentials | The thief can act only as that agent: its scope is one agent, its state carries no personal data (CORE-9), its halts stop token issuance for every audience but the module API, and revoking the credential stops new tokens for the module API too. Tokens already issued stay valid until they expire, as at every audience ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)), so the credential's instances stop within a token's remaining lifetime plus the lease TTL |
 | A forged or tampered bundle | Signed with a key from the enforcement point's configuration (section 7.3), bound to the state's hash, verified step by step (section 7.4) |
-| Replaying an older bundle | Versions only grow, and the state names the one to use (V3, V6) |
+| Replaying an older bundle | Versions only grow, also after a restore or a failover (CORE-18), and the state names the one to use (V3, V6) |
 | Impersonating the core | TLS with trust anchors from configuration, and a certificate valid for the host of the core's configured URL, also when the instance dials an address it kept (I-1) |
 | A stolen bundle key | Removing it from each enforcement point's configuration revokes it, and an enforcement point verifies its active bundle again whenever its keys change (section 7.3). Using the key also needs a way to deliver bundles |
 | Cutting enforcement points off the core | They fail closed when their lease expires (section 5.3): an attacker can stop agents, never free them. This trade-off is accepted in ADR-0005 |

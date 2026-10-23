@@ -43,7 +43,8 @@ Spike S1 tested Microsoft AGT as the foundation of this plan and recommended aga
 - `cedarpy` is pinned to a version whose Cedar language matches what the core's validator accepts (P1-06). The supported framework versions are pinned in the test matrix. A weekly CI job tests against the latest releases of `cedarpy` and of each supported framework, to catch breaking changes early.
 - The test matrix also pins the MCP Python SDK, the frameworks' MCP adapters and the provider SDKs, and the weekly job covers them.
 - References and definition hashes need RFC 8785 canonical JSON: either a new dependency, with its justification (for example `rfc8785`, Apache-2.0), or a small implementation checked against the vectors.
-- The module manifest from P0-03, which declares `tool.expose` among its intervention points (RFC-0002).
+- The module manifest from P0-03, which declares `tool.expose` among its intervention points (RFC-0002), shipped as JSON, which the contracts recommend.
+- The release embeds its manifest's hash, computed with the reference tool from the manifest it ships, never taken from its configuration (contracts, section 3.2).
 
 **Done when:** the package builds and its CI runs, including the weekly job.
 
@@ -80,7 +81,7 @@ When a new bundle reference arrives:
 
 1. Fetch it with `GetBundle`.
 2. Verify the JWS signature against the core's bundle keys (trust configured at installation), every file hash, including the catalog's (V4 accepts the manifest's `catalog` field, and V5 requires its file), and that its version is newer than the active one.
-3. Parse the Cedar policy set once and validate it against the bundle's own Cedar schema, which declares one argument record per tool (RFC-0002, section 7.6). Parse the catalog file (`catalog.json`) once, against its schema (V7, `parse_error`), and index it by reference. A bundle without a catalog counts as an empty catalog: every tool and model action is then `catalog.unknown`.
+3. Parse the Cedar policy set once, as static policies (V7), and validate it against the bundle's own Cedar schema, which declares one argument record per tool (RFC-0002, section 7.6), for diagnostics only: a policy that fails validation is logged and the health reports `HEALTH_DEGRADED`, but the bundle is not rejected for it (contracts, section 7.4). Parse the catalog file (`catalog.json`) once, against its schema (V7, `parse_error`), and index it by reference. A bundle without a catalog counts as an empty catalog: every tool and model action is then `catalog.unknown`.
 4. Swap it in atomically and acknowledge the activation.
 
 A bundle that fails verification is handled by the P0-03 rule: keep the last valid bundle, never run without one, and raise an alert event.
@@ -248,7 +249,7 @@ These numbers are evidence for the Phase 1 gate.
 
 - The gate check must be cheap (a read of an immutable snapshot, 59 ns in S1); it runs on every hook. The catalog check must stay as cheap: dictionary lookups in the same snapshot.
 - Drop the exposure cache atomically with the bundle, the state or the blocks it was computed from.
-- Treat the core's bundle keys as the trust root; ship them through configuration, never fetch them over an unauthenticated channel.
+- Treat the core's bundle keys as the trust root; ship them through configuration, as a JWK Set of `OKP` keys on `Ed25519` (contracts, section 7.3), and never fetch them over an unauthenticated channel.
 - Keep framework-specific code in thin integration modules, so a framework upgrade touches one file.
 - Reconnect as spike S2 validated, with the session backoff of I-4: full jitter, capped at a third of the lease TTL and reset once the instance receives a fresh renewal, the client library's own reconnect backoff included (for grpcio, `grpc.initial_reconnect_backoff_ms` and `grpc.max_reconnect_backoff_ms`). `Publish` and the reports use the backoff of the other calls, capped at 60 seconds. HTTP/2 pings every 10 seconds or more (for grpcio, `grpc.keepalive_time_ms` and `grpc.keepalive_timeout_ms`), and the silence rule of I-9, find a dead connection before the lease expires.
 - Follow the contract clarifications of the halt path's [design note](P1-08-kill-switch.md#progress-notes) (section 13, decisions 2, 6 and 7):

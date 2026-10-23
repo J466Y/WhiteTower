@@ -31,7 +31,7 @@ The contracts were mapped onto Microsoft AGT, OPA, Cedar and engines with native
 
 ## Compatibility and versioning
 
-This is the first version, so nothing breaks. `v1alpha1` stays a draft until this RFC is accepted and `contracts/v0.1.0` is tagged. From then on, a published version never changes incompatibly: a breaking change creates the next version, served next to the previous one (specification, section 10). CI compares the protobuf files with the latest `contracts/v*` tag.
+This is the first version, so nothing breaks. `v1alpha1` stays a draft until this RFC is accepted and `contracts/v0.1.0` is tagged. From then on, a published version never changes incompatibly: a breaking change creates the next version, served next to the previous one (specification, section 10). CI compares the protobuf files with the latest `contracts/v*` tag. Within a version, section 10 tells open documents, whose readers ignore what they do not know, from closed ones, which change only in a stated order: a module's release is never newer than its core's. The contract reads decision 4 of [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), and NFR-01, as denying while no verified bundle is active: an enforcement point that rejects a new bundle keeps deciding with its last valid one (EP-7).
 
 ## Security considerations
 

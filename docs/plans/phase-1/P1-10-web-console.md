@@ -93,7 +93,7 @@ Each subplan gets its own file in `phase-1/P1-10-web-console/` when work starts.
 - **Release:** the request and approval flows.
 - **A minimal break-glass page,** for halting only: a break-glass session cannot block (HUM-06).
 - **Modules:** manifest view, approval, credentials.
-- **Instances:** health, versions, lease, active bundle, drift, and the environment that the core recorded at registration, by which the console groups them ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 7).
+- **Instances:** health, versions, lease, active bundle, drift, the manifest each instance registered with, so that an operator knows when a manifest can be retired (contracts, MAN-3), and the environment that the core recorded at registration, by which the console groups them ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 7).
 
 **Done when:** an operator halts an agent and the fleet, follows the confirmations live, and a second person releases them, all in the console.
 

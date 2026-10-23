@@ -485,7 +485,7 @@ New scenarios:
   - `tool.expose` among the actions an enforcement point's manifest must declare, with `tool.invoke` and `model.invoke`;
   - a `decision_id` that `action.executed` may leave out.
 
-  An enforcement point that does not support them rejects the new bundles, and keeps its last valid bundle or, with none, stays closed: incompatible, but safe.
+  An enforcement point that does not support them rejects the new bundles. It keeps deciding with its last valid bundle, under policies the core has since replaced, or, with none, stays closed, and it reports `HEALTH_DEGRADED` while the core flags the drift (contracts, EP-7): incompatible, and safe in that it never allows what a bundle it verified did not.
 - **When it lands.** No module verifies bundles or decides on tools yet (P1-09 has not started). This RFC therefore proposes to land in `v1alpha1` before `contracts/v0.1.0` is tagged (contracts, section 10: changes before the tag are free). Plan P0-03 lands it, in a step of its own (step 12), and puts the new text in new sections (4.10, 5.10, 6.9 to 6.11 and 7.7), so that no section that other documents cite changes its number. If the tag comes first, the changes that are not additive make `v1alpha2`, served next to `v1alpha1`.
 - **Vectors.** The `v1alpha1` combination vectors that use a tool or a model are rewritten with per-tool records and a catalog.
 

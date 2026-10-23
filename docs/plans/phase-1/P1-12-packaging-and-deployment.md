@@ -98,6 +98,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 
 ### 7. Upgrades (OPS-07, NFR-06)
 
+- The core is upgraded before its modules: a module's release is never newer than its core's, because the core reads the closed documents that modules send (contracts, section 10).
 - An upgrade test from version N-1 to N with data (`helm upgrade`).
 - Documentation that migrations are forward-only, so a rollback means restoring a backup.
 - A rolling upgrade with 500 mock instances connected must cause no lease expiry and lose no state: halts, active blocks and enablement still hold on every instance afterwards (the mock module of P1-07 applies catalogs and blocks).
@@ -110,6 +111,7 @@ Block all egress except cluster-internal traffic, run the full end-to-end suite,
 - A scripted restore drill.
 - After a restore, the audit log still verifies, and a consistency check against a checkpoint exported before the backup passes.
 - A restore to an earlier point loses the halts, blocks and disables issued after it. The runbook shows how to find them in the SIEM (`whitetower.halt.issued.v1`, `whitetower.catalog.blocked.v1`, `whitetower.tooling.disabled.v1`) and issue them again. A block names the key of what it covers, or its hash, which is matched against the restored catalog's references; a block of a reference the restored catalog never had cannot be rebuilt from events.
+- After a restore, the runbook re-issues every agent's bundle at a higher version, even when its content is unchanged, so that no enforcement point that kept running holds a bundle the restored core no longer names (contracts, CORE-18; P1-06 step 6).
 - A key compromise procedure.
 
 **Done when:** the drill passes once and is documented.
