@@ -86,7 +86,7 @@ Each rule denies all ingress and egress, with two exceptions:
 
 - Acknowledge each halt, per agent, with the layer `network_quarantined`, the time the rule was accepted by the API server and the number of pods covered (P1-08 stores them in `halt_layer_reports`).
 - Report honestly: the acknowledgement says the rule is in place, not that every connection is gone; the measurements of step 8 give the time to effective isolation.
-- Publish `quarantine.applied` and `quarantine.lifted` events.
+- Publish `quarantine.applied` and `quarantine.lifted` events, with the cluster's name and the quarantine's `mechanism`, an open value whose known ones are the templates of step 3 (contracts, section 5.8). The layer leaves the core's machine listener and token endpoint reachable from the workloads it isolates (RC-7).
 - Report per agent the pods found, so the console can show agents that run in the cluster without the label, or with no pods at all.
 
 **Done when:** a halt on a mock core shows the quarantine layer with the right pod count, and the events validate against the catalog.

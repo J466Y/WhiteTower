@@ -76,7 +76,7 @@ After commit, notify the other replicas. Token issuance is blocked at once for e
 ### 4. Propagation tracking
 
 - **Expected pairs** of instance and agent: the instances whose streams carry a targeted agent when a replica applies the halt, every instance shown as connected whose scope covers a targeted agent, and those whose streams open while it is active (the design note, section 7). They include the network quarantine module of each cluster where a targeted agent has pods (P1-15), while it serves the agent.
-- **Acknowledgements** report each layer with its timestamp: gate closed, in-flight action interrupted, process terminated, network quarantined (with the number of workloads covered).
+- **Acknowledgements** report each layer with its timestamp: gate closed, in-flight action interrupted, process terminated, network quarantined (with the number of workloads isolated).
 - **Halt status:** propagating, then confirmed (every expected pair acknowledged), partially confirmed, or unconfirmed after a timeout (10 seconds by default), which fires an alert.
 - **Metrics:** `whitetower_halt_propagation_seconds` (issued to acknowledged), `whitetower_halt_effect_seconds` (issued to in-flight interruption or termination) and `whitetower_halt_quarantine_seconds` (issued to network quarantine applied).
 - An instance is flagged as suspect when it reports an allow decision or an executed action whose time is after its acknowledged gate closing ([threat model](../../security/threat-model.md), DC-6). Denials, and evidence buffered before the halt and delivered afterwards, are expected.

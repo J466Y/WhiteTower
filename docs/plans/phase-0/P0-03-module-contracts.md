@@ -223,6 +223,15 @@ The draft changed after the spikes and the [threat model](../../security/threat-
 
 The maintainer reviewed the specification and approved RFC-0001, and agreed to settle each open question of section 12 when the work that needs it starts. While the project has a single maintainer, acceptance also needs an external reviewer, after a review of at least two weeks from the day the RFC is announced ([GOVERNANCE.md](../../../GOVERNANCE.md)). Then the RFC is accepted and `contracts/v0.1.0` is tagged. Only P1-07 needs the accepted contracts; the other Phase 1 plans can start before.
 
+### 2026-10-02 and 2026-10-09: changes from P1-01 and P1-02
+
+Two plans changed the specification as they built on it, and recorded the changes in their own progress notes. The review of RFC-0001 found them missing here, so this entry, written on 2026-10-23, lists them. That review covered them like the rest:
+
+| Change | Source | Where |
+| --- | --- | --- |
+| A message's size is that of its encoding in the call, once decompressed. The core refuses a larger request with `RESOURCE_EXHAUSTED` and never sends a larger message, and a message over the limits is never retried as it is | P1-01, step 6 ([progress notes](../phase-1/P1-01-core-platform-skeleton.md#progress-notes), 2026-10-02) | Sections 4.6 and 4.8 |
+| The core's events carry the ID of the request that made the change, in the extension attribute `wtrequestid` | P1-02, step 1 ([progress notes](../phase-1/P1-02-audit-log.md#progress-notes), 2026-10-09) | Section 8.2; `cloudevent.schema.json` |
+
 ### 2026-10-19: RFC-0002 joins the contracts before the tag
 
 The maintainer brought the MCP servers, tools and models of agents into the MVP (decision of 2026-10-13), and [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) proposes the contract changes. Its follow-up added step 12: RFC-0002 lands in `v1alpha1` before the tag, and the tag waits for it. With it, P1-06, P1-09 and P1-16 also build on the contracts: their parts that need RFC-0002 wait for step 12.
@@ -310,7 +319,7 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 4. Decision profile and policies | Points 2, 15, 17, 19, 24, 31, 32 and 37 | Done |
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Done |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Done |
-| 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Not started |
+| 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Done |
 | Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | Not started |
 | Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Not started |
 
@@ -477,3 +486,25 @@ P1-07.2 adds to the kit what the scenarios need:
 | The fake core checks sources as the core does, holds a `Publish` response, and fails a call with `RESOURCE_EXHAUSTED` or `UNAVAILABLE` | S-10 |
 | The driver protocol gains endpoints that replace the module's evidence buffer and that stop the module, and the driver survives the end of the module's process | S-05, S-07, S-10 |
 | The kit makes the fake core unreachable while the module restarts | S-10 |
+
+### 2026-10-23: corrections, part 6: conformance, runtime control, and the rest
+
+The last part of the corrections follows the maintainer's decisions on points 33, 34 and 38 of the review, and applies its editorial corrections:
+
+| Point | Change | Where |
+| --- | --- | --- |
+| 33 | `v1alpha1` specifies runtime control as the network quarantine of Kubernetes workloads, and other platforms and layers come through an RFC. A layer leaves the core reachable from the workloads it isolates (RC-7), and blocks DNS by default; an enforcement point reuses the core's last resolved addresses when resolution fails. The rule of DNS leaves section 12. The quarantine events name their mechanism with an open value, rather than a closed list of CNIs | Sections 2, 3.1, 5.7, 5.8 and 12; S-29 |
+| 34 | One rule times every timed scenario: the kit's own clock, from when the fake core sends, with 1 second for transport and polling. S-04 and S-17 expect `gate.lease_expired` by the TTL plus 1 second; S-05 expects the gate's acknowledgement within 1 second, the maintainer's choice, and honest outcomes for the later layers; S-12 says what it checks of the backoff | Section 9.2, S-04, S-05, S-12 and S-17; RFC-0002's S-20 |
+| 38 | RFC-0001 says that the specification changed after its approval, and where each change is listed; its main choices add the rule that a halt applies wherever the instance runs and the environment that registration returns; its related items add ADR-0010, KIL-01, KIL-02 and NFR-20; its implementation plan adds P1-05; and the question on tool arguments points to RFC-0002. The specification's related items add ADR-0010, and appendix B KIL-02. The entry of 2026-10-02 and 2026-10-09 above lists the changes these notes lacked. ADR-0004 is not edited: RFC-0001's section on compatibility says which of its clauses section 10 replaces | RFC-0001; the specification's header, section 12 and appendix B |
+
+The editorial corrections: the contracts have seven parts, not six; RC-4 and S-15 count the workloads isolated, the word of section 5.5, and so do the domain model and P1-08; section 6.2 names `attributes.owner_id`; EP-2 cites the bounded evaluation time; CORE-3 lists the versions in its error for people, while instances learn them from `GetServerInfo`; `dataschema` and section 12 follow the decision of 2026-09-30 on question Q6, as `api/events/README.md` does; and section 7.2 states the JWS signing input. CORE-4 needed no correction of its own, since point 26 rewrote it.
+
+What follows is for the coding agents ([AGENTS.md](../../../AGENTS.md), work queue), in one part:
+
+- **Runtime control.** In the quarantine events, `cni` becomes `mechanism`, an open string with a pattern, whose four known values the schema documents; `cluster` stays required. Their examples change, and the golden file of indexed examples is regenerated.
+- **The kit's skeleton** follows I-7, as P1-07.2 would have done: the fake core returns `ENVIRONMENT_PRODUCTION` at registration; the stub takes the environment from its registration, and treats an unspecified or unknown one as refused; `WT_CONFORMANCE_ENVIRONMENT` leaves the driver protocol; and `/v1/decide`, with the comments of `kit.DecideRequest` and `stubep.Decide`, says the subject comes from the state and the registration. The driver protocol gains `WT_CONFORMANCE_EVIDENCE_CAPACITY`, with which the harness gives the module a small buffer for S-11; a module that cannot take it reports S-11 as not run. The runs of S-25 with each environment stay with P1-07.2.
+- **Examples and vectors.** The examples of `decision.made` and `action.executed` get different span IDs, since they record two different calls, and C-15's description says that the environment that registration returns decides.
+
+Two corrections wait for the pull request that accepts RFC-0001, since the coding parts regenerate the vectors and change the examples first: appendix A's bundle references (the valid bundle's hash and size, 4344 bytes today rather than the 4241 of `tampered-policy`) and ep-python's manifest hash, and the counts of vectors in section 9.1 and in RFC-0001.
+
+P1-07.2 adds to the kit what S-29 needs: the driver protocol's endpoints for runtime-control modules also say whether an isolated workload reaches the core's machine listener and token endpoint, as the platform shows it.
