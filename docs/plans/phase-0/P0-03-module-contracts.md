@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: the corrections from the review of RFC-0001 and its acceptance, then, once RFC-0002 is accepted, step 12 remain (see [progress notes](#progress-notes)) |
+| **Status** | In progress: RFC-0001 is accepted provisionally (2026-10-23). Its changes to `api/`, then, once RFC-0002 is accepted, step 12 and the tag remain (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
@@ -320,8 +320,8 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Done |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Done |
 | 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Done |
-| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | Not started |
-| Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Not started |
+| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | Queued: AGENTS.md, rows 2 to 11 |
+| Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Done |
 
 RFC-0002's review follows, the same way.
 
@@ -508,3 +508,14 @@ What follows is for the coding agents ([AGENTS.md](../../../AGENTS.md), work que
 Two corrections wait for the pull request that accepts RFC-0001, since the coding parts regenerate the vectors and change the examples first: appendix A's bundle references (the valid bundle's hash and size, 4344 bytes today rather than the 4241 of `tampered-policy`) and ep-python's manifest hash, and the counts of vectors in section 9.1 and in RFC-0001.
 
 P1-07.2 adds to the kit what S-29 needs: the driver protocol's endpoints for runtime-control modules also say whether an isolated workload reaches the core's machine listener and token endpoint, as the platform shows it.
+
+### 2026-10-23: RFC-0001 accepted provisionally
+
+With the six parts of corrections merged, the maintainer accepted RFC-0001 provisionally on 2026-10-23 ([GOVERNANCE.md](../../../GOVERNANCE.md#rfc-process)), and decided two more things:
+
+- **Accepted now** (decision 1, option A). The accepted text is the specification at commit `a284a2d`. The changes to `api/`, the vectors, the conformance kit and the core follow in their own pull requests, as GOVERNANCE.md's rule 6 says, and land before `contracts/v0.1.0` is tagged. RFC-0001's status had said it would wait for them.
+- **Those parts first** (decision 2, option A). They depend on no feature plan, and the tag and step 12 wait for them, so they move up in AGENTS.md's work queue, to rows 2 to 11, right after the version mechanism of the halt path.
+
+RFC-0001 now holds the record of its review: each point, its decision and the part that applied it, and that the maintainer alone reviewed it. Step 11 is done. What is left of the review is small: once the coding agents have regenerated the vectors, a pull request of the reviewer's updates appendix A (the valid bundle's hash and size, and ep-python's manifest hash) and the counts of vectors in section 9.1 and in RFC-0001.
+
+RFC-0002's provisional review follows, the same way. The tag waits for step 12 and for the parts above.
