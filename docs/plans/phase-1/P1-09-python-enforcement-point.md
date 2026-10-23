@@ -42,7 +42,7 @@ Spike S1 tested Microsoft AGT as the foundation of this plan and recommended aga
 - Python 3.11 or later; CI tests the three latest minor versions.
 - `cedarpy` is pinned to a version whose Cedar language matches what the core's validator accepts (P1-06). The supported framework versions are pinned in the test matrix. A weekly CI job tests against the latest releases of `cedarpy` and of each supported framework, to catch breaking changes early.
 - The test matrix also pins the MCP Python SDK, the frameworks' MCP adapters and the provider SDKs, and the weekly job covers them.
-- References and definition hashes need RFC 8785 canonical JSON: either a new dependency, with its justification (for example `rfc8785`, Apache-2.0), or a small implementation checked against the vectors.
+- References need RFC 8785 canonical JSON, and definition hashes RFC-0002's extension of it, which writes integers exactly whatever their size (RFC-0002, section 3). A library that follows RFC 8785 strictly refuses integers beyond 2^53, so the hashes need a small implementation checked against the vectors; references may use it too, or a new dependency with its justification.
 - The module manifest from P0-03, which declares `tool.expose` among its intervention points (RFC-0002), shipped as JSON, which the contracts recommend.
 - The release embeds its manifest's hash, computed with the reference tool from the manifest it ships, never taken from its configuration (contracts, section 3.2).
 
@@ -148,15 +148,16 @@ A small generic API (a decorator and a context manager) covers custom agents and
 
 Steps 9 to 12 are the enforcement point's side of RFC-0002, which the hooks of step 8 feed in each framework. The enforcement point finds the tools bound to the agent, the MCP servers it launches or connects to with the tools they list, the models it calls, and the tools its model requests ask the provider to run.
 
-- **References**, exactly as RFC-0002, section 3, says: normalized URLs; `connector:<provider>/<connector ID>`; `stdio:` followed by the RFC 8785 canonical JSON of the array of the command and its arguments, after redaction. A tool or a model is written as the RFC 8785 canonical JSON of an object of its parts: `name` and `server` for an MCP tool, `name` for the agent's own tool, `provider` and `type` for a built-in tool, and `endpoint`, `name` and `provider` for a model, without `endpoint` for the provider's public endpoint.
-- **Hashes.** A tool's definition hash is the SHA-256 of the canonical JSON of the members that section 3 lists for its kind; built-in tools have no definition. The enforcement point also hashes what blocks name (step 10): the string form of each reference, the provider's name and the endpoint's base URL. All these hashes are computed when a tool list or a model changes, never on each call.
+- **References**, exactly as RFC-0002, section 3, says: URLs normalized as it says, with the host that `url_host` reads; `connector:<provider>/<connector ID>`; `stdio:` followed by the RFC 8785 canonical JSON of the array of the command and its arguments, after redaction, the deployment's rules included. A tool or a model is written as the RFC 8785 canonical JSON of an object of its parts: `name` and `server` for an MCP tool, `name` for the agent's own tool, `provider` and `type` for a built-in tool, and `endpoint`, `name` and `provider` for a model, whose endpoint is always there, the provider's default included.
+- **Hashes.** A tool's definition hash is the SHA-256 of the canonical JSON of the members that section 3 lists for its kind. For an MCP tool, they are read from the `tools/list` message itself, for example from the transport's messages before the SDK parses them, since the SDK's objects add defaults and drop members. Integers are written exactly, and a definition that section 3 leaves without a hash is reported without one. Built-in tools have no definition. The enforcement point also hashes what blocks name (step 10): the string form of each reference, the provider's name and the endpoint's base URL. All these hashes are computed when a tool list or a model changes, never on each call.
 - **Reports** go out before the gate first opens (SHOULD), and again when an MCP server connects or sends `notifications/tools/list_changed`, when a model is first called, and when a request declares a provider-run tool not reported yet. A report covers what the agent is configured with, not only what it called, and carries each tool's definition hash. The definitions the core does not have, which its response lists, follow through `ReportDefinitions`, at most 4 MiB per call. Reports are coalesced to the latest one, sent within the core's rate limit (one per instance and agent every 10 seconds), and retried with backoff. A report over the limits is not retried as it is, and the heartbeats report `HEALTH_DEGRADED`.
 - **Redaction (EP-14)**, before anything leaves the process:
   - no environment variables, headers or authorization values;
   - URLs lose their user information, query and fragment, including URLs passed as arguments;
-  - `<redacted>` replaces the value of an argument that follows a flag, or is joined to it as `--flag=value`, when the flag's name contains, in any case, `token`, `secret`, `password`, `passwd`, `key`, `auth`, `credential` or `cookie`.
+  - `<redacted>` replaces the value of an argument that follows a flag, or is joined to it as `--flag=value`, when the flag's name contains, in any case, `token`, `secret`, `password`, `passwd`, `key`, `auth`, `credential` or `cookie`;
+  - the deployment's redaction rules, from the active bundle's catalog file, replace the path segment that follows each of their URL prefixes, in URLs normalized as section 3 says, arguments included, and the values of the flags they name. Before the first bundle, the enforcement point reports without them, and the core applies them (CORE-11); references are computed again when a bundle brings other rules.
 
-**Done when:** the vectors of references, definition hashes and redaction pass, and so do S-18, S-24 and ST-77: canary secrets placed in URLs, in the command-line arguments that EP-14 redacts and in environment variables never appear in anything sent to the kit's fake core, nor in the enforcement point's logs. A secret in a positional argument is beyond EP-14; the guide says to pass secrets through the environment. The core's own redaction (CORE-11) is tested in P1-16.
+**Done when:** the vectors of references, definition hashes and redaction pass, and so do S-18, S-24 and ST-77: canary secrets placed in URLs, in the command-line arguments that EP-14 redacts and in environment variables never appear in anything sent to the kit's fake core, nor in the enforcement point's logs, and neither does one in a URL path segment that a redaction rule names, once a bundle has brought the rule. A secret in a positional argument, or in a URL path that no rule names, is beyond EP-14; the guide says to pass secrets through the environment. The core's own redaction (CORE-11) is tested in P1-16.
 
 ### 10. Catalog check and blocks (EP-15, EP-16; CAT-04, CAT-05)
 
@@ -169,9 +170,9 @@ Steps 9 to 12 are the enforcement point's side of RFC-0002, which the hooks of s
 
 ### 11. Exposure and provider-run tools (EP-17, EP-18; CAT-05, CAT-07)
 
-- **Exposure.** Before each model call, evaluate `tool.expose` for every tool the request offers, and remove the denied ones through the framework's middleware: in LangGraph 1.x agents, for example, LangChain's `wrap_model_call` middleware can replace the request's tools, and the second framework has its own equivalent. When a denied tool cannot be removed, deny the model call in every case: RFC-0002 requires it for provider-run tools and changed definitions, and recommends it otherwise.
-- **Reuse.** Exposure decisions are kept until the bundle, the agent's state, the blocks or the tool's definition change, and recomputed off the call path after each change. Only an evaluated decision is recorded (step 6).
-- **Provider-run tools.** Narrow each declared remote MCP server to the tools enabled for the agent, for example through the declaration's list of allowed tools, and deny the model call when the provider could call a tool that is not enabled (ST-82). Where the provider asks for approval of each call, decide it with `tool.invoke` and the call's arguments (CAT-07, EP-18). Record the provider-run calls a response reports as `action.executed` events with origin `provider`.
+- **Exposure.** Before each model call, evaluate `tool.expose` for every tool the request offers, with `calls_decided` (RFC-0002, section 7.3), and remove the denied ones through the framework's middleware: in LangGraph 1.x agents, for example, LangChain's `wrap_model_call` middleware can replace the request's tools, and the second framework has its own equivalent. When a denied tool cannot be removed, deny the model call in every case: RFC-0002 requires it for provider-run tools and changed definitions, and recommends it otherwise.
+- **Reuse.** Exposure decisions are kept until the bundle, the agent's state, the blocks, the tool's definition or whether its calls are decided change, and recomputed off the call path after each change. Only an evaluated decision is recorded (step 6).
+- **Provider-run tools.** Narrow each declared remote MCP server to the tools enabled for the agent, for example through the declaration's list of allowed tools, and deny the model call when the provider could call a tool that is not enabled (ST-82). Where the provider can submit each call for approval, have it do so for every provider-run tool that a usage rule of the bundle names, for example through the `require_approval` setting of an OpenAI `mcp` tool, and decide each submitted call with `tool.invoke` and its arguments (CAT-07, EP-18). `calls_decided` is true only for the provider-run tools whose calls are submitted. Record the provider-run calls a response reports as `action.executed` events with origin `provider`.
 - **Definitions seen in responses.** The provider lists a remote server's tools itself, so the enforcement point sees their definitions only in responses. When a response lists a provider-run MCP tool whose definition differs from the pinned one, deny its exposure from then on (`catalog.definition_changed`). The model may already have seen it in that response: a residual the threat model records (T-79, A-7).
 
 **Done when:** the exposure vectors, S-21, S-22 and ST-82 pass.
@@ -181,8 +182,8 @@ Steps 9 to 12 are the enforcement point's side of RFC-0002, which the hooks of s
 - Fill `context.args["<tool key>"]` with the declared arguments only (the catalog's `args`), named by their path (`options.base`), with the types the catalog declares.
 - Apply the transforms exactly:
   - `lowercase`: ASCII letters only;
-  - `path`: backslashes become slashes, then Go's `path.Clean` rules apply. Python's `posixpath.normpath` differs: it keeps a leading `//`, which Go cleans to `/`;
-  - `url_host` and `email_domain`: as the vectors say, not as the standard libraries' defaults.
+  - `path`, `url_host` and `email_domain`: as RFC-0002 section 7.5 defines them, never through the standard library's parsers. `posixpath.normpath` keeps a leading `//`, and `urllib.parse` reads some hosts otherwise than requests and Node do;
+  - hosts to A-labels as WHATWG converts them, without the STD3 rules: the `idna` package's `uts46_remap` with `std3_rules=False` and `transitional=False`, then Punycode, rather than `idna.encode`, which applies IDNA 2008 and refuses the underscores of names such as `my_service.internal`.
 - Arrays of strings or of integers become sets, transformed element by element. A value that does not fit its declared type, or that a transform cannot read, denies the call with `error.invalid_request`. A missing argument is left out, so usage rules apply `if_absent`. Values never reach evidence.
 
 **Done when:** the argument vectors pass with `cedarpy` (ST-79), and so does S-23. P1-16 runs the same vectors on `cedar-go`.
@@ -219,7 +220,7 @@ These numbers are evidence for the Phase 1 gate.
 
 - A wheel built in CI, signed with Sigstore, with an SBOM, published as `whitetower-ep`.
 - An installation guide, the compatibility matrix and a troubleshooting section.
-- The guide says what each integration discovers and can narrow, what redaction misses (secrets in positional arguments), and what each `catalog.*` reason means.
+- The guide says what each integration discovers and can narrow, what redaction misses (secrets in positional arguments, and in URL paths that no redaction rule names), and what each `catalog.*` reason means.
 
 **Done when:** a pilot engineer can instrument a new agent from the guide alone.
 
@@ -242,11 +243,11 @@ These numbers are evidence for the Phase 1 gate.
 | Mixing threads and `asyncio` in agent processes | The watch loop is isolated in its own thread; tests in both kinds of agents |
 | A framework hides its MCP connections, or the tools its model requests declare, from the hooks | The generic API lets the agent declare them; what the enforcement point cannot resolve is unknown, and denied |
 | A framework or provider does not let the enforcement point change a request's tools | Deny the model call; the compatibility matrix says which integrations can narrow |
-| Python and the core's Go compute different definition hashes (number formatting, Unicode, key order) | Definition-hash vectors run on both stacks; a tested RFC 8785 implementation |
+| Python and the core's Go compute different definition hashes (integers beyond 2^53, `null` members, the SDK's objects instead of the wire form, Unicode, key order) | RFC-0002's canonical JSON, with integers written exactly; definition-hash vectors run on both stacks |
 | A framework or Pydantic upgrade changes the generated parameter schemas, so every function tool is denied as `catalog.definition_changed` | Pinned versions; the weekly job flags the change; the compatibility matrix records it |
 | Local servers launched through paths or versions that change on each start produce new references, and flood the catalog | Documented stable launch commands; the limits of reports and the bound on each agent's entries waiting for review (DC-10), beyond which new references are left out and denied, so the problem shows at once |
-| Parsers differ (T-78): `https://good.com\@evil.com/` has the host `evil.com` for Python's `urlsplit`, and is an error for Go's `net/url` | Transforms implemented to the vectors, not to the standard libraries' defaults |
-| Secrets in positional arguments escape EP-14 | The core redacts again (CORE-11); the guide says to pass secrets in the environment, which is never reported |
+| Parsers differ (T-78): Python's own read `http://evil.com\@good.com/` as two hosts, `good.com` for `urlsplit`, httpx and yarl, and `evil.com` for urllib3 and requests, while Go's `net/url` refuses it | `url_host` refuses what parsers read differently (RFC-0002, section 7.5); transforms implemented to the RFC and its vectors, not to the standard libraries' defaults |
+| Secrets in positional arguments, or in URL paths that no redaction rule names, escape EP-14 | The deployment's redaction rules; the core redacts again (CORE-11) and flags URL paths that look like they hold a secret (P1-16); the guide says to pass secrets in the environment, which is never reported |
 
 ## Notes for implementers
 

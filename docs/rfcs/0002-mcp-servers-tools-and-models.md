@@ -70,11 +70,22 @@ The maintainer decided on 2026-10-13:
 
 | Entry | Reference |
 | --- | --- |
-| Remote MCP server, called by the agent or by its model provider | The server's URL without user information, query or fragment, with the scheme and host in lowercase, the default port left out, and an empty path written as `/` |
+| Remote MCP server, called by the agent or by its model provider | The server's URL, normalized as below, after the redaction of EP-14 |
 | MCP server hosted by the model provider and named by an ID rather than a URL | `connector:<provider>/<connector ID>` |
 | Local MCP server | `stdio:` followed by the RFC 8785 canonical JSON of the array of its command and arguments, as configured, after the redaction of EP-14 |
 | Tool | Its server's reference and the tool's name. A function, `http` or `other` tool: its name alone. A built-in tool: the provider and the tool's type |
-| Model | The provider, a value of the contracts' table of model providers (section 6.3), such as `openai`, `anthropic` or `ollama`, the base URL of the endpoint, normalized like a remote server's and absent for the provider's public endpoint, and the model's name as requested |
+| Model | The provider, a value of the contracts' table of model providers (section 6.3), such as `openai`, `anthropic` or `ollama`; the base URL of the endpoint the agent calls, normalized as below, even when it is the provider's default; and the model's name as requested |
+
+**Normalized URLs.** A remote server's URL and a model's endpoint are normalized as follows, so that two enforcement points that read one URL write one reference:
+
+1. The URL is read as the `url_host` transform reads it (section 7.5), which also gives its host, and its scheme is `http` or `https`. A URL that this cannot read, or with a backslash in its path, makes no reference: the server or the model is not reported, and its calls are `catalog.unknown`.
+2. User information, query and fragment are removed.
+3. The scheme is written in lowercase, the host as `url_host` gives it, and the port only when it is not the scheme's default (80 for `http`, 443 for `https`).
+4. In the path, a character that RFC 3986 does not allow there is percent-encoded as UTF-8. Percent-encoding is then normalized as RFC 3986 says in section 6.2.2 (hexadecimal digits in uppercase, unreserved characters decoded), and dot segments are removed as its section 5.2.4 says. An empty path is written `/`; any other trailing slash stays as written.
+
+For example, `HTTPS://API.Example.COM:443/mcp/./tools/../%7euser/` becomes `https://api.example.com/mcp/~user/`.
+
+**What a reference covers.** A reference names what an enforcement point can report without secrets. It leaves out a URL's user information, query and fragment, the values that redaction replaces (EP-14), and a local server's environment variables. Configurations that differ only in those share one reference, and one approval covers them all: a server that takes its roots or its database from environment variables, or a remote server whose query names a tenant, is one entry whatever they hold.
 
 **String form.** A server's reference is a string. A reference with several parts is written as the RFC 8785 canonical JSON of an object of those parts:
 
@@ -83,7 +94,7 @@ The maintainer decided on 2026-10-13:
 | MCP tool | `{"name":"create_issue","server":"https://api.githubcopilot.com/mcp/"}` |
 | The agent's own tool | `{"name":"send_email"}` |
 | Built-in tool | `{"provider":"openai","type":"web_search"}` |
-| Model | `{"endpoint":"http://gpu-01.internal:11434/","name":"llama3.1:8b","provider":"ollama"}`, without `endpoint` for the provider's public endpoint |
+| Model | `{"endpoint":"http://gpu-01.internal:11434/","name":"llama3.1:8b","provider":"ollama"}`, and for a model of a provider's default endpoint, `{"endpoint":"https://api.openai.com/v1","name":"gpt-4o","provider":"openai"}` |
 
 The vectors use these forms, and blocks name their SHA-256 (section 6).
 
@@ -91,12 +102,14 @@ The vectors use these forms, and blocks name their SHA-256 (section 6).
 
 - **Servers:** a slug of lowercase letters, digits and hyphens, at most 63 characters, derived from the name the server announces or from its host.
 - **Tools:** `<server key>/<tool name>`. Two server keys are reserved: `agent`, for the agent's own tools, and `provider.<provider>`, for a provider's built-in tools.
-- **Models:** a slug of their provider or endpoint, a slash, and a slug of their name, which keeps its dots (`gpu-01/llama3.1-8b`).
+- **Models:** a slug of their provider or endpoint, a slash, and a slug of their name, which keeps its dots (`gpu-01/llama3.1-8b`). For an endpoint that the core knows as its provider's default, the slug is the provider's (`openai/gpt-4o`): a table of the core's own, which shapes only the key, never the reference.
 
-**Definitions.** A definition hash is the lowercase hexadecimal SHA-256 of the RFC 8785 canonical JSON of the following, leaving out absent members:
+**Definitions.** A definition hash is the lowercase hexadecimal SHA-256 of the canonical JSON of the following members, leaving out those that are absent or `null`:
 
-- **MCP tool:** the members `name`, `title`, `description`, `inputSchema`, `outputSchema` and `annotations`, as the server lists the tool.
+- **MCP tool:** the members `name`, `title`, `description`, `inputSchema`, `outputSchema` and `annotations` of the tool, as the `tools/list` result carries them in the JSON-RPC message itself. SDKs turn tools into objects that add defaults or drop members, so their objects are not the input.
 - **Function, `http` or `other` tool:** its name and the JSON Schema of its parameters, as the framework presents them to the model. Their descriptions belong to the agent's own code, which its owner controls ([threat model](../security/threat-model.md), A-6).
+
+The canonical JSON is RFC 8785's, with one extension. RFC 8785 covers I-JSON, whose integers stop at 2^53 - 1 (contracts, section 1), and tool schemas often hold larger ones, such as 18446744073709551615, the bound of an unsigned 64-bit field. A library that rounds it, as `gowebpki/jcs` does (it writes 18446744073709552000), gives a hash that the other stack does not compute, and two schemas that differ only in such a number hash alike; one that refuses it makes the tool unusable. So **a number written without a fraction or an exponent is written as its exact value in decimal**, with `-0` as `0`: within ±(2^53 - 1), this is what RFC 8785 writes. Any other number is written as RFC 8785 says. A number that is not finite as a double, a member name that repeats, or a string with a lone surrogate leaves the definition without a hash. A tool without a hash is reported without one and can never be approved, so its calls are denied (`catalog.not_approved`, or `catalog.definition_changed` once another definition is pinned).
 
 A built-in tool has no definition. The provider versions it in its type, which is part of its reference, and what a declaration configures belongs to the agent's code (A-6).
 
@@ -113,12 +126,12 @@ A new method of the registry service, idempotent. Only an instance of a module t
 | `instance_id` | The reporting instance |
 | `agent_id` | The agent the tooling belongs to, in the instance's scope |
 | `servers` | Each MCP server: reference, transport (`stdio` or `http`), origin, the name and version it announces, and a display form (its URL or command line, redacted) |
-| `tools` | Each tool: kind, origin, its server (MCP tools, named by the server's position in `servers`) or its provider and type (built-in tools), its name and, except for built-in tools, its definition hash |
+| `tools` | Each tool: kind, origin, its server (MCP tools, named by the server's position in `servers`) or its provider and type (built-in tools), its name and, except for built-in tools, its definition hash, when its definition has one (section 3) |
 | `models` | Each model: provider, endpoint, name and, when the runtime reports one, digest |
 
 A report is complete: it replaces the instance's previous report for that agent. Its response lists the definition hashes the core does not have.
 
-**`RegistryService.ReportDefinitions`**, also idempotent and called by the same instances, sends those definitions: for each, the members that section 3 hashes, as the server or the framework presents them, within the contracts' message limit (section 4.8). The core recomputes each hash and stores the definition under it; a definition whose hash matches none that the agent's reports name is refused. Definitions are content-addressed, so each is sent once, whatever the number of agents, instances and restarts. They travel apart from reports because a report carrying every description and schema could exceed the message limit many times over.
+**`RegistryService.ReportDefinitions`**, also idempotent and called by the same instances, sends those definitions: for each, the members that section 3 hashes, taken as section 3 says, within the contracts' message limit (section 4.8). The core recomputes each hash and stores the definition under it; a definition whose hash matches none that the agent's reports name is refused. Definitions are content-addressed, so each is sent once, whatever the number of agents, instances and restarts. They travel apart from reports because a report carrying every description and schema could exceed the message limit many times over.
 
 - **EP-13. Report tooling.** Report the agent's tooling as soon as it is known; the first report SHOULD come before the gate first opens. Report again whenever it changes, for example when:
   - an MCP server connects, or announces a changed tool list (`notifications/tools/list_changed`);
@@ -128,10 +141,12 @@ A report is complete: it replaces the instance's previous report for that agent.
   Report what the agent is configured with, not only what it has called. Then send the definitions the core asks for.
 - **EP-14. Redact.** Never report environment variables, HTTP headers, authorization values or any other credential. Remove user information, query and fragment from URLs, including URLs passed as command-line arguments. Replace with `<redacted>` the value of any command-line argument that follows a flag, or is written `--flag=value`, when the flag's name contains, in any case, `token`, `secret`, `password`, `passwd`, `key`, `auth`, `credential` or `cookie`.
 
+  Apply also the deployment's redaction rules, which the catalog file carries (section 5). In a URL that, normalized as section 3 says, starts with one of their prefixes, replace the path segment that follows the prefix with `<redacted>`, and write the URL normalized, also where it is a command-line argument. Treat the flags they name, each matched exactly without its leading dashes, like those above. Apply them to everything reported and to the references computed, so that references match the catalog's. Until a bundle is active, an instance has no rules and reports without them: the core applies them (CORE-11).
+
 #### 4.2 What the core does
 
 - **CORE-10.** The core MUST treat reports as observations. A report MUST NOT approve, enable or unblock anything, and MUST NOT change an approved definition.
-- **CORE-11.** The core MUST apply the redaction of EP-14 again before storing a report, and MUST NOT copy reported descriptions, schemas or references into audit events, which name references only by their SHA-256 (section 9).
+- **CORE-11.** The core MUST apply the redaction of EP-14, with the deployment's redaction rules, again before it stores or logs anything from a report, and MUST NOT copy reported descriptions, schemas or references into audit events, which name references only by their SHA-256 (section 9). When an administrator adds a rule, the core applies it to the references the catalog already holds (P1-16).
 - **CORE-13.** The core MUST bound, for each agent, what the agent's reports brought that still waits for review: new entries of each kind, and new definitions and digests of known entries. Beyond the bound, it still records the report but leaves out what is new, and says how much in its response. A new entry left out stays unknown (`catalog.unknown`); a new definition or digest left out is not stored, so the tool or the model stays denied (`catalog.definition_changed`, `catalog.digest_mismatch`). Both last until reviewers approve or decline enough of what the agent brought. The bound is one report's worth by default (256 servers, 4,096 tools and 256 models, and as many new definitions as tools), and administrators can change it. A compromised agent therefore cannot make the catalog, or the reviewers' queue, grow faster than people decide.
 - **New entries.** A reference the catalog does not have becomes a `discovered` entry; the agent's own tools become entries of that agent. When a tool's reported definition differs from the approved one, the approved definition stays pinned and the new one waits for review. A model's new digest is handled the same way: the pinned digest stays, and the new one waits for review.
 - **Observations.** For each agent, the core keeps the entries observed and when each was last seen. The console can then show tooling waiting for a decision, and enabled tooling the agent no longer has.
@@ -143,11 +158,12 @@ A report is complete: it replaces the instance's previous report for that agent.
 
 ### 5. The catalog in the bundle
 
-Each agent's bundle carries a catalog file, `catalog.json`, listed in the bundle manifest like the Cedar schema (`catalog`, with its path and SHA-256). It is activated with the policies, atomically, and holds the entries enabled for the agent and those observed for it:
+Each agent's bundle carries a catalog file, `catalog.json`, listed in the bundle manifest like the Cedar schema (`catalog`, with its path and SHA-256). It is activated with the policies, atomically, and holds the entries enabled for the agent and those observed for it, and the deployment's redaction rules:
 
 ```json
 {
   "format": "whitetower.catalog.v1",
+  "redaction": { "url_prefixes": ["https://mcp.example.net/s/"], "flags": ["pat"] },
   "servers": [
     { "key": "github", "reference": "https://api.githubcopilot.com/mcp/", "transport": "http", "status": "approved" }
   ],
@@ -172,6 +188,8 @@ Each agent's bundle carries a catalog file, `catalog.json`, listed in the bundle
 - **Pinned values.** `definition` and `digest` are pinned when the entry, or its new definition or digest, is approved.
 - **Classification.** `read_only`, `destructive` and `open_world` are set by the reviewer. They start from the tool's MCP annotations, or, when those are absent, from the protocol's conservative defaults: not read-only, destructive, open world. Annotations are hints from the server; the catalog's values have been reviewed.
 - **Arguments.** `args` lists the tool's arguments that policies may see (section 7.5).
+- **Redaction rules.** `redaction` carries the deployment's redaction rules (EP-14): URL prefixes, after each of which the next path segment is a secret, and flag names whose values are secrets, beyond those EP-14 lists. Some services put an account's secret in a URL's path, as Zapier's MCP server does. The rules are a setting of the platform administrator (P1-16, through the API of P1-17), and a change rebuilds every bundle.
+- **Size.** The core keeps every bundle within the limit of step V1 (2 MiB). The entries enabled for the agent come first: a request to enable an entry that would take the agent's bundle over the limit is refused, with that reason. Entries observed but not enabled are listed while they fit, those seen most recently first; one left out is denied as `catalog.unknown`, the decision it would get anyway, with a less precise reason. A tool takes a few hundred bytes of the file: an agent with 300 tools has a file of about 130 KiB, while one at the limits of a report (section 4.2) would need from about 1.8 MiB, with short references, to 4.5 MiB. When the enabled entries and the policies alone do not fit, the core publishes no bundle: the agent keeps the one it has, and the console says why (P1-06).
 - **Every bundle carries one,** empty when nothing is observed or enabled for the agent. An enforcement point that supports catalogs treats a bundle without one as an empty catalog: every tool and model action is then `catalog.unknown`.
 - **Format.** The decision profile gains a JSON Schema of the file, `whitetower.catalog.v1`.
 - **Verification.** Step V4 accepts the manifest's `catalog` field, step V5 requires its file, and step V7 parses it against its schema (`parse_error`). An enforcement point that does not support catalogs rejects such a bundle (`invalid_manifest`): it keeps its last valid bundle or, with none, stays closed, and it never activates a bundle built after this RFC (contracts, section 7.6).
@@ -238,7 +256,7 @@ With a catalog, a resource's ID is its key, and its properties come from the cat
 | Resource | Properties |
 | --- | --- |
 | `tool` | `kind`, `origin`, `name`, `read_only`, `destructive` and `open_world`; for MCP tools, also `server` (the server's key) and `transport`; for built-in tools, also `provider` |
-| `model` | `provider` and `name`; for self-hosted models, also `endpoint` |
+| `model` | `provider`, `name` and `endpoint` |
 
 In Cedar, an MCP tool's parent is its server, `WhiteTower::McpServer::"<key>"`, so that a policy can name a whole server: `resource in WhiteTower::McpServer::"github"`. The context of `model.invoke` gains `digest`, when the runtime reports one.
 
@@ -250,12 +268,14 @@ This RFC adds a ninth action: a tool is offered to a model.
 | --- | --- | --- |
 | `tool.expose` | `tool` | MUST, for every provider-run tool, and for every tool of a model request where the framework lets the enforcement point change the request's tools |
 
-- **EP-17. Exposure.** Before each model call, evaluate `tool.expose` for every tool the request offers, and remove the denied ones from the request. When a denied tool cannot be removed:
+Its context carries `calls_decided`: true when every call of the tool will be decided as `tool.invoke` before it runs. That holds for the tools the agent runs, and for a provider-run tool only while the provider submits each of its calls to the agent for approval (section 7.4). A usage rule forbids exposing a tool whose calls are not decided (section 8), so that no rule is approved and then never applied.
+
+- **EP-17. Exposure.** Before each model call, evaluate `tool.expose` for every tool the request offers, with `calls_decided` set as above, and remove the denied ones from the request. When a denied tool cannot be removed:
   - deny the model call if the tool is provider-run, because the provider would call it without passing through the agent;
   - deny the model call if the denial is `catalog.definition_changed`;
   - otherwise, the enforcement point SHOULD deny the model call.
 
-  Exposure decisions MAY be reused until the bundle, the agent's state, the blocks or the tool's definition change, so a model call normally costs no evaluation. An exposure decision is recorded when it is evaluated; reusing it writes nothing. Policies on `tool.expose` therefore SHOULD NOT depend on the time.
+  Exposure decisions MAY be reused until the bundle, the agent's state, the blocks, the tool's definition or whether its calls are decided change, so a model call normally costs no evaluation. An exposure decision is recorded when it is evaluated; reusing it writes nothing. Policies on `tool.expose` therefore SHOULD NOT depend on the time.
 
 A changed, possibly poisoned, description never reaches the model. Where the framework allows it, neither does any tool the agent may not use.
 
@@ -266,7 +286,7 @@ The enforcement point sees a provider-run tool twice: declared in the model requ
 - **EP-18. Provider-run tools.**
   - Narrow each declared remote MCP server to the tools enabled for the agent, for example by setting the declaration's list of allowed tools.
   - Deny the model call when it would let the provider call a tool that is not enabled.
-  - Where the provider asks the agent to approve each call, evaluate `tool.invoke` with the call's arguments, and answer with the decision.
+  - Where the provider can submit each call of a provider-run tool to the agent for approval, have it do so for every such tool that a usage rule of the bundle names (the tools that the `@rule` annotations of its policies list, section 8), and MAY for the others. Evaluate `tool.invoke` for each submitted call, with its arguments, and answer with the decision.
   - Record the provider-run calls that a response reports as `action.executed` events with origin `provider`.
   - When a response lists a provider-run MCP tool whose definition differs from the pinned one, deny its exposure from then on (`catalog.definition_changed`).
 
@@ -284,9 +304,40 @@ This section answers RFC-0001's open question on tool arguments.
 | Transform | Value |
 | --- | --- |
 | `lowercase` | The string, with ASCII letters in lowercase |
-| `path` | The path with backslashes turned into slashes, then cleaned lexically as Go's `path.Clean` does: repeated slashes merged, `.` and `..` resolved |
-| `url_host` | The host of an absolute URL, in ASCII lowercase |
-| `email_domain` | What follows the last `@`, in ASCII lowercase |
+| `path` | The path, cleaned as below |
+| `url_host` | The host of a URL, read as below |
+| `email_domain` | The domain of an address, read as below |
+
+A value that a transform cannot read denies the call (EP-19). The three that read structure refuse what parsers read differently, since a tool reads its arguments with its own parser: a rule must see what the tool will do.
+
+**`path`** cleans a path lexically. Once backslashes are slashes, it gives what Go's `path.Clean` gives; Python's `posixpath.normpath` differs, keeping a leading `//`, so it would let `//etc/passwd` past a rule on `/etc/*`.
+
+1. A value with a control character (U+0000 to U+001F, U+007F) cannot be read: a server written in C stops at a NUL, and would open another file than the one the rule saw.
+2. Backslashes become slashes.
+3. The path is split at slashes. Empty segments and `.` are dropped. `..` removes the segment before it, is dropped at the root of an absolute path, and is kept at the start of a relative one.
+4. An absolute path is written with one leading slash, a relative one without. An empty result is `/` for an absolute path and `.` for a relative one. Drive letters and UNC names are ordinary segments: `C:\Windows\..` becomes `C:`.
+
+For example, `//srv/./data/../../etc/passwd` becomes `/etc/passwd`.
+
+**`url_host`** reads the host of a URL. Parsers disagree on some URLs: Python's `urllib.parse` reads `http://evil.com\@good.com/` as `good.com`, while requests and Node's WHATWG parser read `evil.com`.
+
+1. Leading and trailing spaces and C0 control characters (U+0000 to U+001F) are ignored, as WHATWG's and Python's parsers do. A control character (U+0000 to U+001F, U+007F) anywhere else cannot be read.
+2. The URL starts with a scheme and `//`, whatever the scheme. A value without them, such as `example.com`, cannot be read: tools complete it in different ways.
+3. The authority runs to the first `/`, `?` or `#`. A backslash or whitespace in it cannot be read.
+4. User information is ignored: the host follows the last `@` of the authority, as every parser reads it.
+5. A port, after the host, is 1 to 5 digits, and at most 65535.
+6. An IPv6 address, in brackets, is written as RFC 5952 says, in brackets. One with a zone ID cannot be read.
+7. Any other host that has a `%` cannot be read. The rest is converted to A-labels as WHATWG's "domain to ASCII" does without strictness: UTS #46, non-transitional, without the STD3 rules, so that underscores pass, and with joiners and Bidi checked. An A-label that does not decode cannot be read. The host is then in lowercase and loses one trailing dot; one with an empty label, or with any character but letters, digits, `.`, `-` and `_`, cannot be read.
+8. A host whose last label is then a number (decimal digits, or `0x` and hexadecimal digits) is an IPv4 address, and must be four decimal numbers from 0 to 255 without leading zeros: `0x7f.1`, `2130706433` and `127.1`, which parsers and resolvers take to 127.0.0.1, cannot be read.
+
+**`email_domain`** reads the domain of an address.
+
+1. Leading and trailing spaces are ignored. A control character cannot be read.
+2. The value is an address; `Display Name <address>`, with no quote, angle bracket, `@`, `,`, `;`, `:`, parenthesis, square bracket or backslash in the name; or `"Quoted Name" <address>`, with no quote or backslash between the quotes.
+3. The address has exactly one `@`, and its local part no whitespace, quote, parenthesis, angle bracket, square bracket, backslash, `,`, `;` or `:`. A `,` or `;` cannot be read: several addresses in one string, of which a rule would see only one.
+4. The domain is read as `url_host` reads a host, but neither an IPv6 address nor a domain literal (`[192.0.2.1]`) nor a domain whose last label is a number can be read.
+
+Legitimate values that these rules refuse are rare: a URL without a scheme, a quoted local part, a domain literal. A tool that takes several recipients in one string has those calls denied by any rule on `email_domain`; one that takes them as an array does not.
 
 - **Types** come from the tool's input schema: strings, integers and booleans, and arrays of strings or of integers, which become sets. A transform applies to each element of an array.
 - **EP-19. Arguments.** Fill only the declared arguments, and apply their transforms. A value that does not fit its declared type, or that a transform cannot read (a URL without a host, for example), denies the call with `error.invalid_request`. Values never reach evidence (contracts, section 8.3).
@@ -315,7 +366,7 @@ namespace WhiteTower {
   entity Model {
     provider?: String,
     name?: String,
-    endpoint?: String      // the normalized base URL, for self-hosted models
+    endpoint?: String      // the normalized base URL of the endpoint
   };
 
   // Generated for each bundle from the catalog's argument declarations.
@@ -329,14 +380,22 @@ namespace WhiteTower {
     digest?: String
   };
 
-  action "tool.expose" appliesTo { principal: Agent, resource: Tool, context: ToolContext };
+  type ExposeContext = {
+    time: datetime,
+    task_id?: String,
+    trace_id?: String,
+    on_behalf_of?: String,
+    calls_decided: Bool    // every call of the tool will be decided as tool.invoke
+  };
+
+  action "tool.expose" appliesTo { principal: Agent, resource: Tool, context: ExposeContext };
   action "model.invoke" appliesTo { principal: Agent, resource: Model, context: ModelContext };
 }
 ```
 
 ### 8. Usage rules
 
-A usage rule forbids a pattern of use of one or more tools. It replaces what skills would have taught, and is enforced on every call.
+A usage rule forbids a pattern of use of one or more tools. It replaces what skills would have taught, and is enforced on every call: a tool with a rule is offered to a model only when each of its calls will be decided (section 7.3).
 
 | Field | Meaning |
 | --- | --- |
@@ -362,7 +421,7 @@ Each condition has the following fields:
 | `matches`, `not_matches` | The string matches, or does not match, one of the patterns. Patterns are Cedar `like` patterns, where `*` matches any sequence of characters |
 | `less_than`, `greater_than` | The integer is smaller, or larger, than the value |
 
-A rule compiles to one Cedar `forbid` statement per tool, annotated with the rule's canonical JSON:
+A rule compiles to two Cedar `forbid` statements per tool, each annotated with the rule's canonical JSON: one forbids the calls that match the rule's conditions, and the other forbids offering the tool to a model while its calls are not decided (section 7.3):
 
 ```cedar
 @rule("{\"id\":\"no-push-to-main\",\"tools\":[\"github/push_files\"],\"when\":[{\"arg\":\"branch\",\"op\":\"in\",\"values\":[\"main\",\"master\"]}]}")
@@ -375,6 +434,15 @@ forbid (
   then ["main", "master"].contains(context.args["github/push_files"]["branch"])
   else true
 };
+
+@rule("{\"id\":\"no-push-to-main\",\"tools\":[\"github/push_files\"],\"when\":[{\"arg\":\"branch\",\"op\":\"in\",\"values\":[\"main\",\"master\"]}]}")
+forbid (
+  principal,
+  action == WhiteTower::Action::"tool.expose",
+  resource == WhiteTower::Tool::"github/push_files"
+) unless {
+  context.calls_decided
+};
 ```
 
 - **Ordinary policies.** Rules live in ordinary policies, global or agent-specific, and follow the same approval workflow: adding a rule needs the same approvals as any other policy text (unresolved question 2). The console edits them as forms. Each statement carries its rule in the annotation, so the policy text is the only source of truth.
@@ -383,7 +451,7 @@ forbid (
 - **Limits.**
   - Cedar's `like` is the only pattern language, so rules can use no regular expressions.
   - Rules are stateless: sequences of calls and counts per task are left to Phase 2.
-  - A path is cleaned lexically, so symbolic links on the server are not resolved.
+  - A path is cleaned lexically, so symbolic links on the server are not resolved. Path rules are therefore safe as allow-lists, `not_matches` on the directories a tool may use: a relative path or a symbolic link escapes a deny-list such as `matches "/etc/*"`.
 
 ### 9. Events
 
@@ -448,11 +516,11 @@ The Phase 2 MCP gateway will enforce it, as another enforcement point that uses 
 
 New vectors cover:
 
-- references, their string forms, and redaction;
-- definition hashes, which the Go and Python stacks must compute alike;
+- references, normalized URLs, their string forms, and redaction, with the deployment's rules;
+- definition hashes, which the Go and Python stacks must compute alike, with integers beyond 2^53, `null` members, repeated names and lone surrogates;
 - the catalog check and its order, blocks included;
-- transforms, missing arguments and types;
-- exposure;
+- transforms, with the values each one cannot read, missing arguments and types;
+- exposure, with calls decided and not decided;
 - bundles with a catalog file.
 
 The combination vectors that use a tool or a model gain a catalog, and their resource IDs become keys.
@@ -503,10 +571,10 @@ Threat model version 0.1.1 records these additions, together with actor TA-11 (a
 | --- | --- | --- | --- |
 | T-74 | S, T, D | An agent reports tooling it does not have, or hides tooling it has, to mislead reviewers or flood the catalog | Reports never authorize (CORE-10); limits, and a rate limit per instance and agent; a bound on each agent's entries waiting for review (CORE-13, DC-10); new entries are inert until reviewed. Hiding a tool gains nothing, because calls are resolved when they happen and an unknown tool is denied |
 | T-75 | T | Tool poisoning: a third-party server's description carries instructions for the model, or changes after approval | Reviewers see full definitions; approval pins their hash; a changed definition is denied and hidden from the model until approved (EP-16, EP-17) |
-| T-76 | T, I | Reported text attacks reviewers through script injection, misleading names, hidden characters, or secrets left in command lines | Shown as plain text, with hidden characters made visible, length limits and a strict Content Security Policy (NFR-12); escaped by the CLI; redacted by the enforcement point and again by the core (EP-14, CORE-11); marked as reported. A secret passed as a positional argument escapes EP-14's rules |
+| T-76 | T, I | Reported text attacks reviewers through script injection, misleading names, hidden characters, or secrets left in command lines | Shown as plain text, with hidden characters made visible, length limits and a strict Content Security Policy (NFR-12); escaped by the CLI; redacted by the enforcement point and again by the core, with the deployment's rules for secrets in URL paths (EP-14, CORE-11); marked as reported. A secret passed as a positional argument, or in a URL path that no rule names, escapes them |
 | T-77 | S | Another server answers at an approved reference: DNS hijack, or a hijacked or unpinned package launched by `npx` | References identify, they do not authenticate. The agent's MCP client checks TLS; pinned definitions reveal changed tools; the catalog flags local servers launched from unpinned packages. The supply chain of MCP servers stays with the agent's owner (A-6) |
-| T-78 | E | Usage rules are bypassed through how arguments are written: `..` segments, letter case, URL parser differences, missing arguments that the server fills in, unexpected types | Transforms with conformance vectors; missing arguments match by default; a value of the wrong type denies; no regular expressions. Documented limits: symbolic links, server-side defaults (R-15) |
-| T-79 | E, R | Provider-run tools act outside the agent's process | Exposure checked before every model call; declarations narrowed to enabled tools; each call decided where the provider asks for approval; global policies can forbid `origin == "provider"`; evidence from responses. What remains is the provider's own behavior (A-7), and a changed definition the model sees once before the enforcement point learns of it |
+| T-78 | E | Usage rules are bypassed through how arguments are written: `..` segments, letter case, URL parser differences, missing arguments that the server fills in, unexpected types | Transforms that refuse what parsers read differently, and control characters in paths, with conformance vectors; missing arguments match by default; a value of the wrong type denies; no regular expressions. Documented limits: symbolic links, relative paths against deny-lists, server-side defaults (R-15) |
+| T-79 | E, R | Provider-run tools act outside the agent's process | Exposure checked before every model call; declarations narrowed to enabled tools; each call decided where the provider submits it for approval, which the enforcement point asks for the tools that usage rules name; a tool with usage rules never exposed while its calls are not decided; global policies can forbid `origin == "provider"`; evidence from responses. What remains is the provider's own behavior (A-7), and a changed definition the model sees once before the enforcement point learns of it |
 | T-80 | D | Blocks or catalog changes slow halts, or flood enforcement points | Blocks travel in their own record, as hashes and deltas, with a cap of 500, and never rebuild bundles (DC-9); halts are measured with 500 blocks active; bundle rebuilds run in chunks (P1-06) |
 | T-81 | D, E | An insider disables tools or blocks servers to disrupt agents, or undoes a block alone | Only roles that can already halt or suspend; a reason is required; everything is audited. Enabling and unblocking need a second person (HUM-04) |
 | T-82 | E | The seeded `wt-catalog` permit applies without the catalog check: an enforcement point that predates catalogs, or a bundle without its catalog file | Every bundle carries a catalog file; the manifest's `catalog` field fails V4 where it is unknown, and V5 requires the file (section 5) |
@@ -521,12 +589,12 @@ Threat model version 0.1.1 records these additions, together with actor TA-11 (a
 | --- | --- | --- | --- | --- |
 | ST-75 | A tooling report never approves, enables or unblocks anything: new entries stay discovered, a changed definition or digest stays unapproved, and nothing becomes usable; beyond the bound on an agent's entries waiting for review, a report's new entries are left out and stay denied | T-74, DC-10 | integration | P1-16 |
 | ST-76 | A server changes a tool's description; the tool is denied and hidden until its new definition is approved | T-75 | e2e | P1-09 |
-| ST-77 | Canary secrets in MCP server URLs, in the command-line arguments that EP-14 redacts and in environment variables never reach the core, its logs or events | T-76 | integration | P1-09 |
+| ST-77 | Canary secrets in MCP server URLs, in a URL path segment that a redaction rule names, in the command-line arguments that EP-14 redacts and in environment variables never reach the core's storage, its logs or events | T-76 | integration | P1-09 |
 | ST-78 | Reported names and descriptions with markup and script render as text in the console, with invisible and bidirectional characters made visible | T-76 | e2e | P1-10 |
-| ST-79 | The argument vectors (traversal, case, missing arguments, wrong types) give the expected decisions | T-78 | unit | P1-09 |
+| ST-79 | The argument vectors (traversal, a leading double slash and control characters in paths, case, URL and address tricks, missing arguments, wrong types) give the expected decisions | T-78 | unit | P1-09 |
 | ST-80 | With 500 active blocks, a block reaches every mock enforcement point within NFR-24, and halts of one agent and of the fleet still meet NFR-03 | T-80, DC-9 | integration | P1-16 |
 | ST-81 | Nobody approves their own request to enable or to unblock | T-81 | integration | P1-16 |
-| ST-82 | A model request that offers a provider-run tool that is not enabled, and cannot be narrowed, is denied | T-79 | unit | P1-09 |
+| ST-82 | A model request that offers a provider-run tool that is not enabled, and cannot be narrowed, is denied; a provider-run tool that a usage rule names is not offered while its calls are not decided | T-79 | unit | P1-09 |
 | ST-83 | Reported text that `wtctl` prints is escaped: no control, bidirectional or invisible character reaches the terminal | T-76 | unit | P1-11 |
 
 ST-80 runs with the measurement harness of P1-08; whether a block denies before policies is the enforcement point's, checked by scenarios S-19 and S-20.
@@ -568,7 +636,7 @@ The maintainer answered these questions on 2026-10-21. Plan P1-16 records the an
 | Plan | Implements |
 | --- | --- |
 | P0-03, step 12 | The contract text, protobuf, schemas and vectors of this RFC, before `contracts/v0.1.0` is tagged |
-| P1-16 (new): MCP servers, tools and models | The catalog and its workflow, reports and definitions, enablement, declared tooling, blocks, the content of the catalog file and the argument declarations, the usage-rule form and compiler, the core event types of section 9, the API and the metrics |
+| P1-16 (new): MCP servers, tools and models | The catalog and its workflow, reports and definitions, enablement, declared tooling, blocks, the redaction rules, the content of the catalog file and the argument declarations, the usage-rule form and compiler, the core event types of section 9, the API and the metrics |
 | P1-06 | The catalog file and a Cedar schema in each bundle, the seeded `wt-catalog` policy, and the check of `@rule` statements at submission |
 | P1-07 | `ReportTooling`, `ReportDefinitions` and the blocks record in the module API, the mock module's catalog behavior, and the scenarios S-18 to S-24 |
 | P1-08 | The halt path's design, which blocks share; the harness that measures halts with blocks active |

@@ -519,3 +519,27 @@ With the six parts of corrections merged, the maintainer accepted RFC-0001 provi
 RFC-0001 now holds the record of its review: each point, its decision and the part that applied it, and that the maintainer alone reviewed it. Step 11 is done. What is left of the review is small: once the coding agents have regenerated the vectors, a pull request of the reviewer's updates appendix A (the valid bundle's hash and size, and ep-python's manifest hash) and the counts of vectors in section 9.1 and in RFC-0001.
 
 RFC-0002's provisional review follows, the same way. The tag waits for step 12 and for the parts above.
+
+### 2026-10-23: RFC-0002's provisional review, part 1
+
+The reviewer read RFC-0002 against the specification as RFC-0001's review left it, plan P1-16, the design of the halt path and the threat model, and found 21 points, 8 of them major, and 3 editorial notes. The maintainer decided the eight major points on 2026-10-23, and this part applies them to RFC-0002 and to the documents that follow from it:
+
+| Point | Decision | Where |
+| --- | --- | --- |
+| 1. A usage rule never applies to a provider-run tool whose calls the provider does not submit for approval | `tool.expose` gains `calls_decided`; the enforcement point asks for approvals for the tools that usage rules name; each rule compiles to a second statement, which forbids exposing the tool while its calls are not decided | RFC-0002, sections 7.3, 7.4, 7.6 and 8; CAT-07; T-79, ST-82; P1-06, P1-09, P1-16 step 6 |
+| 2. The `path` transform is defined by a Go library | An algorithm in the text: control characters cannot be read, and a leading `//` is merged, as Go does and Python's `normpath` does not; path rules are safe as allow-lists | RFC-0002, sections 7.5 and 8; T-78, R-15, ST-79; P1-09 |
+| 3. `url_host` and `email_domain` meet the differences between parsers | Rules that refuse what parsers read differently, narrowed after a check: of 42 legitimate URLs and 18 addresses, they refuse 2 and 4, and in 38 URL tricks and 15 address tricks no parser reaches another host than theirs | RFC-0002, section 7.5; T-78, R-15, ST-79; P1-09 |
+| 4. Secrets in URL paths escape EP-14, and what a reference covers is unstated | The deployment's redaction rules, a setting carried in every catalog file and applied by the enforcement point and the core; an approval covers every configuration that shares a reference | RFC-0002, sections 3, 4.1, 4.2 and 5; CAT-10; T-76, T-83, DC-11, ST-77; P1-09, P1-16 steps 2 and 4, P1-17, the domain model |
+| 5. A remote server's URL is normalized only in part | A full normalization, with the host that `url_host` reads | RFC-0002, section 3; P1-09 |
+| 6. "The provider's public endpoint" is undefined | A model's reference always carries its endpoint; the core's keys still read `openai/gpt-4o` | RFC-0002, sections 3 and 7.2; P1-09, P1-16 step 2 |
+| 7. Definition hashes over input that RFC 8785 does not cover | RFC 8785 with integers written exactly, `null` members left out, and the wire form of `tools/list` as the input | RFC-0002, sections 3 and 4.1; P1-09, P1-16 step 4, the domain model |
+| 8. A catalog file can be larger than a bundle may be | The core keeps each bundle within step V1: enabled entries first, observed ones while they fit, and an enabling that would not fit refused | RFC-0002, section 5; P1-06, P1-16 step 5 |
+
+The check of point 3 ran each URL through Python's `urllib.parse`, urllib3, requests, httpx and yarl, Node's WHATWG parser, Go's `net/url` and curl 8.12, and each address through Python's three address parsers. Python's own parsers disagree: `http://evil.com\@good.com/` is `good.com` for `urlsplit`, httpx and yarl, and `evil.com` for urllib3 and requests. The rules as first proposed refused 15 of the legitimate URLs and 9 of the addresses: spaces in a query, user information, other schemes, display names.
+
+Step 12 carries these decisions into the specification, the schemas and the vectors. The vectors take the check's cases, which the reviewer hands over with the specification text (pull request 1). Two notes for them (pull request 3):
+
+- Go's ready-made `idna.Lookup` profile refuses underscores. The Go stack converts hosts with `golang.org/x/net/idna` options close to WHATWG's (UTS #46 mapping, non-transitional, no STD3 rules, no hyphen checks, joiners and Bidi checked), which agreed with Node's `domainToASCII` on every valid host of the check. In Python, the `idna` package's `encode` applies IDNA 2008 and refuses underscores too, so the Python stack uses its `uts46_remap`, then Punycode.
+- `gowebpki/jcs` cannot compute definition hashes as it is: it writes 18446744073709551615 as 18446744073709552000.
+
+The 13 minor points and the editorial notes follow in later parts.

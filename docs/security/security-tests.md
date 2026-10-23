@@ -2,8 +2,8 @@
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1.3, with [threat model v0.1.4](threat-model.md) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings) and 2026-10-22 (the review of RFC-0001: ST-35, ST-38, ST-40, ST-49, ST-51 and ST-86) |
+| **Status** | Version 0.1.4, with [threat model v0.1.5](threat-model.md) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings), 2026-10-22 (the review of RFC-0001: ST-35, ST-38, ST-40, ST-49, ST-51 and ST-86) and 2026-10-23 (the review of RFC-0002: ST-77, ST-79 and ST-82) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 8 |
 
 Each test turns an abuse case of the threat model into a check that fails if the control it covers is missing. Each has one owner plan: its acceptance criteria require the test to pass, and it runs in CI from then on. Plan [P1-13](../plans/phase-1/P1-13-security-hardening-and-release.md) runs the whole catalog before the first release.
@@ -111,9 +111,9 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-52 | The enforcement point refuses to start with a private key file that other users can read | T-23 | unit |
 | ST-53 | The package is published with trusted publishing and attestations, and the installation guide pins exact versions and hashes | T-66 | review |
 | ST-76 | A server changes a tool's description: the tool is denied, and hidden from the model, until its new definition is approved | T-75 | e2e |
-| ST-77 | Canary secrets placed in MCP server URLs, in the command-line arguments that EP-14 redacts and in environment variables never reach the core, its logs or its events | T-76 | integration |
-| ST-79 | The argument vectors (path traversal, letter case, URL tricks, missing arguments, wrong types) give the decisions they expect | T-78 | unit |
-| ST-82 | A model request that offers a provider-run tool not enabled for the agent, and that cannot be narrowed, is denied | T-79 | unit |
+| ST-77 | Canary secrets placed in MCP server URLs, in a URL path segment that a redaction rule names, in the command-line arguments that EP-14 redacts and in environment variables never reach the core's storage, its logs or its events | T-76 | integration |
+| ST-79 | The argument vectors (path traversal, a leading double slash and control characters in paths, letter case, URL and address tricks, missing arguments, wrong types) give the decisions they expect | T-78 | unit |
+| ST-82 | A model request that offers a provider-run tool not enabled for the agent, and that cannot be narrowed, is denied; a provider-run tool that a usage rule names is not offered while its calls are not decided | T-79 | unit |
 
 ## P1-10: Web console
 
