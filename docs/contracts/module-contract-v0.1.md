@@ -74,7 +74,7 @@ A module has a set of approved manifests, typically one for each release it runs
 - **MAN-2.** The core MUST refuse the registration of an instance whose module is not approved, or whose `manifest_sha256` is not the hash of one of the module's approved manifests. The error carries only the hash presented; the console and `wtctl` show both.
 - **MAN-3.** A changed manifest is a new manifest of the module, which MUST be approved on its own before instances that run it can register; its registration leaves the approved ones in force. An operator retires a manifest explicitly, which ends the streams of the instances registered with it and refuses their calls, as MAN-4 does. Every manifest of a module keeps the same `metadata.name`, `spec.identity` and `spec.agents`.
 - **MAN-4.** Revoking a module MUST end its instances' streams and refuse their calls from then on.
-- **MAN-5.** The core MUST return, in `RegisterInstanceResponse`, the environment recorded for the credential the instance registered with. It MUST refuse, with `PERMISSION_DENIED`, the registration of an enforcement point whose credential has none, since every decision needs one (section 6.2).
+- **MAN-5.** The core MUST return, in `RegisterInstanceResponse`, the environment recorded for the credential the instance registered with. It MUST refuse, with `PERMISSION_DENIED`, the registration of an enforcement point whose credential has none, since every decision that evaluates policies needs one (section 6.2).
 - **MAN-6.** The core MUST refuse a manifest whose `spec.events.emits` lists a type that the catalog (section 8.5) does not have, that only the core emits, or whose emitters include none of the manifest's capabilities, and MUST check the same when it ingests an event. The catalog's emitters bind; adding an emitter to a type later is an additive change.
 
 ### 3.3 Permissions
@@ -132,7 +132,7 @@ An instance belongs to the principal whose token registered it. Its key is uniqu
 | `GovernanceService.Acknowledge` | Its agent | Their scope |
 | `PolicyService.GetBundle` | Its agent's bundles | Bundles of agents in their scope, with `policy.bundles.read` |
 | `PolicyService.GetBundleKeys` | Yes | With `policy.bundles.read` |
-| `EventService.Publish` | Types in `emits`, from a source under `/agents/<its agent>/ep/`, about its agent | Types in `emits`, from a source under `/modules/<module>/`, about agents in their scope |
+| `EventService.Publish` | Types in `emits`, from a source under `/agents/<its agent>/ep/`, about its agent | Types in `emits`, from a source under `/modules/<its module>/`, about agents in their scope |
 | `MetaService.GetServerInfo` | Yes | Yes |
 
 - **CORE-2.** The core MUST check these rules on every call, not only at registration. A failure of the call itself MUST refuse the whole call with `PERMISSION_DENIED`: the caller's identity or permission, a module not approved or revoked, an enforcement point's credential without an environment (MAN-5), a bundle of an agent outside the scope (`GetBundle`), or an instance that the caller's principal did not register (`Heartbeat`, `DeregisterInstance`, `Watch`, `Acknowledge` and `Publish`). A failure of one item decides that item only: an `Acknowledge` item about an agent outside the scope is not recorded and is counted, as one about an unknown halt is, and a `Publish` event outside these rules is rejected on its own, with its reason (section 8.4).
@@ -189,11 +189,13 @@ A stream that the core ends with `ABORTED`, because its instance opened another 
 - A `RESOURCE_EXHAUSTED` error MAY carry a `google.rpc.RetryInfo` detail. The instance waits at least the delay it gives before it retries that call, but for a session call never longer than the cap of I-4.
 - **CORE-15.** The core MUST NOT refuse an `Acknowledge` request that carries a halt acknowledgement because of a rate limit.
 - Unary calls SHOULD carry a deadline, 10 seconds RECOMMENDED.
-- Retrying is always safe: acknowledgements carry an `acknowledgement_id` chosen by the instance, and events are de-duplicated on their source and ID.
+- Retrying is always safe: acknowledgements carry an `acknowledgement_id` chosen by the instance, and events are de-duplicated on their source and ID for at least 28 days (section 8.4).
 
 ### 4.8 Limits
 
 A message's size is that of its encoding in the call, binary protobuf or JSON, once decompressed: a client that compresses its messages, or accepts compressed ones, gains no room. The core refuses a larger request with `RESOURCE_EXHAUSTED`, and never sends a larger message.
+
+Events travel as bytes, which JSON carries as base64: a JSON `Publish` holds about 3 MiB of events, 47 of 64 KiB, and a binary one about 4 MiB, 63 of them. An instance checks a batch's encoded size before it sends it, and splits a larger batch, whose events stay in its buffer (section 8.4).
 
 | Limit | `v1alpha1` |
 | --- | --- |
@@ -201,8 +203,8 @@ A message's size is that of its encoding in the call, binary protobuf or JSON, o
 | Compression of messages | `gzip`, or none |
 | Size of a `Watch` message | 1 MiB; the core splits larger snapshots into parts |
 | Acknowledgements per request | 100 |
-| Events per `Publish` | 500, and 4 MiB in total |
-| Size of one event | 64 KiB |
+| Events per `Publish` | 500, within the message limit |
+| Size of one event | 64 KiB, as its CloudEvent's JSON in UTF-8; an event over the limit is `REJECTED` on its own |
 | Size of a bundle | 2 MiB, at most 1,000 files |
 | Heartbeat interval | Set by the core, 30 seconds by default |
 | Lease TTL | 10 to 300 seconds, per agent |
@@ -217,15 +219,21 @@ A message's size is that of its encoding in the call, binary protobuf or JSON, o
 
 An **instance** is one process of a module, with its own leases, streams and evidence buffer, and, for an enforcement point, its own gate.
 
-- **I-5.** An instance MUST register before any other call, and SHOULD deregister when it stops on purpose. Before an enforcement point deregisters, it MUST close its gate for every agent it serves, and allow nothing afterwards.
+- **I-5.** An instance MUST register before any other call, and SHOULD deregister when it stops on purpose. Before an enforcement point deregisters, it MUST close its gate for every agent it serves, and allow nothing afterwards. Before an instance deregisters, or ends its own process, `terminate` included, it SHOULD deliver its evidence buffer, within a bound that fits its platform's grace period for termination.
 - **I-6.** An instance MUST send heartbeats at the interval the core sets, which every `RegisterInstanceResponse` and `HeartbeatResponse` carries. An instance that receives none, or one that is not positive, keeps the interval in force: 30 seconds before the first. A runtime-control instance reports as served agents those that have workloads it controls, and an enforcement point that serves several agents those in its scope for which it holds an active bundle. Served agents never authorize anything, and the core ignores those outside the scope.
-- **I-7.** An enforcement point MUST put in the subject of every decision the environment its registration returned (MAN-5, section 6.2). It MUST NOT take the environment from its configuration, nor from its access token, which RFC 9068 (section 6) forbids a client to inspect. It MUST treat a registration that returns no environment, or one it does not know, as refused, and allow nothing (EP-1, EP-10).
+- **I-7.** An enforcement point MUST put in the subject of every decision the environment its registration returned (MAN-5, section 6.2). It MUST NOT take the environment from its configuration, nor from its access token, which RFC 9068 (section 6) forbids a client to inspect. Until a registration of this process returns an environment, its decisions carry none, never one from an earlier process, its configuration or its token. It MUST treat a registration that returns no environment, or one it does not know, as refused, and allow nothing (EP-1, EP-10).
 - **I-8.** An instance's key MUST be unique to its process, and SHOULD stay the same across the process's restarts: a random ID, created with the evidence buffer and stored in it, is RECOMMENDED. A host or pod name is not enough, since several processes, or the same agent in two environments, may share it.
 - **CORE-4.** The core MUST show an instance as lost:
   - an instance of a module that watches the governance state (an enforcement point or a runtime-control module), with an agent in its scope, once it has held no stream for longer than the shortest lease TTL in its scope, whatever its heartbeats;
   - any other instance, once it has neither sent a heartbeat nor held a stream for three of the heartbeat intervals the core last set for it.
 
   It MUST count a lost instance in the status of the halts it had to acknowledge.
+
+**Health**, which each heartbeat reports, says whether the instance can do what the state asks:
+
+- `HEALTH_HEALTHY`: it can. A gate that the state closes, for a halt or a drill, a lifecycle state, or a state that names no bundle, leaves health as it is.
+- `HEALTH_DEGRADED`: enforcement works, but needs an operator: renewals arrive stale while the lease still holds, events are `REJECTED`, or the oldest undelivered event is older than a threshold (section 8.4).
+- `HEALTH_UNHEALTHY`: the instance cannot enforce what the state asks: the lease ran out while it was connected, the evidence buffer is full, a bundle the state names could not be activated and none is active, or a halt layer failed. An instance MUST report it while its gate is closed with `gate.evidence_full`.
 
 ## 5. Governance state, leases and halts
 
@@ -265,9 +273,9 @@ A halt applies wherever the instance runs. An instance applies every halt in an 
 ### 5.3 Leases
 
 - A renewal renews the lease of every agent in scope. Each lease then lasts that agent's `lease_ttl`, measured on the client's **monotonic clock** from the moment it received the renewal. A `lease_ttl` above 300 seconds counts as 300; one that is zero, negative or absent renews nothing; one under 10 seconds is applied as it is, never lengthened.
-- **Only a fresh renewal counts.** An instance ignores a renewal without `server_time`, or whose `server_time` is more than a tolerance before or after its own clock: 5 seconds by default, and at most 30 (section 4.8). Such a renewal renews nothing, and while an instance receives only those, it SHOULD report `HEALTH_DEGRADED` in its heartbeats. A renewal from the future counts as stale too, since an instance whose clock is behind the core's would otherwise accept renewals as old as the tolerance plus its lag. Something on the path that holds the stream back can then delay it by the tolerance at most: beyond that, leases run out and the gate closes, instead of halts arriving late ([threat model](../security/threat-model.md), T-32). The check relies on clocks synchronized within the tolerance (ASM-04), far tighter than token expiry needs; the lease itself is still measured on the monotonic clock.
+- **Only a fresh renewal counts.** An instance ignores a renewal without `server_time`, or whose `server_time` is more than a tolerance before or after its own clock: 5 seconds by default, and at most 30 (section 4.8). Such a renewal renews nothing. While an instance receives only those, it SHOULD report `HEALTH_DEGRADED` in its heartbeats while the lease holds, and `HEALTH_UNHEALTHY` once it runs out (section 4.9). A renewal from the future counts as stale too, since an instance whose clock is behind the core's would otherwise accept renewals as old as the tolerance plus its lag. Something on the path that holds the stream back can then delay it by the tolerance at most: beyond that, leases run out and the gate closes, instead of halts arriving late ([threat model](../security/threat-model.md), T-32). The check relies on clocks synchronized within the tolerance (ASM-04), far tighter than token expiry needs; the lease itself is still measured on the monotonic clock.
 - **A lease belongs to the instance,** not to a stream. The end of a stream, a reconnection, or a new registration with the same key neither renews a lease nor ends it: only a fresh renewal renews it, and only its TTL ends it. So an enforcement point that reconnects within its lease keeps deciding on the last state it applied. There is no lease before the first fresh renewal after the instance starts. An agent that enters the scope through a change gets its lease from the next renewal; the core SHOULD send one right after such a change.
-- **When a lease expires, the agent is treated as halted**: the enforcement point denies everything and applies the agent's halt mode (KIL-04), and emits `whitetower.lease.expired.v1`, one event per agent, with that agent as subject. A denial of `agent.stop` never keeps the agent from stopping (section 6.3). The gate opens again when the instance has a current state and a new lease.
+- **When a lease expires, the agent is treated as halted**: the enforcement point denies everything and applies the agent's halt mode (KIL-04), and emits `whitetower.lease.expired.v1`, one event per agent, with that agent as subject: it says whether renewals stopped or arrived stale, and the halt mode applied, with its layers. A denial of `agent.stop` never keeps the agent from stopping (section 6.3). The gate opens again when the instance has a current state and a new lease.
 
 ### 5.4 The gate
 
@@ -293,11 +301,15 @@ When an agent becomes halted, the enforcement point:
 2. **Applies the halt mode** to work already in flight:
    - `block`: nothing more; the work in flight finishes.
    - `interrupt`: interrupts the work in flight through the framework's own cancellation, where the framework allows it.
-   - `terminate`: interrupts, then ends the agent's process after a grace period (10 seconds by default). An unknown mode is treated as `interrupt`.
-3. **Acknowledges each layer** with its outcome: `done`, `not_done` (attempted, not achieved, such as a blocking call still running), `not_applicable` (nothing in flight, or the mode excludes the layer) or `failed`. Each report carries the time since the halt was received, on the monotonic clock. The gate is acknowledged as soon as it is closed; later layers follow in further acknowledgements.
-4. **Emits** `whitetower.instance.halted.v1` with the same layers.
+   - `terminate`: interrupts, then ends the agent's process if work is still running at the end of a grace period (10 seconds by default). A release during the grace period cancels the end. An unknown mode is treated as `interrupt`.
+3. **Acknowledges each layer** with its outcome: `done`, `not_done` (attempted, not achieved, such as a blocking call still running), `not_applicable` (nothing in flight, or the mode excludes the layer) or `failed`. Each report carries the time since this process received the halt, on the monotonic clock: for a halt it found at start, since it applied the state that carried it. The gate is acknowledged as soon as it is closed; later layers follow in further acknowledgements.
+4. **Emits** `whitetower.instance.halted.v1` with the same layers and the halt mode it applied, once per halt and agent. The halt's scope is left out when the instance does not know it (EP-10).
 
 Drill halts are handled exactly like real halts. Every halt ID that covers the agent, including a fleet halt, is acknowledged for that agent.
+
+The halt mode acts on the work in flight when the agent becomes halted. A process that applies its first complete snapshot while its agent is already halted acknowledges the gate `done`, reports the later layers `not_applicable`, and keeps running, closed, until the release: it never ends itself for that halt.
+
+An instance inside the agent's process that ends the process (`terminate`) reports `process_terminated` `done` just before, as its last report for that halt. It first writes `whitetower.instance.halted.v1` to its durable buffer, and waits at most about a second for the acknowledgement's response.
 
 A runtime-control module acknowledges its own layer (`network_quarantined`, with the number of workloads isolated) per agent, once the layer is in place.
 
@@ -310,11 +322,11 @@ When no halt covers the agent any more, the gate reopens only if every other con
 - **EP-1. Start closed.** Allow nothing until the instance has registered, applied a complete snapshot, received a lease renewal and activated a verified bundle for the agent.
 - **EP-2. Decide locally, gate first.** For every governed call and interaction, check the gate (section 5.4), then evaluate the agent's bundle with the profile and the combining algorithm of section 6. Never call the core synchronously to decide.
 - **EP-3. Leases.** Keep one lease per agent on a monotonic clock, renewed only by fresh renewals; when it expires, deny everything, without keeping the agent from stopping, apply the halt mode and emit `whitetower.lease.expired.v1` (section 5.3).
-- **EP-4. Halts.** When the agent or the fleet is halted, close the gate at once, apply the halt mode, acknowledge each layer honestly and emit `whitetower.instance.halted.v1` (section 5.5).
+- **EP-4. Halts.** When the agent or the fleet becomes halted, close the gate at once, apply the halt mode, acknowledge each layer honestly and emit `whitetower.instance.halted.v1` (section 5.5).
 - **EP-5. Releases.** Reopen only when no halt covers the agent and every other gate condition holds (section 5.6).
 - **EP-6. Lifecycle.** Open the gate only in the `active` state, and in `validated` and `ready` only when the registration returned `non_production`: no decision is labeled production for an agent that is not active (section 5.4, row 5).
 - **EP-7. Bundles.** Fetch the bundle the state refers to, verify it (section 7.4), activate it atomically, acknowledge the outcome, and emit `whitetower.bundle.activated.v1` or `whitetower.bundle.rejected.v1`. Keep the last valid bundle when a new one is rejected, and never allow anything without one. While the active bundle is not the one the state names, report `HEALTH_DEGRADED`: the core flags the drift (POL-05), and a halt is the tool for an emergency that the rejected bundle would have handled. When the state stops referring to a bundle, deactivate the active one, so that the gate closes with `gate.no_bundle`, and keep its version as the floor of V6 for the next one.
-- **EP-8. Evidence.** Record each decision (`whitetower.decision.made.v1`) durably before the action proceeds, and each allowed call's outcome once it finishes (`whitetower.action.executed.v1`, AUD-02); publish events at least once, in order, from a stable source (section 8.4). Close the gate when the evidence buffer cannot accept another event.
+- **EP-8. Evidence.** Record each decision (`whitetower.decision.made.v1`) durably before the action proceeds, and each allowed call's outcome once it finishes (`whitetower.action.executed.v1`, AUD-02); publish events at least once, in order, from a stable source (section 8.4). Close the gate when the evidence buffer cannot accept another event. A denial with `gate.evidence_full` is the one decision not recorded, since the buffer cannot take it.
 - **EP-9. Reconnection.** Reconnect with the backoff of section 4.7 when an established stream fails (section 4.6) or falls silent (I-9), resuming from the last version applied. Never lower that version, whichever stream a message comes on, and apply every agent state a change carries, whatever that state's own version (section 5.2). Accept a snapshot at any time, unless it is below the version applied.
 - **EP-10. Unknown content.** Ignore the unknown fields of protobuf messages, in either encoding, and read an unknown enum value with its fail-closed meaning; the bundle manifest is the exception, since V4 refuses its unknown members (section 10). An unknown field never narrows a halt. Treat an unknown lifecycle state as closing the gate, an unknown halt scope as a halt, and an unknown halt mode as `interrupt`. Never let an unknown value open anything.
 - **EP-11. Identity and trust.** An enforcement point inside an agent's process authenticates as that agent and serves it only. One that authenticates as its module establishes the agent of each call without trusting its caller: it originates the call itself, or the caller presents a White Tower access token issued to that agent for the enforcement point's own audience, never the module API's, which it verifies against the core's keys ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)); never a header, a parameter or an address. A call it cannot attribute to an agent in its scope is denied with `error.unknown_agent`. Take the core's trust anchors and the bundle keys from configuration. When the configured bundle keys change, verify the active bundle again (section 7.3).
@@ -324,7 +336,7 @@ When no halt covers the agent any more, the gate reopens only if every other con
 
 - **RC-1.** Apply the module's layer to every agent in scope that is halted, whether by an agent, selector or fleet halt, including workloads started after the halt.
 - **RC-2.** Never lift a layer without a current state from the core showing the agent running: not after a restart, not while disconnected or on a silent stream (I-9), and never on a message below the version applied (section 5.2).
-- **RC-3.** When the lease expires, keep every layer in place, apply no new one, and emit `whitetower.lease.expired.v1`. A module MAY offer, off by default, to apply its layer to every agent in scope when its lease expires.
+- **RC-3.** When the lease expires, keep every layer in place, apply no new one, and emit `whitetower.lease.expired.v1`. A module MAY offer, off by default, to apply its layer to every agent in scope when its lease expires. It reports that layer in `whitetower.lease.expired.v1`, whose `effect` is then `all_quarantined`, and its lift in `whitetower.quarantine.lifted.v1`.
 - **RC-4.** Acknowledge each halt per agent with the layer, its outcome and the number of workloads covered. Report `done` only once the layer is in place, and `not_applicable` when the agent has no workloads the module controls.
 - **RC-5.** Emit the module's events when a layer is applied or lifted.
 - **RC-6.** Report, through heartbeats, the agents that have workloads the module controls.
@@ -334,7 +346,7 @@ When no halt covers the agent any more, the gate reopens only if every other con
 Besides the obligations of the core in sections 4 and 5.2 (CORE-1 to CORE-7, and CORE-14 to CORE-16):
 
 - **CORE-8.** A halt is committed, and the stream updated, without waiting for any module. Token issuance for the halted agents stops in the same transaction, except for tokens for the module API, which their enforcement points still need to acknowledge the halt, deliver their evidence and learn of the release ([ADR-0010](../adr/0010-built-in-agent-token-issuer.md)).
-- **CORE-9.** Governance state carries no personal data other than the owner's pseudonymous principal ID.
+- **CORE-9.** The core adds no personal data to governance state other than the owner's pseudonymous principal ID. Slugs and labels are written by people, who must not put personal data in them.
 - **CORE-17.** The subject properties that an enforcement point builds from the state (section 6.2) MUST always match [`decision-request.schema.json`](../../api/policy/decision-request.schema.json): labels, for one, follow its syntax.
 - **CORE-18.** The bundle reference that the core sends for an agent MUST never name a version lower than one it may have sent before, nor the same version with another manifest hash, also after a restore or an asynchronous failover. After either, the core re-issues every agent's bundle at a higher version, even when its content is unchanged.
 - **CORE-19.** The core MUST record a layer report only for a layer that a capability of the instance's manifest declares, MUST count and drop the others, and judges each capability's layers on their own. A report whose layer or outcome is unspecified never counts as done, nor a bundle acknowledgement whose outcome is unspecified as an activation.
@@ -416,7 +428,7 @@ An enforcement point that evaluates `agent.start` SHOULD meet EP-1 before it let
 | `agent` | The requesting agent's ID: an agent action concerns the agent itself | None |
 | `mcp_server`, `dataset`, `skill`, `url` | Reserved for later actions | None |
 
-A request whose resource type does not match its action, or whose agent action names another agent, is invalid and denied (`error.invalid_request`).
+A request whose resource type does not match its action, or whose agent action names another agent, is invalid and denied (`error.invalid_request`), and so is one whose resource ID is empty or longer than 512 characters.
 
 **Model providers.** `provider` takes a value of this table, or, for any other provider, a lowercase name of its own, such as `ollama` for a model that Ollama serves locally. The table copies the well-known values of OpenTelemetry's `gen_ai.provider.name` in semantic conventions v1.41.1. They are pinned here, because OpenTelemetry's values are still in development and have been renamed since; a new row is an additive change.
 
@@ -463,7 +475,7 @@ For every request, the applicable global policies and the agent-specific policie
 
 ### 6.6 Responses and reasons
 
-`decision` is `true` only with reason `policy.permit`. The `context` always carries a `reason` and the list of determining `policies` (White Tower policy IDs, each once, in ascending order), and carries `bundle_version` whenever policies were evaluated. `obligations` is reserved and always empty: decisions are booleans in `v1alpha1`.
+`decision` is `true` only with reason `policy.permit`. The `context` always carries a `reason` and the list of determining `policies` (White Tower policy IDs, each once, in ascending order). It carries `bundle_version`, the version of the bundle that decided: always with `policy.permit`, `policy.forbid`, `policy.no_permit` and `error.evaluation`, never with the gate's reasons, and optionally with `error.timeout`, `error.unknown_agent` and `error.invalid_request`. `obligations` is reserved and always empty: decisions are booleans in `v1alpha1`.
 
 | Reason | Decision | Meaning | Determining policies |
 | --- | --- | --- | --- |
@@ -575,35 +587,47 @@ Events are **CloudEvents 1.0 in the JSON format**, and I-JSON (section 1), valid
 | --- | --- |
 | `specversion` | `1.0` |
 | `id` | Unique within the source; UUIDv7 RECOMMENDED |
-| `source` | The evidence stream: `/core`, `/agents/<agent-id>/ep/<stream-id>` for an enforcement point inside an agent, `/modules/<module>/<stream-id>` for other modules |
+| `source` | The evidence stream: `/core`, `/agents/<agent-id>/ep/<stream-id>` for an enforcement point inside an agent, `/modules/<module>/<stream-id>` for other modules. `<module>` is the module's slug (`metadata.name`). `<stream-id>` names an evidence buffer: the instance creates it with its buffer and stores it there, at least 64 random bits in lowercase hexadecimal, never a host, pod, cluster or instance name. The instance key of I-8 can reuse it |
 | `type` | A catalog type, `whitetower.<area>.<event>.v<N>` |
 | `time` | When it happened, at the source |
 | `subject` | The agent ID, when the event is about one agent (the catalog says when it is required) |
-| `datacontenttype` | `application/json` |
+| `datacontenttype` | Optional: `application/json`, which its absence means in the JSON format |
 | `data` | An object, valid against the type's schema |
-| `wtseq` | Required from modules, absent from the core: the event's position in its source, as a decimal string (`"1"`, `"2"` and so on, without gaps). A string, because CloudEvents integers are limited to 32 bits |
-| `traceparent`, `tracestate` | The W3C trace context (CloudEvents distributed tracing extension), when the action has a trace |
+| `wtseq` | Required from modules, absent from the core: the event's position in its source, as a decimal string (`"1"`, `"2"` and so on, without gaps). A string, because CloudEvents integers are limited to 32 bits; not the standard `sequence` extension, since decimal strings without padding do not sort as numbers |
+| `traceparent`, `tracestate` | The W3C trace context (CloudEvents distributed tracing extension), when the action has a trace. `traceparent` may have any version but `ff`. Both follow the privacy sections of W3C Trace Context (its section 6) and of CloudEvents |
 | `wtorigtype` | For events translated by an adapter, the original type, for example AGT's `ai.agentos.tool.blocked` |
 | `wtrequestid` | From the core only: the ID of the request that made the change, as the core's logs and its `X-Request-Id` header give it |
 | `dataschema` | Optional in `v1alpha1`; it becomes required, with stable URLs, once the project settles its domain (open question Q6) |
 
 Other extension attributes are allowed and kept, since they are part of the evidence.
 
+**Narrower than CloudEvents 1.0.** The envelope's schema refuses some events that CloudEvents allows, and common SDK defaults fail it. Each failure is `REJECTED` for good (section 8.4):
+
+- `time` has exactly three fractional digits and ends in `Z`. Write it with a fixed layout, such as `2006-01-02T15:04:05.000Z` in Go: Go's `RFC3339Nano` drops trailing zeros, and Python's `isoformat()` writes six digits;
+- no attribute is null, although the JSON format lets an encoder write an unset attribute as null;
+- an extension's name has at most 20 characters, and its value is a string, an integer or a boolean;
+- `id` has at most 128 characters.
+
 ### 8.3 Personal data
 
 Events are minimized by design (NFR-20, domain model section 7):
 
 - People appear only as pseudonymous principal IDs, never as names or email addresses.
-- Decision events record the **names** of a call's arguments, or nothing, or an HMAC-SHA-256 of the canonical arguments with a key the deployment holds, as configured. They never record argument values in `v1alpha1`.
+- Decision events record the **names** of a call's arguments, or nothing, or, in the hashed mode, the HMAC-SHA-256, in lowercase hexadecimal, of the canonical JSON (section 1) of the arguments object as the tool receives it, with a key the deployment holds and that key's ID (`key_id`), as configured. They never record argument values in `v1alpha1`.
+- A resource ID longer than 512 characters, or an argument name longer than 128, is recorded as its SHA-256, marked as such.
+- Values that a module copies from the agent or its framework, such as `task_id` or an extension attribute, follow the first rule. A framework's run or thread ID is recorded only when the deployment declares it opaque; otherwise it is recorded as its HMAC, or not at all.
+- Every `detail` field carries fixed text or codes: never messages, values, paths or names.
 - Prompts, model outputs and tool results are never recorded in `v1alpha1`.
 - Failed calls record the error's type, never its message.
 - Halt reasons are free text written by people: they stay in the core's events and are never sent to modules.
 
 ### 8.4 Delivery
 
-- **At least once.** The core de-duplicates on source and ID; a retried batch is safe.
-- **In order.** An instance publishes each source's events in `wtseq` order. The core records a gap in a source's sequence as an audit finding (AUD-02).
-- **Stable sources.** A source identifies an evidence stream, not a process: an instance that keeps its buffer across restarts keeps its source and continues its sequence. A new buffer starts a new source at 1.
+- **At least once.** The core de-duplicates on source and ID, and recognizes an event by them for at least 28 days: a retried batch is safe.
+- **I-12. In order, one call at a time.** An instance MUST send each source's events in `wtseq` order, and send an event only once every earlier event of its source has a result (`ACCEPTED`, `DUPLICATE` or `REJECTED`), so that at most one `Publish` call that carries a given source is in flight. After a failure, whatever its code, it sends those events again, in batches of its choosing, before any later event of the source.
+- **Findings.** The core records a gap as soon as an event arrives past the next expected position of its source, and the finding stays (AUD-02). It also records a finding when a source's `wtseq` repeats, or goes back, under a new event ID.
+- **Stable sources.** A source identifies an evidence stream, not a process: an instance that keeps its buffer across restarts keeps its source and continues its sequence. A new buffer starts a new source at 1. A source has exactly one writer, and is not bound to the instance that first wrote it.
+- **Backlog.** An instance SHOULD report `HEALTH_DEGRADED` once its oldest undelivered event is older than a threshold, and reports `HEALTH_UNHEALTHY` while its gate is closed with `gate.evidence_full` (section 4.9).
 - **Results.** The core decides each event on its own. It checks de-duplication first, so a retry of an event it accepted stays `DUPLICATE`, even once its agent has left the scope. An event outside the rules of section 4.3, of a type the module does not emit, from a source it does not own or about an agent outside its scope, is `REJECTED` with its reason, and the other events of the batch are still decided. `ACCEPTED` and `DUPLICATE` events leave the buffer. A `REJECTED` event can never be accepted: the instance MUST NOT retry it, MUST log it and SHOULD report `HEALTH_DEGRADED`. The gap it leaves stays visible in the audit log.
 - **Durability (EP-8).** An enforcement point writes each decision to a durable local buffer before the action proceeds, sized for at least 24 hours at 10 events per second (NFR-08), and closes its gate when the buffer is full.
 
@@ -611,7 +635,7 @@ Events are minimized by design (NFR-20, domain model section 7):
 
 | Type | Emitted by | Subject | When |
 | --- | --- | --- | --- |
-| `whitetower.decision.made.v1` | Enforcement points | Required | A governed call or interaction was decided, allowed or denied |
+| `whitetower.decision.made.v1` | Enforcement points | Required | A governed call or interaction was decided, allowed or denied, with the decision's `bundle_version` (section 6.6) |
 | `whitetower.action.executed.v1` | Enforcement points | Required | An allowed call finished: succeeded, failed or cancelled |
 | `whitetower.instance.started.v1` | Any module | Optional | An instance started and registered |
 | `whitetower.instance.halted.v1` | Enforcement points | Required | A halt was applied, layer by layer |
@@ -653,15 +677,15 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | --- | --- | --- |
 | S-01 Start closed: nothing is allowed before state, lease and a verified bundle | EP-1, EP-7 | Implemented |
 | S-02 Every gate condition denies, with its reason. The kit runs it once with each environment that its fake core returns at registration: with `production`, a `validated` or `ready` agent stays closed with `gate.lifecycle`. The kit also removes the agent from the state while its lease is valid, and brings it back before the next renewal: the module allows nothing in between, and allows again only after a renewal once the agent is back | EP-2, EP-6, I-11, fail-closed vectors | Designed |
-| S-03 The combination vectors give the expected decisions | EP-2, section 6 | Designed |
+| S-03 The combination vectors give the expected decisions, with their `bundle_version` | EP-2, section 6 | Designed |
 | S-04 Lease expiry denies and halts within the TTL plus a tolerance | EP-3 | Designed |
-| S-05 A halt closes the gate and is acknowledged layer by layer, within the NFR-03 target. The kit runs it once with each environment that its fake core returns at registration, `production` and `non_production` | EP-4, section 5.1 | Designed |
+| S-05 A halt closes the gate and is acknowledged layer by layer, within the NFR-03 target. The kit runs it once with each environment that its fake core returns at registration, `production` and `non_production`, and once in the `terminate` mode | EP-4, section 5.1 | Designed |
 | S-06 A fleet halt halts the agent although its own state is unchanged. The kit runs it once with each environment that its fake core returns at registration, `production` and `non_production` | EP-4, section 5.1 | Designed |
-| S-07 Reconnecting while halted stays halted | EP-1, EP-4, EP-9 | Designed |
+| S-07 Reconnecting while halted stays halted. The kit also restarts the module during a halt in the `terminate` mode: the module stays up and closed until the release | EP-1, EP-4, EP-9, section 5.5 | Designed |
 | S-08 A release reopens only with a valid lease and bundle | EP-5 | Designed |
 | S-09 The bundle vectors are rejected with the right reasons, and the previous bundle stays active. The fake core's `GetBundleKeys` also lists the untrusted key that signs the `unknown-key` vector, and the module must still reject that vector with `unknown_key`. When the driver reloads the module's bundle keys without the key that signed the active bundle, the module verifies its bundle again and closes its gate with `gate.no_bundle` | EP-7, EP-11 | Designed |
-| S-10 Events validate against the catalog, with a gapless `wtseq`, and survive a restart. Every allowed call that finishes yields `whitetower.action.executed.v1` | EP-8 | Designed |
-| S-11 A full evidence buffer closes the gate | EP-8 | Designed |
+| S-10 Events validate against the catalog, with a gapless `wtseq`, and survive a restart. Every allowed call that finishes yields `whitetower.action.executed.v1`. The fake core holds a `Publish` response, and no later event of that source may arrive meanwhile; it fails a call with `RESOURCE_EXHAUSTED`, then one with `UNAVAILABLE`, and the same events must come first after each. After the driver replaces the module's buffer, a new source starts at 1, and two instances of the module write distinct sources. The kit restarts the module while the fake core is unreachable, and the denials it records meanwhile must validate. When the driver stops the module, the kit reports one that deregisters before it has delivered its buffer, without failing it | EP-8, I-5, I-12, section 8.2 | Designed |
+| S-11 A full evidence buffer closes the gate, and the module reports `HEALTH_UNHEALTHY` while it is full | EP-8, section 4.9 | Designed |
 | S-12 Reconnection uses jittered backoff bounded by the lease, resets after a renewal, and resumes from the last version applied, even when a renewal passed versions that carried nothing for the stream. The module reconnects after a stream cut in the middle of a message, the first one included. When it resumes, it applies a change that carries an agent state older than the version it resumed from, and a snapshot just past that version, which replaces its state. A reconnection within the lease keeps deciding on the last state applied. The kit also black-holes the core, through a TCP proxy that drops traffic without closing the connection, and then refuses connections for over two minutes: the module finds the silent stream and reconnects on a new connection, and its retries stay within the cap of I-4. The fake core also refuses a registration with `PERMISSION_DENIED` and then accepts it, and ends an established stream with `PERMISSION_DENIED` and then accepts the next: the module ends its leases at once, allows nothing meanwhile, and is back within the cap of I-4. A stream body that ends without an end-of-stream message is a cut, and the module resumes | EP-9, I-4, I-9, sections 4.6 and 5.2 | Designed |
 | S-13 Unknown fields and values never open anything. A halt that carries an unknown field also closes the gate and is acknowledged, in the encoding the module uses (binary protobuf or JSON); the kit's fake core scripts it in P1-07.2. For a runtime-control module, an unknown field in a halt never lifts or narrows its layer | EP-10, RC-2 | Designed |
 | S-14 A runtime-control module never lifts a layer without a current state | RC-2, RC-3 | Designed |
@@ -687,7 +711,7 @@ S-18 to S-24 are reserved for [RFC-0002](../rfcs/0002-mcp-servers-tools-and-mode
   - `v1`: twelve months.
 - **Additive changes stay in the version:** new fields, enum values, methods, event types and optional event data. What a reader does with what it does not know depends on the document:
   - **Open documents:** protobuf messages, in both encodings, and the extension attributes of CloudEvents. Readers ignore unknown fields. A JSON decoder discards unknown fields and unknown enum names, and a discarded enum reads as its `UNSPECIFIED` value, with that value's stated meaning (EP-10).
-  - **Closed documents:** each JSON document with a schema, whose reader refuses what it does not know. Event data, event types and the module manifest are read by the core, which gets a change first: a module sends one only to a core that has it, so a module's release is never newer than its core's (the compatibility matrix below). The bundle manifest gains a member only as `whitetower.bundle.v2`, or in a new contract version, since V4 refuses unknown members. In the decision documents, an unknown member or value denies.
+  - **Closed documents:** each JSON document with a schema, whose reader refuses what it does not know. Event data, event types and the module manifest are read by the core, which gets a change first: a module sends one only to a core that has it, so a module's release is never newer than its core's (the compatibility matrix below). The bundle manifest gains a member only as `whitetower.bundle.v2`, or in a new contract version, since V4 refuses unknown members. In the decision documents, an unknown member or value denies. A value that the core sends and a module repeats in its events, such as a halt's scope, needs a fallback in the event's schema before its enumeration grows.
 - **Additive changes only fail closed.** A new field, record or value may add a restriction, or narrow a halt, within the version only if an instance that ignores it denies or halts more (section 5.1); a change that would make such an instance allow or halt less is a breaking change. So is a new enum value whose fail-closed meaning would stop the instances that do not know it, such as an environment, or a lifecycle state that opens the gate. A method added within a version is optional for modules.
 - **An event type changes incompatibly only as a new type** (`.v2`); emitters may send both during a migration.
 - **Every change to `api/proto`, `api/events`, `api/manifest` or `api/policy`, or to what a conformance vector expects, needs an RFC** (GOVERNANCE.md). A new vector for a rule this specification already states needs none.

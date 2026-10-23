@@ -118,7 +118,7 @@ A new method of the registry service, idempotent. Only an instance of a module t
 
 A report is complete: it replaces the instance's previous report for that agent. Its response lists the definition hashes the core does not have.
 
-**`RegistryService.ReportDefinitions`**, also idempotent and called by the same instances, sends those definitions: for each, the members that section 3 hashes, as the server or the framework presents them, at most 4 MiB per call. The core recomputes each hash and stores the definition under it; a definition whose hash matches none that the agent's reports name is refused. Definitions are content-addressed, so each is sent once, whatever the number of agents, instances and restarts. They travel apart from reports because a report carrying every description and schema could exceed the message limit many times over.
+**`RegistryService.ReportDefinitions`**, also idempotent and called by the same instances, sends those definitions: for each, the members that section 3 hashes, as the server or the framework presents them, within the contracts' message limit (section 4.8). The core recomputes each hash and stores the definition under it; a definition whose hash matches none that the agent's reports name is refused. Definitions are content-addressed, so each is sent once, whatever the number of agents, instances and restarts. They travel apart from reports because a report carrying every description and schema could exceed the message limit many times over.
 
 - **EP-13. Report tooling.** Report the agent's tooling as soon as it is known; the first report SHOULD come before the gate first opens. Report again whenever it changes, for example when:
   - an MCP server connects, or announces a changed tool list (`notifications/tools/list_changed`);
@@ -214,7 +214,7 @@ For `tool.invoke`, `tool.expose` (section 7.3) and `model.invoke`, an enforcemen
 
 Blocks come first, so they also cover entries the bundle does not list. A catalog denial carries the bundle's version, because the catalog is part of the bundle.
 
-- **EP-16. Catalog check.** Apply the catalog check to every `tool.invoke`, `tool.expose` and `model.invoke`. Resolve the tool or the model by its reference at the time of the call, never by its name alone. Anything that cannot be resolved is `catalog.unknown`.
+- **EP-16. Catalog check.** Apply the catalog check to every `tool.invoke`, `tool.expose` and `model.invoke`. Resolve the tool or the model by its reference at the time of the call, never by its name alone. Anything that cannot be resolved is `catalog.unknown`. A decision with a `catalog.*` reason carries `bundle_version`, as the policy reasons do (contracts, section 6.6).
 
 What passes the check is enabled for the agent. P1-06 seeds a global policy, named `wt-catalog`, that permits the tool and model actions, so that an enabled entry is usable unless a policy forbids it:
 

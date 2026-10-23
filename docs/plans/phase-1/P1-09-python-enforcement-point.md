@@ -99,10 +99,10 @@ When the agent or the fleet is halted:
 3. **Apply the agent's halt mode:**
    - `block`: gate only;
    - `interrupt`: gate plus cancellation;
-   - `terminate`: all of the above, then the process exits after a grace period (10 seconds by default).
+   - `terminate`: all of the above, then, if work is still running at the end of a grace period (10 seconds by default), the process ends. Just before, it writes `instance.halted` to its durable buffer, reports `process_terminated` `done` as its last report for that halt, and waits at most about a second for the response. A release during the grace period cancels the end (contracts, section 5.5).
 4. **Acknowledge** each layer with its timestamp, honestly: if blocking work is still running after the grace period, report "in-flight action not interrupted".
 
-On release, the gate reopens only if the lease and the bundle are valid. A terminated agent is restarted by its supervisor (for example Kubernetes) and starts closed until its state arrives (KIL-07).
+On release, the gate reopens only if the lease and the bundle are valid. A terminated agent is restarted by its supervisor (for example Kubernetes) and starts closed until its state arrives (KIL-07). A process that starts while its agent is halted stays up and closed until the release, and never ends itself for that halt (contracts, section 5.5).
 
 A change that carries a halt and blocks closes the gate first; the gate's acknowledgement never waits for the blocks to be applied.
 
@@ -114,6 +114,9 @@ A change that carries a halt and blocks closes the gate first; the gate's acknow
 - With RFC-0002, `decision.made` also names the usage rules that decided, each by its policy ID and rule ID, and the resource's origin. The provider-run calls that a model response reports are `action.executed` events with origin `provider`, without a `decision_id` when no decision preceded them. An exposure decision is recorded when it is evaluated; reusing it writes nothing.
 - Size the buffer for NFR-08 (24 hours at 10 events per second), counting exposure decisions, and cap it. Publish in batches, with retries and respect for backpressure.
 - When the buffer is full, close the gate: no action without evidence.
+- Keep the buffer on storage that outlives the container, such as a volume: a buffer that lives only as long as its pod loses what it has not delivered when the pod goes. Deliver it, within the platform's grace period for termination, before deregistering or ending the process, `terminate` included (contracts, I-5).
+- Send each source's events in order, one `Publish` call at a time, and send them again first after a failure (I-12). Report `HEALTH_DEGRADED` once the oldest undelivered event is older than a threshold, and `HEALTH_UNHEALTHY` while the buffer is full (contracts, sections 4.9 and 8.4).
+- The hashed mode of arguments takes its key from a file and the key's ID from a setting (contracts, section 8.3).
 
 **Done when:** after a one-hour core outage under load, every event arrives once reconnected, with no gap in `wtseq`.
 

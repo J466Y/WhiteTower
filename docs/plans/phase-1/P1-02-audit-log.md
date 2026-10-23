@@ -329,3 +329,12 @@ On 2026-10-21 the maintainer decided that the settings get a plan of their own, 
 - Registered, the setting would let the platform administrator change a value that changes nothing, so P1-17 lists it read-only.
 - On 2026-10-22 the maintainer decided to retire it: P1-17 pull request 1 deletes the row with a migration, and the retention period stays in the file configuration, so shortening it still needs access to the server's configuration (P1-17, step 6).
 
+
+### 2026-10-23: follow-up from the review of RFC-0001
+
+The review of RFC-0001 changed what ingestion does with module events (contracts, sections 4.3, 8.2 and 8.4; [P0-03's progress notes](../phase-0/P0-03-module-contracts.md#progress-notes) of 2026-10-22 and 2026-10-23). A fix of its own lands it before P1-07 serves `Publish` ([AGENTS.md](../../../AGENTS.md), work queue):
+
+- **Sources.** A source names a module by its slug, and an evidence buffer by a random stream ID, never by an instance ID. The caller carries its agent ID or its module's slug: `/agents/<agent-id>/ep/` is accepted only from that agent's own enforcement points, and `/modules/<slug>/` only from that module's instances. The rule that a module's source ends in the caller's instance ID goes, and the audit facts take the checked slug as the actor. `cloudevent.schema.json` narrows the stream ID to 16 to 64 lowercase hexadecimal characters, every example's source takes such an ID, with the cluster's name kept in the data, and the golden file of indexed examples is regenerated.
+- **Repeats.** A source's `wtseq` that repeats, or goes back, under a new event ID is a finding: a new core event type, or an extension of `whitetower.audit.gap_detected.v1`, with every step of AGENTS.md's checklist for audit events.
+- **De-duplication first.** It runs before the check of scope, so a retry of an accepted event stays `DUPLICATE`, even once its agent has left the instance's scope. Evidence about an agent recently unbound from the module is decided with the delivery period that P1-05 step 5 decides, if there is one.
+- **De-duplication for 28 days at least.** The key keeps the month, since the table is partitioned by it, and the check also looks in the previous month's partition, with a test across a month boundary on the fake clock.
