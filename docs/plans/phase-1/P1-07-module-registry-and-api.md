@@ -110,7 +110,7 @@ A state acknowledgement at or after the version that carries a block means the i
 
 ### 7. Event ingestion and tooling reports
 
-Wire `EventService.Publish` to the ingestion logic of P1-02 (step 5), with per-instance rate limits and counters used as health signals.
+Wire `EventService.Publish` to the ingestion logic of P1-02 (step 5), with per-instance rate limits and counters used as health signals. The agents an instance may publish about are its scope (contracts, section 4.3), not the agents it reports as served.
 
 Once P1-16 step 4 is merged, wire `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions` to its logic the same way:
 
@@ -139,7 +139,7 @@ It serves tests, demos and load tests. It is also the reference implementation m
 
 ### 9. Conformance kit (MOD-05, subplan candidate)
 
-Implement every P0-03 scenario in `test/conformance`. The `wt-conformance` runner plays the core against a module under test and produces JUnit XML plus a readable report. It runs in CI against the mock module and is documented for third-party authors. Its documentation shows a minimal client in plain HTTP, as P0-03 promised: the unary calls, the Connect framing of a `Watch` stream and its end-of-stream message (contracts, appendix A), and the token requests of section 4.2.
+Implement every P0-03 scenario in `test/conformance`. The `wt-conformance` runner plays the core against a module under test and produces JUnit XML plus a readable report. It runs in CI against the mock module and is documented for third-party authors. Its documentation shows a minimal client in plain HTTP, as P0-03 promised: the unary calls, the Connect framing of a `Watch` stream and its end-of-stream message (contracts, appendix A), and the token requests of section 4.2. The driver's `POST /v1/decide` gains an optional `agent_id`, and the kit runs the halt, lease and bundle scenarios with two agents in scope for an enforcement point that serves several (contracts, section 9.2).
 
 The kit's fake core returns, in `RegisterInstanceResponse`, the environment of the credential the instance registered with, as the core does (step 4), so the driver protocol's `WT_CONFORMANCE_ENVIRONMENT` and the environment in the configuration of the stub enforcement point (`test/conformance/stubep`) give way to it, and the driver protocol's `POST /v1/decide` has the module build the subject from its state and its registration, not its credential ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 7).
 

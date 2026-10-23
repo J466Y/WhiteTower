@@ -3,13 +3,13 @@
 | | |
 | --- | --- |
 | **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md) |
-| **Date** | 2026-09-29 |
+| **Date** | 2026-09-29; updated 2026-10-22 (the Rego wrapper and decision points, from the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md), step 9 |
 | **Contract** | [module-contract-v0.1.md](module-contract-v0.1.md) |
 
 The contracts must not be shaped like one product, and certainly not like White Tower's own enforcement point, which implements them first ([ADR-0011](../adr/0011-own-python-enforcement-point.md)). This document maps them onto four kinds of engines. For each, it records what fits, the gaps, and how each gap is resolved.
 
-**Result: no blocking gap.** The module API, the governance state and the event catalog fit every engine unchanged. One additive change is foreseen for Phase 2: new bundle languages for engines that neither run Cedar nor Rego.
+**Result: no blocking gap for `v1alpha1`, which is Cedar only.** The module API, the governance state and the event catalog fit every engine unchanged. The review of RFC-0001 found two gaps that this mapping had missed: the Rego wrapper fails open in several cases, and decision points lack what would make them interoperate. Both wait for Phase 2 (contracts, sections 6.7, 6.8 and 12), and bringing them back is additive, as are new bundle languages for engines that run neither Cedar nor Rego.
 
 ## 1. Microsoft AGT
 
@@ -33,11 +33,11 @@ OPA 1.x, a graduated project of the Cloud Native Computing Foundation. It can be
 
 | Contract element | OPA | Gap and resolution |
 | --- | --- | --- |
-| Role | A `policy-engine`, embedded in an enforcement point or as a decision point | None |
-| Language (6.7) | Rego | The standard wrapper [`decision.rego`](../../api/policy/rego/decision.rego) implements the combining algorithm; checked with OPA 1.21 on the three rules |
+| Role | A `policy-engine`, embedded in an enforcement point or as a decision point | Phase 2: `v1alpha1` is Cedar only, and has no decision points |
+| Language (6.7) | Rego | Phase 2. A sketch of a wrapper implements the combining algorithm, but the review of RFC-0001 found it failing open on OPA 1.21: a `deny` that is a set, or not a boolean, never forbids; a policy file in the wrapper's own package can override a global forbid; and deeper packages are ignored. Section 12 of the contracts lists what the mapping must settle |
 | Decision request (6.1) | Any JSON input document | The AuthZEN request is the input as is |
 | Decision API (6.8) | Its REST Data API (`POST /v1/data/whitetower/decision/response`); no native AuthZEN, which OPA declined to add (ADR-0004) | A thin adapter exposes the AuthZEN evaluation endpoint and calls OPA |
-| Errors (6.5, rule 4) | Evaluation errors, such as conflicting rule values, return an error or an undefined result | The caller treats both as a denial (`error.evaluation`) |
+| Errors (6.5, rule 4) | Evaluation errors, such as conflicting rule values, return an error or an undefined result | The caller treats both as a denial (`error.evaluation`). A failing built-in function is undefined by default, unless strict built-in errors are on, so a rule can stay open: the Phase 2 mapping turns them on |
 | Bundles (7) | Its own bundle format and signatures (`.signatures.json`) | The enforcement point verifies the White Tower bundle, then loads its Rego files into OPA; OPA's own bundle signing is not used |
 | Evidence (8) | Decision logs, and a status API for bundle activation | The adapter emits `decision.made` and `bundle.activated` from its own decision path, which has the reason codes |
 | Halts, leases | None | The calling enforcement point's gate |
@@ -61,9 +61,9 @@ Decision points that implement the AuthZEN Authorization API themselves. They ar
 
 | Contract element | Cerbos, Topaz | Gap and resolution |
 | --- | --- | --- |
-| Role | `policy-engine` decision points (`embedded: false`), called by an enforcement point or a gateway | None |
-| Decision request and response (6.1) | AuthZEN evaluation natively | Each maps AuthZEN's subject and resource types to its own model: `agent`, `tool` and `model` become its principal and resource kinds. Checked with the vectors |
-| Languages (6.7) | Topaz evaluates Rego; Cerbos has its own YAML policies | Topaz can use the Rego wrapper. Cerbos needs a new bundle language: an additive change of `language` in a later contract version |
+| Role | `policy-engine` decision points (`embedded: false`), called by an enforcement point or a gateway | Phase 2: decision points wait for `v1beta1` (contracts, section 6.8) |
+| Decision request and response (6.1) | AuthZEN evaluation natively | Each maps AuthZEN's subject and resource types to its own model: `agent`, `tool` and `model` become its principal and resource kinds, and an adapter maps the response's context. To be checked with the vectors in Phase 2 |
+| Languages (6.7) | Topaz evaluates Rego; Cerbos has its own YAML policies | Topaz could use a Rego wrapper once Phase 2 settles one. Cerbos needs a new bundle language: an additive change of `language` in a later contract version |
 | Combining algorithm (6.5) | Each engine has its own rule precedence and scoping | The global and agent-specific levels must be expressed so that an agent-level policy can never override a global denial, and the vectors translated to the engine's language must pass. A mapping that cannot meet rule 1 is not conformant |
 | Bundles (7) | Their own policy stores | The adapter verifies the White Tower bundle and writes its policies to the engine's store |
 | Halts, leases, evidence | None: they are decision points | The calling enforcement point or gateway |
@@ -73,8 +73,8 @@ Decision points that implement the AuthZEN Authorization API themselves. They ar
 | Engine | Module API and governance state | Decision profile | Bundles | Events |
 | --- | --- | --- | --- | --- |
 | AGT | Unchanged, run by the adapter | Unchanged; a White Tower backend inside AGT | Unchanged | Unchanged; `wtorigtype` keeps AGT's types |
-| OPA | Unchanged | Unchanged, through the Rego wrapper | Unchanged, `rego` language | Unchanged |
+| OPA | Unchanged | Phase 2, through a Rego wrapper that settles the gaps above, failing built-in functions included | Phase 2: a `rego` language | Unchanged |
 | Cedar | Unchanged | Unchanged; rule 4 added by the enforcement point | Unchanged | Unchanged |
-| Cerbos, Topaz | Unchanged | Unchanged, through AuthZEN | Additive: new languages when needed | Unchanged |
+| Cerbos, Topaz | Unchanged | Phase 2, through AuthZEN, with an adapter of the response | Additive: new languages when needed | Unchanged |
 
 **Not mapped:** Galileo Agent Control, named in the charter, was acquired by Cisco in 2026 (architecture, section 13). For the Phase 2 replacement demonstration, prefer engines hosted by a foundation or clearly independent, such as OPA.

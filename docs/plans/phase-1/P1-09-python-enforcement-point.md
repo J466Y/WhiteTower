@@ -131,7 +131,10 @@ Start with LangGraph 1.x, then the second framework the pilot needs. Each integr
 - routes every tool call, model call, input and output through the gate and the policies, and denies by raising the framework's own error or refusal;
 - registers the cancellation used by the halt layers;
 - registers what step 9 discovers: MCP sessions and their tool lists, function tools, model clients, and the provider-run tools that model requests declare;
-- routes every tool and model call through the catalog check by reference (step 10), and every model request through exposure (step 11).
+- routes every tool and model call through the catalog check by reference (step 10), and every model request through exposure (step 11);
+- applies what a denial does, action by action, as section 6.3 of the contracts lists, and never keeps the agent from stopping;
+- waits, before the framework starts the agent, until the gate can open (EP-1), for a configurable time at most, which a test checks;
+- maps the framework's names of model providers to the contracts' table of providers (section 6.3).
 
 A small generic API (a decorator and a context manager) covers custom agents and tools outside the supported frameworks. The examples live in `modules/ep-python/examples/`, and the Compose `demo-agent` service uses one of them.
 

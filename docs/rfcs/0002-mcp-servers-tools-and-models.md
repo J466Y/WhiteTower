@@ -74,7 +74,7 @@ The maintainer decided on 2026-10-13:
 | MCP server hosted by the model provider and named by an ID rather than a URL | `connector:<provider>/<connector ID>` |
 | Local MCP server | `stdio:` followed by the RFC 8785 canonical JSON of the array of its command and arguments, as configured, after the redaction of EP-14 |
 | Tool | Its server's reference and the tool's name. A function, `http` or `other` tool: its name alone. A built-in tool: the provider and the tool's type |
-| Model | The provider (the framework's name for it, such as `openai`, `anthropic` or `ollama`), the base URL of the endpoint, normalized like a remote server's and absent for the provider's public endpoint, and the model's name as requested |
+| Model | The provider, a value of the contracts' table of model providers (section 6.3), such as `openai`, `anthropic` or `ollama`, the base URL of the endpoint, normalized like a remote server's and absent for the provider's public endpoint, and the model's name as requested |
 
 **String form.** A server's reference is a string. A reference with several parts is written as the RFC 8785 canonical JSON of an object of those parts:
 
@@ -194,7 +194,7 @@ How blocks travel:
 - **In their own record of the watch stream.** A snapshot carries every active block, and changes carry the blocks added and the IDs of those removed. A block (`Block`) carries its ID, its kind (`server`, `tool`, `model`, `provider` or `endpoint`), the SHA-256 of what it covers and its issue time. What it covers is hashed in its string form (section 3): the reference of a server, a tool or a model, the name of a provider, or the normalized base URL of an endpoint. Hashes keep blocks small, and keep local paths out of a record that every enforcement point receives; the references and the reasons stay in the core, which shows them. Enforcement points compute the hashes of an entry once, when a tool list or a model changes, never on each call.
 - **Versions.** Blocks take their versions from the same version counter as the rest of the state ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 2), so a lease renewal still means "your state is current" (CORE-6).
 - **CORE-12.** A block is committed, and the stream updated, without waiting for any bundle, as for halts (CORE-8).
-- **EP-15. Blocks.** Apply a block as soon as it arrives. It denies every later call to, and exposure of, what it covers. A block of a kind the enforcement point does not know denies every tool and model call while it is active. Then acknowledge the state version that carries the block, without waiting for the 60 seconds EP-12 allows, so the console shows how far each block has spread, as it does for halts.
+- **EP-15. Blocks.** Apply a block as soon as it arrives. It denies every later call to, and exposure of, what it covers. A block of a kind the enforcement point does not know denies every tool and model call while it is active. Then acknowledge the state version that carries the block, per agent for an instance that serves several (contracts, EP-12), without waiting for the 60 seconds EP-12 allows, so the console shows how far each block has spread, as it does for halts.
 - **Halts stay fast.** Blocks never enlarge the fleet record that fleet halts change, so a fleet halt costs the same with or without blocks. The core caps active blocks at 500, about 40 KB in a snapshot, which keeps them within one watch message. P1-16 measures halt propagation with that many blocks active, with the harness of P1-08.
 
 ### 7. Decisions

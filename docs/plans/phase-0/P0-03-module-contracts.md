@@ -307,7 +307,7 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 1. Provisional review | The rule in GOVERNANCE.md, the status and review period of both RFCs, and the governance part of point 38 | Done |
 | 2. The watch stream, leases and instances | Points 1, 5, 11, 18, 25, 26 and 29 | Done |
 | 3. Authentication, authorization and transport | Points 4, 6, 8, 23 and 30 | Done |
-| 4. Decision profile and policies | Points 2, 15, 17, 19, 24, 31, 32 and 37 | Not started |
+| 4. Decision profile and policies | Points 2, 15, 17, 19, 24, 31, 32 and 37 | Done |
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Not started |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Not started |
 | 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Not started |
@@ -389,3 +389,33 @@ P1-07.2 adds to the kit what the scenarios need:
 | The fake core refuses a registration, and ends an established stream, with `PERMISSION_DENIED`, then accepts; and it ends a stream body without an end-of-stream message | S-12 |
 | The kit's certificate authority also issues a certificate for another host | S-26 |
 | The fake token endpoint follows section 4.2: the issuer's metadata, the client IDs, the assertion's `aud`, the module API's resource and `expires_in`; it can refuse an assertion with a 400, and answer 503 | S-31 |
+
+### 2026-10-22: corrections, part 3: the decision profile and policies
+
+The third part follows the maintainer's decisions on points 2, 15, 17, 19, 24, 31, 32 and 37 of the review:
+
+| Point | Change | Where |
+| --- | --- | --- |
+| 2 | `v1alpha1` is Cedar only, run inside the enforcement point or beside it in an embedded policy engine. The review found the Rego wrapper failing open on OPA 1.21, and decision points without what makes them interoperate, so both wait for Phase 2; section 12 lists what each must settle. POL-01 says that Rego comes in Phase 2 | Sections 2, 6.7, 6.8, 7.1 and 12; engine-mappings.md; RFC-0001; POL-01 |
+| 15 | An enforcement point checks that a request is inside the profile before it evaluates, and denies one outside it with `error.invalid_request`. Integers are signed 64-bit and decoded exactly, `args` values are never null, and `on_behalf_of` makes a request invalid even when empty. Determining policies are listed once, in ascending order, and the order of reasons is fixed | Sections 6.4, 6.6 and 6.7 |
+| 17 | No decision is labeled production for an agent that is not active: the gate closes in `validated` and `ready` when the registration returned `production` | Section 5.4, EP-6; S-02; the lifecycle; T-73, AT-4 |
+| 19 | An enforcement point that serves several agents establishes the agent of each call without trusting its caller, acknowledges state per agent, and reports as served the agents it holds a bundle for; a lease expiry is one event per agent. An instance may apply the halts of a snapshot part as soon as the part arrives | Sections 2, 4.9, 5.2, 5.3, 6.2, 6.6 and 9.2, EP-11, EP-12 |
+| 24 | What a denial does, action by action; a denial never keeps an agent from stopping. The gate is checked when a call is made, and no governed call waits for the core; an enforcement point may wait, for a bounded time, before the framework starts the agent | Sections 5.3 to 5.5 and 6.3, EP-3 |
+| 31 | The subject properties built from the state always match the request schema (CORE-17). An enforcement point need not validate them, and one that finds them invalid denies with `error.invalid_request` | Sections 5.9 and 6.2 |
+| 32 | The core refuses a policy that compares a fixed attribute with a value outside the profile's set, and section 6.2 lists the agent's kinds and risk tiers | Sections 6.2 and 6.7; P1-06 step 3 |
+| 37 | A model's provider takes a value of a table pinned from OpenTelemetry's well-known names (semantic conventions v1.41.1), or a lowercase name of its own; `trace_id` is the trace ID of the event's `traceparent` | Sections 6.3 and 6.4; RFC-0002, section 3 |
+
+The documents follow: the lifecycle (its gate column, its section 9, and `agent-lifecycle.yaml`, whose `enforcement_gate` gains the value `non_production`), the engine mappings, RFC-0001 (its item 4, and the gaps the mapping missed), RFC-0002 (the providers, and EP-15's acknowledgement per agent), POL-01, P1-05 (step 5), P1-06 (Cedar only, and the check of fixed values in step 3), P1-07 (steps 7 and 9) and P1-09 (step 8). The threat model changes T-73 and AT-4. Step 12 adds RFC-0002's `tool.expose` to the table of what a denial does, and its catalog check to the order of reasons.
+
+What follows is for the coding agents ([AGENTS.md](../../../AGENTS.md), work queue), in three parts:
+
+- **`api/`, then `task gen`.** `bundle-manifest.schema.json` allows the language `cedar` only, and policy paths that end in `.cedar`. `module-manifest.schema.json` gives a policy engine the language `cedar` only and `embedded: true` only, with an invalid example in `api/manifest/testdata/invalid`. `decision-request.schema.json` refuses null values in `args`, makes `on_behalf_of` a false schema that keeps its description, and bounds labels (at most 64, with values of at most 255 characters) and data categories (at most 32, of at most 63 characters). `decision.rego` moves from `api/policy/rego` to `docs/contracts/rego` as a sketch, and `api/policy/README.md` loses its row. Comments change in `governance.proto` (labels follow the request schema's syntax; state acknowledgements per agent), in `registry.proto` (the served agents of an enforcement point that serves several) and in the Cedar schema (the providers, without `local`; `on_behalf_of` stays), and so do the descriptions of `lease.expired` (one event per agent) and `decision.made` (a denied `agent.stop` lets the agent stop). The kit's bundle checks (`bundle.go`) and `check_vectors.py` accept `.cedar` files only.
+- **Vectors on both stacks.** The Go profile checks a request against the schema before it evaluates, with the schema library already in `go.mod`, and decodes numbers as `json.Number`; `check_vectors.py` answers `error.invalid_request` rather than raising, and a schema library there would be a new dependency to justify. The gate of both takes the environment: F-10 uses `non_production`, and new fail-closed vectors cover `validated` and `ready` with `production`. About ten combination vectors: times without milliseconds and with an offset; a float argument; n = 2^63-1 under a forbid on n > 1000 (`policy.forbid`) and n = 2^63 (`error.invalid_request`); an unknown member; `on_behalf_of` set to a name and to an empty string; an erroring permit beside a satisfied permit, and beside a satisfied forbid (`error.evaluation`, naming the erroring permit); and two permits out of ascending order. `vectors_test.go` checks that every refused request fails the schema or a named rule.
+- **A fix of the core, outside the RFC.** The inventory's validation of label keys, and the `Labels` pattern of the OpenAPI document, take the request schema's pattern; no migration is needed before a release.
+
+P1-07.2 adds to the kit what the scenarios need:
+
+| Addition | Scenarios |
+| --- | --- |
+| The fake core returns each environment at registration for S-02, as it does for S-05 and S-06; S-05 and S-06 use an `active` agent, since a `validated` or `ready` one stays closed in production | S-02, S-05, S-06 |
+| The driver's `POST /v1/decide` gains an optional `agent_id`, and the kit runs the halt, lease and bundle scenarios with two agents in scope for an enforcement point that serves several | S-04, S-05, S-09 |

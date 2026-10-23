@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Version 0.1.4: version 0.1, which the maintainer reviewed and accepted on 2026-09-30; the additions of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which the RFC's review covers; the changes that follow [the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), which the maintainer accepted on 2026-10-20; the threat and the design change of [plan P1-17](../plans/phase-1/P1-17-settings.md) (settings), which follow the maintainer's decision of 2026-10-21 that settings get a plan of their own; and the changes from the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md), which the maintainer decided on 2026-10-21 and 2026-10-22 (section 10) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): T-31, AT-1 and DC-9), 2026-10-21 (settings, plan [P1-17](../plans/phase-1/P1-17-settings.md): T-83 and DC-11) and 2026-10-22 (the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md): T-20, T-31, T-32, T-33, T-37, T-84, AT-1, AT-6, AT-7 and DC-2) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): T-31, AT-1 and DC-9), 2026-10-21 (settings, plan [P1-17](../plans/phase-1/P1-17-settings.md): T-83 and DC-11) and 2026-10-22 (the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md): T-20, T-31, T-32, T-33, T-37, T-73, T-84, AT-1, AT-4, AT-6, AT-7 and DC-2) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md) |
 | **Models** | The MVP as designed: [architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [module contracts v0.1](../contracts/module-contract-v0.1.md), [domain model](../architecture/domain-model.md), [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md) |
 | **Related** | [Framework mapping](framework-mapping.md), [security test catalog](security-tests.md), [SECURITY.md](../../SECURITY.md) |
@@ -346,7 +346,7 @@ Each table covers the flows of one boundary. The rating is likelihood / impact �
 | T-70 | D | A database or core outage longer than the lease TTL stops the fleet | M / H → H | Highly available PostgreSQL (P1-12 step 4) and core (NFR-06) | R-08 |
 | T-71 | D | An insider, or a break-glass holder, halts the fleet | L / H → M | A reason is required; audited; alerts; releasing needs two people (KIL-05) | R-12 |
 | T-72 | D | Expensive queries on the public API, such as audit searches, exhaust the core | M / M → M | Pagination, a maximum page size, query timeouts, rate limits; enforcement points on another listener | Low |
-| T-73 | E | A non-production credential is used in production: an agent only `validated` runs where production data lives, with a token nothing checks | M / M → M | Credentials and tokens carry the environment (`wt_env`); production resources that accept White Tower tokens must require `wt_env=production` (deployment guide); gateways enforce it in Phase 2 | R-14 |
+| T-73 | E | A non-production credential is used in production: an agent only `validated` runs where production data lives, with a token nothing checks | M / M → M | Credentials and tokens carry the environment (`wt_env`); production resources that accept White Tower tokens must require `wt_env=production` (deployment guide); gateways enforce it in Phase 2; an enforcement point keeps its gate closed for an agent that is not `active` when its registration returned `production`, a module credential's included (contracts, section 5.4) | R-14 |
 
 ## 6. Attack trees
 
@@ -404,6 +404,7 @@ Each tree starts from an attacker's goal. Branches are alternatives unless marke
 - Call the lifecycle API past a missing check (T-03): matrix tests.
 - Edit the database (T-53): R-06.
 - Skip activation and use a non-production credential in production (T-73): R-14.
+- Have an enforcement point that authenticates as its module decide a `validated` or `ready` agent as production (T-73): the gate stays closed in those states when the registration returned `production` (contracts, section 5.4).
 
 ### AT-5: steal or replay agent tokens, or confuse their algorithm or audience
 
@@ -527,4 +528,4 @@ The abuse cases above become tests in the [security test catalog](security-tests
 | 0.1.1 | 2026-10-19 | RFC-0002, MCP servers, tools and models (plan P1-16). Added: boundary TB-10 and flows F16 and F17, actor TA-11, assumption A-7, two assets, threats T-74 to T-82 and section 5.12 (the cross-cutting section becomes 5.13), attack tree AT-10, design changes DC-9 and DC-10, accepted risk R-15, and tests ST-75 to ST-83. Changed: the scope, A-6, the governance state asset, O-1, O-3, TB-1, TB-2, F6, F15, T-40, attack trees AT-1, AT-6, AT-7 and AT-8, and accepted risks R-01, R-02, R-10 and R-11 |
 | 0.1.2 | 2026-10-20 | The accepted design of the halt path (plan P1-08). Changed: T-31, attack tree AT-1 and design change DC-9. The security test catalog and the framework mapping are unchanged |
 | 0.1.3 | 2026-10-21 | Settings (plan P1-17). Added: threat T-83 and design change DC-11. The security test catalog gains ST-84 and ST-85; the framework mapping is unchanged |
-| 0.1.4 | 2026-10-22 | The review of RFC-0001 (plan P0-03). Added: threat T-84. Changed: T-20, T-31, T-32, T-33, T-37, attack trees AT-1, AT-6 and AT-7, and design change DC-2. The security test catalog gains ST-86, and ST-35, ST-38, ST-40, ST-49 and ST-51 change; the framework mapping is unchanged |
+| 0.1.4 | 2026-10-22 | The review of RFC-0001 (plan P0-03). Added: threat T-84. Changed: T-20, T-31, T-32, T-33, T-37, T-73, attack trees AT-1, AT-4, AT-6 and AT-7, and design change DC-2. The security test catalog gains ST-86, and ST-35, ST-38, ST-40, ST-49 and ST-51 change; the framework mapping is unchanged |
