@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md). Contract version `v1alpha1` |
+| **Status** | Accepted provisionally in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md) on 2026-10-23. Contract version `v1alpha1`, a draft until `contracts/v0.1.0` is tagged (section 10) |
 | **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)) and 2026-10-22 and 2026-10-23 (changes to what the conformance vectors expect need an RFC, and the corrections from the review of RFC-0001, which [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) list) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |

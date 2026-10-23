@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Draft for review in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md) |
+| **Status** | Accepted provisionally with [RFC-0001](../rfcs/0001-module-contracts-v0.1.md) on 2026-10-23 |
 | **Date** | 2026-09-29; updated 2026-10-22 (the Rego wrapper and decision points, from the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md), step 9 |
 | **Contract** | [module-contract-v0.1.md](module-contract-v0.1.md) |

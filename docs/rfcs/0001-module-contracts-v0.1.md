@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | In review, provisionally ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)): approved by the maintainer on 2026-09-30, and every point of the maintainer's review decided on 2026-10-22. It is accepted once the corrections are in the specification and `api/` |
+| **Status** | Accepted provisionally on 2026-10-23 ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)): the specification at commit `a284a2d`, after the maintainer's review (see [Review record](#review-record)). Its changes to `api/` follow before the tag `contracts/v0.1.0` |
 | **Authors** | @J466Y |
 | **Review period** | 2026-10-21 to 2026-10-22: the maintainer's provisional review, with no external reviewer. A review of at least two weeks, with an external reviewer, follows before the contracts leave alpha (`v1beta1`) |
 | **Related** | Plan [P0-03](../plans/phase-0/P0-03-module-contracts.md); MOD-01 to MOD-05, MOD-08, POL-03, POL-05, POL-06, KIL-01 to KIL-04, KIL-07, KIL-10, AUD-02, NFR-20; [ADR-0004](../adr/0004-api-and-contract-formats.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md), [ADR-0010](../adr/0010-built-in-agent-token-issuer.md), [ADR-0011](../adr/0011-own-python-enforcement-point.md) |
@@ -70,3 +70,53 @@ Listed in section 12 of the specification: learning rotated bundle keys from the
 | P1-09 | The Python enforcement point, first implementation of the enforcement point obligations |
 | P1-15 | The network quarantine module, first implementation of the runtime-control obligations |
 | P1-02 | Event ingestion, de-duplication and gap detection |
+
+## Review record
+
+The maintainer alone reviewed this RFC, with no external reviewer, under the provisional acceptance of [GOVERNANCE.md](../../GOVERNANCE.md#rfc-process); a review of at least two weeks, with an external reviewer, follows before the contracts leave alpha (`v1beta1`). The review ran on 2026-10-21 and 2026-10-22, over the specification as it stood, with every change since the approval of 2026-09-30, from seven perspectives: a module author, security, a policy engine, operations, standards, an implementer, and consistency with the other documents. It raised 39 points, 3 of them blocking, 13 major and 23 minor, and 11 editorial corrections. The maintainer decided every point, each time with the review's recommendation except for point 5, and the corrections went into the specification and the plans in six parts, which [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) list change by change. The accepted text is the specification at commit `a284a2d`.
+
+| Point | Severity | Decision | Applied in |
+| --- | --- | --- | --- |
+| 1. A token rollover could undo an acknowledged halt, and leases were tied to an undefined session | Blocking | A | Part 1 |
+| 2. The Rego wrapper failed open, and decision points could not interoperate | Blocking | A: `v1alpha1` is Cedar only | Part 3 |
+| 3. The stream ID of module sources was undefined, and the merged ingestion refused the contract's own examples | Blocking | A | Part 5, and a fix of P1-02 |
+| 4. I-1 checked the core's certificate chain but not its name | Major | A | Part 2 |
+| 5. What an instance is, and the limit of its streams | Major | B: the core ends the oldest of three streams | Part 1 |
+| 6. What `PERMISSION_DENIED` refuses and closes, and how an instance recovers | Major | A | Part 2 |
+| 7. The `terminate` mode around the end of a process | Major | A | Part 5 |
+| 8. Token requests had no profile, and the planned audience was one that current OAuth guidance forbids | Major | A | Part 2 |
+| 9. Compatibility within a version | Major | A | Part 4 |
+| 10. Event schemas refused what the obligations make modules report | Major | A | Part 5 |
+| 11. Liveness of streams, and which backoff covers which call | Major | A | Part 1 |
+| 12. Event delivery: reordered batches, and the horizon of de-duplication | Major | A | Part 5 |
+| 13. One approved manifest per module forced fleet-wide upgrades | Major | A | Part 4 |
+| 14. The manifest's hash depended on an undefined conversion of YAML | Major | A | Part 4 |
+| 15. The edges of the decision profile | Major | A | Part 3 |
+| 16. Bundle versions could repeat after a restore | Major | A | Part 4 |
+| 17. Agents in `validated` and `ready` could be decided as production through a module credential | Minor | A | Part 3 |
+| 18. The freshness check of renewals was one-sided | Minor | A | Part 1 |
+| 19. Enforcement points that serve several agents | Minor | A | Part 3 |
+| 20. Two conformant bundle verifiers could disagree | Minor | A | Part 4 |
+| 21. The manifest did not tie capabilities to their permissions, events and layers | Minor | A, with `whitetower.action.executed.v1` a MUST in EP-8 (AUD-02) | Part 4 |
+| 22. Personal data in copied fields, and an undefined hashed mode of arguments | Minor | A | Part 5 |
+| 23. How `Watch` is carried | Minor | A | Part 2 |
+| 24. What a denial does, and how an agent starts | Minor | A | Part 3 |
+| 25. Values the core sends were not bounded on the client's side | Minor | A | Part 1 |
+| 26. Lost instances | Minor | A | Part 1 |
+| 27. Events lost at the end of a source | Minor | A | Part 5 |
+| 28. Health had no definition | Minor | A | Part 5 |
+| 29. Two inputs that an instance controls on the halt path | Minor | A | Part 1 |
+| 30. Revoking stolen keys | Minor | A | Part 2 |
+| 31. Label keys that the request schema refused | Minor | A | Part 3, and a fix of P1-04 |
+| 32. A misspelled fixed value could disable a forbid | Minor | A | Part 3, in P1-06 |
+| 33. Runtime control was generic in the text but Kubernetes-only in the schemas | Minor | A | Part 6 |
+| 34. Timed scenarios had no pass criterion, and the kit's skeleton contradicted I-7 | Minor | A, with the gate's acknowledgement in S-05 within 1 second | Part 6 |
+| 35. `Publish`'s total size and the message limit disagreed | Minor | A | Part 5 |
+| 36. The CloudEvents profile was narrower than CloudEvents without saying so | Minor | A | Part 5 |
+| 37. No shared names of model providers | Minor | A | Part 3 |
+| 38. This RFC and the governance documents lagged behind the specification | Minor | A | The provisional review and part 6 |
+| 39. The manifest's version pattern accepted versions that SemVer forbids | Minor | A | Part 4, in the schema only |
+
+The editorial corrections went into part 6, except two. The one of CORE-4 was not needed, since point 26 rewrote CORE-4. Appendix A's references to the valid bundle and to ep-python's manifest, and the counts of vectors in section 9.1 and in item 7 above, follow the vectors that the coding agents regenerate.
+
+The changes that the corrections bring to `api/`, the vectors, the conformance kit and the core are parts for the coding agents ([AGENTS.md](../../AGENTS.md), work queue), and land before `contracts/v0.1.0` is tagged, as GOVERNANCE.md's rule 6 says.
