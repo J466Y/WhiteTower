@@ -463,7 +463,7 @@ New scenarios:
 | --- | --- |
 | S-18 A report makes nothing usable | CORE-10, EP-16 |
 | S-19 Unknown, discovered, disabled and blocked tooling is denied with its reason, before policies | EP-16 |
-| S-20 A block denies within the halt propagation target, without a new bundle, and is acknowledged once applied | EP-15, CORE-12 |
+| S-20 A block denies within the halt propagation target, timed as section 9.2 of the contracts says, without a new bundle, and is acknowledged once applied | EP-15, CORE-12 |
 | S-21 A tool whose definition changed is denied and not exposed | EP-16, EP-17 |
 | S-22 Only exposed tools reach the model; a provider-run tool that cannot be removed fails the model call | EP-17, EP-18 |
 | S-23 Arguments follow the vectors | EP-19 |

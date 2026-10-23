@@ -9,4 +9,4 @@ CloudEvents 1.0 types emitted by White Tower's core and modules, contract versio
 | [`schemas/`](schemas/) | One JSON Schema per type for its `data`, and the shared definitions |
 | [`examples/`](examples/) | One complete, valid event per type |
 
-Schemas have no `$id` yet: stable URLs depend on the project's domain (open question Q6). They reference each other by relative path.
+Schemas have no `$id` yet: stable URLs wait for a domain of the project's own, which open question Q6 decided on 2026-09-30 it does not have for now. They reference each other by relative path.
