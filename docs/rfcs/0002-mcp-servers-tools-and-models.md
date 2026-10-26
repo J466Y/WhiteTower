@@ -2,9 +2,9 @@
 
 | | |
 | --- | --- |
-| **Status** | Draft |
+| **Status** | Accepted provisionally on 2026-10-26 ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)): this text at commit `2c37ac7`, after the maintainer's review (see [Review record](#review-record)). Its contract text, protobuf, schemas and vectors follow in step 12 of P0-03, before the tag `contracts/v0.1.0` |
 | **Authors** | @J466Y |
-| **Review period** | The maintainer's provisional review ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)), after RFC-0001 is accepted. A review of at least two weeks, with an external reviewer, follows before the contracts leave alpha (`v1beta1`) |
+| **Review period** | 2026-10-23 to 2026-10-26: the maintainer's provisional review, with no external reviewer. A review of at least two weeks, with an external reviewer, follows before the contracts leave alpha (`v1beta1`), with the findings of the live test of blocks (point 14 of the review) |
 | **Related** | [RFC-0001](0001-module-contracts-v0.1.md) and its open question on tool arguments; [module contracts](../contracts/module-contract-v0.1.md), sections 4 to 8; requirements INV-07, POL-05, POL-06, MOD-06, KIL-01, UI-02, and the area this RFC adds: CAT-01 to CAT-10, NFR-24 and UI-10 ([requirements](../requirements/mvp-requirements.md#511-mcp-servers-tools-and-models-cat)); plans [P0-03](../plans/phase-0/P0-03-module-contracts.md) (step 12), [P1-16](../plans/phase-1/P1-16-mcp-servers-tools-and-models.md), [P1-06](../plans/phase-1/P1-06-policy-model-and-distribution.md), [P1-07](../plans/phase-1/P1-07-module-registry-and-api.md), [P1-08](../plans/phase-1/P1-08-kill-switch.md), [P1-09](../plans/phase-1/P1-09-python-enforcement-point.md), [P1-10](../plans/phase-1/P1-10-web-console.md), [P1-11](../plans/phase-1/P1-11-cli.md); [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0011](../adr/0011-own-python-enforcement-point.md); [threat model](../security/threat-model.md) |
 
 ## Summary
@@ -674,3 +674,40 @@ The maintainer answered these questions on 2026-10-21. Plan P1-16 records the an
 The follow-up of 2026-10-19 turned this RFC into scope, after the maintainer confirmed it: requirements version 0.3 (CAT-01 to CAT-10, NFR-24, UI-10), plan P1-16 and step 12 of P0-03, the domain model (section 3.9), threat model version 0.1.1, security tests ST-75 to ST-83, the plans index and the re-baselined roadmap. Planning also settled what this draft had left open: the string form of references, definitions sent apart from reports, entries for the agent's own tools, blocks named by hash and never a status in bundles, a bound on each agent's entries waiting for review, a way to decline entries, and the owner of each change.
 
 The skills repository is no longer planned. The `skills-repository` capability and the `skill` resource type stay reserved, so that nothing has to be renamed if skills return.
+
+## Review record
+
+The maintainer alone reviewed this RFC, with no external reviewer, under the provisional acceptance of [GOVERNANCE.md](../../GOVERNANCE.md#rfc-process); a review of at least two weeks, with an external reviewer, follows before the contracts leave alpha (`v1beta1`). The review ran from 2026-10-23 to 2026-10-26. It read this RFC against the specification as RFC-0001's review left it (commit `3ca9d83`), plan P1-16, the design of the halt path ([P1-08's design note](../plans/phase-1/P1-08-kill-switch.md#progress-notes), sections 2, 4, 6 and 9), version 0.1.4 of the threat model and the requirements. Where a point turned on how real software behaves, the reviewer ran it: URL and address parsers in Python, Node, Go and curl, IDNA in the three stacks, and RFC 8785 in `gowebpki/jcs`. It raised 21 points, 8 of them major, and 3 editorial notes. The maintainer decided the major points on 2026-10-23 and the others on 2026-10-26, each on its recommended option:
+
+| Point | Severity | Decision | Applied in |
+| --- | --- | --- | --- |
+| 1. A usage rule never applied to a provider-run tool whose calls the provider does not submit for approval | Major | A | Part 1 |
+| 2. The `path` transform was defined by a Go library | Major | A | Part 1 |
+| 3. `url_host` and `email_domain` met the differences between parsers | Major | A, narrowed after a check of what it refuses | Part 1 |
+| 4. Secrets in URL paths escaped EP-14, and what a reference covers was unstated | Major | A | Part 1 |
+| 5. A remote server's URL was normalized only in part | Major | A | Part 1 |
+| 6. "The provider's public endpoint" was undefined | Major | A | Part 1 |
+| 7. Definition hashes were taken over input that RFC 8785 does not cover | Major | B: RFC 8785, with integers written exactly | Part 1 |
+| 8. A catalog file could be larger than a bundle may be | Major | A | Part 1 |
+| 9. The catalog check had no place among the reasons of the contracts' section 6.6 | Minor | A | Part 2 |
+| 10. The evidence of a catalog denial could not say what was denied | Minor | A | Part 2 |
+| 11. The operators of usage rules had no types | Minor | A | Part 2 |
+| 12. Each statement of a rule repeated the whole rule | Minor | A | Part 2 |
+| 13. An argument's path could be read two ways | Minor | A | Part 2 |
+| 14. The blocks record left its rules to the design of the halt path | Minor | A, provisional until a live test | Part 2 |
+| 15. A block did not stop the result of a call in flight | Minor | A | Part 2 |
+| 16. Three classifications of compatibility contradicted the contracts' section 10 | Minor | A | Part 3 |
+| 17. A late report could undo a newer one, items over the limits were lost in silence, and some strings had no limit | Minor | A | Part 3 |
+| 18. The core's side of `ReportTooling` and `ReportDefinitions` was unstated | Minor | A | Part 3 |
+| 19. EP-18 had no scenario | Minor | A | Part 3 |
+| 20. The Cedar schema left a model's attributes optional, and reused exposure decisions outlived what they depend on | Minor | A | Part 3 |
+| 21. A reference's SHA-256 was taken for a pseudonym | Minor | A | Part 3 |
+
+Two of them need a note:
+
+- **Point 3.** The rules first proposed refused 15 of 42 legitimate URLs and 9 of 18 addresses: spaces in a query, user information, other schemes, display names. The maintainer asked for a check that the denials were not excessive, and the rules were narrowed until they refused 2 of the URLs and 4 of the addresses, while in 38 URL tricks and 15 address tricks no parser reached another host than theirs.
+- **Point 14.** The rules of the blocks record and EP-15's acknowledgement apply provisionally (section 6). A live test with real enforcement points in a real environment, the end-to-end test of P1-09 (its step 14), confirms them, and its findings go to the review that precedes `v1beta1`.
+
+The three parts are the commits of pull request #70, and [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) of 2026-10-23 and 2026-10-26 list what each changed. The editorial notes went into part 3.
+
+The contract text, protobuf, schemas and vectors of this RFC follow in step 12 of P0-03, in their own pull requests before `contracts/v0.1.0` is tagged, as GOVERNANCE.md's rule 6 says. The specification text comes first, and it is the reviewer's, with the cases of point 3's check for the vectors; the protobuf, the schemas and the vectors are parts for the coding agents ([AGENTS.md](../../AGENTS.md), work queue).
