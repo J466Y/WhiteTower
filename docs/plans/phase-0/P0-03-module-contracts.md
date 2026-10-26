@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26). RFC-0001's changes to `api/`, then step 12 and the tag remain (see [progress notes](#progress-notes)) |
+| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/`, then step 12's protobuf, schemas and vectors, and the tag remain (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
@@ -238,7 +238,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 
 | Pull request | Content | Status |
 | --- | --- | --- |
-| 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Waits for RFC-0002's acceptance |
+| 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, `api/policy`, `api/manifest`, `api/events`, and the kit's fake core | Not started |
 | 3. Vectors on both stacks | The new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier | Not started |
 
@@ -584,3 +584,33 @@ With the three parts of its review merged (pull request #70), the maintainer acc
 - **Step 12 next** (decision 2, option A). Its pull requests 2 and 3, the protobuf, the schemas and the vectors, move up in AGENTS.md's work queue to row 12, right after the code parts of RFC-0001's review, which edit the same files. The tag, and every part of P1-06, P1-07, P1-09 and P1-16 that builds on RFC-0002, wait for them.
 
 RFC-0002 now holds the record of its review: each point, its decision and the part that applied it, and that the maintainer alone reviewed it. Step 12's pull request 1, the specification text, is the reviewer's and comes next, with the cases of the URL and address check for the vectors.
+
+### 2026-10-26: step 12, pull request 1: RFC-0002 in the specification
+
+RFC-0002, as accepted, is in the specification. The new sections hold its proposal, and the sections it changes follow:
+
+| Sections | What they gain |
+| --- | --- |
+| 4.10 Tooling reports (new) | The terms, references, normalized URLs, string forms, keys and definition hashes; `ReportTooling` and `ReportDefinitions`; EP-13, EP-14, CORE-10, CORE-11 and CORE-13; the limits |
+| 5.10 Blocks (new) | The blocks record, CORE-12 and EP-15, the cap of 500, and the live test that its rules wait for |
+| 6.9 to 6.11 (new) | The catalog check and EP-16, with `wt-catalog`; `tool.expose`, EP-17 and EP-18; per-tool arguments, the four transforms and EP-19, and usage rules with their `@rule` annotations |
+| 7.7 The catalog file (new) | `catalog.json`, its size rules and its verification |
+| 1 to 4.9 | The canonical JSON of definitions; the `enforcement-point` capability, and the skills repository no longer planned; CORE-2 over the two methods, and their rows among the services, errors and limits; health while a report leaves something out |
+| 5.1 to 5.9 | The blocks record in the state and the stream; blocks after the gate; EP-10 for the catalog file and unknown kinds of blocks; CORE-9 with the hashes of blocks |
+| 6.1 to 6.7 | The example's resource; `tool.expose` among the actions and in what a denial does; resources from the catalog; `calls_decided` and `digest`; the catalog's reasons and their place; a schema for each bundle instead of the `ToolArgs` extension point |
+| 7.1 to 7.6 | The manifest's `catalog` member, and V4, V5 and V7 |
+| 8 to 12, and the appendices | Tooling in evidence and the events' new fields; the vectors to come, the kit's model provider, and S-18 to S-24 and S-32; the catalog file as a closed document; six threats; the question on tool arguments closed, and the live test of blocks among the open ones; the requirements covered |
+
+Writing the text settled five details that RFC-0002 left open, so that every stack reads a value alike:
+
+- **IPv4 in IPv6.** `url_host` cannot read an IPv6 address written with a dotted part or in the IPv4-mapped range (`::ffff:0:0/96`). It is another spelling of an IPv4 address, which step 8 already refuses in its other forms, and the stacks write it differently: `[::ffff:7f00:1]` in Node, `[::ffff:127.0.0.1]` in Go and in Python 3.13, which changed it from 3.12. All three write other IPv6 addresses alike, as section 4 of RFC 5952 says.
+- **Whitespace and ports.** The whitespace that `url_host` refuses in an authority is Unicode's White_Space property; an empty label includes a leading dot; a colon after the host with no port cannot be read; and `0x` with any hexadecimal digits, none included, counts as a number, as WHATWG counts it.
+- **Addresses.** `email_domain` ignores only spaces around the value, since a tab is a control character; a local part must not be empty; and the display name of `<address>` may be empty.
+- **Paths.** A `..` after a `..` kept at the start of a relative path is kept too, as Go's `path.Clean` does.
+- **IDNA in Python.** The `idna` package's `uts46_remap` maps without checking joiners and Bidi, which the rule asks for: the Python stack also runs the package's `valid_contextj` and `check_bidi` on each label.
+
+What pull requests 2 and 3 take from here:
+
+- **The cases of the URL and address check** are in [`test/conformance/vectors/inputs/url-and-address-check.json`](../../../test/conformance/vectors/inputs/url-and-address-check.json): 80 URLs and 33 addresses, each with its class, what each parser read and what the check read under section 6.11, and the IDNA of 14 hosts on the three stacks. `arguments.json` takes their values, and its expected results from the specification, which decides where the file differs; such a difference is a finding to report. Under section 6.11, the check refuses 2 of the 42 legitimate URLs and 4 of the 18 legitimate addresses, and no parser reaches another host than the check reads.
+- **Names.** Section 9.1 names the vector files, and section 4.10 the fields of the two methods. Appendix A's examples of `ReportTooling`, `ReportDefinitions` and the blocks record wait for the protobuf of pull request 2: the reviewer adds them afterwards, with appendix A's references of RFC-0001 and the counts of vectors.
+- **Schemas.** The manifest's schema requires `tool.expose` among an enforcement point's intervention points (section 6.3). The bundle manifest's schema knows `catalog` without requiring it: a bundle without one decides as with an empty catalog (section 7.7).

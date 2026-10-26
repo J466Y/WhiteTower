@@ -711,3 +711,5 @@ Two of them need a note:
 The three parts are the commits of pull request #70, and [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) of 2026-10-23 and 2026-10-26 list what each changed. The editorial notes went into part 3.
 
 The contract text, protobuf, schemas and vectors of this RFC follow in step 12 of P0-03, in their own pull requests before `contracts/v0.1.0` is tagged, as GOVERNANCE.md's rule 6 says. The specification text comes first, and it is the reviewer's, with the cases of point 3's check for the vectors; the protobuf, the schemas and the vectors are parts for the coding agents ([AGENTS.md](../../AGENTS.md), work queue).
+
+Writing the specification text (step 12, pull request 1) settled five details that this RFC left open, so that every stack reads a value alike; one of them refuses IPv6 addresses that spell an IPv4 address. [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) of 2026-10-26 list them.
