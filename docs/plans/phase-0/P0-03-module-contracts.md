@@ -153,7 +153,7 @@ Write the RFC and review it as [GOVERNANCE.md](../../../GOVERNANCE.md#rfc-proces
 
 [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) lands in `v1alpha1` before `contracts/v0.1.0` is tagged, so its changes that are not additive need no `v1alpha2` (specification, section 10). P1-06, P1-07, P1-09 and P1-16 build on it, so it comes first.
 
-- **Specification:** the text of RFC-0002 goes into new sections (4.10, 5.10, 6.9 to 6.11 and 7.7), so that no section other documents cite changes its number, together with the changes it makes to sections 2, 4.3, 4.4, 4.8, 5.1, 5.2, 5.4, 5.7, 5.9, 6.3, 6.4, 6.6, 6.7, 7.1, 7.4, 8.5 and 9 to 12, and to the appendices. It supersedes the `ToolArgs` extension point of section 6.7, and closes the question of section 12 on tool arguments.
+- **Specification:** the text of RFC-0002 goes into new sections (4.10, 5.10, 6.9 to 6.11 and 7.7), so that no section other documents cite changes its number, together with the changes it makes to sections 2, 4.3, 4.4, 4.8, 4.9, 5.1, 5.2, 5.4, 5.7, 5.9, 6.3, 6.4, 6.6, 6.7, 7.1, 7.4, 8.5 and 9 to 12, and to the appendices. It supersedes the `ToolArgs` extension point of section 6.7, and closes the question of section 12 on tool arguments.
 - **Protobuf:** `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions`, and the blocks record of the watch stream (`Block`, in snapshots and in changes). Schemas and annotations travel as JSON text, never as `google.protobuf.Struct`, whose numbers would change definition hashes. The kit's fake core gains the new methods in the same pull request, because it embeds no unimplemented handler; P1-07 gives them the behavior its scenarios need.
 - **Decision profile (`api/policy`):** the action `tool.expose`, the `catalog.*` reasons, the kind `builtin`, the properties and context fields, per-tool argument records, the Cedar schema of RFC-0002 section 7.6, the manifest's `catalog` field, and a JSON Schema of the catalog file (`whitetower.catalog.v1`).
 - **Manifest (`api/manifest`):** `tool.expose` among the actions an enforcement point must declare, with `tool.invoke` and `model.invoke`, and the examples updated.
@@ -519,3 +519,59 @@ With the six parts of corrections merged, the maintainer accepted RFC-0001 provi
 RFC-0001 now holds the record of its review: each point, its decision and the part that applied it, and that the maintainer alone reviewed it. Step 11 is done. What is left of the review is small: once the coding agents have regenerated the vectors, a pull request of the reviewer's updates appendix A (the valid bundle's hash and size, and ep-python's manifest hash) and the counts of vectors in section 9.1 and in RFC-0001.
 
 RFC-0002's provisional review follows, the same way. The tag waits for step 12 and for the parts above.
+
+### 2026-10-23: RFC-0002's provisional review, part 1
+
+The reviewer read RFC-0002 against the specification as RFC-0001's review left it, plan P1-16, the design of the halt path and the threat model, and found 21 points, 8 of them major, and 3 editorial notes. The maintainer decided the eight major points on 2026-10-23, and this part applies them to RFC-0002 and to the documents that follow from it:
+
+| Point | Decision | Where |
+| --- | --- | --- |
+| 1. A usage rule never applies to a provider-run tool whose calls the provider does not submit for approval | `tool.expose` gains `calls_decided`; the enforcement point asks for approvals for the tools that usage rules name; each rule compiles to a second statement, which forbids exposing the tool while its calls are not decided | RFC-0002, sections 7.3, 7.4, 7.6 and 8; CAT-07; T-79, ST-82; P1-06, P1-09, P1-16 step 6 |
+| 2. The `path` transform is defined by a Go library | An algorithm in the text: control characters cannot be read, and a leading `//` is merged, as Go does and Python's `normpath` does not; path rules are safe as allow-lists | RFC-0002, sections 7.5 and 8; T-78, R-15, ST-79; P1-09 |
+| 3. `url_host` and `email_domain` meet the differences between parsers | Rules that refuse what parsers read differently, narrowed after a check: of 42 legitimate URLs and 18 addresses, they refuse 2 and 4, and in 38 URL tricks and 15 address tricks no parser reaches another host than theirs | RFC-0002, section 7.5; T-78, R-15, ST-79; P1-09 |
+| 4. Secrets in URL paths escape EP-14, and what a reference covers is unstated | The deployment's redaction rules, a setting carried in every catalog file and applied by the enforcement point and the core; an approval covers every configuration that shares a reference | RFC-0002, sections 3, 4.1, 4.2 and 5; CAT-10; T-76, T-83, DC-11, ST-77; P1-09, P1-16 steps 2 and 4, P1-17, the domain model |
+| 5. A remote server's URL is normalized only in part | A full normalization, with the host that `url_host` reads | RFC-0002, section 3; P1-09 |
+| 6. "The provider's public endpoint" is undefined | A model's reference always carries its endpoint; the core's keys still read `openai/gpt-4o` | RFC-0002, sections 3 and 7.2; P1-09, P1-16 step 2 |
+| 7. Definition hashes over input that RFC 8785 does not cover | RFC 8785 with integers written exactly, `null` members left out, and the wire form of `tools/list` as the input | RFC-0002, sections 3 and 4.1; P1-09, P1-16 step 4, the domain model |
+| 8. A catalog file can be larger than a bundle may be | The core keeps each bundle within step V1: enabled entries first, observed ones while they fit, and an enabling that would not fit refused | RFC-0002, section 5; P1-06, P1-16 step 5 |
+
+The check of point 3 ran each URL through Python's `urllib.parse`, urllib3, requests, httpx and yarl, Node's WHATWG parser, Go's `net/url` and curl 8.12, and each address through Python's three address parsers. Python's own parsers disagree: `http://evil.com\@good.com/` is `good.com` for `urlsplit`, httpx and yarl, and `evil.com` for urllib3 and requests. The rules as first proposed refused 15 of the legitimate URLs and 9 of the addresses: spaces in a query, user information, other schemes, display names.
+
+Step 12 carries these decisions into the specification, the schemas and the vectors. The vectors take the check's cases, which the reviewer hands over with the specification text (pull request 1). Two notes for them (pull request 3):
+
+- Go's ready-made `idna.Lookup` profile refuses underscores. The Go stack converts hosts with `golang.org/x/net/idna` options close to WHATWG's (UTS #46 mapping, non-transitional, no STD3 rules, no hyphen checks, joiners and Bidi checked), which agreed with Node's `domainToASCII` on every valid host of the check. In Python, the `idna` package's `encode` applies IDNA 2008 and refuses underscores too, so the Python stack uses its `uts46_remap`, then Punycode.
+- `gowebpki/jcs` cannot compute definition hashes as it is: it writes 18446744073709551615 as 18446744073709552000.
+
+The 13 minor points and the editorial notes follow in later parts.
+
+### 2026-10-26: RFC-0002's provisional review, part 2
+
+The maintainer chose the recommended option of the seven minor points of the third batch on 2026-10-26, and marked one of them, point 14, for a live test. This part applies them:
+
+| Point | Decision | Where |
+| --- | --- | --- |
+| 9. The catalog check has no place among the reasons of section 6.6 | After `error.unknown_agent` and before `error.invalid_request`; `catalog.*` decisions carry no determining policies | RFC-0002, section 7.1; P1-09 |
+| 10. The evidence of a catalog denial cannot say what was denied | Tooling that the catalog does not list is named by its name, with `reference_sha256`; a denial by a block carries `block_id` | RFC-0002, sections 7.1 and 9; P1-09 |
+| 11. The operators of usage rules have no types | A table of the operators that each type takes; values never empty, and one for the comparisons; the generator refuses the rest | RFC-0002, section 8; P1-16 step 6 |
+| 12. Each statement of a rule repeats the whole rule | Each annotation carries the rule's ID and description, its statement's tool and the conditions; a rule is the set of its statements, compared once parsed | RFC-0002, section 8; P1-06, P1-16 step 6 |
+| 13. An argument's path can be read two ways | Paths through objects only, with no `.` or `:` in declared names; the entries of `args` carry their path and their transform | RFC-0002, sections 5 and 7.5; P1-09, P1-16 step 2 |
+| 14. The blocks record leaves its rules to the design of the halt path | The first part of a snapshot carries it, only enforcement points' streams do, and a snapshot replaces the set; EP-15 acknowledges at once, for one agent of the instance. Provisional: a live test with real enforcement points confirms it before `v1beta1` | RFC-0002, section 6 and S-20; P1-07, P1-09 step 14, P1-16 step 7 |
+| 15. A block does not stop the result of a call in flight | The block row of the catalog check also applies to `tool.result` and `model.result` | RFC-0002, sections 6 and 7.1, and S-20; P1-09 |
+
+Step 12 carries them into the specification: section 6.6 gains the catalog check's place, and section 12, which lists what the review before `v1beta1` must settle, gains the live test of point 14. The six remaining minor points and the editorial notes follow.
+
+### 2026-10-26: RFC-0002's provisional review, part 3
+
+The maintainer chose the recommended option of the six minor points of the fourth batch, and the editorial notes, on 2026-10-26. This part applies them:
+
+| Point | Decision | Where |
+| --- | --- | --- |
+| 16. Three classifications of the RFC's compatibility contradict section 10 | The blocks record is not additive; a new kind of block needs a new contract version; the catalog file is a closed document, which gains a member only as `whitetower.catalog.v2` or in a new contract version | RFC-0002, Compatibility and versioning |
+| 17. A late report can undo a newer one, items over the limits are lost in silence, and some strings have no limit | One report per agent in flight, each retry with the current tooling; the enforcement point leaves out the items over the limits, logs them and reports `HEALTH_DEGRADED`; the core refuses a report over the limits as a whole (`INVALID_ARGUMENT`); a limit for every string, and the fit in 4 MiB stated for binary protobuf | RFC-0002, sections 4.1 and 4.2; P1-07, P1-09, P1-16 step 4 |
+| 18. The core's side of `ReportTooling` and `ReportDefinitions` is unstated | CORE-2 covers both, at the level of the call; `ReportDefinitions` carries `instance_id`; a definition that matches no hash of the instance's reports is refused on its own, and listed in the response | RFC-0002, section 4.1; P1-07, P1-16 step 4 |
+| 19. EP-18 has no scenario | S-32, with a model provider that the kit plays; the vectors of usage rules also give their decisions | RFC-0002, section 11; MOD-05; the architecture, P1-07, P1-09 |
+| 20. The Cedar schema leaves a model's attributes optional, and reused exposure decisions outlive what they depend on | `provider`, `name` and `endpoint` required; policies on `tool.expose` read no context but `calls_decided`; a new registration ends reused decisions | RFC-0002, sections 7.3 and 7.6; P1-09 |
+| 21. A reference's SHA-256 is taken for a pseudonym | It keeps the text out of events and blocks, but a path that can be guessed can be checked against it; references shown only with `catalog.view`; keys never from command lines | RFC-0002, sections 3 and 9, and Privacy; the threat model's assets, the domain model, P1-16 step 2 |
+| Editorial | `catalog.definition_changed` carries both hashes, or both digests; a reference is hashed as the UTF-8 bytes of its string form; threat model version 0.1.1 "recorded" | RFC-0002, sections 3, 6 and 9, and Security considerations |
+
+Step 12 carries them into the specification: CORE-2 lists `ReportTooling` and `ReportDefinitions`; section 4.9 adds tooling left out of a report to what `HEALTH_DEGRADED` means; section 9.3 gains S-32, which this part reserves there with S-18 to S-24, and section 9.2 the kit's model provider, which P1-07.2 builds; and section 10 names `whitetower.catalog.v1` among its identifiers, as a closed document. Every point of the review is now decided and applied. The pull request that accepts RFC-0002 follows.

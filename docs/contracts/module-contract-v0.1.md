@@ -705,7 +705,7 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | S-30 Values out of range never open anything. The fake core sends a lease TTL of an hour, which lasts 300 seconds; a zero and an absent one, which renew nothing; a snapshot whose first part lacks the fleet state, which the module refuses, keeping its state and reconnecting; heartbeat responses without an interval or with zero, after which the module keeps the interval in force; and a state that stops naming a bundle, which closes the gate with `gate.no_bundle` | I-6, EP-7, sections 5.2 and 5.3 | Designed |
 | S-31 The module gets its tokens as section 4.2 says, from the kit's fake token endpoint: it reads the issuer's metadata and refuses metadata with another issuer, sends the client ID of its identity and an assertion whose `aud` is the issuer identifier alone, and asks for the module API's resource. When the endpoint refuses an assertion with a 400, the module logs the error and retries at the cap of I-4; when it answers 503, the module retries with the backoff of section 4.7 | I-10 | Designed |
 
-S-18 to S-24 are reserved for [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which joins the contracts before `contracts/v0.1.0` is tagged ([P0-03](../plans/phase-0/P0-03-module-contracts.md), step 12).
+S-18 to S-24, and S-32, are reserved for [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), which joins the contracts before `contracts/v0.1.0` is tagged ([P0-03](../plans/phase-0/P0-03-module-contracts.md), step 12).
 
 ## 10. Versioning and compatibility
 
