@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: RFC-0001 is accepted provisionally (2026-10-23). Its changes to `api/`, then, once RFC-0002 is accepted, step 12 and the tag remain (see [progress notes](#progress-notes)) |
+| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26). RFC-0001's changes to `api/`, then step 12 and the tag remain (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
@@ -575,3 +575,12 @@ The maintainer chose the recommended option of the six minor points of the fourt
 | Editorial | `catalog.definition_changed` carries both hashes, or both digests; a reference is hashed as the UTF-8 bytes of its string form; threat model version 0.1.1 "recorded" | RFC-0002, sections 3, 6 and 9, and Security considerations |
 
 Step 12 carries them into the specification: CORE-2 lists `ReportTooling` and `ReportDefinitions`; section 4.9 adds tooling left out of a report to what `HEALTH_DEGRADED` means; section 9.3 gains S-32, which this part reserves there with S-18 to S-24, and section 9.2 the kit's model provider, which P1-07.2 builds; and section 10 names `whitetower.catalog.v1` among its identifiers, as a closed document. Every point of the review is now decided and applied. The pull request that accepts RFC-0002 follows.
+
+### 2026-10-26: RFC-0002 accepted provisionally
+
+With the three parts of its review merged (pull request #70), the maintainer accepted RFC-0002 provisionally on 2026-10-26 ([GOVERNANCE.md](../../../GOVERNANCE.md#rfc-process)), and decided two more things:
+
+- **Accepted now** (decision 1, option A). The accepted text is RFC-0002 at commit `2c37ac7`. Its contract text, protobuf, schemas and vectors follow in step 12, in their own pull requests, as GOVERNANCE.md's rule 6 says, and land before `contracts/v0.1.0` is tagged. Point 14 stays provisional until the live test of P1-09 step 14.
+- **Step 12 next** (decision 2, option A). Its pull requests 2 and 3, the protobuf, the schemas and the vectors, move up in AGENTS.md's work queue to row 12, right after the code parts of RFC-0001's review, which edit the same files. The tag, and every part of P1-06, P1-07, P1-09 and P1-16 that builds on RFC-0002, wait for them.
+
+RFC-0002 now holds the record of its review: each point, its decision and the part that applied it, and that the maintainer alone reviewed it. Step 12's pull request 1, the specification text, is the reviewer's and comes next, with the cases of the URL and address check for the vectors.
