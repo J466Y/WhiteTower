@@ -4,7 +4,7 @@
 | --- | --- |
 | **Phase** | 1 Core MVP |
 | **Status** | Draft |
-| **Size** | XL, split into two subplans before it starts, by a pull request of its own: **P1-07.1** (steps 1 to 7, about 5 weeks: generated code, authentication and authorization, registration, sessions, the governance state service with the blocks record, acknowledgements, event ingestion) and **P1-07.2** (steps 8 to 10, about 3 weeks: the wiring of tooling reports of step 7, once P1-16's pull request 3 is merged, then the mock module, the conformance kit with S-01 to S-30, the load test), each with its tests (step 11). The first pull request of P1-07.1 is the version mechanism of the halt path ([design note](P1-08-kill-switch.md#progress-notes), section 14), which needs nothing from P1-05 and lands ahead of it |
+| **Size** | XL, split into two subplans before it starts, by a pull request of its own: **P1-07.1** (steps 1 to 7, about 5 weeks: generated code, authentication and authorization, registration, sessions, the governance state service with the blocks record, acknowledgements, event ingestion) and **P1-07.2** (steps 8 to 10, about 3 weeks: the wiring of tooling reports of step 7, once P1-16's pull request 3 is merged, then the mock module, the conformance kit with S-01 to S-32, the load test), each with its tests (step 11). The first pull request of P1-07.1 is the version mechanism of the halt path ([design note](P1-08-kill-switch.md#progress-notes), section 14), which needs nothing from P1-05 and lands ahead of it |
 | **Depends on** | P0-03, P1-01, P1-05 (can start with stub authentication); P0-03 step 12 (RFC-0002 in the contracts) for the parts of RFC-0002; P1-16 step 4 for the wiring of tooling reports (step 7) |
 | **Unblocks** | P1-08, P1-09, P1-10.5; P1-04 pull request 4, through the first pull request of P1-07.1; P1-16 step 7, through the blocks record of step 5 and, for ST-80, the mock module of step 8 |
 | **Requirements** | MOD-01 to MOD-05, MOD-07, KIL-07, AUD-02 (ingestion wiring); the transport of CAT-01 and CAT-04, and part of NFR-24's budget |
@@ -16,7 +16,7 @@ The core side of the module contracts: modules are registered and approved, thei
 
 ## Scope
 
-**In:** the generated code, authentication and authorization on the machine listener, module registration, instance sessions, the governance state service and watch fan-out, acknowledgements, ingestion wiring, the mock reference module, the conformance kit, load tests. Once P0-03 step 12 has put RFC-0002 in the contracts: the generated code, the authorization and the wiring of `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions`, the blocks record of the watch stream, the mock module's side of RFC-0002, the scenarios S-18 to S-24, and the load test with blocks.
+**In:** the generated code, authentication and authorization on the machine listener, module registration, instance sessions, the governance state service and watch fan-out, acknowledgements, ingestion wiring, the mock reference module, the conformance kit, load tests. Once P0-03 step 12 has put RFC-0002 in the contracts: the generated code, the authorization and the wiring of `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions`, the blocks record of the watch stream, the mock module's side of RFC-0002, the scenarios S-18 to S-24 and S-32 with the kit's model provider, and the load test with blocks.
 
 **Out:** the kill switch domain (P1-08, which writes the governance state through the service built here); bundles (P1-06); the Python enforcement point (P1-09); the network quarantine module (P1-15); RFC-0002's contract text, protobuf, schemas and vectors (P0-03 step 12); the catalog domain: validating reports, storing observations and definitions, issuing and lifting blocks (P1-16, which writes blocks through the service built here).
 
@@ -24,7 +24,7 @@ The core side of the module contracts: modules are registered and approved, thei
 
 - `internal/modules`, `internal/govstate`, `internal/api/moduleapi`.
 - `modules/mock`: a Go reference enforcement point.
-- `test/conformance`: the conformance kit runner (`wt-conformance`) with every scenario of P0-03 and RFC-0002, S-01 to S-30.
+- `test/conformance`: the conformance kit runner (`wt-conformance`) with every scenario of P0-03 and RFC-0002, S-01 to S-32.
 - A load test report, with and without 500 active blocks.
 
 ## Steps
@@ -44,7 +44,7 @@ RFC-0002's contract text, protobuf, schemas and vectors land first, in P0-03 ste
   - **enforcement points embedded in an agent**, whose subject is the agent's SPIFFE ID, may only serve that agent;
   - **module instances**, whose subject is a module's SPIFFE ID, may only serve the agents bound to the module by an operator.
 - The event types a caller may publish are those its manifest declares.
-- Only instances of modules whose manifest declares the `enforcement-point` capability may call `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions`, and only about agents in their scope (RFC-0002, section 4.1).
+- Only instances of modules whose manifest declares the `enforcement-point` capability may call `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions`, and only about agents in their scope (RFC-0002, section 4.1). Any other call is refused as a whole, with `PERMISSION_DENIED` (CORE-2).
 
 **Done when:** negative tests pass: watching another agent, publishing undeclared types, reporting tooling about another agent or from a module without `enforcement-point`, and using an expired token or one with the wrong audience are all rejected.
 
@@ -120,6 +120,7 @@ Wire `EventService.Publish` to the ingestion logic of P1-02 (step 5), with per-i
 Once P1-16 step 4 is merged, wire `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions` to its logic the same way:
 
 - the handler authenticates the caller, checks its scope and its capability (step 2) and the message limits (contracts, section 4.8), then passes the instance's identity, its agents and the request to P1-16, which validates it, applies the limits of reports and their rate limit, and stores it;
+- a report or a `ReportDefinitions` call over the limits of reports is refused as a whole, with `INVALID_ARGUMENT`, while a definition that matches no hash named in the instance's reports is refused on its own and listed in the response (RFC-0002, sections 4.1 and 4.2);
 - a report sent twice changes nothing;
 - logs carry counts, never reported text.
 
@@ -136,8 +137,8 @@ Once P1-16 step 4 is merged, wire `RegistryService.ReportTooling` and `RegistryS
 - it also plays a runtime-control module, which acknowledges the `network_quarantined` layer for the agents it reports as served (I-6), for the tests of P1-08 step 4;
 - its manifest declares each role it plays, the runtime-control one included, with the events each must emit (contracts, section 3.3), `whitetower.action.executed.v1` among them (EP-8);
 - it can also authenticate as the agent it serves, as an enforcement point inside an agent does, so that P1-08 step 3 can halt one agent's instances on a production and a non-production credential;
-- once RFC-0002 is in the contracts, its manifest declares `tool.expose`, and it plays the enforcement point's side of RFC-0002: it reports scripted, configurable tooling (servers, tools and models, with canary secrets it redacts, definitions that change on demand, and hostile reported text: markup, script, bidirectional and invisible characters, 16 KiB descriptions) through `ReportTooling` and `ReportDefinitions`; applies blocks by the SHA-256 of the string forms of what they cover, and denies every tool and model call while a block of a kind it does not know is active; checks the catalog before policies; fills per-tool arguments with their transforms; evaluates `tool.expose` on scripted model requests; and narrows provider-run tools;
-- flags inject faults: drop acknowledgements, delay them, crash, lie; and, for RFC-0002, report secrets unredacted, ignore blocks, skip the catalog check, expose a denied or changed tool, acknowledge blocks late.
+- once RFC-0002 is in the contracts, its manifest declares `tool.expose`, and it plays the enforcement point's side of RFC-0002: it reports scripted, configurable tooling (servers, tools and models, with canary secrets it redacts, definitions that change on demand, and hostile reported text: markup, script, bidirectional and invisible characters, 16 KiB descriptions) through `ReportTooling` and `ReportDefinitions`; applies blocks by the SHA-256 of the string forms of what they cover, and denies every tool and model call while a block of a kind it does not know is active; checks the catalog before policies; fills per-tool arguments with their transforms; evaluates `tool.expose` on scripted model requests; and plays EP-18 against the kit's model provider (step 9): it narrows provider-run tools, has the calls of the tools that usage rules name submitted for approval and decides them, records the calls that responses report, and stops exposing a tool whose definition changed in a response;
+- flags inject faults: drop acknowledgements, delay them, crash, lie; and, for RFC-0002, report secrets unredacted, ignore blocks, skip the catalog check, expose a denied or changed tool, acknowledge blocks late, approve a provider-run call without deciding it.
 
 It serves tests, demos and load tests. It is also the reference implementation module authors can read.
 
@@ -151,13 +152,15 @@ The kit's fake core returns, in `RegisterInstanceResponse`, the environment of t
 
 The kit additions that the scenarios need are listed in [P0-03's progress notes](../phase-0/P0-03-module-contracts.md#progress-notes): those of S-26 to S-29 in the notes of 2026-10-21, and those of S-12, S-27 and S-30 in the notes of 2026-10-22 (corrections, part 1).
 
-Once P0-03 step 12 has added RFC-0002's vectors, also implement the RFC's scenarios S-18 to S-24, which run those vectors through the module under test. The kit checks the module's side only: the core's side is tested in P1-16 (ST-75 for CORE-10, ST-80 for the spread of blocks). The [driver protocol](../../../test/conformance/driver-protocol.md) gains three endpoints for these scenarios, in its table "Planned for P1-07":
+Once P0-03 step 12 has added RFC-0002's vectors, also implement the RFC's scenarios S-18 to S-24, which run those vectors through the module under test, and S-32. The kit checks the module's side only: the core's side is tested in P1-16 (ST-75 for CORE-10, ST-80 for the spread of blocks). The [driver protocol](../../../test/conformance/driver-protocol.md) gains three endpoints for these scenarios, in its table "Planned for P1-07":
 
 | Endpoint | Purpose |
 | --- | --- |
 | `POST /v1/tooling` | Sets the tooling the agent is configured with: MCP servers (URL or command, arguments, environment, headers), their tools with definitions, models, and provider-run tools. The module reports it (S-18, S-24) and resolves calls against it |
 | `POST /v1/call` | A tool or model call as the agent makes it (server, tool name, current definition, arguments; provider, endpoint, model, runtime digest), through the normal path: gate, catalog, policies, evidence. S-03, S-19, S-20, S-21 and S-23 use it; `/v1/decide` stays for the other actions |
-| `POST /v1/model-request` | A model request that offers tools, run by the agent or by the provider, removable or not. It answers with the tools that reached the model, or with the denial (S-21, S-22) |
+| `POST /v1/model-request` | A model request that offers tools, run by the agent or by the provider, removable or not. It answers with the tools that reached the model, or with the denial (S-21, S-22), and for S-32 with the decisions on the calls the provider submitted |
+
+For S-32, the kit also plays a model provider, at the endpoint that `POST /v1/tooling` gives the agent's model. It speaks the part of a provider's API that EP-18 uses, for example OpenAI's Responses API: an `mcp` tool with its list of allowed tools and its approval setting, and, in responses, the `mcp_list_tools`, `mcp_approval_request` and `mcp_call` items. The kit scripts what it lists, submits and reports, and checks what reaches it: the narrowed declarations, and an answer to each approval request that matches the module's decision.
 
 **Done when:** the kit fails on each fault the mock module can inject, and passes without faults.
 
@@ -196,7 +199,7 @@ Build the load test to take new scenarios, as the halt path's [design note](P1-0
 - With 500 concurrent streams on two replicas, state changes are delivered with p95 ≤ 1 second (part of NFR-03's budget).
 - During a rolling restart of one replica, every enforcement point reconnects within a third of the shortest lease TTL it holds (I-4) without losing a change, and no lease expires with the default TTL.
 - Instances and their state are visible through the API.
-- The mock module passes scenarios S-18 to S-24, and the kit fails on each fault of RFC-0002 that the mock module can inject.
+- The mock module passes scenarios S-18 to S-24 and S-32, and the kit fails on each fault of RFC-0002 that the mock module can inject.
 - With 500 concurrent streams on two replicas and 500 active blocks, state changes and blocks are delivered with p95 ≤ 1 second (part of the budgets of NFR-03 and NFR-24).
 - The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-07-module-registry-and-api) pass: ST-34 to ST-39, with ST-35 and ST-38 covering `ReportTooling`, `ReportDefinitions` and the message limits of reports and definitions.
 

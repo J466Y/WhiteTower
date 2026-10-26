@@ -96,11 +96,11 @@ For example, `HTTPS://API.Example.COM:443/mcp/./tools/../%7euser/` becomes `http
 | Built-in tool | `{"provider":"openai","type":"web_search"}` |
 | Model | `{"endpoint":"http://gpu-01.internal:11434/","name":"llama3.1:8b","provider":"ollama"}`, and for a model of a provider's default endpoint, `{"endpoint":"https://api.openai.com/v1","name":"gpt-4o","provider":"openai"}` |
 
-The vectors use these forms, and blocks name their SHA-256 (section 6).
+The vectors use these forms. Blocks and events name a reference by the SHA-256 of the UTF-8 bytes of its string form (sections 6 and 9).
 
 **Keys.** The core assigns each entry a key the first time it sees the entry, and the key never changes once the entry is approved. The agent's own tools are entries of their agent: their keys are unique within the agent, because the same name in two agents is different code. Every other key is unique in the catalog:
 
-- **Servers:** a slug of lowercase letters, digits and hyphens, at most 63 characters, derived from the name the server announces or from its host.
+- **Servers:** a slug of lowercase letters, digits and hyphens, at most 63 characters, derived from the name the server announces or from its host, never from a command line, whose paths can hold a user name: events carry keys in clear.
 - **Tools:** `<server key>/<tool name>`. Two server keys are reserved: `agent`, for the agent's own tools, and `provider.<provider>`, for a provider's built-in tools.
 - **Models:** a slug of their provider or endpoint, a slash, and a slug of their name, which keeps its dots (`gpu-01/llama3.1-8b`). For an endpoint that the core knows as its provider's default, the slug is the provider's (`openai/gpt-4o`): a table of the core's own, which shapes only the key, never the reference.
 
@@ -129,9 +129,11 @@ A new method of the registry service, idempotent. Only an instance of a module t
 | `tools` | Each tool: kind, origin, its server (MCP tools, named by the server's position in `servers`) or its provider and type (built-in tools), its name and, except for built-in tools, its definition hash, when its definition has one (section 3) |
 | `models` | Each model: provider, endpoint, name and, when the runtime reports one, digest |
 
+The core refuses as a whole, with `PERMISSION_DENIED`, a call from a module that does not declare the capability, from an instance that the caller's principal did not register, or about an agent outside the instance's scope, as CORE-2 says for the module API's other methods.
+
 A report is complete: it replaces the instance's previous report for that agent. Its response lists the definition hashes the core does not have.
 
-**`RegistryService.ReportDefinitions`**, also idempotent and called by the same instances, sends those definitions: for each, the members that section 3 hashes, taken as section 3 says, within the contracts' message limit (section 4.8). The core recomputes each hash and stores the definition under it; a definition whose hash matches none that the agent's reports name is refused. Definitions are content-addressed, so each is sent once, whatever the number of agents, instances and restarts. They travel apart from reports because a report carrying every description and schema could exceed the message limit many times over.
+**`RegistryService.ReportDefinitions`**, also idempotent, and called by the same instances under the same rules, carries the calling instance's `instance_id` and those definitions: for each, the members that section 3 hashes, taken as section 3 says, within the contracts' message limit (section 4.8). The core recomputes each hash and stores the definition under it. A definition whose hash matches none that this instance's current reports name, for any of its agents, is refused on its own and listed in the response, and the others are still stored, as CORE-2 says for the items of a call. Definitions are content-addressed, so each is sent once, whatever the number of agents, instances and restarts. They travel apart from reports because a report carrying every description and schema could exceed the message limit many times over.
 
 - **EP-13. Report tooling.** Report the agent's tooling as soon as it is known; the first report SHOULD come before the gate first opens. Report again whenever it changes, for example when:
   - an MCP server connects, or announces a changed tool list (`notifications/tools/list_changed`);
@@ -139,6 +141,8 @@ A report is complete: it replaces the instance's previous report for that agent.
   - a model request declares a provider-run tool not reported yet.
 
   Report what the agent is configured with, not only what it has called. Then send the definitions the core asks for.
+
+  Keep at most one report per agent in flight. Retry a report that failed, or that the core refused, with the agent's tooling as it is when the retry is sent, never as it was: each report replaces the one before it, so an older report that arrived late would undo a newer one. Leave out of a report, and log, what is over the limits of section 4.2: the servers, tools and models beyond its counts, and those whose strings, or whose definition, are over their limits. A server left out takes its tools with it. An instance that calls in JSON, whose escapes can make a report at the limits larger than the message limit, leaves out what does not fit the same way. Report `HEALTH_DEGRADED` while anything is left out (contracts, section 4.9): what is left out stays unknown, so its calls are denied (`catalog.unknown`).
 - **EP-14. Redact.** Never report environment variables, HTTP headers, authorization values or any other credential. Remove user information, query and fragment from URLs, including URLs passed as command-line arguments. Replace with `<redacted>` the value of any command-line argument that follows a flag, or is written `--flag=value`, when the flag's name contains, in any case, `token`, `secret`, `password`, `passwd`, `key`, `auth`, `credential` or `cookie`.
 
   Apply also the deployment's redaction rules, which the catalog file carries (section 5). In a URL that, normalized as section 3 says, starts with one of their prefixes, replace the path segment that follows the prefix with `<redacted>`, and write the URL normalized, also where it is a command-line argument. Treat the flags they name, each matched exactly without its leading dashes, like those above. Apply them to everything reported and to the references computed, so that references match the catalog's. Until a bundle is active, an instance has no rules and reports without them: the core applies them (CORE-11).
@@ -152,9 +156,10 @@ A report is complete: it replaces the instance's previous report for that agent.
 - **Observations.** For each agent, the core keeps the entries observed and when each was last seen. The console can then show tooling waiting for a decision, and enabled tooling the agent no longer has.
 - **Limits (contracts, section 4.8).**
   - A report holds at most 256 servers, 4,096 tools and 256 models.
-  - References and display forms are at most 2 KiB each, and names at most 256 bytes, so a full report fits in the 4 MiB message limit.
-  - Each description is at most 16 KiB, and each schema at most 64 KiB.
-  - The core MAY refuse, with `RESOURCE_EXHAUSTED`, more than one report per instance and agent every 10 seconds. The instance retries a refused report with the backoff of the contracts' other calls, no sooner than the error's `RetryInfo` says (contracts, section 4.7).
+  - References, endpoints and display forms are at most 2 KiB each, names at most 256 bytes, and versions, providers, built-in tools' types and digests at most 128 bytes, so a full report fits in the 4 MiB message limit in binary protobuf, at about 3.8 MiB. In JSON, escapes can make it larger (EP-13).
+  - Each description is at most 16 KiB, each schema at most 64 KiB, each title at most 256 bytes, and each tool's annotations at most 4 KiB.
+  - The core refuses as a whole, with `INVALID_ARGUMENT`, a report or a `ReportDefinitions` call over these limits: an enforcement point leaves out what does not fit them (EP-13).
+  - The core MAY refuse, with `RESOURCE_EXHAUSTED`, more than one report per instance and agent every 10 seconds. The instance retries a refused report with the backoff of the contracts' other calls, no sooner than the error's `RetryInfo` says (contracts, section 4.7), and with the agent's current tooling (EP-13).
 
 ### 5. The catalog in the bundle
 
@@ -209,7 +214,7 @@ Blocks name references, not keys, so an enforcement point applies them without w
 
 How blocks travel:
 
-- **In their own record of the watch stream.** A snapshot carries every active block, and changes carry the blocks added and the IDs of those removed. The first part of a snapshot carries the record, with the fleet state, and a snapshot's record replaces the instance's whole set of blocks. A change adds the blocks it carries, replacing one whose ID the instance knows, and removes the IDs it lists, ignoring those it does not know. Only enforcement points' streams carry the record. A block (`Block`) carries its ID, its kind (`server`, `tool`, `model`, `provider` or `endpoint`), the SHA-256 of what it covers and its issue time. What it covers is hashed in its string form (section 3): the reference of a server, a tool or a model, the name of a provider, or the normalized base URL of an endpoint. Hashes keep blocks small, and keep local paths out of a record that every enforcement point receives; the references and the reasons stay in the core, which shows them. Enforcement points compute the hashes of an entry once, when a tool list or a model changes, never on each call.
+- **In their own record of the watch stream.** A snapshot carries every active block, and changes carry the blocks added and the IDs of those removed. The first part of a snapshot carries the record, with the fleet state, and a snapshot's record replaces the instance's whole set of blocks. A change adds the blocks it carries, replacing one whose ID the instance knows, and removes the IDs it lists, ignoring those it does not know. Only enforcement points' streams carry the record. A block (`Block`) carries its ID, its kind (`server`, `tool`, `model`, `provider` or `endpoint`), the SHA-256 of what it covers and its issue time. What it covers is hashed as the UTF-8 bytes of its string form (section 3): the reference of a server, a tool or a model, the name of a provider, or the normalized base URL of an endpoint. Hashes keep blocks small, and keep local paths out of a record that every enforcement point receives; the references and the reasons stay in the core, which shows them. Enforcement points compute the hashes of an entry once, when a tool list or a model changes, never on each call.
 - **Versions.** Blocks take their versions from the same version counter as the rest of the state ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 2), so a lease renewal still means "your state is current" (CORE-6).
 - **CORE-12.** A block is committed, and the stream updated, without waiting for any bundle, as for halts (CORE-8).
 - **EP-15. Blocks.** Apply a block as soon as it arrives. It denies every later call to, exposure of, and result from what it covers (section 7.1). A block of a kind the enforcement point does not know denies every tool and model call while it is active. Then acknowledge at once a state version at or above the one that carries the block, for at least one agent the instance serves, without waiting for the 60 seconds that EP-12 allows: it covers every earlier block, and the per-agent acknowledgements of EP-12 follow at their own pace. From these acknowledgements, the console shows how far each block has spread, as it does for halts.
@@ -279,7 +284,7 @@ Its context carries `calls_decided`: true when every call of the tool will be de
   - deny the model call if the denial is `catalog.definition_changed`;
   - otherwise, the enforcement point SHOULD deny the model call.
 
-  Exposure decisions MAY be reused until the bundle, the agent's state, the blocks, the tool's definition or whether its calls are decided change, so a model call normally costs no evaluation. An exposure decision is recorded when it is evaluated; reusing it writes nothing. Policies on `tool.expose` therefore SHOULD NOT depend on the time.
+  Exposure decisions MAY be reused until the bundle, the agent's state, the blocks, the tool's definition or whether its calls are decided change, or until the instance registers again, since its registration gives the subject's environment (contracts, I-7). A model call therefore normally costs no evaluation. An exposure decision is recorded when it is evaluated; reusing it writes nothing. Policies on `tool.expose` therefore SHOULD NOT read the context, except `calls_decided`: its other fields, such as the time and the task, change between the model calls that reuse a decision.
 
 A changed, possibly poisoned, description never reaches the model. Where the framework allows it, neither does any tool the agent may not use.
 
@@ -367,10 +372,11 @@ namespace WhiteTower {
     provider?: String      // for built-in tools
   };
 
+  // Every model has all three, from the catalog.
   entity Model {
-    provider?: String,
-    name?: String,
-    endpoint?: String      // the normalized base URL of the endpoint
+    provider: String,
+    name: String,
+    endpoint: String       // the normalized base URL of the endpoint
   };
 
   // Generated for each bundle from the catalog's argument declarations.
@@ -477,14 +483,14 @@ New event types emitted by the core:
 | `whitetower.catalog.discovered.v1` | None | A report brought entries the catalog did not have. The event lists their keys and the SHA-256 of their references, and names the reporting instance |
 | `whitetower.catalog.approved.v1` | None | An entry, a new definition of a tool or a new digest of a model was approved, with the pinned hash or digest and the classification |
 | `whitetower.catalog.declined.v1` | None | A reviewer declined an entry, a new definition or a new digest, with the reason. It stays not approved, and leaves the queue of what waits for review |
-| `whitetower.catalog.definition_changed.v1` | None | A reported definition or digest differs from the approved one; the event carries both, and names the reporting instance |
+| `whitetower.catalog.definition_changed.v1` | None | A reported definition or digest differs from the approved one; the event carries both hashes, or both digests, and names the reporting instance |
 | `whitetower.catalog.blocked.v1` | None | A block was issued, with its ID, its kind, the SHA-256 of what it covers and the key of the entry it covers when the catalog has one, the state version that carries it, its reason and its issuer |
 | `whitetower.catalog.unblocked.v1` | None | A block was lifted, with its ID, the state version, the requester and the approver |
 | `whitetower.tooling.enabled.v1` | Required | Entries were enabled for an agent, with the requester and the approver |
 | `whitetower.tooling.disabled.v1` | Required | Entries were disabled for an agent, with the person who disabled them and the reason |
 | `whitetower.tooling.observed.v1` | Required | The tooling observed for an agent changed: keys added and removed, and the reporting instance or the person who declared it |
 
-Events name references only by their SHA-256, because a local server's command line can hold a user name (NFR-20), and they carry no description or schema. An event lists at most 100 entries or keys, so that it stays within the 64 KiB of an event (contracts, section 4.8); more take several events. The events a report causes have the system as their actor.
+Events name references only by their SHA-256, so that a local server's command line, which can hold a user name, stays out of the audit log, and they carry no description or schema. The hash is not a pseudonym, though (Privacy, under Security considerations). An event lists at most 100 entries or keys, so that it stays within the 64 KiB of an event (contracts, section 4.8); more take several events. The events a report causes have the system as their actor.
 
 Events from enforcement points gain optional fields:
 
@@ -536,7 +542,7 @@ New vectors cover:
 - definition hashes, which the Go and Python stacks must compute alike, with integers beyond 2^53, `null` members, repeated names and lone surrogates;
 - the catalog check, its order and its place among the reasons, blocks included, on results too;
 - transforms, with the values each one cannot read, missing arguments and types;
-- usage rules: the operators each type takes, and the statements the generator produces;
+- usage rules: the operators each type takes, the statements the generator produces, and the decisions they give;
 - exposure, with calls decided and not decided;
 - bundles with a catalog file.
 
@@ -553,24 +559,28 @@ New scenarios:
 | S-22 Only exposed tools reach the model; a provider-run tool that cannot be removed fails the model call | EP-17, EP-18 |
 | S-23 Arguments follow the vectors | EP-19 |
 | S-24 Reports carry no secrets | EP-13, EP-14 |
+| S-32 Provider-run tools follow EP-18, with a model provider that the kit plays. Declared remote servers reach the provider narrowed to the tools enabled for the agent, and a request that would let it call another tool is denied. The calls it submits for approval are decided as `tool.invoke`, with their arguments, and answered with the decision, and a tool that a usage rule names is offered only while its calls are submitted. The calls its responses report yield `action.executed` with origin `provider`, and a response that lists a tool whose definition changed stops the tool's exposure | EP-17, EP-18 |
+
+S-25 to S-31 are RFC-0001's. The kit plays S-32's model provider at the endpoint that the driver gives the agent's model, and scripts the tools it lists, the calls it submits for approval and those it reports.
 
 ## Compatibility and versioning
 
 - **Additive:**
   - the new methods, action and reasons;
   - the event types, and the optional fields of existing events;
-  - the blocks record of the watch stream;
   - the new properties and context fields;
   - the enumeration value `builtin`.
 - **Not additive:**
   - the catalog file in bundles;
+  - the blocks record of the watch stream, since a new record may add a restriction within the version only if an instance that ignores it denies more (contracts, section 10): an enforcement point that ignores blocks allows what they deny, and its acknowledgements of the state versions that carry them would count them as applied;
   - the required properties of tools;
   - resource IDs that are keys;
   - per-tool argument records, which replace the single `ToolArgs` record of `v1alpha1`;
   - `tool.expose` among the actions an enforcement point's manifest must declare, with `tool.invoke` and `model.invoke`;
   - a `decision_id` that `action.executed` may leave out.
 
-  An enforcement point that does not support them rejects the new bundles. It keeps deciding with its last valid bundle, under policies the core has since replaced, or, with none, stays closed, and it reports `HEALTH_DEGRADED` while the core flags the drift (contracts, EP-7): incompatible, and safe in that it never allows what a bundle it verified did not.
+  An enforcement point that does not support them rejects the new bundles. It keeps deciding with its last valid bundle, under policies the core has since replaced, or, with none, stays closed, and it reports `HEALTH_DEGRADED` while the core flags the drift (contracts, EP-7): incompatible, and safe in that it never allows what a bundle it verified did not. Blocks are the exception, since they travel outside bundles: such an instance never applies them, so if these changes make `v1alpha2` (below), the core counts a block as applied only by the instances it serves `v1alpha2`.
+- **Later changes.** A new kind of block needs a new contract version: an enforcement point that does not know it denies every tool and model call while it is active (EP-15), which stops the instances that do not know it (contracts, section 10). The catalog file is a closed document (contracts, section 10): like the bundle manifest, it gains a member only as `whitetower.catalog.v2`, or in a new contract version, and step 12 names its format among the identifiers of the contracts' section 10.
 - **When it lands.** No module verifies bundles or decides on tools yet (P1-09 has not started). This RFC therefore proposes to land in `v1alpha1` before `contracts/v0.1.0` is tagged (contracts, section 10: changes before the tag are free). Plan P0-03 lands it, in a step of its own (step 12), and puts the new text in new sections (4.10, 5.10, 6.9 to 6.11 and 7.7), so that no section that other documents cite changes its number. If the tag comes first, the changes that are not additive make `v1alpha2`, served next to `v1alpha1`.
 - **Vectors.** The `v1alpha1` combination vectors that use a tool or a model are rewritten with per-tool records and a catalog.
 
@@ -582,7 +592,7 @@ This RFC changes two trust boundaries and adds a third:
 - **TB-1** shows what agents report to people, in the console and in the CLI.
 - **TB-10**, new, lies between the agent's process and its MCP servers and model providers (flows F16 and F17), which the threat model did not draw. Tool definitions and results come in across it, and provider-run tools act beyond it.
 
-Threat model version 0.1.1 records these additions, together with actor TA-11 (a malicious or compromised tool provider), assumption A-7 (model providers run only the tools a request declares, and report the calls they made), design changes DC-9 and DC-10, and accepted risk R-15:
+Threat model version 0.1.1 recorded these additions, together with actor TA-11 (a malicious or compromised tool provider), assumption A-7 (model providers run only the tools a request declares, and report the calls they made), design changes DC-9 and DC-10, and accepted risk R-15:
 
 | ID | STRIDE | Threat | Mitigation |
 | --- | --- | --- | --- |
@@ -598,7 +608,7 @@ Threat model version 0.1.1 records these additions, together with actor TA-11 (a
 
 **Unchanged risk.** An agent whose process is compromised can bypass its enforcement point (T-40), its catalog check and exposure included. This RFC does not change that: the risk stays R-01, answered by network quarantine and, in Phase 2, by the gateways and the harness.
 
-**Privacy.** Tool descriptions and schemas describe software, not people. Argument values used in decisions never reach evidence (contracts, section 8.3). URLs and command lines are redacted (EP-14, CORE-11), but a local path can still hold a user name: the catalog keeps references for review, and events name them only by their SHA-256 (section 9).
+**Privacy.** Tool descriptions and schemas describe software, not people. Argument values used in decisions never reach evidence (contracts, section 8.3). URLs and command lines are redacted (EP-14, CORE-11), but a local path can still hold a user name. The catalog keeps references for review, and shows them only to those who may view the catalog (`catalog.view`, P1-16). Events and blocks name references only by their SHA-256, which keeps their text out of the audit log and the watch stream, but is not a pseudonym (NFR-20): a path such as `/home/<user>/...` can be guessed, and its hash checked against a list of user names. Keys, which events carry in clear, never come from a command line (section 3).
 
 **Proposed security tests:**
 
@@ -655,7 +665,7 @@ The maintainer answered these questions on 2026-10-21. Plan P1-16 records the an
 | P0-03, step 12 | The contract text, protobuf, schemas and vectors of this RFC, before `contracts/v0.1.0` is tagged |
 | P1-16 (new): MCP servers, tools and models | The catalog and its workflow, reports and definitions, enablement, declared tooling, blocks, the redaction rules, the content of the catalog file and the argument declarations, the usage-rule form and compiler, the core event types of section 9, the API and the metrics |
 | P1-06 | The catalog file and a Cedar schema in each bundle, the seeded `wt-catalog` policy, and the check of `@rule` statements at submission |
-| P1-07 | `ReportTooling`, `ReportDefinitions` and the blocks record in the module API, the mock module's catalog behavior, and the scenarios S-18 to S-24 |
+| P1-07 | `ReportTooling`, `ReportDefinitions` and the blocks record in the module API, the mock module's catalog behavior, the kit's model provider, and the scenarios S-18 to S-24 and S-32 |
 | P1-08 | The halt path's design, which blocks share; the harness that measures halts with blocks active |
 | P1-09 | In LangGraph and the second framework: discovery, references and redaction, the catalog check, exposure through the framework's middleware, provider-run tools, arguments and transforms |
 | P1-10 | A new subplan, P1-10.7: MCP servers, Models, and the "MCP and Tools" tabs |

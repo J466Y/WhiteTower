@@ -153,7 +153,7 @@ Write the RFC and review it as [GOVERNANCE.md](../../../GOVERNANCE.md#rfc-proces
 
 [RFC-0002](../../rfcs/0002-mcp-servers-tools-and-models.md) lands in `v1alpha1` before `contracts/v0.1.0` is tagged, so its changes that are not additive need no `v1alpha2` (specification, section 10). P1-06, P1-07, P1-09 and P1-16 build on it, so it comes first.
 
-- **Specification:** the text of RFC-0002 goes into new sections (4.10, 5.10, 6.9 to 6.11 and 7.7), so that no section other documents cite changes its number, together with the changes it makes to sections 2, 4.3, 4.4, 4.8, 5.1, 5.2, 5.4, 5.7, 5.9, 6.3, 6.4, 6.6, 6.7, 7.1, 7.4, 8.5 and 9 to 12, and to the appendices. It supersedes the `ToolArgs` extension point of section 6.7, and closes the question of section 12 on tool arguments.
+- **Specification:** the text of RFC-0002 goes into new sections (4.10, 5.10, 6.9 to 6.11 and 7.7), so that no section other documents cite changes its number, together with the changes it makes to sections 2, 4.3, 4.4, 4.8, 4.9, 5.1, 5.2, 5.4, 5.7, 5.9, 6.3, 6.4, 6.6, 6.7, 7.1, 7.4, 8.5 and 9 to 12, and to the appendices. It supersedes the `ToolArgs` extension point of section 6.7, and closes the question of section 12 on tool arguments.
 - **Protobuf:** `RegistryService.ReportTooling` and `RegistryService.ReportDefinitions`, and the blocks record of the watch stream (`Block`, in snapshots and in changes). Schemas and annotations travel as JSON text, never as `google.protobuf.Struct`, whose numbers would change definition hashes. The kit's fake core gains the new methods in the same pull request, because it embeds no unimplemented handler; P1-07 gives them the behavior its scenarios need.
 - **Decision profile (`api/policy`):** the action `tool.expose`, the `catalog.*` reasons, the kind `builtin`, the properties and context fields, per-tool argument records, the Cedar schema of RFC-0002 section 7.6, the manifest's `catalog` field, and a JSON Schema of the catalog file (`whitetower.catalog.v1`).
 - **Manifest (`api/manifest`):** `tool.expose` among the actions an enforcement point must declare, with `tool.invoke` and `model.invoke`, and the examples updated.
@@ -559,3 +559,19 @@ The maintainer chose the recommended option of the seven minor points of the thi
 | 15. A block does not stop the result of a call in flight | The block row of the catalog check also applies to `tool.result` and `model.result` | RFC-0002, sections 6 and 7.1, and S-20; P1-09 |
 
 Step 12 carries them into the specification: section 6.6 gains the catalog check's place, and section 12, which lists what the review before `v1beta1` must settle, gains the live test of point 14. The six remaining minor points and the editorial notes follow.
+
+### 2026-10-26: RFC-0002's provisional review, part 3
+
+The maintainer chose the recommended option of the six minor points of the fourth batch, and the editorial notes, on 2026-10-26. This part applies them:
+
+| Point | Decision | Where |
+| --- | --- | --- |
+| 16. Three classifications of the RFC's compatibility contradict section 10 | The blocks record is not additive; a new kind of block needs a new contract version; the catalog file is a closed document, which gains a member only as `whitetower.catalog.v2` or in a new contract version | RFC-0002, Compatibility and versioning |
+| 17. A late report can undo a newer one, items over the limits are lost in silence, and some strings have no limit | One report per agent in flight, each retry with the current tooling; the enforcement point leaves out the items over the limits, logs them and reports `HEALTH_DEGRADED`; the core refuses a report over the limits as a whole (`INVALID_ARGUMENT`); a limit for every string, and the fit in 4 MiB stated for binary protobuf | RFC-0002, sections 4.1 and 4.2; P1-07, P1-09, P1-16 step 4 |
+| 18. The core's side of `ReportTooling` and `ReportDefinitions` is unstated | CORE-2 covers both, at the level of the call; `ReportDefinitions` carries `instance_id`; a definition that matches no hash of the instance's reports is refused on its own, and listed in the response | RFC-0002, section 4.1; P1-07, P1-16 step 4 |
+| 19. EP-18 has no scenario | S-32, with a model provider that the kit plays; the vectors of usage rules also give their decisions | RFC-0002, section 11; MOD-05; the architecture, P1-07, P1-09 |
+| 20. The Cedar schema leaves a model's attributes optional, and reused exposure decisions outlive what they depend on | `provider`, `name` and `endpoint` required; policies on `tool.expose` read no context but `calls_decided`; a new registration ends reused decisions | RFC-0002, sections 7.3 and 7.6; P1-09 |
+| 21. A reference's SHA-256 is taken for a pseudonym | It keeps the text out of events and blocks, but a path that can be guessed can be checked against it; references shown only with `catalog.view`; keys never from command lines | RFC-0002, sections 3 and 9, and Privacy; the threat model's assets, the domain model, P1-16 step 2 |
+| Editorial | `catalog.definition_changed` carries both hashes, or both digests; a reference is hashed as the UTF-8 bytes of its string form; threat model version 0.1.1 "recorded" | RFC-0002, sections 3, 6 and 9, and Security considerations |
+
+Step 12 carries them into the specification: CORE-2 lists `ReportTooling` and `ReportDefinitions`; section 4.9 adds tooling left out of a report to what `HEALTH_DEGRADED` means; section 9.3 gains S-32, which this part reserves there with S-18 to S-24, and section 9.2 the kit's model provider, which P1-07.2 builds; and section 10 names `whitetower.catalog.v1` among its identifiers, as a closed document. Every point of the review is now decided and applied. The pull request that accepts RFC-0002 follows.

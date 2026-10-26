@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Draft v0.1, open for review |
-| **Date** | 2026-09-28; updated 2026-09-29 (ADR-0011, network quarantine), 2026-09-30 (threat model), 2026-10-19 ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): MCP servers, tools and models) and 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): the halt tracker, halt acknowledgements, versions, renewals and reads, sections 3.1, 5.3, 6 and 9) |
+| **Date** | 2026-09-28; updated 2026-09-29 (ADR-0011, network quarantine), 2026-09-30 (threat model), 2026-10-19 ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): MCP servers, tools and models), 2026-10-20 (the design of the halt path, plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes): the halt tracker, halt acknowledgements, versions, renewals and reads, sections 3.1, 5.3, 6 and 9) and 2026-10-26 (the review of RFC-0002: scenario S-32, section 13) |
 | **Related** | [Requirements](../requirements/mvp-requirements.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md), [Threat model](../security/threat-model.md) |
 
 This document describes how the MVP is built: its components, the interfaces between them, the flows that matter most, and how it is deployed. The reasons behind each choice are in the ADRs; this document only links to them. Normative details (exact schemas, messages and states) are produced by the Phase 0 plans and will replace the sketches marked as such here.
@@ -526,7 +526,7 @@ Anything added to the "builds" tables needs an ADR explaining why integration wa
 | The sealer limits audit throughput | Spike S3: at 2,000 events per second the sealer was busy 18% of the time, with a p99 sealing delay of 341 ms, and it kept up at 10,000 per second ([S3](../spikes/S3-audit-throughput.md)) |
 | Fail-closed turns core outages into fleet outages | High availability, TTL tuned per risk tier, alerting on lease health; documented as an accepted trade-off (ADR-0005) |
 | Blocks or catalog changes slow halts | Blocks travel in their own record of the watch stream, as hashes, at most 500, and never rebuild bundles (DC-9); bundle rebuilds run in chunks (P1-06); halts are measured with 500 active blocks (ST-80, NFR-24) |
-| Frameworks and model providers differ in what an enforcement point can see or change in a model request | Exposure fails closed where a tool cannot be removed (EP-17, EP-18); conformance scenarios S-18 to S-24; what a provider does with the tools it runs stays a residual risk (threat model, T-79 and A-7) |
+| Frameworks and model providers differ in what an enforcement point can see or change in a model request | Exposure fails closed where a tool cannot be removed (EP-17, EP-18); conformance scenarios S-18 to S-24, and S-32 with a model provider that the kit plays; what a provider does with the tools it runs stays a residual risk (threat model, T-79 and A-7) |
 | Reports flood the catalog or its reviewers | Limits, and a rate limit per instance and agent; a bound on each agent's entries waiting for review (DC-10); discovered entries stay inert until reviewed (T-74) |
 | The Go core and the Python enforcement point compute references or definition hashes differently | Vectors for string forms and definition hashes run on both stacks (P0-03 step 12); the core recomputes every hash it stores |
 | Contracts change often during the alpha | `v1alpha1` label, RFC process, breaking-change checks in CI |
