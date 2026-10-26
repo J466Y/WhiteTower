@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted provisionally with [RFC-0001](../rfcs/0001-module-contracts-v0.1.md) on 2026-10-23 |
-| **Date** | 2026-09-29; updated 2026-10-22 (the Rego wrapper and decision points, from the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)) |
+| **Date** | 2026-09-29; updated 2026-10-22 (the Rego wrapper and decision points, from the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)) and 2026-10-26 (`tool.expose`, from [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md), step 9 |
 | **Contract** | [module-contract-v0.1.md](module-contract-v0.1.md) |
 
@@ -21,7 +21,7 @@ What was verified in [spike S1](../spikes/S1-agt.md), with `agent-governance-too
 | Gate (section 5.4) | Has none | The adapter provides it, exactly as White Tower's own enforcement point does |
 | Watch, leases, halts | No control-plane protocol | The adapter runs the watch client and the lease timer |
 | Decision request (6.1 to 6.4) | `PolicyEvaluator` receives a context with the agent ID and the tool name; its `CedarBackend` hard-codes its entity types | The adapter registers a White Tower backend that builds the profile's request on `cedarpy`, about 25 lines in S1 |
-| Actions (6.3) | The intervention points of its new policy runtime (ACS) map one to one to the profile's actions | ACS is an alpha with native wheels for Linux x86-64 only; until it stabilizes, the adapter hooks the frameworks' own integrations |
+| Actions (6.3) | The intervention points of its new policy runtime (ACS) map one to one to the profile's actions, but for `tool.expose`, which ACS lacks (section 6.10) | ACS is an alpha with native wheels for Linux x86-64 only; until it stabilizes, the adapter hooks the frameworks' own integrations, where it also evaluates `tool.expose` before each model call |
 | Combining algorithm (6.5) | Its own YAML rules come first, first match wins; then it consults only the first external backend | Configure no AGT rules, and one White Tower backend holding the global and agent-specific policies as one Cedar policy set. Rule 4 (errors deny) is implemented in the backend |
 | Bundles (7) | Loads policies from local files or pinned URLs | The adapter fetches through `GetBundle`, verifies (section 7.4), and gives the backend the policy set |
 | Halt layers (5.5) | `KillSwitch.kill()` runs a registered callback with a 5-second timeout, and reports `terminated=True` even when a blocking thread keeps running | The adapter closes its gate first and reports each layer itself; AGT's kill is one way to interrupt, never the proof |
