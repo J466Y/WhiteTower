@@ -543,3 +543,19 @@ Step 12 carries these decisions into the specification, the schemas and the vect
 - `gowebpki/jcs` cannot compute definition hashes as it is: it writes 18446744073709551615 as 18446744073709552000.
 
 The 13 minor points and the editorial notes follow in later parts.
+
+### 2026-10-26: RFC-0002's provisional review, part 2
+
+The maintainer chose the recommended option of the seven minor points of the third batch on 2026-10-26, and marked one of them, point 14, for a live test. This part applies them:
+
+| Point | Decision | Where |
+| --- | --- | --- |
+| 9. The catalog check has no place among the reasons of section 6.6 | After `error.unknown_agent` and before `error.invalid_request`; `catalog.*` decisions carry no determining policies | RFC-0002, section 7.1; P1-09 |
+| 10. The evidence of a catalog denial cannot say what was denied | Tooling that the catalog does not list is named by its name, with `reference_sha256`; a denial by a block carries `block_id` | RFC-0002, sections 7.1 and 9; P1-09 |
+| 11. The operators of usage rules have no types | A table of the operators that each type takes; values never empty, and one for the comparisons; the generator refuses the rest | RFC-0002, section 8; P1-16 step 6 |
+| 12. Each statement of a rule repeats the whole rule | Each annotation carries the rule's ID and description, its statement's tool and the conditions; a rule is the set of its statements, compared once parsed | RFC-0002, section 8; P1-06, P1-16 step 6 |
+| 13. An argument's path can be read two ways | Paths through objects only, with no `.` or `:` in declared names; the entries of `args` carry their path and their transform | RFC-0002, sections 5 and 7.5; P1-09, P1-16 step 2 |
+| 14. The blocks record leaves its rules to the design of the halt path | The first part of a snapshot carries it, only enforcement points' streams do, and a snapshot replaces the set; EP-15 acknowledges at once, for one agent of the instance. Provisional: a live test with real enforcement points confirms it before `v1beta1` | RFC-0002, section 6 and S-20; P1-07, P1-09 step 14, P1-16 step 7 |
+| 15. A block does not stop the result of a call in flight | The block row of the catalog check also applies to `tool.result` and `model.result` | RFC-0002, sections 6 and 7.1, and S-20; P1-09 |
+
+Step 12 carries them into the specification: section 6.6 gains the catalog check's place, and section 12, which lists what the review before `v1beta1` must settle, gains the live test of point 14. The six remaining minor points and the editorial notes follow.

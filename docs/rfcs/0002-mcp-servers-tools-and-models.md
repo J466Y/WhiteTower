@@ -172,7 +172,7 @@ Each agent's bundle carries a catalog file, `catalog.json`, listed in the bundle
       "key": "github/create_pull_request", "server": "github", "name": "create_pull_request",
       "kind": "mcp", "origin": "agent", "status": "approved", "enabled": true,
       "definition": "4d1c…", "read_only": false, "destructive": false, "open_world": true,
-      "args": [{ "name": "base", "path": "base", "type": "String" }]
+      "args": [{ "name": "base", "path": ["base"], "type": "String" }]
     }
   ],
   "models": [
@@ -187,7 +187,7 @@ Each agent's bundle carries a catalog file, `catalog.json`, listed in the bundle
 - **Status and enablement.** `status` comes from the catalog and is `discovered` or `approved`; `enabled` comes from the agent's enablement. An agent is enabled to use tools and models, so servers carry no `enabled` field, and a tool of an MCP server can be approved only once its server is. Blocks never appear in the file: they travel in the watch stream (section 6).
 - **Pinned values.** `definition` and `digest` are pinned when the entry, or its new definition or digest, is approved.
 - **Classification.** `read_only`, `destructive` and `open_world` are set by the reviewer. They start from the tool's MCP annotations, or, when those are absent, from the protocol's conservative defaults: not read-only, destructive, open world. Annotations are hints from the server; the catalog's values have been reviewed.
-- **Arguments.** `args` lists the tool's arguments that policies may see (section 7.5).
+- **Arguments.** `args` lists the tool's arguments that policies may see (section 7.5): each with its name, which is its key in `context.args`; its path, as the array of the property names that lead to it; its transform, when it has one; and its type.
 - **Redaction rules.** `redaction` carries the deployment's redaction rules (EP-14): URL prefixes, after each of which the next path segment is a secret, and flag names whose values are secrets, beyond those EP-14 lists. Some services put an account's secret in a URL's path, as Zapier's MCP server does. The rules are a setting of the platform administrator (P1-16, through the API of P1-17), and a change rebuilds every bundle.
 - **Size.** The core keeps every bundle within the limit of step V1 (2 MiB). The entries enabled for the agent come first: a request to enable an entry that would take the agent's bundle over the limit is refused, with that reason. Entries observed but not enabled are listed while they fit, those seen most recently first; one left out is denied as `catalog.unknown`, the decision it would get anyway, with a less precise reason. A tool takes a few hundred bytes of the file: an agent with 300 tools has a file of about 130 KiB, while one at the limits of a report (section 4.2) would need from about 1.8 MiB, with short references, to 4.5 MiB. When the enabled entries and the policies alone do not fit, the core publishes no bundle: the agent keeps the one it has, and the console says why (P1-06).
 - **Every bundle carries one,** empty when nothing is observed or enabled for the agent. An enforcement point that supports catalogs treats a bundle without one as an empty catalog: every tool and model action is then `catalog.unknown`.
@@ -209,11 +209,13 @@ Blocks name references, not keys, so an enforcement point applies them without w
 
 How blocks travel:
 
-- **In their own record of the watch stream.** A snapshot carries every active block, and changes carry the blocks added and the IDs of those removed. A block (`Block`) carries its ID, its kind (`server`, `tool`, `model`, `provider` or `endpoint`), the SHA-256 of what it covers and its issue time. What it covers is hashed in its string form (section 3): the reference of a server, a tool or a model, the name of a provider, or the normalized base URL of an endpoint. Hashes keep blocks small, and keep local paths out of a record that every enforcement point receives; the references and the reasons stay in the core, which shows them. Enforcement points compute the hashes of an entry once, when a tool list or a model changes, never on each call.
+- **In their own record of the watch stream.** A snapshot carries every active block, and changes carry the blocks added and the IDs of those removed. The first part of a snapshot carries the record, with the fleet state, and a snapshot's record replaces the instance's whole set of blocks. A change adds the blocks it carries, replacing one whose ID the instance knows, and removes the IDs it lists, ignoring those it does not know. Only enforcement points' streams carry the record. A block (`Block`) carries its ID, its kind (`server`, `tool`, `model`, `provider` or `endpoint`), the SHA-256 of what it covers and its issue time. What it covers is hashed in its string form (section 3): the reference of a server, a tool or a model, the name of a provider, or the normalized base URL of an endpoint. Hashes keep blocks small, and keep local paths out of a record that every enforcement point receives; the references and the reasons stay in the core, which shows them. Enforcement points compute the hashes of an entry once, when a tool list or a model changes, never on each call.
 - **Versions.** Blocks take their versions from the same version counter as the rest of the state ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 2), so a lease renewal still means "your state is current" (CORE-6).
 - **CORE-12.** A block is committed, and the stream updated, without waiting for any bundle, as for halts (CORE-8).
-- **EP-15. Blocks.** Apply a block as soon as it arrives. It denies every later call to, and exposure of, what it covers. A block of a kind the enforcement point does not know denies every tool and model call while it is active. Then acknowledge the state version that carries the block, per agent for an instance that serves several (contracts, EP-12), without waiting for the 60 seconds EP-12 allows, so the console shows how far each block has spread, as it does for halts.
+- **EP-15. Blocks.** Apply a block as soon as it arrives. It denies every later call to, exposure of, and result from what it covers (section 7.1). A block of a kind the enforcement point does not know denies every tool and model call while it is active. Then acknowledge at once a state version at or above the one that carries the block, for at least one agent the instance serves, without waiting for the 60 seconds that EP-12 allows: it covers every earlier block, and the per-agent acknowledgements of EP-12 follow at their own pace. From these acknowledgements, the console shows how far each block has spread, as it does for halts.
 - **Halts stay fast.** Blocks never enlarge the fleet record that fleet halts change, so a fleet halt costs the same with or without blocks. The core caps active blocks at 500, about 40 KB in a snapshot, which keeps them within one watch message. P1-16 measures halt propagation with that many blocks active, with the harness of P1-08.
+
+**Provisional.** The rules of the record and EP-15's acknowledgement are applied provisionally: the maintainer decided on 2026-10-26 that a live test, with real enforcement points in a real environment, confirms them before the contracts leave alpha (`v1beta1`). The end-to-end test of P1-09 runs it (its step 14), and its findings go to the review that precedes `v1beta1`.
 
 ### 7. Decisions
 
@@ -230,9 +232,11 @@ For `tool.invoke`, `tool.expose` (section 7.3) and `model.invoke`, an enforcemen
 | 5 | The tool's definition, as the agent has it now, differs from the pinned one | `catalog.definition_changed` |
 | 6 | A digest is pinned for the model, and the runtime's digest differs or is unknown | `catalog.digest_mismatch` |
 
-Blocks come first, so they also cover entries the bundle does not list. A catalog denial carries the bundle's version, because the catalog is part of the bundle.
+Blocks come first, so they also cover entries the bundle does not list. A catalog denial carries the bundle's version, because the catalog is part of the bundle, and no determining policies. For `tool.result` and `model.result`, which an enforcement point SHOULD evaluate (contracts, section 6.3), only row 1 applies: a block issued while a call runs keeps its result from the agent and its model.
 
-- **EP-16. Catalog check.** Apply the catalog check to every `tool.invoke`, `tool.expose` and `model.invoke`. Resolve the tool or the model by its reference at the time of the call, never by its name alone. Anything that cannot be resolved is `catalog.unknown`. A decision with a `catalog.*` reason carries `bundle_version`, as the policy reasons do (contracts, section 6.6).
+Among the reasons of the contracts' section 6.6, the catalog check comes after `error.unknown_agent`, since it needs the agent's bundle, and before `error.invalid_request`, since the arguments' types, and what transforms can read, come from the catalog (EP-19). The order is therefore the gate, `error.unknown_agent`, the catalog check, `error.invalid_request`, `error.timeout`, then rules 1 to 4.
+
+- **EP-16. Catalog check.** Apply the catalog check to every `tool.invoke`, `tool.expose` and `model.invoke`, and its first row to every `tool.result` and `model.result` evaluated. Resolve the tool or the model by its reference at the time of the call, never by its name alone. Anything that cannot be resolved is `catalog.unknown`. A decision with a `catalog.*` reason carries `bundle_version`, as the policy reasons do (contracts, section 6.6), and no determining policies. It names tooling that the catalog does not list by its name as the agent sees it, with the SHA-256 of its reference, and a block by its ID (section 9).
 
 What passes the check is enabled for the agent. P1-06 seeds a global policy, named `wt-catalog`, that permits the tool and model actions, so that an enabled entry is usable unless a policy forbids it:
 
@@ -299,7 +303,7 @@ This section answers RFC-0001's open question on tool arguments.
 - **Which arguments.** Policies see two sets of a tool's arguments: those that the usage rules of the agent's effective policy set use, and those a reviewer declared for the tool in the catalog. The core lists them in the catalog file (`args`) and declares them in the bundle's Cedar schema. A policy version with a statement that reads any other argument is refused when it is submitted: enforcement points never fill that argument, so the condition could never hold.
 - **Declarations stay stable.** A declaration that an active policy version reads cannot be withdrawn, and a declared argument's type cannot change while an active usage rule uses it. A new definition that gives the argument another type can still be approved; a value that does not fit the declared type then denies the call (EP-19).
 - **One record per tool.** `context.args` holds one record per tool, keyed by the tool's key, with the declared arguments inside: `context.args["github/create_pull_request"]["base"]`. Per-tool records keep types unambiguous: `id` can be a number for one tool and a string for another. The arguments of the agent's own tools (`agent/<name>`) are declared only in that agent's schema, because the same name can mean other arguments in another agent: global policies, and their usage rules, cannot read them.
-- **Naming.** An argument is named by its path in the call's arguments, for example `options.base` for a nested field. When a transform applies, a colon and the transform's name follow: `path:path`, `url:url_host`.
+- **Naming.** An argument is named by its path in the call's arguments, for example `options.base` for a nested field. When a transform applies, a colon and the transform's name follow: `path:path`, `url:url_host`. A path goes through objects only, never into an array's elements, and a property whose name contains `.` or `:` cannot be declared, so that a name reads only one way.
 
 | Transform | Value |
 | --- | --- |
@@ -418,13 +422,24 @@ Each condition has the following fields:
 | --- | --- |
 | `equals`, `not_equals` | The value is, or is not, the single value given |
 | `in`, `not_in` | The value is, or is not, one of the values. For an array: at least one element is in them, or at least one element is not |
-| `matches`, `not_matches` | The string matches, or does not match, one of the patterns. Patterns are Cedar `like` patterns, where `*` matches any sequence of characters |
+| `matches`, `not_matches` | The string matches one of the patterns, or matches none of them. Patterns are Cedar `like` patterns, where `*` matches any sequence of characters |
 | `less_than`, `greater_than` | The integer is smaller, or larger, than the value |
 
-A rule compiles to two Cedar `forbid` statements per tool, each annotated with the rule's canonical JSON: one forbids the calls that match the rule's conditions, and the other forbids offering the tool to a model while its calls are not decided (section 7.3):
+Each operator takes some types only, since Cedar cannot test each element of a set against a pattern or a bound:
+
+| Argument type | Operators |
+| --- | --- |
+| String | `equals`, `not_equals`, `in`, `not_in`, `matches`, `not_matches` |
+| Integer | `equals`, `not_equals`, `in`, `not_in`, `less_than`, `greater_than` |
+| Boolean | `equals`, `not_equals` |
+| Set of strings or of integers | `in`, `not_in` |
+
+`values` is never empty, and holds exactly one value for `equals`, `not_equals`, `less_than` and `greater_than`. Its values have the argument's type, or are patterns for `matches` and `not_matches`. Transforms apply to strings and to sets of strings. The generator refuses any other rule.
+
+A rule compiles to two Cedar `forbid` statements per tool. Each is annotated with `@rule`, the canonical JSON of the rule's ID and description, the statement's tool and the rule's conditions, so that an annotation grows with the conditions, never with the number of tools. One statement forbids the calls that match the conditions; the other forbids offering the tool to a model while its calls are not decided (section 7.3):
 
 ```cedar
-@rule("{\"id\":\"no-push-to-main\",\"tools\":[\"github/push_files\"],\"when\":[{\"arg\":\"branch\",\"op\":\"in\",\"values\":[\"main\",\"master\"]}]}")
+@rule("{\"description\":\"Pushes to main go through pull requests\",\"id\":\"no-push-to-main\",\"tool\":\"github/push_files\",\"when\":[{\"arg\":\"branch\",\"op\":\"in\",\"values\":[\"main\",\"master\"]}]}")
 forbid (
   principal,
   action == WhiteTower::Action::"tool.invoke",
@@ -435,7 +450,7 @@ forbid (
   else true
 };
 
-@rule("{\"id\":\"no-push-to-main\",\"tools\":[\"github/push_files\"],\"when\":[{\"arg\":\"branch\",\"op\":\"in\",\"values\":[\"main\",\"master\"]}]}")
+@rule("{\"description\":\"Pushes to main go through pull requests\",\"id\":\"no-push-to-main\",\"tool\":\"github/push_files\",\"when\":[{\"arg\":\"branch\",\"op\":\"in\",\"values\":[\"main\",\"master\"]}]}")
 forbid (
   principal,
   action == WhiteTower::Action::"tool.expose",
@@ -446,7 +461,7 @@ forbid (
 ```
 
 - **Ordinary policies.** Rules live in ordinary policies, global or agent-specific, and follow the same approval workflow: adding a rule needs the same approvals as any other policy text (unresolved question 2). The console edits them as forms. Each statement carries its rule in the annotation, so the policy text is the only source of truth.
-- **Generated text is checked.** When a policy version is submitted, the core regenerates each statement that carries `@rule` from its annotation, and refuses the version unless the statement is exactly what the generator produces. A reviewer can therefore trust the form the console shows. The generator takes each argument's type from the catalog's declarations, because a condition compiles differently for a string and for a set.
+- **Generated text is checked.** The statements of one policy whose annotations carry a rule's ID make up the rule: they carry the same description and conditions, and both statements of each of its tools. When a policy version is submitted, the core regenerates each statement that carries `@rule` from its annotation, and refuses the version unless every statement equals, once parsed, what the generator produces, and every rule is whole. The annotation's JSON is written as a Cedar string, its quotes and backslashes escaped with a backslash. A reviewer can therefore trust the form the console shows. The generator takes each argument's type from the catalog's declarations, because a condition compiles differently for a string and for a set.
 - **Evidence names the rule.** Decision events name each rule that decided by its policy and its rule ID (section 9), so the audit log says "denied by `no-push-to-main`".
 - **Limits.**
   - Cedar's `like` is the only pattern language, so rules can use no regular expressions.
@@ -474,6 +489,7 @@ Events name references only by their SHA-256, because a local server's command l
 Events from enforcement points gain optional fields:
 
 - `decision.made` gains the usage rules that decided, each named by its policy ID and its rule ID, and the resource's origin.
+- `decision.made` and `action.executed` gain `reference_sha256`, the SHA-256 of the string form of the resource's reference, for tooling that the catalog does not list: the resource's `id` is then its name as the agent sees it, and the hash is the one that `catalog.discovered` carries, so the console links the event to the entry. `decision.made` also gains `block_id`, for `catalog.blocked`.
 - `action.executed` gains the origin. Its `decision_id` becomes optional, and is absent for the provider-run calls that no decision preceded.
 
 ### 10. Outside the contracts
@@ -518,8 +534,9 @@ New vectors cover:
 
 - references, normalized URLs, their string forms, and redaction, with the deployment's rules;
 - definition hashes, which the Go and Python stacks must compute alike, with integers beyond 2^53, `null` members, repeated names and lone surrogates;
-- the catalog check and its order, blocks included;
+- the catalog check, its order and its place among the reasons, blocks included, on results too;
 - transforms, with the values each one cannot read, missing arguments and types;
+- usage rules: the operators each type takes, and the statements the generator produces;
 - exposure, with calls decided and not decided;
 - bundles with a catalog file.
 
@@ -531,7 +548,7 @@ New scenarios:
 | --- | --- |
 | S-18 A report makes nothing usable | CORE-10, EP-16 |
 | S-19 Unknown, discovered, disabled and blocked tooling is denied with its reason, before policies | EP-16 |
-| S-20 A block denies within the halt propagation target, timed as section 9.2 of the contracts says, without a new bundle, and is acknowledged once applied | EP-15, CORE-12 |
+| S-20 A block denies within the halt propagation target, timed as section 9.2 of the contracts says, without a new bundle, and is acknowledged once applied. The result of a call in flight when it arrives does not reach the agent, where the module evaluates `tool.result`, and a snapshot that no longer carries the block lifts it | EP-15, CORE-12 |
 | S-21 A tool whose definition changed is denied and not exposed | EP-16, EP-17 |
 | S-22 Only exposed tools reach the model; a provider-run tool that cannot be removed fails the model call | EP-17, EP-18 |
 | S-23 Arguments follow the vectors | EP-19 |

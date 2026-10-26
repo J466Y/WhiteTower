@@ -161,9 +161,10 @@ Steps 9 to 12 are the enforcement point's side of RFC-0002, which the hooks of s
 
 ### 10. Catalog check and blocks (EP-15, EP-16; CAT-04, CAT-05)
 
-- For `tool.invoke`, `tool.expose` and `model.invoke`, after the gate and before policies, deny with the first reason that applies, in the six-row order of RFC-0002, section 7.1: `catalog.blocked`, `catalog.unknown`, `catalog.not_approved`, `catalog.not_enabled`, `catalog.definition_changed`, `catalog.digest_mismatch`. A catalog denial carries the bundle's version.
+- For `tool.invoke`, `tool.expose` and `model.invoke`, after the gate and `error.unknown_agent`, and before `error.invalid_request` and policies, deny with the first reason that applies, in the six-row order of RFC-0002, section 7.1: `catalog.blocked`, `catalog.unknown`, `catalog.not_approved`, `catalog.not_enabled`, `catalog.definition_changed`, `catalog.digest_mismatch`. For `tool.result` and `model.result`, only the block row applies, so a block also withholds the result of a call in flight.
+- A catalog denial carries the bundle's version and no determining policies. Tooling that the catalog does not list is named by its name as the agent sees it, with `reference_sha256`, and a denial by a block carries its `block_id` (RFC-0002, section 9).
 - Resolve the tool or the model by its reference at the time of the call, never by its name alone; anything unresolved is `catalog.unknown`. Blocks come first, so they also cover entries the bundle does not list.
-- **Blocks** are matched by the SHA-256 of the string form of what they cover: the reference of a server, a tool or a model, the name of a provider, or the normalized base URL of an endpoint. A block of a server covers its tools. Blocks are indexed by kind and hash, so a call costs a few lookups, never a scan of 500 blocks. A block of a kind the enforcement point does not know denies every tool and model call while it is active.
+- **Blocks** are matched by the SHA-256 of the string form of what they cover: the reference of a server, a tool or a model, the name of a provider, or the normalized base URL of an endpoint. A block of a server covers its tools. Blocks are indexed by kind and hash, so a call costs a few lookups, never a scan of 500 blocks. A block of a kind the enforcement point does not know denies every tool and model call while it is active. A snapshot's blocks replace the whole set, and a change adds and removes blocks by ID. Once a block is applied, the enforcement point acknowledges at once a state version at or above the block's, for one of the agents it serves (EP-15).
 - A pinned model digest is checked against the runtime's, for example the digest that Ollama lists for the model, cached per endpoint and model. An unknown digest denies.
 
 **Done when:** the catalog-check vectors, S-19 and S-20 pass.
@@ -179,7 +180,7 @@ Steps 9 to 12 are the enforcement point's side of RFC-0002, which the hooks of s
 
 ### 12. Arguments and transforms (EP-19; CAT-06)
 
-- Fill `context.args["<tool key>"]` with the declared arguments only (the catalog's `args`), named by their path (`options.base`), with the types the catalog declares.
+- Fill `context.args["<tool key>"]` with the declared arguments only (the catalog's `args`): each under its name, read at its path, an array of property names through objects only, with its transform and the type the catalog declares.
 - Apply the transforms exactly:
   - `lowercase`: ASCII letters only;
   - `path`, `url_host` and `email_domain`: as RFC-0002 section 7.5 defines them, never through the standard library's parsers. `posixpath.normpath` keeps a leading `//`, and `urllib.parse` reads some hosts otherwise than requests and Node do;
@@ -199,8 +200,9 @@ OpenTelemetry metrics: gate state, remaining lease, active bundle version, buffe
 - Run the conformance kit against the enforcement point, wrapping a sample agent, S-18 to S-24 included.
 - End-to-end test in Compose: register an agent, approve it and its policy, activate it; the demo agent runs and its decisions reach the audit log; halt it and check the gate closes within target; release and reinstate it.
 - Once P1-16 steps 5 and 7 are merged, the end-to-end test adds the tooling: the demo MCP server is discovered, approved and enabled, then usable; its tool's description changes, and the tool is denied and hidden until the new definition is approved (ST-76); a block denies without a new bundle.
+- **The live test of blocks.** The maintainer decided on 2026-10-26 that the rules of RFC-0002's blocks record and EP-15's acknowledgement stay provisional until a live test, with real enforcement points in a real environment, confirms them. With several of these enforcement points, and P1-07's mock module as an instance that serves several agents, the test issues and lifts blocks, cuts and restores streams so that a snapshot replaces the set, and checks that each block's spread in the console matches what each enforcement point applied. It runs in the Compose stack with the end-to-end test, and once on Kubernetes, from P1-12's Helm chart. Its findings go to the review of RFC-0002 that precedes `v1beta1`.
 
-**Done when:** both run in CI.
+**Done when:** both run in CI, the live test of blocks included, and the live test has run once on Kubernetes.
 
 ### 15. Measurements
 
