@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"sync"
@@ -73,6 +74,10 @@ func TestSubscribersResyncThenReceiveInOrder(t *testing.T) {
 	m.Interrupt()
 	m.Send("governance", "5")
 	r.expect(t, "resync", "5")
+	if err := m.PublishCommitted(context.Background(), "governance", "6"); err != nil {
+		t.Fatal(err)
+	}
+	r.expect(t, "6")
 	r.quiet(t)
 }
 
@@ -156,6 +161,9 @@ func TestChannelsAndPayloadsAreChecked(t *testing.T) {
 	for _, channel := range []string{"", "Governance", "1st", "has-hyphen", "has.dot", strings.Repeat("a", 41)} {
 		if _, err := m.Subscribe(channel, newRecorder()); err == nil {
 			t.Errorf("subscribed to %q", channel)
+		}
+		if err := m.PublishCommitted(context.Background(), channel, "1"); err == nil {
+			t.Errorf("published on %q", channel)
 		}
 		if err := checkChannel(channel); err == nil {
 			t.Errorf("%q passed", channel)

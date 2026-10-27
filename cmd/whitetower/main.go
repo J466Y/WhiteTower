@@ -25,6 +25,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/authz"
+	"github.com/J466Y/WhiteTower/internal/govstate"
 	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
@@ -264,6 +265,15 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
 	auditLog := audit.NewLog(database).WithWriter(writer)
 	authorizer := authz.NewAuthorizer()
+
+	// The notifications across replicas, which the domain plans publish and
+	// subscribe to. The bus stops before the database closes.
+	bus := notify.NewPostgres(notify.PostgresOptions{DB: database, Logger: logger, Metrics: metrics.NewNotify(registry)})
+	// Every domain that writes the governance state takes its versions from
+	// the version counter, through the same Versions, which announces each
+	// change on the bus once it commits.
+	versions := govstate.NewVersions(bus, logger)
+
 	api := rest.Handler(rest.Options{
 		Logger:        logger,
 		Authenticator: authenticator,
@@ -276,12 +286,11 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Exchanger:     oidcSvc,
 		AuditLog:      auditLog,
 		Inventory: inventory.New(inventory.Options{
-			DB:         database,
-			Clock:      clock.System,
-			Writer:     writer,
-			Authorizer: authorizer,
-			// P1-07 replaces it with the governance state's own versions.
-			Versions:    inventory.SequenceVersions{},
+			DB:          database,
+			Clock:       clock.System,
+			Writer:      writer,
+			Authorizer:  authorizer,
+			Versions:    versions,
 			RoleMapping: cfg.Auth.OIDC.RoleMapping,
 		}),
 	})
@@ -305,10 +314,8 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		return err
 	}
 
-	// The notifications across replicas and the background jobs, which the
-	// domain plans subscribe to and register. They stop before the database
-	// closes.
-	bus := notify.NewPostgres(notify.PostgresOptions{DB: database, Logger: logger, Metrics: metrics.NewNotify(registry)})
+	// The background jobs, which the domain plans register. They stop before
+	// the database closes.
 	replica, _ := os.Hostname()
 	runner := jobs.New(jobs.Options{DB: database, Replica: replica, Logger: logger, Metrics: metrics.NewJobs(registry)})
 	if err := runner.Add(authn.CleanupSessionsJob(sessionStore)); err != nil {

@@ -17,10 +17,12 @@ import (
 	"github.com/J466Y/WhiteTower/internal/api/rest/problem"
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authz"
+	"github.com/J466Y/WhiteTower/internal/govstate"
 	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
+	"github.com/J466Y/WhiteTower/internal/platform/notify"
 )
 
 // Otto has the owner role, as Olivia does; Omar is an operator.
@@ -61,7 +63,8 @@ func inventoryOptions(t *testing.T, people map[string]string) Options {
 	opts := options(io.Discard)
 	opts.Authorizer = authz.NewAuthorizer()
 	opts.Inventory = inventory.New(inventory.Options{
-		DB: pool, Clock: clk, Writer: audit.NewWriter(catalog, clk), Authorizer: opts.Authorizer, Versions: inventory.SequenceVersions{},
+		DB: pool, Clock: clk, Writer: audit.NewWriter(catalog, clk), Authorizer: opts.Authorizer,
+		Versions:    govstate.NewVersions(notify.NewMemory(), opts.Logger),
 		RoleMapping: map[string]string{"wt-owner": "owner"},
 	})
 	return opts

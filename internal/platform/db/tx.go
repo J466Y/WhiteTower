@@ -56,7 +56,8 @@ func (t *Tx) BeforeCommit(fn func(ctx context.Context) error) {
 // in the transaction, such as work outside the database. fn gets a context
 // that the caller's cancellation does not end, and handles its own failures:
 // the change is already made. Notifications to the other replicas need no
-// hook: notify.Bus sends them in the transaction itself.
+// hook: notify.Bus sends them in the transaction itself, except those of the
+// governance state, which go after commit (docs/development/internals.md).
 func (t *Tx) AfterCommit(fn func(ctx context.Context)) {
 	t.afterCommit = append(t.afterCommit, fn)
 }

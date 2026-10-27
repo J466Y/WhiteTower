@@ -112,6 +112,27 @@ func TestNotificationsReachEveryReplica(t *testing.T) {
 	}
 }
 
+// A notification published outside any transaction, for a change already
+// committed, reaches every replica, its own included.
+func TestANotificationOfACommittedChangeReachesEveryReplica(t *testing.T) {
+	d := dbtest.New(t)
+	a := listen(t, d, "replica-a", PostgresOptions{})
+	b := listen(t, d, "replica-b", PostgresOptions{})
+	onA, onB := newRecorder(), newRecorder()
+	subscribe(t, a, "governance", onA)
+	subscribe(t, b, "governance", onB)
+	onA.expect(t, "resync")
+	onB.expect(t, "resync")
+
+	if err := a.PublishCommitted(context.Background(), "governance", "45"); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range []*recorder{onA, onB} {
+		r.expect(t, "45")
+		r.quiet(t)
+	}
+}
+
 // Notifications arrive in the order their transactions commit.
 func TestNotificationsKeepTheCommitOrder(t *testing.T) {
 	d := dbtest.New(t)
@@ -202,10 +223,15 @@ func TestPublishChecksItsInput(t *testing.T) {
 		{"governance", strings.Repeat("x", MaxPayload+1), "exceeds"},
 		{"governance", "a\x00b", "without NUL"},
 	} {
-		// The input is refused before the transaction is used.
+		// The input is refused before the transaction, or the database, is
+		// used.
 		if err := b.Publish(context.Background(), nil, tt.channel, tt.payload); err == nil ||
 			!strings.Contains(err.Error(), tt.want) {
 			t.Errorf("%q: got %v, want %q", tt.channel, err, tt.want)
+		}
+		if err := b.PublishCommitted(context.Background(), tt.channel, tt.payload); err == nil ||
+			!strings.Contains(err.Error(), tt.want) {
+			t.Errorf("%q, once committed: got %v, want %q", tt.channel, err, tt.want)
 		}
 	}
 	if _, err := b.Subscribe("has-hyphen", newRecorder()); err == nil {

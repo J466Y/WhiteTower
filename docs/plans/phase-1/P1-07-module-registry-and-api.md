@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | Ready: the first pull request of P1-07.1; the rest after P1-05 |
+| **Status** | In progress (1 of 13 pull requests); the rest after P1-05 |
 | **Size** | XL, split into two subplans: **[P1-07.1](P1-07-module-registry-and-api/P1-07.1-module-api-and-governance-state.md)** (steps 1 to 7, about 5 weeks: generated code, authentication and authorization, registration, sessions, the governance state service with the blocks record, acknowledgements, event ingestion) and **[P1-07.2](P1-07-module-registry-and-api/P1-07.2-mock-module-kit-and-load-test.md)** (the tooling reports of step 7, once P1-16's pull request 3 is merged, then steps 8 to 10, about 3 weeks: the mock module, the conformance kit with S-01 to S-32, the load test). The first pull request of P1-07.1 is the version mechanism of the halt path ([design note](P1-08-kill-switch.md#progress-notes), section 14), which needs nothing from P1-05 and lands ahead of it |
 | **Depends on** | P0-03, P1-01, P1-05 (can start with stub authentication); P0-03 step 12 (RFC-0002 in the contracts) for the parts of RFC-0002; P1-16 step 4 for the wiring of tooling reports (step 7) |
 | **Unblocks** | P1-08, P1-09, P1-10.5; P1-04 pull request 4, through the first pull request of P1-07.1; P1-16 step 7, through the blocks record of step 5 and, for ST-80, the mock module of step 8 |
