@@ -112,6 +112,10 @@ func (e *EP) Run(ctx context.Context) {
 	}
 }
 
+// session registers, then watches until the stream ends. PERMISSION_DENIED
+// from either call ends the lease at once, and so does FAILED_PRECONDITION
+// from RegisterInstance; Run then registers again with backoff, never taking
+// the code as final (section 4.6).
 func (e *EP) session(ctx context.Context) error {
 	reg, err := e.registry.RegisterInstance(ctx, connect.NewRequest(&modulev1alpha1.RegisterInstanceRequest{
 		Module:           "conformance-stub",
@@ -121,6 +125,12 @@ func (e *EP) session(ctx context.Context) error {
 		AgentIds:         []string{e.cfg.AgentID},
 	}))
 	if err != nil {
+		// From RegisterInstance, FAILED_PRECONDITION refuses the contract
+		// versions or the manifest hash, which only an operator's action
+		// changes, so it counts as PERMISSION_DENIED.
+		if code := connect.CodeOf(err); code == connect.CodePermissionDenied || code == connect.CodeFailedPrecondition {
+			e.endLease()
+		}
 		return err
 	}
 	e.mu.Lock()
@@ -141,7 +151,27 @@ func (e *EP) session(ctx context.Context) error {
 			return err
 		}
 	}
-	return stream.Err()
+	// PERMISSION_DENIED ends the lease, whether the stream had delivered
+	// messages or not, and even when the client's library made the code up,
+	// as connect-go does for an HTTP 403: that only closes the gate sooner.
+	// Any other end leaves the lease running, and the stub registers again
+	// and resumes from the version it applied.
+	err = stream.Err()
+	if connect.CodeOf(err) == connect.CodePermissionDenied {
+		e.endLease()
+	}
+	return err
+}
+
+// endLease ends the lease at once, as PERMISSION_DENIED from RegisterInstance
+// or Watch requires (section 4.6): the gate closes with gate.lease_expired
+// until a fresh renewal after the stub registers again. The stub serves one
+// agent, so this is every lease it holds. It keeps its state and the version
+// it applied, from which it resumes.
+func (e *EP) endLease() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.leaseDeadline = time.Time{}
 }
 
 // receive applies one message of a watch stream, then syncs the bundle.
@@ -178,7 +208,8 @@ func (e *EP) receive(ctx context.Context, msg *modulev1alpha1.WatchResponse, pen
 }
 
 // applySnapshot replaces the state with a complete snapshot, unless the
-// snapshot is below the version applied (section 5.2).
+// snapshot is below the version applied (section 5.2). An agent that the
+// snapshot does not carry leaves the scope (I-11).
 func (e *EP) applySnapshot(s *modulev1alpha1.SnapshotPart, version uint64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -194,12 +225,16 @@ func (e *EP) applySnapshot(s *modulev1alpha1.SnapshotPart, version uint64) {
 			e.agent = a
 		}
 	}
+	if e.agent == nil {
+		e.leaveScopeLocked()
+	}
 	e.deactivateUnnamedBundleLocked()
 }
 
 // applyChange applies a change, unless the change is below the version
 // applied. The agent's state in it is applied whatever that state's own
-// version (section 5.2).
+// version (section 5.2). An agent that the change lists as removed leaves the
+// scope (I-11).
 func (e *EP) applyChange(c *modulev1alpha1.StateChange, version uint64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -217,10 +252,22 @@ func (e *EP) applyChange(c *modulev1alpha1.StateChange, version uint64) {
 	}
 	for _, id := range c.GetRemovedAgentIds() {
 		if id == e.cfg.AgentID {
-			e.agent = nil
+			e.leaveScopeLocked()
 		}
 	}
 	e.deactivateUnnamedBundleLocked()
+}
+
+// leaveScopeLocked drops the state and the lease of an agent that left the
+// scope, at once (I-11): the gate closes with gate.no_state, and once a change
+// or a snapshot brings the agent back, it stays closed with
+// gate.lease_expired until the next fresh renewal. The stub queues no
+// acknowledgements, so it has none to drop, and it keeps its active bundle:
+// the gate never opens without the agent's state, and the state that brings
+// the agent back names the bundle to use (EP-7). Callers hold e.mu.
+func (e *EP) leaveScopeLocked() {
+	e.agent = nil
+	e.leaseDeadline = time.Time{}
 }
 
 // deactivateUnnamedBundleLocked deactivates the active bundle when the
@@ -361,7 +408,8 @@ func (e *EP) Decide(action profile.Action, resource profile.Resource, ctx profil
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	gate := profile.GateState{
-		StateReceived:  e.stateReceived && e.agent != nil,
+		StateReceived:  e.stateReceived,
+		AgentInState:   e.agent != nil,
 		LeaseValid:     !e.leaseDeadline.IsZero() && time.Now().Before(e.leaseDeadline),
 		AgentHalted:    len(e.agent.GetHalts()) > 0,
 		FleetHalted:    len(e.fleet.GetHalts()) > 0,

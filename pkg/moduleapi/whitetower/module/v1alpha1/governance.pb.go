@@ -556,7 +556,8 @@ type isWatchResponse_Message interface {
 
 type WatchResponse_SnapshotPart struct {
 	// Part of a snapshot. A snapshot replaces the client's whole state, and
-	// takes effect only when its last part arrives.
+	// takes effect when its last part arrives, but the client may apply the
+	// halts of each part as soon as the part arrives (contract, section 5.2).
 	SnapshotPart *SnapshotPart `protobuf:"bytes,2,opt,name=snapshot_part,json=snapshotPart,proto3,oneof"`
 }
 
@@ -580,13 +581,18 @@ func (*WatchResponse_LeaseRenewal) isWatchResponse_Message() {}
 type SnapshotPart struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// True for the first part of a snapshot. The client starts collecting a new
-	// snapshot and keeps its current state until the last part arrives.
+	// snapshot and keeps its current state until the last part arrives, except
+	// for the halts of each part, which it may apply as soon as the part
+	// arrives.
 	First bool `protobuf:"varint,1,opt,name=first,proto3" json:"first,omitempty"`
 	// True for the last part. The client then replaces its state atomically.
 	Last bool `protobuf:"varint,2,opt,name=last,proto3" json:"last,omitempty"`
-	// The fleet state. Present in the first part.
+	// The fleet state. Present in the first part: a snapshot whose first part
+	// lacks it is malformed, and the client keeps its current state and
+	// reconnects with the backoff of I-4 (contract, section 5.2).
 	Fleet *FleetState `protobuf:"bytes,3,opt,name=fleet,proto3" json:"fleet,omitempty"`
-	// Agents in the instance's scope.
+	// Agents in the instance's scope. An agent that the snapshot does not carry
+	// has left the scope (I-11).
 	Agents        []*AgentState `protobuf:"bytes,4,rep,name=agents,proto3" json:"agents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -658,8 +664,9 @@ type StateChange struct {
 	Agents []*AgentState `protobuf:"bytes,1,rep,name=agents,proto3" json:"agents,omitempty"`
 	// The new fleet state, when it changed.
 	Fleet *FleetState `protobuf:"bytes,2,opt,name=fleet,proto3" json:"fleet,omitempty"`
-	// Agents that left the instance's scope. The instance must deny everything
-	// for them from now on.
+	// Agents that left the instance's scope. Each loses its state and its lease
+	// at once, the instance drops the acknowledgements it has queued for it,
+	// and an enforcement point's gate for it closes with gate.no_state (I-11).
 	RemovedAgentIds []string `protobuf:"bytes,3,rep,name=removed_agent_ids,json=removedAgentIds,proto3" json:"removed_agent_ids,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -1621,7 +1628,8 @@ func (x *StateAcknowledgement) GetVersion() uint64 {
 	return 0
 }
 
-// AcknowledgeResponse is empty: the acknowledgements were recorded.
+// AcknowledgeResponse is empty. The core recorded the acknowledgements, apart
+// from those it counts and does not record (Acknowledge).
 type AcknowledgeResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields

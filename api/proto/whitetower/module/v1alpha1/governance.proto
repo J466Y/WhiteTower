@@ -37,6 +37,13 @@ service GovernanceService {
 
   // Acknowledge reports what the instance did with the state it received:
   // halt layers, bundle activations and the state version applied.
+  //
+  // A failure of the call itself, such as an instance that the caller's
+  // principal did not register, refuses the whole call with
+  // PERMISSION_DENIED. A failure of one acknowledgement decides that
+  // acknowledgement only: one about an agent outside the instance's scope is
+  // counted and not recorded, as one about a halt the core does not know is
+  // (CORE-2).
   rpc Acknowledge(AcknowledgeRequest) returns (AcknowledgeResponse) {
     option idempotency_level = IDEMPOTENT;
   }
@@ -69,7 +76,8 @@ message WatchResponse {
   // What the message carries.
   oneof message {
     // Part of a snapshot. A snapshot replaces the client's whole state, and
-    // takes effect only when its last part arrives.
+    // takes effect when its last part arrives, but the client may apply the
+    // halts of each part as soon as the part arrives (contract, section 5.2).
     SnapshotPart snapshot_part = 2;
     // A change after the snapshot, in version order.
     StateChange change = 3;
@@ -81,13 +89,18 @@ message WatchResponse {
 // SnapshotPart is part of a complete state.
 message SnapshotPart {
   // True for the first part of a snapshot. The client starts collecting a new
-  // snapshot and keeps its current state until the last part arrives.
+  // snapshot and keeps its current state until the last part arrives, except
+  // for the halts of each part, which it may apply as soon as the part
+  // arrives.
   bool first = 1;
   // True for the last part. The client then replaces its state atomically.
   bool last = 2;
-  // The fleet state. Present in the first part.
+  // The fleet state. Present in the first part: a snapshot whose first part
+  // lacks it is malformed, and the client keeps its current state and
+  // reconnects with the backoff of I-4 (contract, section 5.2).
   FleetState fleet = 3;
-  // Agents in the instance's scope.
+  // Agents in the instance's scope. An agent that the snapshot does not carry
+  // has left the scope (I-11).
   repeated AgentState agents = 4;
 }
 
@@ -98,8 +111,9 @@ message StateChange {
   repeated AgentState agents = 1;
   // The new fleet state, when it changed.
   FleetState fleet = 2;
-  // Agents that left the instance's scope. The instance must deny everything
-  // for them from now on.
+  // Agents that left the instance's scope. Each loses its state and its lease
+  // at once, the instance drops the acknowledgements it has queued for it,
+  // and an enforcement point's gate for it closes with gate.no_state (I-11).
   repeated string removed_agent_ids = 3;
 }
 
@@ -356,5 +370,6 @@ message StateAcknowledgement {
   uint64 version = 1;
 }
 
-// AcknowledgeResponse is empty: the acknowledgements were recorded.
+// AcknowledgeResponse is empty. The core recorded the acknowledgements, apart
+// from those it counts and does not record (Acknowledge).
 message AcknowledgeResponse {}

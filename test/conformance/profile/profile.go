@@ -351,6 +351,9 @@ func toValue(v any) (types.Value, error) {
 type GateState struct {
 	// A complete snapshot has been applied since the instance started.
 	StateReceived bool `json:"state_received"`
+	// The agent is in the state applied: it has not left the instance's
+	// scope since a snapshot or a change brought it in (I-11).
+	AgentInState bool `json:"agent_in_state"`
 	// The agent's lease has not expired.
 	LeaseValid bool `json:"lease_valid"`
 	// An agent or selector halt covers the agent.
@@ -370,7 +373,7 @@ type GateState struct {
 // (section 5.4).
 func GateReason(s GateState) string {
 	switch {
-	case !s.StateReceived:
+	case !s.StateReceived || !s.AgentInState:
 		return ReasonNoState
 	case !s.LeaseValid:
 		return ReasonLeaseExpired

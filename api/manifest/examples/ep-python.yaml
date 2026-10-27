@@ -53,18 +53,12 @@ spec:
         type: string
       credentials:
         description: How the enforcement point authenticates as the agent.
-        oneOf:
-          - type: object
-            required: [privateKeyFile, keyId]
-            additionalProperties: false
-            properties:
-              privateKeyFile: {type: string}
-              keyId: {type: string}
-          - type: object
-            required: [workloadIdentityTokenFile]
-            additionalProperties: false
-            properties:
-              workloadIdentityTokenFile: {type: string}
+        type: object
+        required: [privateKeyFile, keyId]
+        additionalProperties: false
+        properties:
+          privateKeyFile: {type: string}
+          keyId: {type: string}
       bundleKeys:
         description: File with the bundle signing keys the enforcement point trusts, its trust root.
         type: string
