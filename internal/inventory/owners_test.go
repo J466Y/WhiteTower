@@ -54,6 +54,17 @@ func (f *fixture) lockWaits(t *testing.T) int {
 	return n
 }
 
+// awaitLockWaits waits until n sessions of the test's database wait for a
+// lock.
+func (f *fixture) awaitLockWaits(t *testing.T, n int) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); f.lockWaits(t) < n; time.Sleep(5 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("%d sessions never waited for a lock", n)
+		}
+	}
+}
+
 // openInboxItems counts the open inbox items about the transfer.
 func (f *fixture) openInboxItems(t *testing.T, transfer uuid.UUID) int {
 	t.Helper()
@@ -293,7 +304,8 @@ func TestATransferWaitsForItsRecipient(t *testing.T) {
 		}
 		events := f.events(t, "whitetower.agent.ownership_changed.v1")
 		last := events[len(events)-1].data
-		if last["change"] != "transfer_accepted" || last["former_owner"] != f.olivia.ID || last["transfer_id"] != tr.ID.String() {
+		if last["change"] != "transfer_accepted" || last["former_owner"] != f.olivia.ID || last["transfer_id"] != tr.ID.String() ||
+			last["state_version"] != float64(f.stateVersion(t, a.ID)) {
 			t.Errorf("event data %v", last)
 		}
 	})
@@ -405,11 +417,7 @@ func TestReassignmentsUnderWayTogetherHappenOneAfterTheOther(t *testing.T) {
 			errs <- err
 		}()
 	}
-	for deadline := time.Now().Add(10 * time.Second); f.lockWaits(t) < 2; time.Sleep(5 * time.Millisecond) {
-		if time.Now().After(deadline) {
-			t.Fatal("the reassignments never waited for a lock")
-		}
-	}
+	f.awaitLockWaits(t, 2)
 	free()
 	if err := <-holder; err != nil {
 		t.Fatal(err)

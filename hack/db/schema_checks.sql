@@ -1,5 +1,5 @@
 -- Checks the invariants the database itself enforces (plan P0-02, step 7).
--- Run as a superuser on a database where 00001_init.sql has been applied:
+-- Run as a superuser on a database where the migrations have been applied:
 --   psql -v ON_ERROR_STOP=1 -f hack/db/schema_checks.sql
 -- Every block raises an exception, and psql stops, if an invariant is broken.
 -- P1-01 turns these checks into Go integration tests.
@@ -31,7 +31,7 @@ INSERT INTO whitetower.audit_events (id, source, event_id, type, event_time, act
           '00000000-0000-7000-8000-000000000001', 'agent.create', 'success', convert_to('{}', 'UTF8'));
 INSERT INTO whitetower.lifecycle_transitions (id, agent_id, action, from_state, to_state, actor_type, actor_id, state_version)
   VALUES (gen_random_uuid(), '00000000-0000-7000-8000-000000000020', 'create', NULL, 'draft', 'human',
-          '00000000-0000-7000-8000-000000000001', nextval('whitetower.governance_state_version_seq'));
+          '00000000-0000-7000-8000-000000000001', whitetower.next_governance_version());
 INSERT INTO whitetower.outbox (topic, payload) VALUES ('test', '{}');
 SELECT whitetower.ensure_audit_partitions(6);
 RESET ROLE;
@@ -104,7 +104,7 @@ SELECT pg_temp.must_fail('a submitted policy version changes its content',
 
 INSERT INTO whitetower.halts (id, scope, agent_id, reason, issued_by_type, issued_by, state_version) VALUES
   ('00000000-0000-7000-8000-000000000040', 'agent', '00000000-0000-7000-8000-000000000020', 'suspected exfiltration',
-   'human', '00000000-0000-7000-8000-000000000003', nextval('whitetower.governance_state_version_seq'));
+   'human', '00000000-0000-7000-8000-000000000003', whitetower.next_governance_version());
 SELECT pg_temp.must_fail('a halt is released without an approved request',
   $$UPDATE whitetower.halts SET status = 'released', released_at = now()
     WHERE id = '00000000-0000-7000-8000-000000000040'$$, '42501');
@@ -182,5 +182,31 @@ BEGIN
   RAISE NOTICE 'ok: % monthly audit partitions', n;
 END
 $$;
+
+-- 6. Versions of the governance state come only from the version counter,
+-- and each record carries its transaction's (plan P1-07.1). The checks of
+-- section 4 on governance_state still fail on their CHECK constraints: those
+-- answer before the version check.
+SET ROLE wt_app;
+SELECT pg_temp.must_fail('runtime role draws a version from the sequence',
+  $$SELECT nextval('whitetower.governance_state_version_seq')$$, '42501');
+SELECT pg_temp.must_fail('runtime role moves the version counter itself',
+  $$UPDATE whitetower.governance_head SET version = version + 1$$, '42501');
+SELECT pg_temp.must_fail('an agent''s state at a version its transaction did not take',
+  $$INSERT INTO whitetower.governance_state (agent_id, lifecycle_state, lease_ttl_seconds, state_version)
+    VALUES ('00000000-0000-7000-8000-000000000020', 'draft', 30, -1)$$, '23000');
+INSERT INTO whitetower.governance_state (agent_id, lifecycle_state, lease_ttl_seconds, state_version)
+  VALUES ('00000000-0000-7000-8000-000000000020', 'draft', 30, whitetower.next_governance_version());
+SELECT pg_temp.must_fail('an agent''s state changed to a version its transaction did not take',
+  $$UPDATE whitetower.governance_state SET lifecycle_state = 'proposed', state_version = -1$$, '23000');
+SELECT pg_temp.must_fail('the fleet''s state changed without a new version',
+  $$UPDATE whitetower.fleet_state SET updated_at = now()$$, '23000');
+SELECT pg_temp.must_fail('a halt at a version its transaction did not take',
+  $$INSERT INTO whitetower.halts (id, scope, reason, issued_by_type, state_version)
+    VALUES (gen_random_uuid(), 'fleet', 'a drill', 'system', -1)$$, '23000');
+SELECT pg_temp.must_fail('a lifecycle transition at a version its transaction did not take',
+  $$INSERT INTO whitetower.lifecycle_transitions (id, agent_id, action, to_state, actor_type, state_version)
+    VALUES (gen_random_uuid(), '00000000-0000-7000-8000-000000000020', 'create', 'draft', 'system', -1)$$, '23000');
+RESET ROLE;
 
 \echo 'All schema checks passed.'

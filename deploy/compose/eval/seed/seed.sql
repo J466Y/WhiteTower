@@ -44,3 +44,17 @@ VALUES
   ('00000000-0000-7000-8000-000000000202', '00000000-0000-7000-8000-000000000102', '00000000-0000-7000-8000-000000000001', 'primary', '00000000-0000-7000-8000-000000000001', now()),
   ('00000000-0000-7000-8000-000000000203', '00000000-0000-7000-8000-000000000103', '00000000-0000-7000-8000-000000000001', 'primary', '00000000-0000-7000-8000-000000000001', now())
 ON CONFLICT (id) DO NOTHING;
+
+-- What enforcement points know of each agent, as T1 writes it when an agent
+-- is proposed: its lease by risk tier, its halt mode and the attributes that
+-- policies see, at a version from the version counter.
+INSERT INTO whitetower.governance_state (agent_id, lifecycle_state, lease_ttl_seconds, halt_mode, attributes, state_version)
+SELECT a.id, a.lifecycle_state, (s.value ->> a.risk_tier)::integer, a.halt_mode,
+  jsonb_build_object('slug', a.slug, 'kind', a.kind, 'risk_tier', a.risk_tier,
+    'data_categories', to_jsonb(a.data_categories), 'labels', a.labels, 'owner_id', o.principal_id),
+  whitetower.next_governance_version()
+FROM whitetower.agents a
+JOIN whitetower.agent_owners o ON o.agent_id = a.id AND o.role = 'primary' AND o.ended_at IS NULL
+JOIN whitetower.settings s ON s.key = 'killswitch.lease_ttl_seconds'
+WHERE a.id IN ('00000000-0000-7000-8000-000000000101', '00000000-0000-7000-8000-000000000102', '00000000-0000-7000-8000-000000000103')
+ON CONFLICT (agent_id) DO NOTHING;

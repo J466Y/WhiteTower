@@ -40,6 +40,14 @@ type Bus interface {
 	// Publish sends payload on channel if, and once, tx commits: never for a
 	// change that rolls back, and in the order the transactions commit.
 	Publish(ctx context.Context, tx *db.Tx, channel, payload string) error
+	// PublishCommitted sends payload on channel at once, in a statement of
+	// its own, for a change that has already committed. Its notifications
+	// may arrive out of the order of the changes they announce. It serves
+	// the changes of the governance state, whose transactions must never
+	// wait for PostgreSQL's notification lock as they commit, nor fail at
+	// commit when its queue of notifications is full
+	// (docs/development/internals.md).
+	PublishCommitted(ctx context.Context, channel, payload string) error
 	// Subscribe passes the notifications of channel to s, until the
 	// returned function cancels the subscription. That function waits for
 	// s's methods to return, so they must not call it.

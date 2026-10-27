@@ -57,3 +57,11 @@ sql:
         <<: *go
         package: inventorydb
         out: internal/inventory/inventorydb
+  - engine: postgresql
+    schema: *schema
+    queries: internal/govstate/queries
+    gen:
+      go:
+        <<: *go
+        package: govstatedb
+        out: internal/govstate/govstatedb

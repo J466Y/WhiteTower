@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -12,11 +13,13 @@ import (
 	"github.com/J466Y/WhiteTower/api/events"
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authz"
+	"github.com/J466Y/WhiteTower/internal/govstate"
 	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
+	"github.com/J466Y/WhiteTower/internal/platform/notify"
 )
 
 var epoch = time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)
@@ -48,7 +51,7 @@ func setup(t *testing.T) *fixture {
 			Clock:      clk,
 			Writer:     audit.NewWriter(catalog, clk),
 			Authorizer: authz.NewAuthorizer(),
-			Versions:   inventory.SequenceVersions{},
+			Versions:   govstate.NewVersions(notify.NewMemory(), slog.New(slog.DiscardHandler)),
 			RoleMapping: map[string]string{
 				"wt-owner": "owner", "wt-advisory": "advisory", "wt-operator": "operator", "wt-user": "user",
 			},

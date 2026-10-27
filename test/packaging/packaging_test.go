@@ -3,7 +3,9 @@
 package packaging
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +13,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/J466Y/WhiteTower/internal/govstate"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 )
 
@@ -221,5 +224,36 @@ func TestEvaluationSeedScriptExecutesCleanly(t *testing.T) {
 	}
 	if ownerCount < 3 {
 		t.Errorf("expected at least 3 agent primary owners, got %d", ownerCount)
+	}
+
+	// Every agent has its governance state, as T1 writes it: the lease of its
+	// risk tier and the attributes of govstate.Attributes, at a version from
+	// the version counter.
+	rows, err := pool.Query(ctx, `SELECT a.slug, g.lease_ttl_seconds, g.attributes FROM whitetower.agents a
+		JOIN whitetower.governance_state g ON g.agent_id = a.id
+		JOIN whitetower.governance_head h ON h.version = g.state_version`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	leases := map[string]int32{"doc-indexer": 60, "portfolio-analyst-v1": 30, "support-bot-alpha": 60}
+	for rows.Next() {
+		var slug string
+		var lease int32
+		var raw []byte
+		if err := rows.Scan(&slug, &lease, &raw); err != nil {
+			t.Fatal(err)
+		}
+		var attrs govstate.Attributes
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&attrs); err != nil || lease != leases[slug] || attrs.Slug != slug ||
+			attrs.OwnerID.String() != "00000000-0000-7000-8000-000000000001" {
+			t.Errorf("%s: lease %d, attributes %s (%v)", slug, lease, raw, err)
+		}
+		delete(leases, slug)
+	}
+	if err := rows.Err(); err != nil || len(leases) != 0 {
+		t.Errorf("agents without a governance state at the head's version: %v (%v)", leases, err)
 	}
 }

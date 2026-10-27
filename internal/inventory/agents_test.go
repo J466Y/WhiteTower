@@ -341,7 +341,8 @@ func TestAHaltOfTheFleetHaltsEveryAgent(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	a := f.propose(t, "invoice-triage")
-	f.set(t, `UPDATE whitetower.fleet_state SET run_state = 'halted', halt_ids = ARRAY[$1::uuid]`, uuid.Must(uuid.NewV7()))
+	f.set(t, `UPDATE whitetower.fleet_state SET run_state = 'halted', halt_ids = ARRAY[$1::uuid],
+		state_version = whitetower.next_governance_version()`, uuid.Must(uuid.NewV7()))
 	got, err := f.inv.Get(ctx, f.alex, a.ID)
 	if err != nil || !got.Halted {
 		t.Fatalf("halted %v, %v", got.Halted, err)

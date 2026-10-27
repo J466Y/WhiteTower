@@ -214,9 +214,10 @@ func (inv *Inventory) Propose(ctx context.Context, caller auth.Principal, in New
 		if err != nil {
 			return err
 		}
-		// P1-08 folds the active selector halts into the new agent's
-		// governance state here, once selector halts exist.
-		version, err := inv.publishState(ctx, tx, created, now)
+		// T1 creates the agent's governance state, which every later change
+		// writes again. P1-08 folds the active selector halts into it here,
+		// once selector halts exist.
+		version, err := inv.putState(ctx, tx, created, now)
 		if err != nil {
 			return err
 		}

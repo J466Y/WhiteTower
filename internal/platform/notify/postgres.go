@@ -57,9 +57,11 @@ type PostgresOptions struct {
 
 // Postgres is the bus of a deployment. A change publishes its notification
 // in its own transaction, with NOTIFY, which PostgreSQL delivers when the
-// transaction commits. Each replica listens on one session of its own, and
-// passes what it receives to its subscribers; when the session fails, it
-// reconnects and tells every subscriber to resynchronize.
+// transaction commits; a change of the governance state publishes it once it
+// has committed, in a statement of its own. Each replica listens on one
+// session of its own, and passes what it receives to its subscribers; when
+// the session fails, it reconnects and tells every subscriber to
+// resynchronize.
 type Postgres struct {
 	opts PostgresOptions
 
@@ -88,6 +90,15 @@ func (b *Postgres) Publish(ctx context.Context, tx *db.Tx, channel, payload stri
 		return err
 	}
 	_, err := tx.Exec(ctx, "SELECT pg_notify($1, $2)", channelPrefix+channel, payload)
+	return err
+}
+
+// PublishCommitted implements Bus.
+func (b *Postgres) PublishCommitted(ctx context.Context, channel, payload string) error {
+	if err := errors.Join(checkChannel(channel), checkPayload(payload)); err != nil {
+		return err
+	}
+	_, err := b.opts.DB.Exec(ctx, "SELECT pg_notify($1, $2)", channelPrefix+channel, payload)
 	return err
 }
 

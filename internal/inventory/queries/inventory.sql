@@ -2,11 +2,6 @@
 -- The value of a setting, as JSON (domain model, section 5).
 SELECT value FROM whitetower.settings WHERE key = $1;
 
--- name: NextStateVersion :one
--- The next number of the sequence that orders every change of the
--- governance state.
-SELECT nextval('whitetower.governance_state_version_seq')::bigint;
-
 -- name: CreateUseCase :exec
 INSERT INTO whitetower.use_cases (
   id, title, description, business_justification, data_categories, affected_persons,
@@ -140,6 +135,11 @@ SELECT run_state = 'halted' FROM whitetower.fleet_state WHERE id = 1;
 SELECT agent_id FROM whitetower.governance_state
 WHERE agent_id = ANY(sqlc.arg(agent_ids)::uuid[]) AND run_state = 'halted';
 
+-- name: LockGovernanceState :one
+-- Locks the agent's governance state until the transaction ends, before the
+-- transaction takes its version.
+SELECT agent_id FROM whitetower.governance_state WHERE agent_id = $1 FOR NO KEY UPDATE;
+
 -- name: PutGovernanceState :exec
 -- Writes what enforcement points know of the agent, at a new state version.
 INSERT INTO whitetower.governance_state (
@@ -168,8 +168,11 @@ INSERT INTO whitetower.lifecycle_transitions (
 
 -- name: LockAgent :one
 -- Locks the agent's row until the transaction ends, so that the changes of
--- its owners and of its transfers happen one after the other.
-SELECT id FROM whitetower.agents WHERE id = $1 FOR UPDATE;
+-- its owners and of its transfers happen one after the other. The key-share
+-- locks of foreign keys pass this lock: the transaction that holds the
+-- version counter may insert a row that names the agent, such as a halt,
+-- while this one waits for the counter.
+SELECT id FROM whitetower.agents WHERE id = $1 FOR NO KEY UPDATE;
 
 -- name: TouchAgent :execrows
 -- Gives the agent a new version, for a change of its owners or of an

@@ -729,11 +729,14 @@ func (q *Queries) ListUseCases(ctx context.Context, arg ListUseCasesParams) ([]W
 }
 
 const lockAgent = `-- name: LockAgent :one
-SELECT id FROM whitetower.agents WHERE id = $1 FOR UPDATE
+SELECT id FROM whitetower.agents WHERE id = $1 FOR NO KEY UPDATE
 `
 
 // Locks the agent's row until the transaction ends, so that the changes of
-// its owners and of its transfers happen one after the other.
+// its owners and of its transfers happen one after the other. The key-share
+// locks of foreign keys pass this lock: the transaction that holds the
+// version counter may insert a row that names the agent, such as a halt,
+// while this one waits for the counter.
 func (q *Queries) LockAgent(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, lockAgent, id)
 	var id_2 uuid.UUID
@@ -741,17 +744,17 @@ func (q *Queries) LockAgent(ctx context.Context, id uuid.UUID) (uuid.UUID, error
 	return id_2, err
 }
 
-const nextStateVersion = `-- name: NextStateVersion :one
-SELECT nextval('whitetower.governance_state_version_seq')::bigint
+const lockGovernanceState = `-- name: LockGovernanceState :one
+SELECT agent_id FROM whitetower.governance_state WHERE agent_id = $1 FOR NO KEY UPDATE
 `
 
-// The next number of the sequence that orders every change of the
-// governance state.
-func (q *Queries) NextStateVersion(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, nextStateVersion)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+// Locks the agent's governance state until the transaction ends, before the
+// transaction takes its version.
+func (q *Queries) LockGovernanceState(ctx context.Context, agentID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockGovernanceState, agentID)
+	var agent_id uuid.UUID
+	err := row.Scan(&agent_id)
+	return agent_id, err
 }
 
 const pendingTransfers = `-- name: PendingTransfers :many

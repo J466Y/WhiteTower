@@ -10,9 +10,9 @@ import (
 )
 
 // Memory is a bus within one process, for unit tests. Publish delivers once
-// the transaction commits, as PostgreSQL does; Send delivers at once, as if
-// another replica had committed; and Interrupt plays a lost session, after
-// which every subscriber resynchronizes.
+// the transaction commits, as PostgreSQL does, and PublishCommitted at once;
+// Send delivers at once, as if another replica had committed; and Interrupt
+// plays a lost session, after which every subscriber resynchronizes.
 type Memory struct {
 	mu   sync.Mutex
 	subs subscriptions
@@ -29,6 +29,15 @@ func (m *Memory) Publish(_ context.Context, tx *db.Tx, channel, payload string) 
 		return err
 	}
 	tx.AfterCommit(func(context.Context) { m.Send(channel, payload) })
+	return nil
+}
+
+// PublishCommitted implements Bus: it delivers at once.
+func (m *Memory) PublishCommitted(_ context.Context, channel, payload string) error {
+	if err := errors.Join(checkChannel(channel), checkPayload(payload)); err != nil {
+		return err
+	}
+	m.Send(channel, payload)
 	return nil
 }
 
