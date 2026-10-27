@@ -4,8 +4,8 @@
   "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
   "ref": {
     "version": 42,
-    "manifest_sha256": "0716e134b5ddbc6b32598a593591d490a3704d48309a3e580c4862128eedb20a",
-    "size_bytes": 4182
+    "manifest_sha256": "42107be118cbc127ca9ff6ec1f1c22fd3263f456b1e1deb2ca97b1526aeb2afb",
+    "size_bytes": 4344
   },
   "active_version": 41,
   "expected": {

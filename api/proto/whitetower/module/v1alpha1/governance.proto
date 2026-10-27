@@ -249,9 +249,14 @@ message AgentAttributes {
   string kind = 1;
   // "low", "medium", "high" or "critical".
   string risk_tier = 2;
-  // Data categories the agent accesses, from the organization's taxonomy.
+  // Data categories the agent accesses, from the organization's taxonomy: at
+  // most 32, of at most 63 characters each, the bounds of the decision
+  // request's schema (CORE-17).
   repeated string data_categories = 3;
-  // Free-form labels set in the inventory.
+  // Labels set in the inventory. They follow the syntax and the bounds of the
+  // decision request's schema, so that a subject built from them is always
+  // valid: at most 64, whose keys match its pattern and whose values have at
+  // most 255 characters (CORE-17).
   map<string, string> labels = 4;
   // Pseudonymous principal ID of the agent's primary owner. Never a name or an
   // email address.
@@ -364,7 +369,8 @@ message BundleAcknowledgement {
 }
 
 // StateAcknowledgement reports the state version applied, so the console can
-// show instances that lag behind.
+// show instances that lag behind. An instance that serves several agents
+// acknowledges the state per agent, in one acknowledgement for each (EP-12).
 message StateAcknowledgement {
   // The last state version applied.
   uint64 version = 1;

@@ -195,7 +195,7 @@ type Expectation struct {
 	Languages []string
 }
 
-var policyPath = regexp.MustCompile(`^policies/(global|agent)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(cedar|rego)$`)
+var policyPath = regexp.MustCompile(`^policies/(global|agent)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.cedar$`)
 
 // Verify applies the verification steps of section 7.4 in order and returns
 // the manifest, or a *RejectError. A bundle whose version and hash equal the

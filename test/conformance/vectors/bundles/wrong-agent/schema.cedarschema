@@ -33,7 +33,8 @@ namespace WhiteTower {
 
   // A model the agent calls. Its ID is the model's name, for example "gpt-5".
   entity Model {
-    // The provider, for example "openai" or "local".
+    // The provider: a value of the table in section 6.3, such as "openai", or,
+    // for any other provider, a lowercase name of its own, such as "ollama".
     provider?: String
   };
 
@@ -55,7 +56,8 @@ namespace WhiteTower {
     task_id?: String,
     // The W3C trace ID of the request.
     trace_id?: String,
-    // Reserved for per-task delegated credentials (AID-08, Phase 2).
+    // Reserved for per-task delegated credentials (AID-08, Phase 2). A v1alpha1
+    // request never carries it (section 6.4).
     on_behalf_of?: String
   };
 

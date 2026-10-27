@@ -1105,9 +1105,14 @@ type AgentAttributes struct {
 	Kind string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
 	// "low", "medium", "high" or "critical".
 	RiskTier string `protobuf:"bytes,2,opt,name=risk_tier,json=riskTier,proto3" json:"risk_tier,omitempty"`
-	// Data categories the agent accesses, from the organization's taxonomy.
+	// Data categories the agent accesses, from the organization's taxonomy: at
+	// most 32, of at most 63 characters each, the bounds of the decision
+	// request's schema (CORE-17).
 	DataCategories []string `protobuf:"bytes,3,rep,name=data_categories,json=dataCategories,proto3" json:"data_categories,omitempty"`
-	// Free-form labels set in the inventory.
+	// Labels set in the inventory. They follow the syntax and the bounds of the
+	// decision request's schema, so that a subject built from them is always
+	// valid: at most 64, whose keys match its pattern and whose values have at
+	// most 255 characters (CORE-17).
 	Labels map[string]string `protobuf:"bytes,4,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Pseudonymous principal ID of the agent's primary owner. Never a name or an
 	// email address.
@@ -1582,7 +1587,8 @@ func (x *BundleAcknowledgement) GetReason() string {
 }
 
 // StateAcknowledgement reports the state version applied, so the console can
-// show instances that lag behind.
+// show instances that lag behind. An instance that serves several agents
+// acknowledges the state per agent, in one acknowledgement for each (EP-12).
 type StateAcknowledgement struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The last state version applied.
