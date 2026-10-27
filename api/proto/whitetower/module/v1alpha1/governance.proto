@@ -13,8 +13,26 @@ import "google/protobuf/timestamp.proto";
 service GovernanceService {
   // Watch streams the governance state of every agent in the instance's scope:
   // a snapshot, then changes in version order, with lease renewals in between.
-  // The stream never ends on its own except when the token that opened it
-  // expires or the server shuts down; clients reconnect and resume.
+  // The client sets no deadline on it.
+  //
+  // The core ends a stream with UNAUTHENTICATED no later than the expiry of
+  // the token that opened it (CORE-1), and ends a stream it cannot keep up to
+  // date, for example one whose client is too slow to read (CORE-7). It never
+  // refuses a stream because the instance holds others: it keeps at least two
+  // per instance, and when the instance opens more, it may end the oldest with
+  // ABORTED (CORE-16). The client does not reconnect a stream ended with
+  // ABORTED while it holds a newer one.
+  //
+  // Once a stream has delivered its first message, its failure is transient
+  // whatever its code, except UNAUTHENTICATED, which needs a new token first,
+  // and PERMISSION_DENIED, which ends every lease at once and has the client
+  // register again, never treating the code as final. The client then
+  // reconnects with backoff and resumes from the last version it applied.
+  // Before the first message, an error that the core sends is handled as
+  // section 4.6 of the contract says for its code, while a failure that the
+  // client's own library reports, such as a cut in the middle of a message, is
+  // transient. A stream that falls silent for longer than the renewal interval
+  // plus 5 seconds has failed too (I-9).
   rpc Watch(WatchRequest) returns (stream WatchResponse);
 
   // Acknowledge reports what the instance did with the state it received:
@@ -36,7 +54,16 @@ message WatchRequest {
 // WatchResponse is one message of the stream.
 message WatchResponse {
   // The state version the client has reached once it applies this message.
-  // For snapshot parts, the version of the whole snapshot.
+  // For snapshot parts, the version of the whole snapshot. A lease renewal
+  // carries the version at which the client's state is current, which may
+  // pass versions that carried nothing for the stream (CORE-6).
+  //
+  // The version applied never goes back: a client keeps the highest version
+  // it has applied, across all its streams, and ignores a change, or a whole
+  // snapshot, whose version is below it. A fresh renewal renews the leases
+  // whichever stream carries it, but never lowers that version. The agent
+  // states of a change the client applies are applied whatever their own
+  // version (contract, section 5.2).
   uint64 version = 1;
 
   // What the message carries.
@@ -81,9 +108,12 @@ message StateChange {
 // clock from the moment it received this message.
 message LeaseRenewal {
   // The core's clock when it sent the renewal. Required. A client ignores a
-  // renewal without it, or older than its tolerance (5 seconds by default) on
-  // the client's own clock, so a stream held back on its way lets leases run
-  // out instead of delaying halts (contract, section 5.3).
+  // renewal without it, or whose time is more than its tolerance before or
+  // after the client's own clock: 5 seconds by default, and at most 30. A
+  // renewal from the future is stale too, since a client whose clock is behind
+  // the core's would otherwise accept renewals as old as the tolerance plus
+  // its lag. So a stream held back on its way lets leases run out instead of
+  // delaying halts (contract, section 5.3).
   google.protobuf.Timestamp server_time = 1;
 }
 
@@ -104,7 +134,11 @@ message AgentState {
   repeated Halt halts = 5;
   // The agent's effective policy bundle. Absent while it has none.
   BundleRef bundle = 6;
-  // How long the lease lasts after each renewal.
+  // How long the lease lasts after each fresh renewal, from the agent's risk
+  // tier: 10 to 300 seconds. A client bounds what it receives: a TTL above 300
+  // seconds counts as 300, and one that is zero, negative or absent renews
+  // nothing; one under 10 seconds is applied as it is, never lengthened
+  // (contract, section 5.3).
   google.protobuf.Duration lease_ttl = 7;
   // What the agent's owner chose to happen to work in flight when it is halted.
   HaltMode halt_mode = 8;

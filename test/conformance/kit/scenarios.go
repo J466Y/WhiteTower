@@ -67,15 +67,17 @@ func StartClosed(ctx context.Context, core *Core, driver *Driver, fx Fixture) er
 	})
 }
 
-// staleBy is how old the stale renewals of scenario S-17 claim to be: far
-// beyond the contract's default tolerance of 5 seconds.
+// staleBy is how far the stale renewals of scenario S-17 are from the kit's
+// clock, before or after it: beyond the largest tolerance the contract lets
+// a module configure, 30 seconds.
 const staleBy = time.Minute
 
 // StaleRenewals is scenario S-17, for obligation EP-3 and section 5.3: a lease
-// renewal older than the tolerance, or without the core's time, renews
-// nothing, so a stream held back on its way cannot keep a lease alive. The
-// lease runs out within its TTL, and a fresh renewal renews it again. The
-// fixture's lease TTL sets how long the scenario takes.
+// renewal more than the tolerance before or after the module's clock, or
+// without the core's time, renews nothing, so a stream held back on its way
+// cannot keep a lease alive, and neither can a module whose clock is behind
+// the core's. The lease runs out within its TTL, and a fresh renewal renews it
+// again. The fixture's lease TTL sets how long the scenario takes.
 func StaleRenewals(ctx context.Context, core *Core, driver *Driver, fx Fixture) error {
 	if err := waitFor(ctx, func() bool { return core.Watchers() > 0 }); err != nil {
 		return fmt.Errorf("the module never opened a watch: %w", err)
@@ -92,8 +94,10 @@ func StaleRenewals(ctx context.Context, core *Core, driver *Driver, fx Fixture) 
 		return fmt.Errorf("before the stale renewals: %w", err)
 	}
 
-	// 2. A last fresh renewal, then only stale ones at the usual pace: some a
-	// minute old, some without the core's time.
+	// 2. A last fresh renewal, then only stale ones at the usual pace: at each
+	// renewal interval, one a minute old, one a minute in the future and one
+	// without the core's time. Sending the three together means that a module
+	// which takes any one of them for fresh keeps its lease past the deadline.
 	core.RenewLeases()
 	lastFresh := time.Now()
 	stop, stopped := make(chan struct{}), make(chan struct{})
@@ -101,7 +105,7 @@ func StaleRenewals(ctx context.Context, core *Core, driver *Driver, fx Fixture) 
 		defer close(stopped)
 		tick := time.NewTicker(ttl / 3)
 		defer tick.Stop()
-		for i := 0; ; i++ {
+		for {
 			select {
 			case <-stop:
 				return
@@ -109,11 +113,10 @@ func StaleRenewals(ctx context.Context, core *Core, driver *Driver, fx Fixture) 
 				return
 			case <-tick.C:
 			}
-			if i%2 == 0 {
-				core.RenewLeasesAt(timestamppb.New(time.Now().Add(-staleBy)))
-			} else {
-				core.RenewLeasesAt(nil)
-			}
+			now := time.Now()
+			core.RenewLeasesAt(timestamppb.New(now.Add(-staleBy)))
+			core.RenewLeasesAt(timestamppb.New(now.Add(staleBy)))
+			core.RenewLeasesAt(nil)
 		}
 	}()
 	// 3. The lease runs out within its TTL, whatever the stale renewals say.

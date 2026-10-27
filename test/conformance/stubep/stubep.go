@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	mathrand "math/rand/v2"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	modulev1alpha1 "github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1"
 	"github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1/modulev1alpha1connect"
@@ -34,14 +36,28 @@ type Config struct {
 	// How it reaches the core.
 	CoreURL    string
 	HTTPClient connect.HTTPClient
-	// How old a lease renewal may be, on the stub's clock, and still renew
-	// the lease. Zero means DefaultRenewalTolerance.
+	// How far a lease renewal's time may be from the stub's clock, before or
+	// after, for the renewal to renew the lease. Zero means
+	// DefaultRenewalTolerance, and a tolerance above MaxRenewalTolerance
+	// counts as MaxRenewalTolerance.
 	RenewalTolerance time.Duration
 }
 
-// DefaultRenewalTolerance is the contract's default for how old a lease
-// renewal may be (section 5.3).
-const DefaultRenewalTolerance = 5 * time.Second
+const (
+	// DefaultRenewalTolerance is the contract's default for how far a lease
+	// renewal's time may be from the instance's clock (section 5.3).
+	DefaultRenewalTolerance = 5 * time.Second
+	// MaxRenewalTolerance is the largest tolerance the contract lets an
+	// instance configure (section 5.3).
+	MaxRenewalTolerance = 30 * time.Second
+	// maxLeaseTTL is the longest lease the stub applies: a longer TTL from
+	// the core counts as this one (section 5.3).
+	maxLeaseTTL = 300 * time.Second
+)
+
+// errSnapshotWithoutFleet ends a stream whose snapshot is malformed because
+// its first part lacks the fleet state (section 5.2).
+var errSnapshotWithoutFleet = errors.New("malformed snapshot: its first part lacks the fleet state")
 
 // EP is the stub enforcement point.
 type EP struct {
@@ -50,16 +66,22 @@ type EP struct {
 	governance modulev1alpha1connect.GovernanceServiceClient
 	policy     modulev1alpha1connect.PolicyServiceClient
 
-	mu            sync.RWMutex
-	instanceID    string
+	mu         sync.RWMutex
+	instanceID string
+	// applied is the highest state version applied. It never goes back
+	// (section 5.2).
 	applied       uint64
 	stateReceived bool
 	agent         *modulev1alpha1.AgentState
 	fleet         *modulev1alpha1.FleetState
 	leaseDeadline time.Time
-	engine        *profile.Engine
-	active        bundle.Ref
-	rejected      bundle.Ref
+	// engine evaluates the active bundle; nil while no bundle is active.
+	engine *profile.Engine
+	// active is the bundle activated last. Once the state stops naming a
+	// bundle, that bundle is no longer active, but its version stays the
+	// floor of V6 for the next one (EP-7).
+	active   bundle.Ref
+	rejected bundle.Ref
 }
 
 // New returns a stub that has not connected yet: its gate is closed.
@@ -115,34 +137,54 @@ func (e *EP) session(ctx context.Context) error {
 	defer stream.Close()
 	var pending *modulev1alpha1.SnapshotPart
 	for stream.Receive() {
-		msg := stream.Msg()
-		switch m := msg.GetMessage().(type) {
-		case *modulev1alpha1.WatchResponse_SnapshotPart:
-			part := m.SnapshotPart
-			if part.GetFirst() {
-				pending = &modulev1alpha1.SnapshotPart{Fleet: part.GetFleet()}
-			}
-			if pending == nil {
-				continue // a part without its first part: wait for the next snapshot
-			}
-			pending.Agents = append(pending.Agents, part.GetAgents()...)
-			if part.GetLast() {
-				e.applySnapshot(pending, msg.GetVersion())
-				pending = nil
-			}
-		case *modulev1alpha1.WatchResponse_Change:
-			e.applyChange(m.Change, msg.GetVersion())
-		case *modulev1alpha1.WatchResponse_LeaseRenewal:
-			e.renewLease(m.LeaseRenewal)
+		if pending, err = e.receive(ctx, stream.Msg(), pending); err != nil {
+			return err
 		}
-		e.syncBundle(ctx)
 	}
 	return stream.Err()
 }
 
+// receive applies one message of a watch stream, then syncs the bundle.
+// pending holds the parts of a snapshot received so far on the stream, nil
+// between snapshots, and receive returns it updated. A snapshot whose first
+// part lacks the fleet state is malformed: receive returns an error, which
+// ends the stream, and the stub keeps its current state and reconnects with
+// backoff (section 5.2).
+func (e *EP) receive(ctx context.Context, msg *modulev1alpha1.WatchResponse, pending *modulev1alpha1.SnapshotPart) (*modulev1alpha1.SnapshotPart, error) {
+	switch m := msg.GetMessage().(type) {
+	case *modulev1alpha1.WatchResponse_SnapshotPart:
+		part := m.SnapshotPart
+		if part.GetFirst() {
+			if part.GetFleet() == nil {
+				return nil, errSnapshotWithoutFleet
+			}
+			pending = &modulev1alpha1.SnapshotPart{Fleet: part.GetFleet()}
+		}
+		if pending == nil {
+			return nil, nil // a part without its first part: wait for the next snapshot
+		}
+		pending.Agents = append(pending.Agents, part.GetAgents()...)
+		if part.GetLast() {
+			e.applySnapshot(pending, msg.GetVersion())
+			pending = nil
+		}
+	case *modulev1alpha1.WatchResponse_Change:
+		e.applyChange(m.Change, msg.GetVersion())
+	case *modulev1alpha1.WatchResponse_LeaseRenewal:
+		e.renewLease(m.LeaseRenewal, msg.GetVersion())
+	}
+	e.syncBundle(ctx)
+	return pending, nil
+}
+
+// applySnapshot replaces the state with a complete snapshot, unless the
+// snapshot is below the version applied (section 5.2).
 func (e *EP) applySnapshot(s *modulev1alpha1.SnapshotPart, version uint64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if version < e.applied {
+		return
+	}
 	e.stateReceived = true
 	e.applied = version
 	e.fleet = s.GetFleet()
@@ -152,11 +194,18 @@ func (e *EP) applySnapshot(s *modulev1alpha1.SnapshotPart, version uint64) {
 			e.agent = a
 		}
 	}
+	e.deactivateUnnamedBundleLocked()
 }
 
+// applyChange applies a change, unless the change is below the version
+// applied. The agent's state in it is applied whatever that state's own
+// version (section 5.2).
 func (e *EP) applyChange(c *modulev1alpha1.StateChange, version uint64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if version < e.applied {
+		return
+	}
 	e.applied = version
 	if c.GetFleet() != nil {
 		e.fleet = c.GetFleet()
@@ -171,39 +220,83 @@ func (e *EP) applyChange(c *modulev1alpha1.StateChange, version uint64) {
 			e.agent = nil
 		}
 	}
+	e.deactivateUnnamedBundleLocked()
 }
 
-// renewLease starts a new lease on the monotonic clock (obligation EP-3). A
-// renewal without the core's time, or older than the tolerance on the stub's
-// clock, renews nothing (section 5.3).
-func (e *EP) renewLease(r *modulev1alpha1.LeaseRenewal) {
-	tolerance := e.cfg.RenewalTolerance
-	if tolerance == 0 {
-		tolerance = DefaultRenewalTolerance
+// deactivateUnnamedBundleLocked deactivates the active bundle when the
+// agent's state names none, so that the gate closes with gate.no_bundle as
+// soon as that state is applied. e.active keeps the bundle's reference, the
+// floor of V6 for the next one (EP-7). Callers hold e.mu.
+func (e *EP) deactivateUnnamedBundleLocked() {
+	if e.agent != nil && e.agent.GetBundle() == nil {
+		e.engine = nil
 	}
-	if r.GetServerTime() == nil || time.Since(r.GetServerTime().AsTime()) > tolerance {
+}
+
+// renewLease starts a new lease on the monotonic clock (obligation EP-3), if
+// the renewal is fresh. A fresh renewal also raises the version applied to
+// its own, which may pass versions that carried nothing for the stream, but
+// never lowers it (section 5.2, CORE-6).
+func (e *EP) renewLease(r *modulev1alpha1.LeaseRenewal, version uint64) {
+	if !e.fresh(r) {
 		return
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.stateReceived && e.agent != nil {
-		e.leaseDeadline = time.Now().Add(e.agent.GetLeaseTtl().AsDuration())
+	if !e.stateReceived {
+		return
 	}
+	e.applied = max(e.applied, version)
+	if e.agent == nil {
+		return
+	}
+	if ttl, ok := leaseTTL(e.agent.GetLeaseTtl()); ok {
+		e.leaseDeadline = time.Now().Add(ttl)
+	}
+}
+
+// fresh reports whether a lease renewal counts: it carries the core's time,
+// no more than the tolerance before or after the stub's clock. A renewal from
+// the future is stale too (section 5.3).
+func (e *EP) fresh(r *modulev1alpha1.LeaseRenewal) bool {
+	if r.GetServerTime() == nil {
+		return false
+	}
+	tolerance := e.cfg.RenewalTolerance
+	if tolerance == 0 {
+		tolerance = DefaultRenewalTolerance
+	}
+	tolerance = min(tolerance, MaxRenewalTolerance)
+	offset := time.Since(r.GetServerTime().AsTime())
+	return -tolerance <= offset && offset <= tolerance
+}
+
+// leaseTTL bounds the lease TTL that the core sends (section 5.3): a TTL
+// above 300 seconds counts as 300, and one under 10 seconds is applied as it
+// is. A TTL that is zero, negative or absent renews nothing: ok is false.
+func leaseTTL(d *durationpb.Duration) (ttl time.Duration, ok bool) {
+	ttl = d.AsDuration()
+	if ttl <= 0 {
+		return 0, false
+	}
+	return min(ttl, maxLeaseTTL), true
 }
 
 // syncBundle fetches, verifies and activates the bundle the state refers to
 // (obligation EP-7).
 func (e *EP) syncBundle(ctx context.Context) {
 	e.mu.RLock()
-	agent, active, rejected, instanceID := e.agent, e.active, e.rejected, e.instanceID
+	agent, engine, active, rejected, instanceID := e.agent, e.engine, e.active, e.rejected, e.instanceID
 	e.mu.RUnlock()
 	ref := agent.GetBundle()
 	if ref == nil {
 		return
 	}
 	want := bundle.Ref{Version: ref.GetVersion(), ManifestSHA256: ref.GetManifestSha256(), SizeBytes: ref.GetSizeBytes()}
-	// Nothing to do for the active bundle, and a rejected one is never retried.
-	if want.Version == active.Version && want.ManifestSHA256 == active.ManifestSHA256 || want == rejected {
+	// Nothing to do for the active bundle, and a rejected one is never
+	// retried. Once deactivated, even the same bundle is fetched and verified
+	// again, and V6 lets it through.
+	if engine != nil && want.Version == active.Version && want.ManifestSHA256 == active.ManifestSHA256 || want == rejected {
 		return
 	}
 	outcome, reason := modulev1alpha1.BundleOutcome_BUNDLE_OUTCOME_ACTIVATED, ""

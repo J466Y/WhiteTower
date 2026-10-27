@@ -25,7 +25,7 @@ Scenarios S-01, "start closed", and S-17, "stale renewals", run today against th
 ## Running it
 
 ```sh
-go test ./test/conformance/...                 # vectors (Go, cedar-go) and scenarios S-01 and S-17 against the stub
+go test ./test/conformance/...                 # vectors (Go, cedar-go), the stub's own tests, and scenarios S-01 and S-17 against the stub
 python test/conformance/python/check_vectors.py  # the same vectors with cedarpy and cryptography
 ```
 

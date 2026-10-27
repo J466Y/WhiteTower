@@ -320,7 +320,7 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Done |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Done |
 | 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Done |
-| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | Queued: AGENTS.md, rows 2 to 11 |
+| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code part 1 done (2026-10-27); the others queued in AGENTS.md's work queue |
 | Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Done |
 
 RFC-0002's review follows, the same way.
@@ -614,3 +614,25 @@ What pull requests 2 and 3 take from here:
 - **The cases of the URL and address check** are in [`test/conformance/vectors/inputs/url-and-address-check.json`](../../../test/conformance/vectors/inputs/url-and-address-check.json): 80 URLs and 33 addresses, each with its class, what each parser read and what the check read under section 6.11, and the IDNA of 14 hosts on the three stacks. `arguments.json` takes their values, and its expected results from the specification, which decides where the file differs; such a difference is a finding to report. Under section 6.11, the check refuses 2 of the 42 legitimate URLs and 4 of the 18 legitimate addresses, and no parser reaches another host than the check reads.
 - **Names.** Section 9.1 names the vector files, and section 4.10 the fields of the two methods. Appendix A's examples of `ReportTooling`, `ReportDefinitions` and the blocks record wait for the protobuf of pull request 2: the reviewer adds them afterwards, with appendix A's references of RFC-0001 and the counts of vectors.
 - **Schemas.** The manifest's schema requires `tool.expose` among an enforcement point's intervention points (section 6.3). The bundle manifest's schema knows `catalog` without requiring it: a bundle without one decides as with an empty catalog (section 7.7).
+
+### 2026-10-27: corrections, code part 1
+
+The first code part of RFC-0001's review follows the first part of the corrections (2026-10-22), in `api/` and the conformance kit:
+
+| What | Change |
+| --- | --- |
+| `governance.proto` | Comments only: the ends of a `Watch` stream and their codes (section 4.6, CORE-1, CORE-7, CORE-16), `WatchResponse.version` (the version applied never goes back, and what a renewal's version means), `LeaseRenewal.server_time` (the tolerance both ways, at most 30 seconds) and `AgentState.lease_ttl` (its bounds) |
+| `registry.proto` | Comments only: `instance_key` (unique to the process, the same across restarts, a random ID rather than a host or pod name, per principal), the heartbeat interval in every response, the served agents when they changed since the last call the core accepted, and `DeregisterInstance` (the gate closes first) |
+| `pkg/moduleapi` | Regenerated with `task gen`: comments only, no wire change |
+| The stub enforcement point | It never lowers the version it applied: it ignores a change or a snapshot below it, and a fresh renewal raises it to the renewal's version but never lowers it (CORE-6). It checks `server_time` both ways, with a tolerance of 5 seconds by default and at most 30 when configured. It bounds the lease TTL: above 300 seconds it counts as 300, and zero, negative or absent renews nothing. It refuses a snapshot whose first part lacks the fleet state, keeping its state and reconnecting. It deactivates its bundle when the state stops naming one, and keeps that bundle's version as the floor of V6 |
+| S-17 | At each renewal interval, the kit sends one renewal a minute old, one a minute in the future and one without the core's time, so that a module that takes any one of them for fresh keeps its lease past the deadline. It runs against the stub, and fails a stub that accepts renewals from the future |
+
+The stub's own tests hand it the messages of a watch stream one by one, since the kit's fake core cannot yet send what they need: versions below the one applied, values out of range and malformed snapshots, which P1-07.2 adds for S-12, S-27 and S-30.
+
+Three details the list of 2026-10-22 does not name:
+
+- **A renewal's version.** A fresh renewal raises the version the stub applied to its own, as CORE-6 says, and only after a complete snapshot: otherwise a renewal sent before any snapshot would make the stub resume past the snapshot it never applied.
+- **The tolerance's bound.** The stub's configured tolerance counts as 30 seconds when it is larger (section 5.3), and the driver protocol's note on S-17 now rests on that bound rather than on an assumption about the module.
+- **A bundle named again.** Once the stub has deactivated a bundle, a state that names that same bundle again has it fetched, verified and acknowledged again: V6 lets the same version and manifest hash through, and refuses an older one.
+
+The status of S-17 in section 9.3, "the renewal from the future is designed", follows in the reviewer's text.
