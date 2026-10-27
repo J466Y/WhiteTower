@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Version 0.3: the MCP servers, tools and models of agents join the MVP ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), decision of the maintainer of 2026-10-13). Version 0.2 was the Phase 0 gate's (2026-09-30): targets set from measurements, open questions Q1 to Q6 closed |
-| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)), 2026-10-19 (RFC-0002; the permission matrix's row on reassigning an owner, plan P1-04), 2026-10-20 (HUM-04, KIL-02, KIL-05, KIL-06, KIL-09, the glossary's C3 and sections 5.1.1, 5.2.1 and 9: the maintainer's decisions on halts and drills, in [P1-08's design note](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (POL-02 and questions Q8 to Q10: the maintainer's answers to RFC-0002's open questions), 2026-10-22 (KIL-07, aligned with conformance scenario S-07, and POL-01, with Rego in Phase 2: the maintainer's decisions in the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)), 2026-10-23 and 2026-10-26 (CAT-07, CAT-10 and MOD-05: the maintainer's decisions in the review of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)) and 2026-10-27 (AUD-10, NFR-22 and section 9: the maintainer's decisions on the evidence the MVP gives auditors, after feedback on the README) |
+| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)), 2026-10-19 (RFC-0002; the permission matrix's row on reassigning an owner, plan P1-04), 2026-10-20 (HUM-04, KIL-02, KIL-05, KIL-06, KIL-09, the glossary's C3 and sections 5.1.1, 5.2.1 and 9: the maintainer's decisions on halts and drills, in [P1-08's design note](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (POL-02 and questions Q8 to Q10: the maintainer's answers to RFC-0002's open questions), 2026-10-22 (KIL-07, aligned with conformance scenario S-07, and POL-01, with Rego in Phase 2: the maintainer's decisions in the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)), 2026-10-23 and 2026-10-26 (CAT-07, CAT-10 and MOD-05: the maintainer's decisions in the review of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)) and 2026-10-27 (AUD-10, HUM-09, NFR-22, the permission matrix and section 9: the maintainer's decisions on the evidence the MVP gives auditors and on the erasure of a person, after feedback on the README) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
 
@@ -136,6 +136,7 @@ stateDiagram-v2
 | HUM-06 | Break-glass: a sealed emergency credential allows halting agents and the fleet while the IdP is unavailable. Every use raises a critical audit event. | S | New |
 | HUM-07 | Service accounts and personal access tokens for automation, with scopes and expiry. | S | New |
 | HUM-08 | SAML IdPs are supported through an OIDC broker (for example Keycloak), with documented setup. Native SAML is a Phase 2 candidate. | S | Non-functional requirements |
+| HUM-09 | Erasure of a person (GDPR, Article 17): the platform administrator replaces the name, email and IdP subject of an inactive human principal with placeholders and clears its groups, keeping its ID, so that the history and the evidence stay consistent. The erasure is final and audited; the sealed log keeps the pseudonymous ID until retention drops it. | S | New (the maintainer's decision of 2026-10-27) |
 
 #### 5.2.1 Permission matrix (initial, refined in plan P1-03)
 
@@ -171,6 +172,7 @@ stateDiagram-v2
 | View the audit log | ✔ | ✔ | own | | ✔ | ✔ | |
 | Verify and export audit evidence | ✔ | ✔ | | | ✔ | ✔ | |
 | Manage role mappings and settings | | | | | | | ✔ |
+| Erase an inactive person (HUM-09) | | | | | | | ✔ |
 
 ### 5.3 Agent identity and credentials (AID)
 

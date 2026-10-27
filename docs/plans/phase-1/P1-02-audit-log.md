@@ -148,7 +148,7 @@ A consistency check that runs on a schedule, against the latest checkpoint the S
 
 Added on 2026-10-27, when AUD-10 became a Should ([progress notes](#progress-notes)). An auditor asks for the evidence behind an article or a control of the [framework mapping](../../security/framework-mapping.md): the events of some types, for some agents, over a period. An evidence bundle hands them over in one file that anyone can check offline, without access to White Tower and without trusting it.
 
-- **Operation.** `GET /api/v1/audit/evidence` takes the filters of `GET /api/v1/audit/events` (step 6), with the time range required, and answers a ZIP file. The OpenAPI document describes it, with the schema of the bundle's manifest, before the code. Its permissions and scoping are those of step 6, so an owner's bundle holds only their agents' events, and each export records a `whitetower.audit.read.v1` event (AUD-09).
+- **Operation.** `GET /api/v1/audit/evidence` takes the filters of `GET /api/v1/audit/events` (step 6), with the time range required, and answers a ZIP file. The OpenAPI document describes it, with the schema of the bundle's manifest, before the code. Those who may export one are those of the permission matrix's row "Verify and export audit evidence" ([requirements, section 5.2.1](../../requirements/mvp-requirements.md#521-permission-matrix-initial-refined-in-plan-p1-03)): steering, advisory, operators and auditors, not owners. Each export records a `whitetower.audit.read.v1` event (AUD-09).
 - **Content.**
   - `manifest.json`: the format, `whitetower.evidence.v1`; the log's origin; when the bundle was made, and by whom, as a pseudonymous ID; the selection; the number of events; and the ranges of leaves that retention dropped within the time range (step 9);
   - `events.jsonl`: each selected event's canonical bytes, exactly as sealed, one per line, in the order of the log;
@@ -160,7 +160,7 @@ Added on 2026-10-27, when AUD-10 became a Should ([progress notes](#progress-not
 - **Verification.** `auditverify.VerifyEvidence` checks a bundle offline. It takes the checkpoint keys from its caller, never only from the bundle, whose keys could be forged with it. It opens the checkpoint, recomputes each leaf from its event's bytes, checks each inclusion proof, and checks each event against the manifest's selection. Its report says what a bundle proves: each event it holds is genuine, sealed under a checkpoint that the keys signed. A bundle does not prove that no matching event was left out: only the whole log does (step 7). An auditor ties a bundle to a copy that White Tower cannot change by finding its checkpoint among those the SIEM holds (step 8).
 - **CLI.** `wtctl audit evidence` and `wtctl audit verify --evidence` come with P1-11 step 7.
 
-**Done when:** a bundle verifies offline with the published keys alone, and fails when an event, a proof or the checkpoint in it is altered, or when its checkpoint was signed with another key (ST-87); each role gets the events that step 6 gives it; and a selection over the bound is refused.
+**Done when:** a bundle verifies offline with the published keys alone, and fails when an event, a proof or the checkpoint in it is altered, or when its checkpoint was signed with another key (ST-87); only the roles of the matrix's row can export one; and a selection over the bound is refused.
 
 ## Acceptance criteria
 

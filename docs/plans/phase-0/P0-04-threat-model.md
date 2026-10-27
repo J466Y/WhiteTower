@@ -174,4 +174,4 @@ Feedback on the README found that compliance evidence waited for Phase 3. On 202
 | [Threat model](../../security/threat-model.md), version 0.1.6 | T-59: pseudonymization on export rewrites events, which then no longer verify against the checkpoints; evidence bundles are never pseudonymized |
 | [Security test catalog](../../security/security-tests.md), version 0.1.5 | ST-87, for P1-02: an evidence bundle verifies offline with the published keys alone, and fails once altered |
 
-One gap showed up, and is not closed here: the domain model designs an erasure of a person's name and email in `principals` (its section 7), which no plan builds yet. The evidence of the catalog's controls waits for the event types that plan P1-16 adds.
+One gap showed up: the domain model designs an erasure of a person's name and email in `principals` (its section 7), which no plan built. The maintainer decided the same day that P1-03 builds it (HUM-09, step 13), with threat T-85 and test ST-88. The evidence of the catalog's controls waits for the event types that plan P1-16 adds.
