@@ -45,6 +45,14 @@ type EventServiceClient interface {
 	// Publish delivers a batch of events. Delivery is at least once: the core
 	// de-duplicates on the event's source and ID, so a batch can be retried
 	// as is.
+	//
+	// A failure of the call itself, such as an instance that the caller's
+	// principal did not register, refuses the whole call with
+	// PERMISSION_DENIED. Otherwise the core decides each event on its own: an
+	// event outside the authorization rules, of a type the module does not
+	// emit, from a source it does not own or about an agent outside its scope,
+	// is rejected with its reason, and the other events of the batch are still
+	// decided (contract, sections 4.3 and 8.4).
 	Publish(context.Context, *connect.Request[v1alpha1.PublishRequest]) (*connect.Response[v1alpha1.PublishResponse], error)
 }
 
@@ -84,6 +92,14 @@ type EventServiceHandler interface {
 	// Publish delivers a batch of events. Delivery is at least once: the core
 	// de-duplicates on the event's source and ID, so a batch can be retried
 	// as is.
+	//
+	// A failure of the call itself, such as an instance that the caller's
+	// principal did not register, refuses the whole call with
+	// PERMISSION_DENIED. Otherwise the core decides each event on its own: an
+	// event outside the authorization rules, of a type the module does not
+	// emit, from a source it does not own or about an agent outside its scope,
+	// is rejected with its reason, and the other events of the batch are still
+	// decided (contract, sections 4.3 and 8.4).
 	Publish(context.Context, *connect.Request[v1alpha1.PublishRequest]) (*connect.Response[v1alpha1.PublishResponse], error)
 }
 

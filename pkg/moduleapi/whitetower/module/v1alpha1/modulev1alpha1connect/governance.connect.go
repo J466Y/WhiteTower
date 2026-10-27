@@ -70,6 +70,13 @@ type GovernanceServiceClient interface {
 	Watch(context.Context, *connect.Request[v1alpha1.WatchRequest]) (*connect.ServerStreamForClient[v1alpha1.WatchResponse], error)
 	// Acknowledge reports what the instance did with the state it received:
 	// halt layers, bundle activations and the state version applied.
+	//
+	// A failure of the call itself, such as an instance that the caller's
+	// principal did not register, refuses the whole call with
+	// PERMISSION_DENIED. A failure of one acknowledgement decides that
+	// acknowledgement only: one about an agent outside the instance's scope is
+	// counted and not recorded, as one about a halt the core does not know is
+	// (CORE-2).
 	Acknowledge(context.Context, *connect.Request[v1alpha1.AcknowledgeRequest]) (*connect.Response[v1alpha1.AcknowledgeResponse], error)
 }
 
@@ -145,6 +152,13 @@ type GovernanceServiceHandler interface {
 	Watch(context.Context, *connect.Request[v1alpha1.WatchRequest], *connect.ServerStream[v1alpha1.WatchResponse]) error
 	// Acknowledge reports what the instance did with the state it received:
 	// halt layers, bundle activations and the state version applied.
+	//
+	// A failure of the call itself, such as an instance that the caller's
+	// principal did not register, refuses the whole call with
+	// PERMISSION_DENIED. A failure of one acknowledgement decides that
+	// acknowledgement only: one about an agent outside the instance's scope is
+	// counted and not recorded, as one about a halt the core does not know is
+	// (CORE-2).
 	Acknowledge(context.Context, *connect.Request[v1alpha1.AcknowledgeRequest]) (*connect.Response[v1alpha1.AcknowledgeResponse], error)
 }
 

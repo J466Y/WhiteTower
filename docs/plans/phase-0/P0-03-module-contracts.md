@@ -320,7 +320,7 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Done |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Done |
 | 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Done |
-| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code part 1 done (2026-10-27); the others queued in AGENTS.md's work queue |
+| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code parts 1 and 2 done (2026-10-27); the others queued in AGENTS.md's work queue |
 | Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Done |
 
 RFC-0002's review follows, the same way.
@@ -648,3 +648,29 @@ The review found code part 1 complete: the comments say what the specification s
 - a test of the stub's rule that a renewal before any complete snapshot leaves the version applied as it is: a break experiment that dropped the rule passed every test.
 
 The stub is not the reference of the kit, and P1-07.2 runs S-12, S-27 and S-30 against the mock module: the stub's instance key, `stub-<agent ID>`, is the same for two processes (I-8), its backoff is not that of I-4, and it sends no heartbeats, whose interval S-30 checks.
+
+### 2026-10-27: corrections, code part 2
+
+The second code part of RFC-0001's review follows the second part of the corrections (2026-10-22), with the two things the review of code part 1 left to it, in `api/` and the conformance kit:
+
+| What | Change |
+| --- | --- |
+| `governance.proto` | Comments only: a failure of an `Acknowledge` call refuses it whole, while an item about an agent outside the scope is counted and not recorded, as one about an unknown halt is (CORE-2). From the review of code part 1: an instance may apply the halts of a snapshot part as soon as the part arrives (`WatchResponse.snapshot_part`, `SnapshotPart.first`); a snapshot whose first part lacks the fleet state is malformed, and the instance keeps its state and reconnects with the backoff of I-4 (`SnapshotPart.fleet`); and an agent that leaves the scope loses its state and its lease at once, and the instance drops the acknowledgements queued for it (`StateChange.removed_agent_ids`, I-11) |
+| `events.proto` | Comments only: a failure of a `Publish` call refuses it whole, while an event outside the rules is rejected on its own, with its reason (CORE-2, section 8.4) |
+| `pkg/moduleapi` | Regenerated with `task gen`: comments only, no wire change |
+| `ep-python.yaml` | `credentials` loses `workloadIdentityTokenFile`, since workload identity is outside `v1alpha1` (section 4.2): it is the key file and its ID, no longer a `oneOf` |
+| Fail-closed vectors | F-14: the agent left the scope after a complete snapshot, losing its state and its lease, so the gate closes with `gate.no_state`, ahead of `gate.lease_expired`. Every vector gains the input `agent_in_state`, which `profile.go` and `check_vectors.py` read in row 1 of the gate. Both stacks pass the 14 vectors |
+| The stub enforcement point | It drops the state and the lease of an agent that a change lists as removed or that a snapshot does not carry (I-11): its gate closes with `gate.no_state`, and once the agent is back, it stays closed until the next fresh renewal. `PERMISSION_DENIED` from `RegisterInstance` or `Watch` ends its lease at once, and it registers again with backoff (section 4.6). Its gate reads `agent_in_state` as an input of its own, no longer folded into `state_received` |
+| The stub's tests | I-11 on both paths; the codes of section 4.6, through the stub's session; and the rule that a renewal before any complete snapshot leaves the version applied as it is, which the break experiment of the review now fails |
+
+The kit's fake core cannot yet refuse a registration or end a stream with `PERMISSION_DENIED`, which P1-07.2 adds for S-12. So the stub's test of these codes wraps the fake core: the test answers each registration in turn, accepting it or refusing it with a code, and ends the open watch with a code, while the stub's session runs unchanged against it, over HTTP/2 with TLS. The kit does not change.
+
+Five details the list of 2026-10-22 does not name:
+
+- **A refused version or manifest hash.** From `RegisterInstance`, `FAILED_PRECONDITION` refuses the contract versions or the manifest hash, and section 4.6 handles it as `PERMISSION_DENIED`, which point 6 decided: the stub ends its lease for it too. From `Watch`, the code means an instance that is not registered, and leaves the lease running.
+- **The bundle of an agent that leaves.** I-11 drops the agent's state and its lease. The stub keeps its active bundle, since the gate stays closed without the agent's state, and the state that brings the agent back names the bundle to use (EP-7). F-14 has a bundle active for the same reason: it opens nothing.
+- **Queued acknowledgements.** The stub queues none: it sends each bundle acknowledgement once it has the outcome, and no other kind. So it has none to drop.
+- **Codes from the library.** The stub ends its lease on every `PERMISSION_DENIED`, even one that connect-go makes up for an HTTP 403, which section 4.6 counts as transient before a stream's first message: the stub's gate only closes sooner, and it has no halt mode to apply.
+- **Two more comments.** `SnapshotPart.agents` says that an agent the snapshot does not carry has left the scope (I-11), and `AcknowledgeResponse` no longer says that every acknowledgement was recorded.
+
+The counts of fail-closed vectors in section 9.1 and in RFC-0001, 13 today, and ep-python's manifest hash in appendix A follow in the reviewer's pull request, as the note of 2026-10-23 says.
