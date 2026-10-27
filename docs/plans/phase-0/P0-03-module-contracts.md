@@ -636,3 +636,15 @@ Three details the list of 2026-10-22 does not name:
 - **A bundle named again.** Once the stub has deactivated a bundle, a state that names that same bundle again has it fetched, verified and acknowledged again: V6 lets the same version and manifest hash through, and refuses an older one.
 
 The status of S-17 in section 9.3, "the renewal from the future is designed", follows in the reviewer's text.
+
+### 2026-10-27: the review of code part 1
+
+The review found code part 1 complete: the comments say what the specification says, the stub follows sections 5.2 and 5.3 and EP-7, and eleven of twelve break experiments on the stub failed its tests or S-17. Section 9.3 now marks S-17 implemented. The part leaves two things to code part 2, which edits `governance.proto` and the stub too:
+
+- three comments of `governance.proto` that predate section 5.2:
+  - `WatchResponse.snapshot_part` and `SnapshotPart.first` say that a snapshot takes effect only when its last part arrives, and leave out that an instance may apply the halts of each part as soon as it arrives;
+  - `SnapshotPart.fleet` says that the first part carries it, but not that a first part without it is malformed, so that the instance keeps its state and reconnects with the backoff of I-4;
+  - `StateChange.removed_agent_ids` says to deny everything for those agents, but not that each loses its state and its lease at once, and that the instance drops the acknowledgements queued for it (I-11);
+- a test of the stub's rule that a renewal before any complete snapshot leaves the version applied as it is: a break experiment that dropped the rule passed every test.
+
+The stub is not the reference of the kit, and P1-07.2 runs S-12, S-27 and S-30 against the mock module: the stub's instance key, `stub-<agent ID>`, is the same for two processes (I-8), its backoff is not that of I-4, and it sends no heartbeats, whose interval S-30 checks.
