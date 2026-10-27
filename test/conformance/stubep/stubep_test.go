@@ -1,17 +1,21 @@
 package stubep
 
 import (
+	"context"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"slices"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	modulev1alpha1 "github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1"
+	"github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1/modulev1alpha1connect"
 	"github.com/J466Y/WhiteTower/test/conformance/kit"
 	"github.com/J466Y/WhiteTower/test/conformance/profile"
 )
@@ -19,7 +23,9 @@ import (
 // These tests hand the stub the messages of a watch stream one by one, as its
 // session does, so that they can send what the kit's fake core does not send
 // yet: versions below the one applied, values out of range and malformed
-// snapshots.
+// snapshots. The tests of refusals run the stub's session against the kit's
+// fake core, wrapped so that it refuses registrations and ends watches with
+// the codes it cannot send yet.
 
 const agentID = "0192f1c2-7a3b-7c4d-8e5f-000000000001"
 
@@ -57,6 +63,23 @@ func TestTheVersionAppliedNeverGoesBack(t *testing.T) {
 
 	// A snapshot at the version applied replaces the state.
 	feed(t, e, snapshot(10, halted))
+	expectReason(t, e, profile.ReasonHalted)
+}
+
+// TestARenewalBeforeAnySnapshotLeavesTheVersionApplied checks the stub's
+// reading of CORE-6: a fresh renewal raises the version applied only once a
+// complete snapshot has been applied. One that comes first leaves that
+// version at 0, so the stub neither resumes past a snapshot it never applied
+// nor ignores that snapshot when it arrives at a lower version.
+func TestARenewalBeforeAnySnapshotLeavesTheVersionApplied(t *testing.T) {
+	e := New(Config{AgentID: agentID})
+
+	feed(t, e, renewal(9, timestamppb.Now()))
+	expectApplied(t, e, 0)
+	expectReason(t, e, profile.ReasonNoState)
+
+	feed(t, e, snapshot(5, haltedAgentState()), renewal(5, timestamppb.Now()))
+	expectApplied(t, e, 5)
 	expectReason(t, e, profile.ReasonHalted)
 }
 
@@ -222,6 +245,81 @@ func TestTheStubDeactivatesItsBundleWhenTheStateNamesNone(t *testing.T) {
 	}
 }
 
+// TestAnAgentThatLeavesTheScopeLosesItsStateAndItsLease checks I-11: an agent
+// that a change lists as removed, or that a snapshot does not carry, loses its
+// state and its lease at once. The gate closes with gate.no_state, a renewal
+// renews nothing while the agent is out, and once a change brings it back, the
+// gate stays closed until the next fresh renewal.
+func TestAnAgentThatLeavesTheScopeLosesItsStateAndItsLease(t *testing.T) {
+	cases := []struct {
+		name  string
+		leave *modulev1alpha1.WatchResponse
+	}{
+		{name: "a change lists it as removed", leave: removal(2)},
+		{name: "a snapshot does not carry it", leave: snapshot(2)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := New(Config{AgentID: agentID})
+			feed(t, e, snapshot(1, agentState(durationpb.New(time.Minute))), renewal(1, timestamppb.Now()))
+			expectReason(t, e, profile.ReasonNoBundle)
+
+			feed(t, e, tc.leave, renewal(2, timestamppb.Now()))
+			expectReason(t, e, profile.ReasonNoState)
+
+			feed(t, e, change(3, agentState(durationpb.New(time.Minute))))
+			expectReason(t, e, profile.ReasonLeaseExpired)
+			feed(t, e, renewal(3, timestamppb.Now()))
+			expectReason(t, e, profile.ReasonNoBundle)
+		})
+	}
+}
+
+// TestARefusalEndsTheLeaseAtOnce checks section 4.6 through the stub's
+// session, against the kit's fake core: PERMISSION_DENIED from Watch, on an
+// established stream, and PERMISSION_DENIED or FAILED_PRECONDITION from
+// RegisterInstance end the lease at once, while any other end of a watch or
+// refusal of a registration leaves it running. Either way, the stub registers
+// again with backoff until the core accepts it, and the renewal that follows
+// renews its lease.
+func TestARefusalEndsTheLeaseAtOnce(t *testing.T) {
+	cases := []struct {
+		name string
+		// The code that ends the established watch, and the one that refuses
+		// the next registration.
+		watchEnd, refusal connect.Code
+		want              string
+	}{
+		{name: "PERMISSION_DENIED ends the watch", watchEnd: connect.CodePermissionDenied, refusal: connect.CodeUnavailable, want: profile.ReasonLeaseExpired},
+		{name: "PERMISSION_DENIED refuses the registration", watchEnd: connect.CodeUnavailable, refusal: connect.CodePermissionDenied, want: profile.ReasonLeaseExpired},
+		{name: "FAILED_PRECONDITION refuses the registration", watchEnd: connect.CodeUnavailable, refusal: connect.CodeFailedPrecondition, want: profile.ReasonLeaseExpired},
+		{name: "FAILED_PRECONDITION ends the watch", watchEnd: connect.CodeFailedPrecondition, refusal: connect.CodeUnavailable, want: profile.ReasonNoBundle},
+		{name: "UNAVAILABLE ends the watch and refuses the registration", watchEnd: connect.CodeUnavailable, refusal: connect.CodeUnavailable, want: profile.ReasonNoBundle},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+			defer cancel()
+			core, e := startRefusingCore(ctx, t)
+			core.answer(ctx, t, accept)
+			waitForReason(ctx, t, e, profile.ReasonNoBundle)
+
+			core.end(ctx, t, tc.watchEnd)
+			core.answer(ctx, t, tc.refusal)
+			// The stub has handled the refusal once it registers again, and
+			// without a watch it gets no renewal meanwhile.
+			core.answer(ctx, t, connect.CodeUnavailable)
+			expectReason(t, e, tc.want)
+
+			core.answer(ctx, t, accept)
+			waitForReason(ctx, t, e, profile.ReasonNoBundle)
+			if n := len(core.Instances()); n != 2 {
+				t.Errorf("the core accepted %d registrations, want 2", n)
+			}
+		})
+	}
+}
+
 // feed hands messages to the stub one by one, as its session does with a
 // watch stream.
 func feed(t *testing.T, e *EP, msgs ...*modulev1alpha1.WatchResponse) {
@@ -239,14 +337,38 @@ func feed(t *testing.T, e *EP, msgs ...*modulev1alpha1.WatchResponse) {
 // valid bundle of the bundle vectors permits.
 func expectReason(t *testing.T, e *EP, want string) {
 	t.Helper()
-	got := e.Decide(
+	if got := decide(e); got.Context.Reason != want {
+		t.Fatalf("decision %v with reason %s, want reason %s", got.Decision, got.Context.Reason, want)
+	}
+}
+
+// waitForReason waits until the stub's decision has the reason given, while
+// its session applies what the core sends.
+func waitForReason(ctx context.Context, t *testing.T, e *EP, want string) {
+	t.Helper()
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		got := decide(e)
+		if got.Context.Reason == want {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("decision %v with reason %s, want reason %s: %v", got.Decision, got.Context.Reason, want, ctx.Err())
+		case <-tick.C:
+		}
+	}
+}
+
+// decide asks the stub to decide on a call that the valid bundle of the
+// bundle vectors permits.
+func decide(e *EP) profile.Response {
+	return e.Decide(
 		profile.Action{Name: "tool.invoke"},
 		profile.Resource{Type: "tool", ID: "read_invoice", Properties: map[string]any{"kind": "function"}},
 		profile.Context{Time: "2026-09-29T10:00:00.000Z"},
 	)
-	if got.Context.Reason != want {
-		t.Fatalf("decision %v with reason %s, want reason %s", got.Decision, got.Context.Reason, want)
-	}
 }
 
 // expectApplied checks the version the stub applied, from which it resumes
@@ -320,10 +442,113 @@ func change(version uint64, agent *modulev1alpha1.AgentState) *modulev1alpha1.Wa
 	}}
 }
 
+// removal returns a change that lists the stub's agent as removed from the
+// scope.
+func removal(version uint64) *modulev1alpha1.WatchResponse {
+	return &modulev1alpha1.WatchResponse{Version: version, Message: &modulev1alpha1.WatchResponse_Change{
+		Change: &modulev1alpha1.StateChange{RemovedAgentIds: []string{agentID}},
+	}}
+}
+
 // renewal returns a lease renewal that carries serverTime, or none when it is
 // nil.
 func renewal(version uint64, serverTime *timestamppb.Timestamp) *modulev1alpha1.WatchResponse {
 	return &modulev1alpha1.WatchResponse{Version: version, Message: &modulev1alpha1.WatchResponse_LeaseRenewal{
 		LeaseRenewal: &modulev1alpha1.LeaseRenewal{ServerTime: serverTime},
 	}}
+}
+
+// accept is the answer that accepts a registration (refusingCore.answer).
+const accept connect.Code = 0
+
+// refusingCore is the kit's fake core with the refusals it cannot script
+// yet, which plan P1-07.2 adds to it for S-12: the test answers each
+// registration in turn, accepting it or refusing it with a code, and ends the
+// open watch with a code.
+type refusingCore struct {
+	*kit.Core
+	answers chan connect.Code
+	ends    chan connect.Code
+}
+
+// startRefusingCore serves a refusingCore over HTTP/2 with TLS, as the kit's
+// own tests do, to a stub that runs until the test ends. The agent is in the
+// state, with a lease of a minute and no bundle, and every watch gets a
+// snapshot and a renewal at once.
+func startRefusingCore(ctx context.Context, t *testing.T) (*refusingCore, *EP) {
+	t.Helper()
+	core := &refusingCore{Core: kit.NewCore(nil), answers: make(chan connect.Code), ends: make(chan connect.Code)}
+	core.SetAgent(agentState(durationpb.New(time.Minute)))
+	core.Release()
+	mux := http.NewServeMux()
+	mux.Handle(modulev1alpha1connect.NewRegistryServiceHandler(core))
+	mux.Handle(modulev1alpha1connect.NewGovernanceServiceHandler(core))
+	server := httptest.NewUnstartedServer(mux)
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	t.Cleanup(server.Close)
+
+	e := New(Config{AgentID: agentID, CoreURL: server.URL, HTTPClient: server.Client()})
+	ctx, cancel := context.WithCancel(ctx)
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		e.Run(ctx)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-stopped
+	})
+	return core, e
+}
+
+// RegisterInstance waits for the test's answer, then accepts the
+// registration or refuses it.
+func (c *refusingCore) RegisterInstance(ctx context.Context, req *connect.Request[modulev1alpha1.RegisterInstanceRequest]) (*connect.Response[modulev1alpha1.RegisterInstanceResponse], error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case code := <-c.answers:
+		if code != accept {
+			return nil, connect.NewError(code, errors.New("refused by the test"))
+		}
+		return c.Core.RegisterInstance(ctx, req)
+	}
+}
+
+// Watch serves the kit's watch until the test ends it with a code.
+func (c *refusingCore) Watch(ctx context.Context, req *connect.Request[modulev1alpha1.WatchRequest], stream *connect.ServerStream[modulev1alpha1.WatchResponse]) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	served := make(chan error, 1)
+	go func() { served <- c.Core.Watch(ctx, req, stream) }()
+	select {
+	case err := <-served:
+		return err
+	case code := <-c.ends:
+		cancel()
+		<-served // the kit's watch sends nothing once it has returned
+		return connect.NewError(code, errors.New("ended by the test"))
+	}
+}
+
+// answer gives the stub's next registration its answer. It returns once the
+// registration has it, so the stub has handled every earlier answer.
+func (c *refusingCore) answer(ctx context.Context, t *testing.T, code connect.Code) {
+	t.Helper()
+	select {
+	case c.answers <- code:
+	case <-ctx.Done():
+		t.Fatalf("the stub did not register again: %v", ctx.Err())
+	}
+}
+
+// end ends the stub's open watch with a code.
+func (c *refusingCore) end(ctx context.Context, t *testing.T, code connect.Code) {
+	t.Helper()
+	select {
+	case c.ends <- code:
+	case <-ctx.Done():
+		t.Fatalf("the stub holds no watch: %v", ctx.Err())
+	}
 }

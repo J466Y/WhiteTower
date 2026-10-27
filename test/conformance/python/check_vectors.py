@@ -134,7 +134,7 @@ def deny(reason: str) -> dict:
 
 def gate_reason(state: dict) -> str:
     """The gate of section 5.4, in the contract's order."""
-    if not state["state_received"]:
+    if not state["state_received"] or not state["agent_in_state"]:
         return "gate.no_state"
     if not state["lease_valid"]:
         return "gate.lease_expired"

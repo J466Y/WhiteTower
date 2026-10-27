@@ -50,6 +50,7 @@
       "obligation": "EP-1",
       "state": {
         "state_received": false,
+        "agent_in_state": false,
         "lease_valid": false,
         "agent_halted": false,
         "fleet_halted": false,
@@ -69,6 +70,7 @@
       "obligation": "EP-3",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": false,
         "agent_halted": false,
         "fleet_halted": false,
@@ -88,6 +90,7 @@
       "obligation": "EP-4",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": true,
         "fleet_halted": false,
@@ -107,6 +110,7 @@
       "obligation": "EP-4",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": false,
         "fleet_halted": true,
@@ -126,6 +130,7 @@
       "obligation": "EP-2",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": false,
         "agent_halted": true,
         "fleet_halted": false,
@@ -145,6 +150,7 @@
       "obligation": "EP-6",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": false,
         "fleet_halted": false,
@@ -164,6 +170,7 @@
       "obligation": "EP-6",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": false,
         "fleet_halted": false,
@@ -183,6 +190,7 @@
       "obligation": "EP-6",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": false,
         "fleet_halted": false,
@@ -202,6 +210,7 @@
       "obligation": "EP-6",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": false,
         "fleet_halted": false,
@@ -221,6 +230,7 @@
       "obligation": "EP-6",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": false,
         "fleet_halted": false,
@@ -242,6 +252,7 @@
       "obligation": "EP-7",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": false,
         "fleet_halted": false,
@@ -261,6 +272,7 @@
       "obligation": "EP-8",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": false,
         "fleet_halted": false,
@@ -280,6 +292,7 @@
       "obligation": "EP-2",
       "state": {
         "state_received": true,
+        "agent_in_state": true,
         "lease_valid": true,
         "agent_halted": false,
         "fleet_halted": false,
@@ -293,6 +306,26 @@
         "policies": [
           "0192f1c2-7a3b-7c4d-8e5f-000000000201"
         ]
+      }
+    },
+    {
+      "id": "F-14",
+      "description": "The agent left the scope after a complete snapshot, losing its state and its lease: the missing state is reported first",
+      "obligation": "I-11",
+      "state": {
+        "state_received": true,
+        "agent_in_state": false,
+        "lease_valid": false,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "unspecified",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.no_state",
+        "policies": []
       }
     }
   ]
