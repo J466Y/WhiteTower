@@ -456,7 +456,16 @@ func (x *WatchRequest) GetSinceVersion() uint64 {
 type WatchResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The state version the client has reached once it applies this message.
-	// For snapshot parts, the version of the whole snapshot.
+	// For snapshot parts, the version of the whole snapshot. A lease renewal
+	// carries the version at which the client's state is current, which may
+	// pass versions that carried nothing for the stream (CORE-6).
+	//
+	// The version applied never goes back: a client keeps the highest version
+	// it has applied, across all its streams, and ignores a change, or a whole
+	// snapshot, whose version is below it. A fresh renewal renews the leases
+	// whichever stream carries it, but never lowers that version. The agent
+	// states of a change the client applies are applied whatever their own
+	// version (contract, section 5.2).
 	Version uint64 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	// What the message carries.
 	//
@@ -713,9 +722,12 @@ func (x *StateChange) GetRemovedAgentIds() []string {
 type LeaseRenewal struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The core's clock when it sent the renewal. Required. A client ignores a
-	// renewal without it, or older than its tolerance (5 seconds by default) on
-	// the client's own clock, so a stream held back on its way lets leases run
-	// out instead of delaying halts (contract, section 5.3).
+	// renewal without it, or whose time is more than its tolerance before or
+	// after the client's own clock: 5 seconds by default, and at most 30. A
+	// renewal from the future is stale too, since a client whose clock is behind
+	// the core's would otherwise accept renewals as old as the tolerance plus
+	// its lag. So a stream held back on its way lets leases run out instead of
+	// delaying halts (contract, section 5.3).
 	ServerTime    *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=server_time,json=serverTime,proto3" json:"server_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -776,7 +788,11 @@ type AgentState struct {
 	Halts []*Halt `protobuf:"bytes,5,rep,name=halts,proto3" json:"halts,omitempty"`
 	// The agent's effective policy bundle. Absent while it has none.
 	Bundle *BundleRef `protobuf:"bytes,6,opt,name=bundle,proto3" json:"bundle,omitempty"`
-	// How long the lease lasts after each renewal.
+	// How long the lease lasts after each fresh renewal, from the agent's risk
+	// tier: 10 to 300 seconds. A client bounds what it receives: a TTL above 300
+	// seconds counts as 300, and one that is zero, negative or absent renews
+	// nothing; one under 10 seconds is applied as it is, never lengthened
+	// (contract, section 5.3).
 	LeaseTtl *durationpb.Duration `protobuf:"bytes,7,opt,name=lease_ttl,json=leaseTtl,proto3" json:"lease_ttl,omitempty"`
 	// What the agent's owner chose to happen to work in flight when it is halted.
 	HaltMode HaltMode `protobuf:"varint,8,opt,name=halt_mode,json=haltMode,proto3,enum=whitetower.module.v1alpha1.HaltMode" json:"halt_mode,omitempty"`

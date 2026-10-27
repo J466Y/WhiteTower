@@ -47,8 +47,26 @@ const (
 type GovernanceServiceClient interface {
 	// Watch streams the governance state of every agent in the instance's scope:
 	// a snapshot, then changes in version order, with lease renewals in between.
-	// The stream never ends on its own except when the token that opened it
-	// expires or the server shuts down; clients reconnect and resume.
+	// The client sets no deadline on it.
+	//
+	// The core ends a stream with UNAUTHENTICATED no later than the expiry of
+	// the token that opened it (CORE-1), and ends a stream it cannot keep up to
+	// date, for example one whose client is too slow to read (CORE-7). It never
+	// refuses a stream because the instance holds others: it keeps at least two
+	// per instance, and when the instance opens more, it may end the oldest with
+	// ABORTED (CORE-16). The client does not reconnect a stream ended with
+	// ABORTED while it holds a newer one.
+	//
+	// Once a stream has delivered its first message, its failure is transient
+	// whatever its code, except UNAUTHENTICATED, which needs a new token first,
+	// and PERMISSION_DENIED, which ends every lease at once and has the client
+	// register again, never treating the code as final. The client then
+	// reconnects with backoff and resumes from the last version it applied.
+	// Before the first message, an error that the core sends is handled as
+	// section 4.6 of the contract says for its code, while a failure that the
+	// client's own library reports, such as a cut in the middle of a message, is
+	// transient. A stream that falls silent for longer than the renewal interval
+	// plus 5 seconds has failed too (I-9).
 	Watch(context.Context, *connect.Request[v1alpha1.WatchRequest]) (*connect.ServerStreamForClient[v1alpha1.WatchResponse], error)
 	// Acknowledge reports what the instance did with the state it received:
 	// halt layers, bundle activations and the state version applied.
@@ -104,8 +122,26 @@ func (c *governanceServiceClient) Acknowledge(ctx context.Context, req *connect.
 type GovernanceServiceHandler interface {
 	// Watch streams the governance state of every agent in the instance's scope:
 	// a snapshot, then changes in version order, with lease renewals in between.
-	// The stream never ends on its own except when the token that opened it
-	// expires or the server shuts down; clients reconnect and resume.
+	// The client sets no deadline on it.
+	//
+	// The core ends a stream with UNAUTHENTICATED no later than the expiry of
+	// the token that opened it (CORE-1), and ends a stream it cannot keep up to
+	// date, for example one whose client is too slow to read (CORE-7). It never
+	// refuses a stream because the instance holds others: it keeps at least two
+	// per instance, and when the instance opens more, it may end the oldest with
+	// ABORTED (CORE-16). The client does not reconnect a stream ended with
+	// ABORTED while it holds a newer one.
+	//
+	// Once a stream has delivered its first message, its failure is transient
+	// whatever its code, except UNAUTHENTICATED, which needs a new token first,
+	// and PERMISSION_DENIED, which ends every lease at once and has the client
+	// register again, never treating the code as final. The client then
+	// reconnects with backoff and resumes from the last version it applied.
+	// Before the first message, an error that the core sends is handled as
+	// section 4.6 of the contract says for its code, while a failure that the
+	// client's own library reports, such as a cut in the middle of a message, is
+	// transient. A stream that falls silent for longer than the renewal interval
+	// plus 5 seconds has failed too (I-9).
 	Watch(context.Context, *connect.Request[v1alpha1.WatchRequest], *connect.ServerStream[v1alpha1.WatchResponse]) error
 	// Acknowledge reports what the instance did with the state it received:
 	// halt layers, bundle activations and the state version applied.

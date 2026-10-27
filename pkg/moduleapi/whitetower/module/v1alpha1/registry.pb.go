@@ -150,9 +150,14 @@ type RegisterInstanceRequest struct {
 	ManifestSha256 string `protobuf:"bytes,2,opt,name=manifest_sha256,json=manifestSha256,proto3" json:"manifest_sha256,omitempty"`
 	// Version of the module, as in its manifest.
 	ModuleVersion string `protobuf:"bytes,3,opt,name=module_version,json=moduleVersion,proto3" json:"module_version,omitempty"`
-	// Key chosen by the instance, unique within the module and stable for its
-	// deployment slot (for example a pod name). Registering again with the same
-	// key updates the existing instance.
+	// Key chosen by the instance. It is unique to the instance's process, and
+	// should stay the same across the process's restarts: a random ID, created
+	// with the evidence buffer and stored in it, is recommended. A host or pod
+	// name is not enough, since several processes, or the same agent in two
+	// environments, may share it (I-8). Registering again with the same key,
+	// under the same principal, updates the existing instance; the same key
+	// registered by another principal names another instance (contract,
+	// section 4.3).
 	InstanceKey string `protobuf:"bytes,4,opt,name=instance_key,json=instanceKey,proto3" json:"instance_key,omitempty"`
 	// Contract versions the instance supports, for example "v1alpha1".
 	ContractVersions []string `protobuf:"bytes,5,rep,name=contract_versions,json=contractVersions,proto3" json:"contract_versions,omitempty"`
@@ -308,7 +313,10 @@ type RegisterInstanceResponse struct {
 	InstanceId string `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
 	// The contract version selected for this instance.
 	ContractVersion string `protobuf:"bytes,2,opt,name=contract_version,json=contractVersion,proto3" json:"contract_version,omitempty"`
-	// How often the instance must call Heartbeat.
+	// How often the instance must call Heartbeat. Every RegisterInstanceResponse
+	// and HeartbeatResponse carries it. An instance that receives none, or one
+	// that is not positive, keeps the interval in force: 30 seconds before the
+	// first (I-6).
 	HeartbeatInterval *durationpb.Duration `protobuf:"bytes,3,opt,name=heartbeat_interval,json=heartbeatInterval,proto3" json:"heartbeat_interval,omitempty"`
 	// The environment recorded for the credential the instance registered with.
 	// An enforcement point puts it in the subject of every decision (contract,
@@ -386,7 +394,9 @@ type HeartbeatRequest struct {
 	// Short explanation of the health, for operators.
 	Detail string `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
 	// The complete set of agents the instance serves now. Present only when the
-	// set changed since the last report.
+	// set changed since the last RegisterInstance or Heartbeat that the core
+	// accepted: after a failed heartbeat, the next one carries the set
+	// (contract, section 4.4).
 	ServedAgents  *ServedAgents `protobuf:"bytes,4,opt,name=served_agents,json=servedAgents,proto3" json:"served_agents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -496,10 +506,12 @@ func (x *ServedAgents) GetAgentIds() []string {
 	return nil
 }
 
-// HeartbeatResponse may change the heartbeat interval.
+// HeartbeatResponse carries the heartbeat interval, which may change.
 type HeartbeatResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// How often the instance must call Heartbeat from now on.
+	// How often the instance must call Heartbeat from now on. The core sets it
+	// in every response. An instance that receives none, or one that is not
+	// positive, keeps the interval in force (I-6).
 	HeartbeatInterval *durationpb.Duration `protobuf:"bytes,1,opt,name=heartbeat_interval,json=heartbeatInterval,proto3" json:"heartbeat_interval,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache

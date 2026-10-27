@@ -50,14 +50,17 @@ const (
 // RegistryServiceClient is a client for the whitetower.module.v1alpha1.RegistryService service.
 type RegistryServiceClient interface {
 	// RegisterInstance announces an instance and negotiates the contract version.
-	// Registering again with the same module and instance key updates the
-	// existing instance and returns the same instance ID.
+	// Registering again with the same module and instance key, under the same
+	// principal, updates the existing instance and returns the same instance ID.
 	RegisterInstance(context.Context, *connect.Request[v1alpha1.RegisterInstanceRequest]) (*connect.Response[v1alpha1.RegisterInstanceResponse], error)
-	// Heartbeat reports the instance's health and, when it changed, the set of
+	// Heartbeat reports the instance's health and, when it changed since the
+	// last RegisterInstance or Heartbeat that the core accepted, the set of
 	// agents it serves.
 	Heartbeat(context.Context, *connect.Request[v1alpha1.HeartbeatRequest]) (*connect.Response[v1alpha1.HeartbeatResponse], error)
 	// DeregisterInstance tells the core that the instance is stopping on purpose,
-	// so it is shown as disconnected rather than lost.
+	// so it is shown as disconnected rather than lost. An enforcement point first
+	// closes its gate for every agent it serves, and allows nothing afterwards
+	// (I-5).
 	DeregisterInstance(context.Context, *connect.Request[v1alpha1.DeregisterInstanceRequest]) (*connect.Response[v1alpha1.DeregisterInstanceResponse], error)
 }
 
@@ -122,14 +125,17 @@ func (c *registryServiceClient) DeregisterInstance(ctx context.Context, req *con
 // service.
 type RegistryServiceHandler interface {
 	// RegisterInstance announces an instance and negotiates the contract version.
-	// Registering again with the same module and instance key updates the
-	// existing instance and returns the same instance ID.
+	// Registering again with the same module and instance key, under the same
+	// principal, updates the existing instance and returns the same instance ID.
 	RegisterInstance(context.Context, *connect.Request[v1alpha1.RegisterInstanceRequest]) (*connect.Response[v1alpha1.RegisterInstanceResponse], error)
-	// Heartbeat reports the instance's health and, when it changed, the set of
+	// Heartbeat reports the instance's health and, when it changed since the
+	// last RegisterInstance or Heartbeat that the core accepted, the set of
 	// agents it serves.
 	Heartbeat(context.Context, *connect.Request[v1alpha1.HeartbeatRequest]) (*connect.Response[v1alpha1.HeartbeatResponse], error)
 	// DeregisterInstance tells the core that the instance is stopping on purpose,
-	// so it is shown as disconnected rather than lost.
+	// so it is shown as disconnected rather than lost. An enforcement point first
+	// closes its gate for every agent it serves, and allows nothing afterwards
+	// (I-5).
 	DeregisterInstance(context.Context, *connect.Request[v1alpha1.DeregisterInstanceRequest]) (*connect.Response[v1alpha1.DeregisterInstanceResponse], error)
 }
 
