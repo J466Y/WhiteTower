@@ -23,7 +23,7 @@ A published threat model of the MVP architecture: what must be protected, who mi
 ## Deliverables
 
 - `docs/security/threat-model.md`: data flow diagram, trust boundaries, assets, actors, STRIDE tables, attack trees, mitigations with owners, residual risks.
-- `docs/security/framework-mapping.md`: OWASP Top 10 for Agentic Applications 2026 and EU AI Act articles.
+- `docs/security/framework-mapping.md`: OWASP Top 10 for Agentic Applications 2026 and EU AI Act articles; since 2026-10-27, also the controls of ISO/IEC 42001's Annex A and the articles of the GDPR, with the evidence of each.
 - A security test catalog, with each test assigned to a Phase 1 plan.
 - Pull requests that add or change requirements and ADRs where the analysis demands it.
 
@@ -163,3 +163,15 @@ Review with a security reviewer and the maintainers, then publish. Update the mo
 | 9 | Done | Reviewed and accepted on 2026-09-30 by the maintainer, who did not write it. The upkeep rules were already in `GOVERNANCE.md`. An external security review is still planned before the pilot (P1-13 step 8) |
 
 **Nothing remains.** The model is kept current as `GOVERNANCE.md` says, and P1-13 publishes version 0.2 against the implementation.
+
+### 2026-10-27: ISO/IEC 42001, the GDPR and the evidence of each control
+
+Feedback on the README found that compliance evidence waited for Phase 3. On 2026-10-27 the maintainer decided that the MVP gives auditors a minimum (NFR-22, AUD-10):
+
+| Document | Change |
+| --- | --- |
+| [Framework mapping](../../security/framework-mapping.md), version 0.2 | Two new sections: the controls of ISO/IEC 42001's Annex A that White Tower supports, ten of 38, and what it holds for some of the others; and the articles of the GDPR, with the two kinds of processing and the limits of erasure. Every article and control names the event types that evidence it, the EU AI Act's included. A last section says how an auditor gets and checks that evidence |
+| [Threat model](../../security/threat-model.md), version 0.1.6 | T-59: pseudonymization on export rewrites events, which then no longer verify against the checkpoints; evidence bundles are never pseudonymized |
+| [Security test catalog](../../security/security-tests.md), version 0.1.5 | ST-87, for P1-02: an evidence bundle verifies offline with the published keys alone, and fails once altered |
+
+One gap showed up, and is not closed here: the domain model designs an erasure of a person's name and email in `principals` (its section 7), which no plan builds yet. The evidence of the catalog's controls waits for the event types that plan P1-16 adds.

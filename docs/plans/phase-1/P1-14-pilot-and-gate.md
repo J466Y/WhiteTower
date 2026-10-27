@@ -116,7 +116,7 @@ ADR-0011 replaced AGT with White Tower's own enforcement point for the MVP, and 
 ### 9. Evidence
 
 - Auditors run `wtctl audit verify`, and a consistency check against a checkpoint stored in the SIEM.
-- Export the evidence bundle for the pilot period (Could).
+- Export evidence bundles of the pilot period for the articles and controls of the [framework mapping](../../security/framework-mapping.md) that the gate report cites, and have an auditor verify them offline (Should, AUD-10).
 
 **Done when:** the evidence is attached to the gate report.
 

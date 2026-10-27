@@ -2,8 +2,8 @@
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1.4, with [threat model v0.1.5](threat-model.md) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings), 2026-10-22 (the review of RFC-0001: ST-35, ST-38, ST-40, ST-49, ST-51 and ST-86) and 2026-10-23 (the review of RFC-0002: ST-77, ST-79 and ST-82) |
+| **Status** | Version 0.1.5, with [threat model v0.1.6](threat-model.md) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings), 2026-10-22 (the review of RFC-0001: ST-35, ST-38, ST-40, ST-49, ST-51 and ST-86), 2026-10-23 (the review of RFC-0002: ST-77, ST-79 and ST-82) and 2026-10-27 (evidence bundles, plan P1-02: ST-87) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 8 |
 
 Each test turns an abuse case of the threat model into a check that fails if the control it covers is missing. Each has one owner plan: its acceptance criteria require the test to pass, and it runs in CI from then on. Plan [P1-13](../plans/phase-1/P1-13-security-hardening-and-release.md) runs the whole catalog before the first release.
@@ -33,6 +33,7 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-10 | Ingestion refuses event types and sources outside the instance's own; per-instance rate limits and backpressure keep one flooding instance from slowing the others | T-27, T-36 | integration |
 | ST-11 | Fuzzing of the CloudEvents parser and the ingestion path | T-36 | fuzz |
 | ST-12 | Reads of the audit log are themselves audited (AUD-09) | T-03 | integration |
+| ST-87 | An evidence bundle verifies offline with the published checkpoint keys alone. An event, an inclusion proof or the checkpoint altered in it, or a checkpoint signed with another key, fails verification; and its events are never pseudonymized (AUD-10) | T-58, T-59 | integration |
 
 ## P1-03: Human identity and access
 
