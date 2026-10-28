@@ -1,0 +1,15 @@
+{
+  "description": "A format the enforcement point does not support",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "ebb513b1764e7d1a5ccb0c6b47316b65b16b28684eaf8a82be954f029429dd89",
+    "size_bytes": 4506
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "unsupported"
+  }
+}

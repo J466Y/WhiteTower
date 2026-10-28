@@ -1,11 +1,11 @@
 // Package bundle implements the White Tower policy bundle format
 // whitetower.bundle.v1: canonical manifests, detached JWS signatures with
-// Ed25519 keys, and the verification an enforcement point performs before it
-// activates a bundle (docs/contracts/module-contract-v0.1.md, section 7).
+// Ed25519 keys, bundle keys as a JWK Set, and the verification an enforcement
+// point performs before it activates a bundle
+// (docs/contracts/module-contract-v0.1.md, section 7).
 package bundle
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
@@ -17,7 +17,9 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
+	"github.com/cedar-policy/cedar-go"
 	"github.com/gowebpki/jcs"
 )
 
@@ -64,7 +66,8 @@ func reject(reason, format string, args ...any) error {
 	return &RejectError{Reason: reason, Detail: fmt.Sprintf(format, args...)}
 }
 
-// Manifest is the signed description of a bundle.
+// Manifest is the signed description of a bundle. Every member is required
+// (api/policy/bundle-manifest.schema.json).
 type Manifest struct {
 	Format             string        `json:"format"`
 	AgentID            string        `json:"agent_id"`
@@ -72,9 +75,24 @@ type Manifest struct {
 	CreatedAt          string        `json:"created_at"`
 	CombiningAlgorithm string        `json:"combining_algorithm"`
 	Language           string        `json:"language"`
-	CedarSchema        *File         `json:"cedar_schema,omitempty"`
+	CedarSchema        File          `json:"cedar_schema"`
 	Policies           []PolicyEntry `json:"policies"`
 }
+
+// The members of a manifest, of its Cedar schema's entry and of a policy
+// entry: exactly these, each of them required.
+var (
+	manifestMembers = []string{"format", "agent_id", "version", "created_at", "combining_algorithm", "language", "cedar_schema", "policies"}
+	fileMembers     = []string{"path", "sha256"}
+	policyMembers   = []string{"id", "name", "version", "scope", "path", "sha256"}
+)
+
+// The forms of the manifest's strings, as the schema states them.
+var (
+	uuidForm      = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	sha256Form    = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	timestampForm = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$`)
+)
 
 // PolicyEntry lists one policy of the bundle.
 type PolicyEntry struct {
@@ -142,6 +160,37 @@ type Key struct {
 	Public ed25519.PublicKey
 }
 
+// ParseKeys reads bundle keys from a JWK Set (RFC 7517), the form in which
+// section 7.3 has enforcement points take them: OKP keys on the Ed25519
+// curve (RFC 8037), each with its key ID. As RFC 7517 asks, it ignores the
+// keys it cannot use: other types and curves, and keys without an ID or with
+// a malformed public key.
+func ParseKeys(data []byte) ([]Key, error) {
+	var set struct {
+		Keys []struct {
+			Kty string `json:"kty"`
+			Crv string `json:"crv"`
+			X   string `json:"x"`
+			Kid string `json:"kid"`
+		} `json:"keys"`
+	}
+	if err := json.Unmarshal(data, &set); err != nil {
+		return nil, fmt.Errorf("not a JWK Set: %w", err)
+	}
+	if set.Keys == nil {
+		return nil, errors.New("not a JWK Set: no keys member")
+	}
+	var keys []Key
+	for _, k := range set.Keys {
+		pub, err := base64.RawURLEncoding.DecodeString(k.X)
+		if k.Kty != "OKP" || k.Crv != "Ed25519" || k.Kid == "" || err != nil || len(pub) != ed25519.PublicKeySize {
+			continue
+		}
+		keys = append(keys, Key{ID: k.Kid, Public: pub})
+	}
+	return keys, nil
+}
+
 // KeyID returns the RFC 7638 JWK thumbprint of an Ed25519 public key, the
 // recommended key ID.
 func KeyID(pub ed25519.PublicKey) string {
@@ -159,13 +208,11 @@ func Build(m Manifest, files map[string][]byte, keyID string, priv ed25519.Priva
 		}
 		m.Policies[i].SHA256 = SHA256Hex(content)
 	}
-	if m.CedarSchema != nil {
-		content, ok := files[m.CedarSchema.Path]
-		if !ok {
-			return nil, fmt.Errorf("no file for %s", m.CedarSchema.Path)
-		}
-		m.CedarSchema.SHA256 = SHA256Hex(content)
+	content, ok := files[m.CedarSchema.Path]
+	if !ok {
+		return nil, fmt.Errorf("no file for %s", m.CedarSchema.Path)
 	}
+	m.CedarSchema.SHA256 = SHA256Hex(content)
 	manifest, err := Canonical(m)
 	if err != nil {
 		return nil, err
@@ -195,18 +242,19 @@ type Expectation struct {
 	Languages []string
 }
 
-var policyPath = regexp.MustCompile(`^policies/(global|agent)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.cedar$`)
-
-// Verify applies the verification steps of section 7.4 in order and returns
-// the manifest, or a *RejectError. A bundle whose version and hash equal the
-// active one's verifies; the caller then has nothing to activate.
+// Verify applies the verification steps of section 7.4, V1 to V7, in their
+// order, and returns the manifest, or a *RejectError. A bundle whose version
+// and hash equal the active one's verifies; the caller then has nothing to
+// activate.
 func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 	// V1. Size.
 	if want.Ref.SizeBytes > MaxSize || b.Size() > MaxSize || len(b.Files) > MaxFiles {
 		return nil, reject(ReasonOversized, "%d bytes in %d files", b.Size(), len(b.Files))
 	}
 
-	// V2. Signature over the exact manifest bytes.
+	// V2. Signature over the exact manifest bytes. The protected header has
+	// exactly alg, kid and typ, in any order (section 7.2): any other member,
+	// such as b64, which would change what is signed (RFC 7797), is refused.
 	parts := strings.Split(b.Signature, ".")
 	if len(parts) != 3 || parts[1] != "" {
 		return nil, reject(ReasonSignature, "not a JWS with a detached payload")
@@ -242,39 +290,35 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 		return nil, reject(ReasonManifestMismatch, "manifest SHA-256 %s, governance state expects %s", sum, want.Ref.ManifestSHA256)
 	}
 
-	// V4. The manifest's content.
-	dec := json.NewDecoder(bytes.NewReader(b.Manifest))
-	dec.DisallowUnknownFields()
-	var m Manifest
-	if err := dec.Decode(&m); err != nil {
-		return nil, reject(ReasonInvalidManifest, "%v", err)
-	}
-	if m.Format != Format || m.CombiningAlgorithm != CombiningAlgorithm || !slices.Contains(want.Languages, m.Language) {
-		return nil, reject(ReasonUnsupported, "format %q, combining algorithm %q, language %q", m.Format, m.CombiningAlgorithm, m.Language)
+	// V4. The manifest alone, then against the state.
+	m, err := ParseManifest(b.Manifest, want.Languages)
+	if err != nil {
+		return nil, err
 	}
 	if m.AgentID != want.AgentID || m.Version != want.Ref.Version {
 		return nil, reject(ReasonInvalidManifest, "bundle for agent %s version %d, expected agent %s version %d",
 			m.AgentID, m.Version, want.AgentID, want.Ref.Version)
 	}
 
-	// V5. Files: exactly the listed ones, with their hashes.
+	// V5. Files. Each policy's path is built from its entry's ID and scope and
+	// the language, with no duplicates, and the Cedar schema sits at
+	// schema.cedarschema: any other path is malformed. Then exactly the
+	// listed files, with their hashes.
 	listed := map[string]string{}
 	for _, p := range m.Policies {
-		if !policyPath.MatchString(p.Path) || !strings.HasSuffix(p.Path, "."+m.Language) ||
-			!strings.HasPrefix(p.Path, "policies/"+p.Scope+"/") {
-			return nil, reject(ReasonInvalidManifest, "policy path %q", p.Path)
+		path := "policies/" + p.Scope + "/" + p.ID + "." + m.Language
+		if p.Path != path {
+			return nil, reject(ReasonInvalidManifest, "policy %s is at %q, not at %q", p.ID, p.Path, path)
 		}
-		if _, dup := listed[p.Path]; dup {
-			return nil, reject(ReasonInvalidManifest, "policy path %q listed twice", p.Path)
+		if _, dup := listed[path]; dup {
+			return nil, reject(ReasonInvalidManifest, "policy path %q listed twice", path)
 		}
-		listed[p.Path] = p.SHA256
+		listed[path] = p.SHA256
 	}
-	if m.CedarSchema != nil {
-		if m.Language != "cedar" || m.CedarSchema.Path != CedarSchemaPath {
-			return nil, reject(ReasonInvalidManifest, "cedar schema %q", m.CedarSchema.Path)
-		}
-		listed[m.CedarSchema.Path] = m.CedarSchema.SHA256
+	if m.CedarSchema.Path != CedarSchemaPath {
+		return nil, reject(ReasonInvalidManifest, "Cedar schema at %q, not at %q", m.CedarSchema.Path, CedarSchemaPath)
 	}
+	listed[CedarSchemaPath] = m.CedarSchema.SHA256
 	for _, path := range slices.Sorted(maps.Keys(listed)) {
 		content, ok := b.Files[path]
 		if !ok {
@@ -294,7 +338,124 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 	if m.Version < want.ActiveVersion || (m.Version == want.ActiveVersion && sum != want.ActiveSHA256) {
 		return nil, reject(ReasonOlderVersion, "version %d, active version %d", m.Version, want.ActiveVersion)
 	}
+
+	// V7. Every policy parses as a static Cedar policy. cedar-go parses no
+	// templates, so a template does not parse. Validating the policies against
+	// the bundle's schema is the core's job (POL-07): a policy that fails it is
+	// activated all the same.
+	for _, p := range m.Policies {
+		if _, err := cedar.NewPolicyListFromBytes(p.Path, b.Files[p.Path]); err != nil {
+			return nil, reject(ReasonParseError, "%s: %v", p.Path, err)
+		}
+	}
+	return m, nil
+}
+
+// ParseManifest applies the checks of step V4 that read the manifest alone,
+// in their order (section 7.4). A manifest that is not an object, or that has
+// an unknown or a missing member, or a member of the wrong type, is
+// invalid_manifest: the types are those of
+// api/policy/bundle-manifest.schema.json, the forms of its strings included.
+// Then a format, combining algorithm or language that is not supported is
+// unsupported, even though the schema's constant fails too. Paths need only
+// be strings here: step V5 builds them from their entries.
+func ParseManifest(data []byte, languages []string) (*Manifest, error) {
+	if err := checkMembers(data); err != nil {
+		return nil, reject(ReasonInvalidManifest, "%v", err)
+	}
+	var m Manifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, reject(ReasonInvalidManifest, "%v", err)
+	}
+	if err := checkForms(&m); err != nil {
+		return nil, reject(ReasonInvalidManifest, "%v", err)
+	}
+	if m.Format != Format || m.CombiningAlgorithm != CombiningAlgorithm || !slices.Contains(languages, m.Language) {
+		return nil, reject(ReasonUnsupported, "format %q, combining algorithm %q, language %q", m.Format, m.CombiningAlgorithm, m.Language)
+	}
 	return &m, nil
+}
+
+// checkMembers checks that the manifest, its Cedar schema's entry and each
+// policy entry are objects with exactly their members, none of them null.
+// Decoding into a Manifest then checks the type of each member, since
+// encoding/json neither reports a missing member nor refuses null.
+func checkMembers(data []byte) error {
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	manifest, err := object(v, manifestMembers)
+	if err != nil {
+		return err
+	}
+	if _, err := object(manifest["cedar_schema"], fileMembers); err != nil {
+		return fmt.Errorf("cedar_schema: %w", err)
+	}
+	policies, ok := manifest["policies"].([]any)
+	if !ok {
+		return errors.New("policies is not an array")
+	}
+	for i, p := range policies {
+		if _, err := object(p, policyMembers); err != nil {
+			return fmt.Errorf("policy %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
+// object returns v as an object that has exactly the members named, none of
+// them null.
+func object(v any, members []string) (map[string]any, error) {
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return nil, errors.New("not an object")
+	}
+	for name, value := range obj {
+		if !slices.Contains(members, name) {
+			return nil, fmt.Errorf("unknown member %q", name)
+		}
+		if value == nil {
+			return nil, fmt.Errorf("member %q is null", name)
+		}
+	}
+	for _, name := range members {
+		if _, ok := obj[name]; !ok {
+			return nil, fmt.Errorf("missing member %q", name)
+		}
+	}
+	return obj, nil
+}
+
+// checkForms checks the values that the schema constrains beyond their JSON
+// type: identifiers, hashes and times in their forms, versions from 1, names
+// of 1 to 200 characters, and the two scopes.
+func checkForms(m *Manifest) error {
+	switch {
+	case !uuidForm.MatchString(m.AgentID):
+		return fmt.Errorf("agent_id %q is not a UUID", m.AgentID)
+	case m.Version < 1:
+		return errors.New("version is 0")
+	case !timestampForm.MatchString(m.CreatedAt):
+		return fmt.Errorf("created_at %q is not a time with milliseconds in UTC", m.CreatedAt)
+	case !sha256Form.MatchString(m.CedarSchema.SHA256):
+		return fmt.Errorf("cedar_schema.sha256 %q is not a SHA-256", m.CedarSchema.SHA256)
+	}
+	for i, p := range m.Policies {
+		switch n := utf8.RuneCountInString(p.Name); {
+		case !uuidForm.MatchString(p.ID):
+			return fmt.Errorf("policy %d: id %q is not a UUID", i, p.ID)
+		case n < 1 || n > 200:
+			return fmt.Errorf("policy %d: a name of %d characters", i, n)
+		case p.Version < 1:
+			return fmt.Errorf("policy %d: version is 0", i)
+		case p.Scope != "global" && p.Scope != "agent":
+			return fmt.Errorf("policy %d: scope %q", i, p.Scope)
+		case !sha256Form.MatchString(p.SHA256):
+			return fmt.Errorf("policy %d: sha256 %q is not a SHA-256", i, p.SHA256)
+		}
+	}
+	return nil
 }
 
 // Reason returns the rejection reason of err, or "" if err is not a rejection.

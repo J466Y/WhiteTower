@@ -1,0 +1,15 @@
+{
+  "description": "The manifest names no Cedar schema, and the bundle carries none",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "145bc007566ff59e8cfd33d17b47058291eac46c5a1869520cc70eaf165aa1ad",
+    "size_bytes": 1052
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

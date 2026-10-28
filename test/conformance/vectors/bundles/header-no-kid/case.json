@@ -1,0 +1,15 @@
+{
+  "description": "The trusted key signs the bundle, but the JWS header has no kid",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "87188a2a375d9b901158767c6b6f68e6ff820c537e555eeb5e2e4a1df76ed522",
+    "size_bytes": 4506
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "signature"
+  }
+}
