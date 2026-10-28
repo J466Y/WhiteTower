@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -14,7 +15,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+	"unicode/utf8"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/J466Y/WhiteTower/test/conformance/bundle"
 	"github.com/J466Y/WhiteTower/test/conformance/kit"
@@ -223,17 +228,23 @@ func generateBundleCases(t *testing.T) []generated {
 	add("oversized", "Governance state announces a bundle larger than the limit", b, ref, 41, rejected(bundle.ReasonOversized))
 
 	// V2. The JWS header has exactly alg EdDSA, kid and typ, in any order
-	// (section 7.2). signedWith signs a valid bundle with a detached JWS whose
-	// protected header is the JSON text given: sign signs the JWS signing
-	// input, the header and the manifest, both encoded (RFC 7515).
-	signedWith := func(header string, sign func(input []byte) []byte) *bundle.Bundle {
+	// (section 7.2): JSON in UTF-8 (section 1), in base64url as RFC 7515
+	// defines it. signedAs signs a valid bundle with a detached JWS whose
+	// protected header travels as the text given: sign signs the JWS signing
+	// input, that text and the encoded manifest (RFC 7515). signedWith does so
+	// for the header's JSON text, which it encodes.
+	signedAs := func(protected string, sign func(input []byte) []byte) *bundle.Bundle {
 		b := valid()
-		protected := base64.RawURLEncoding.EncodeToString([]byte(header))
 		input := protected + "." + base64.RawURLEncoding.EncodeToString(b.Manifest)
 		b.Signature = protected + ".." + base64.RawURLEncoding.EncodeToString(sign([]byte(input)))
 		return b
 	}
+	signedWith := func(header string, sign func(input []byte) []byte) *bundle.Bundle {
+		return signedAs(base64.RawURLEncoding.EncodeToString([]byte(header)), sign)
+	}
 	signedByTrusted := func(input []byte) []byte { return ed25519.Sign(trusted, input) }
+	// header is the protected header that bundle.Sign writes.
+	header := fmt.Sprintf(`{"alg":%q,"kid":%q,"typ":%q}`, bundle.Algorithm, trustedID, bundle.Type)
 
 	b = signedWith(fmt.Sprintf(`{"alg":"none","kid":%q,"typ":%q}`, trustedID, bundle.Type), func([]byte) []byte { return nil })
 	add("header-alg-none", "The JWS header names the algorithm none, and the signature is empty", b, b.Ref(42), 41, rejected(bundle.ReasonSignature))
@@ -263,18 +274,56 @@ func generateBundleCases(t *testing.T) []generated {
 	b = signedWith(fmt.Sprintf(`{"typ":%q,"kid":%q,"alg":"EdDSA"}`, bundle.Type, trustedID), signedByTrusted)
 	add("header-any-order", "The JWS header has its three members in another order", b, b.Ref(42), 41, bundleOutcome{Outcome: "activated"})
 
+	b = signedWith(fmt.Sprintf(`{"alg":"EdDSA","jku":"https://keys.example/bundle-keys.json","typ":%q}`, bundle.Type), signedByTrusted)
+	add("header-jku-instead-of-kid", "The trusted key signs the bundle, but the JWS header has jku in place of kid: three members, not the three that section 7.2 names",
+		b, b.Ref(42), 41, rejected(bundle.ReasonSignature))
+
+	protected := base64.RawURLEncoding.EncodeToString([]byte(header))
+	b = signedAs(protected[:64]+"\n"+protected[64:], signedByTrusted)
+	add("header-line-break", "The JWS header's base64url has a line break, which RFC 7515 does not allow, and the trusted key signs the header as it travels",
+		b, b.Ref(42), 41, rejected(bundle.ReasonSignature))
+
+	b = valid()
+	b.Signature += "=="
+	add("signature-padding", "The signature's base64url ends with the padding that RFC 7515 leaves out", b, b.Ref(42), 41, rejected(bundle.ReasonSignature))
+
+	b = signedWith("\xef\xbb\xbf"+header, signedByTrusted)
+	add("header-byte-order-mark", "The JWS header's JSON starts with a byte order mark, which JSON in UTF-8 never carries, and the trusted key signs it",
+		b, b.Ref(42), 41, rejected(bundle.ReasonSignature))
+
+	b = signedWith(strings.Replace(header, trustedID, trustedID+"\xff", 1), signedByTrusted)
+	add("header-invalid-utf8", "The JWS header's key ID ends with a byte that is not UTF-8, and the trusted key signs the header",
+		b, b.Ref(42), 41, rejected(bundle.ReasonSignature))
+
 	// V4. The manifest's structure, then the values it must support, then the
-	// agent and the version that governance state names. changed signs again,
-	// with the trusted key, the manifest of b once change has changed its
-	// members; change returns the manifest to sign.
+	// agent and the version that governance state names. resigned signs b
+	// again, with the trusted key, over the manifest given. changed does so
+	// once change has changed the members of b's manifest; change returns the
+	// manifest to sign.
+	resigned := func(b *bundle.Bundle, manifest []byte) *bundle.Bundle {
+		b.Manifest, b.Signature = manifest, bundle.Sign(manifest, trustedID, trusted)
+		return b
+	}
 	changed := func(b *bundle.Bundle, change func(m map[string]any) any) *bundle.Bundle {
 		manifest, err := bundle.Canonical(change(decodeManifest(t, b.Manifest)))
 		if err != nil {
 			t.Fatal(err)
 		}
-		b.Manifest, b.Signature = manifest, bundle.Sign(manifest, trustedID, trusted)
-		return b
+		return resigned(b, manifest)
 	}
+
+	b = valid()
+	b = resigned(b, append([]byte("\xef\xbb\xbf"), b.Manifest...))
+	add("byte-order-mark", "The manifest starts with a byte order mark, which JSON in UTF-8 never carries (section 1)",
+		b, b.Ref(42), 41, rejected(bundle.ReasonInvalidManifest))
+
+	b = valid()
+	name := []byte(`"name":"global-no-external-email"`)
+	if !bytes.Contains(b.Manifest, name) {
+		t.Fatal("the valid manifest no longer names global-no-external-email")
+	}
+	b = resigned(b, bytes.Replace(b.Manifest, name, []byte("\"name\":\"global-no-external-email\xff\""), 1))
+	add("invalid-utf8", "A policy's name ends with a byte that is not UTF-8 (section 1)", b, b.Ref(42), 41, rejected(bundle.ReasonInvalidManifest))
 
 	b = changed(valid(), func(m map[string]any) any { return []any{m} })
 	add("not-an-object", "The manifest is an array that holds a valid manifest", b, b.Ref(42), 41, rejected(bundle.ReasonInvalidManifest))
@@ -592,12 +641,24 @@ func TestBundleVectors(t *testing.T) {
 	}
 }
 
+// validateManifest checks a manifest's bytes against the schema. Bytes that
+// are not a JSON text, which is UTF-8 without a byte order mark (RFC 8259,
+// section 8.1), match no schema: encoding/json would read an invalid byte as
+// U+FFFD rather than refuse it.
+func validateManifest(schema *jsonschema.Schema, manifest []byte) error {
+	if !utf8.Valid(manifest) || bytes.HasPrefix(manifest, []byte("\xef\xbb\xbf")) {
+		return errors.New("not a JSON text: invalid UTF-8, or a byte order mark")
+	}
+	return validateJSON(schema, json.RawMessage(manifest))
+}
+
 // TestTheManifestSchemaAgreesWithStepV4 checks the manifest of every bundle
 // vector against bundle-manifest.schema.json. A manifest that step V4 refuses
-// on its own, as invalid_manifest or unsupported, fails the schema, and the
-// manifest of every activated bundle passes it. The other manifests may go
-// either way: the schema cannot tie a policy's path to its entry, which step
-// V5 does, nor know the agent and the version that governance state names.
+// on its own, as invalid_manifest or unsupported, fails the schema, one that
+// is not JSON in UTF-8 included, and the manifest of every activated bundle
+// passes it. The other manifests may go either way: the schema cannot tie a
+// policy's path to its entry, which step V5 does, nor know the agent and the
+// version that governance state names.
 func TestTheManifestSchemaAgreesWithStepV4(t *testing.T) {
 	schema := compileSchema(t, "../../api/policy/bundle-manifest.schema.json")
 	for _, name := range bundleCaseNames(t) {
@@ -609,7 +670,7 @@ func TestTheManifestSchemaAgreesWithStepV4(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			schemaErr := validateJSON(schema, json.RawMessage(manifest))
+			schemaErr := validateManifest(schema, manifest)
 			if _, err := bundle.ParseManifest(manifest, []string{"cedar"}); err != nil && schemaErr == nil {
 				t.Errorf("step V4 refuses the manifest (%v), and the schema accepts it", err)
 			}

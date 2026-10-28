@@ -10,7 +10,8 @@ import (
 
 // TestParseKeysIgnoresTheKeysItCannotUse checks section 7.3's JWK Set: the
 // verifier trusts the OKP keys on Ed25519 that carry a key ID and a public key
-// of 32 bytes, and, as RFC 7517 asks, ignores every other key of the set.
+// of 32 bytes in base64url, as RFC 7515 defines it, and, as RFC 7517 asks,
+// ignores every other key of the set.
 func TestParseKeysIgnoresTheKeysItCannotUse(t *testing.T) {
 	pub := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)).Public().(ed25519.PublicKey)
 	x := base64.RawURLEncoding.EncodeToString(pub)
@@ -20,8 +21,9 @@ func TestParseKeysIgnoresTheKeysItCannotUse(t *testing.T) {
 		{"kty": "OKP", "crv": "Ed25519", "x": %[1]q},
 		{"kty": "OKP", "crv": "Ed25519", "kid": "short", "x": "AAAA"},
 		{"kty": "OKP", "crv": "Ed25519", "kid": "padded", "x": %[2]q},
+		{"kty": "OKP", "crv": "Ed25519", "kid": "line-break", "x": %[3]q},
 		{"kty": "OKP", "crv": "Ed25519", "kid": "trusted", "x": %[1]q, "alg": "EdDSA", "use": "sig"}
-	]}`, x, x+"=")
+	]}`, x, x+"=", x[:20]+"\n"+x[20:])
 
 	keys, err := ParseKeys([]byte(set))
 	if err != nil {

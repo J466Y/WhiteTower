@@ -152,6 +152,11 @@ def gate_reason(state: dict) -> str:
 
 
 def b64url(data: str) -> bytes:
+    """Base64url as RFC 7515 defines it: the URL-safe alphabet only, without
+    padding, line breaks or any other character, which urlsafe_b64decode would
+    take or skip. Raises ValueError otherwise."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]*", data):
+        raise ValueError("not base64url")
     return base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
 
 
@@ -175,6 +180,25 @@ SHA256 = re.compile(r"[0-9a-f]{64}")
 TIMESTAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z")
 
 
+def trusted_key(jwk: dict) -> Ed25519PublicKey | None:
+    """The public key of a JWK of the trusted set (section 7.3), or None for a key
+    that the checker cannot use and ignores, as RFC 7517 asks: another type or
+    curve, no key ID, or an x that is not the base64url of 32 bytes."""
+    if jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519" or type(jwk.get("kid")) is not str or not jwk["kid"]:
+        return None
+    try:
+        return Ed25519PublicKey.from_public_bytes(b64url(jwk["x"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def utf8_json(data: bytes):
+    """Parses JSON in the encoding that section 1 states: UTF-8, without a byte order
+    mark, which json.loads refuses in text. From bytes, json.loads would take a byte
+    order mark, UTF-16 and UTF-32. Raises ValueError otherwise."""
+    return json.loads(data.decode("utf-8"))
+
+
 def members(value, names: set) -> dict:
     """An object with exactly the members named, none of them null, or invalid_manifest."""
     if type(value) is not dict or set(value) != names or None in value.values():
@@ -193,15 +217,16 @@ def positive(value) -> bool:
 def check_manifest(manifest: bytes) -> dict:
     """The checks of step V4 that read the manifest alone, in their order (section 7.4).
 
-    A manifest that is not an object, or that has an unknown or a missing member,
-    or a member of the wrong type, is invalid_manifest: the types are those of
+    A manifest that is not JSON in UTF-8 without a byte order mark (section 1), or
+    not an object, or that has an unknown or a missing member, or a member of the
+    wrong type, is invalid_manifest: the types are those of
     bundle-manifest.schema.json, the forms of its strings included. Then a format,
     combining algorithm or language that is not supported is unsupported, even
     though the schema's constant fails too. Paths need only be strings here: V5
     builds them from their entries.
     """
     try:
-        m = json.loads(manifest)
+        m = utf8_json(manifest)
     except ValueError:
         raise Rejected("invalid_manifest") from None
     members(m, MANIFEST_MEMBERS)
@@ -244,13 +269,14 @@ def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: di
     size = len(manifest) + sum(len(c) for c in files.values())
     if ref["size_bytes"] > 2 << 20 or size > 2 << 20 or len(files) > 1000:
         raise Rejected("oversized")
-    # V2. Signature. The protected header has exactly alg, kid and typ, in any
-    # order (section 7.2): any other member, such as b64, is refused.
+    # V2. Signature. The header and the signature are in base64url as RFC 7515
+    # defines it, and the header is JSON in UTF-8 with exactly alg, kid and typ,
+    # in any order (section 7.2): any other member, such as b64, is refused.
     parts = signature.split(".")
     if len(parts) != 3 or parts[1] != "":
         raise Rejected("signature")
     try:
-        header = json.loads(b64url(parts[0]))
+        header = utf8_json(b64url(parts[0]))
     except ValueError:
         raise Rejected("signature") from None
     if type(header) is not dict or set(header) != {"alg", "kid", "typ"} \
@@ -326,11 +352,9 @@ def main() -> int:
         reason = gate_reason(case["state"])
         check(case["id"], deny(reason) if reason else engine.evaluate(fail_closed["request"]), case["expected"])
 
-    # The trusted bundle keys, a JWK Set (section 7.3), of which the checker
-    # uses the OKP keys on Ed25519 that have a key ID, as RFC 7517 asks.
+    # The trusted bundle keys, a JWK Set (section 7.3).
     keys = json.loads((VECTORS / "bundles" / "trusted-keys.json").read_text(encoding="utf-8"))
-    trusted = {k["kid"]: Ed25519PublicKey.from_public_bytes(b64url(k["x"])) for k in keys["keys"]
-               if k.get("kty") == "OKP" and k.get("crv") == "Ed25519" and "kid" in k}
+    trusted = {k["kid"]: key for k in keys["keys"] if (key := trusted_key(k)) is not None}
     bundle_cases = sorted(p for p in (VECTORS / "bundles").iterdir() if p.is_dir())
     for case_dir in bundle_cases:
         case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
