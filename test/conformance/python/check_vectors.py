@@ -396,6 +396,9 @@ def main() -> int:
             got = {"outcome": "rejected", "reason": r.reason}
         check(f"bundle {case_dir.name}", got, case["expected"])
 
+    # A failure may name a character that the console cannot encode, such as
+    # an emoji on Windows: it is printed as an escape instead.
+    sys.stdout.reconfigure(errors="backslashreplace")
     manifest_cases = sorted(p for p in (VECTORS / "manifests").iterdir() if p.is_dir())
     for case_dir in manifest_cases:
         case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
@@ -410,7 +413,15 @@ def main() -> int:
                 print(f"FAIL manifest {case_dir.name}: canonical JSON {canonical.decode()}")
         check(f"manifest {case_dir.name}", got, case["expected"])
 
-    total = len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases)
+    documents = json.loads((VECTORS / "manifests" / "documents.json").read_text(encoding="utf-8"))["documents"]
+    for doc in documents:
+        try:
+            got = {"outcome": "accepted", "canonical_json": read_manifest(doc["yaml"].encode()).decode()}
+        except ManifestRefused:
+            got = {"outcome": "refused"}
+        check(f"manifest document {doc['name']}", got, doc["expected"])
+
+    total = len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases) + len(documents)
     print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML)")
     return 1 if failures else 0
 

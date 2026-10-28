@@ -36,5 +36,5 @@ The Python check needs `cedarpy`, `cryptography` and PyYAML; the virtual environ
 
 - `combination.json` and `fail-closed.json` are edited by hand. Both implementations must still pass.
 - The bundle vectors are generated, because their signatures must match their bytes: change `bundle_vectors_test.go`, then run `go test ./test/conformance -run TestBundleVectorsAreCurrent -update`.
-- The manifest vectors are generated from the examples of `api/manifest`, so that they follow them: after an example changes, run `go test ./test/conformance/manifest -run TestManifestVectorsAreCurrent -update`.
+- The manifest vectors are generated from the examples of `api/manifest` and the documents of the reader's tests, so that they follow both: after either changes, run `go test ./test/conformance/manifest -run TestManifestVectorsAreCurrent -update`.
 - Vectors are part of the contract: changing their meaning needs an RFC.

@@ -1,0 +1,7 @@
+{
+  "description": "A display name saved in Windows-1252, whose é is the byte E9, so the manifest is not UTF-8",
+  "obligation": "MAN-1",
+  "expected": {
+    "outcome": "refused"
+  }
+}
