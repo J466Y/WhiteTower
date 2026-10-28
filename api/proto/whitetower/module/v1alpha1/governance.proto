@@ -302,7 +302,7 @@ message HaltAcknowledgement {
 
 // HaltLayer is one layer of a halt (architecture, sections 6.1 and 6.2).
 enum HaltLayer {
-  // Unknown.
+  // Unknown. A report of this layer never counts as done (CORE-19).
   HALT_LAYER_UNSPECIFIED = 0;
   // Every further governed call and interaction is denied (KIL-01).
   HALT_LAYER_GATE_CLOSED = 1;
@@ -316,7 +316,7 @@ enum HaltLayer {
 
 // LayerOutcome says what happened at one layer.
 enum LayerOutcome {
-  // Unknown. Never counts as done.
+  // Unknown. Never counts as done (CORE-19).
   LAYER_OUTCOME_UNSPECIFIED = 0;
   // The layer is in place.
   LAYER_OUTCOME_DONE = 1;
@@ -348,7 +348,7 @@ message HaltLayerReport {
 
 // BundleOutcome says what the instance did with a bundle.
 enum BundleOutcome {
-  // Unknown.
+  // Unknown. Never counts as an activation (CORE-19).
   BUNDLE_OUTCOME_UNSPECIFIED = 0;
   // Verified and active.
   BUNDLE_OUTCOME_ACTIVATED = 1;

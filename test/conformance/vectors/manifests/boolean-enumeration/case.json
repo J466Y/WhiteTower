@@ -1,0 +1,7 @@
+{
+  "description": "An enumeration [on, off]: booleans in YAML 1.1, strings in YAML 1.2",
+  "obligation": "MAN-1",
+  "expected": {
+    "outcome": "refused"
+  }
+}

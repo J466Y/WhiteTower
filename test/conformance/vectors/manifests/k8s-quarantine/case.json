@@ -1,0 +1,8 @@
+{
+  "description": "The example k8s-quarantine.yaml, with the hash an instance presents when it registers",
+  "obligation": "MAN-2",
+  "expected": {
+    "outcome": "accepted",
+    "sha256": "874665e6dce59d4b9e1289471b222e9fb2fc50161f4175cca9f315d4164aecde"
+  }
+}

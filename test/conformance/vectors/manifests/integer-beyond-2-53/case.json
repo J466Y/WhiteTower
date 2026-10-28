@@ -1,0 +1,7 @@
+{
+  "description": "The integer 2^53 + 1, which a double cannot hold, so the manifest is not I-JSON",
+  "obligation": "MAN-1",
+  "expected": {
+    "outcome": "refused"
+  }
+}

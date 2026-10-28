@@ -6,12 +6,13 @@ Checks that a module implements the module contracts ([specification, section 9]
 
 | Path | Content |
 | --- | --- |
-| [`vectors/`](vectors/) | Language-neutral test vectors: combination semantics, the gate, signed bundles |
+| [`vectors/`](vectors/) | Language-neutral test vectors: combination semantics, the gate, signed bundles, module manifests |
 | [`profile/`](profile/) | Reference implementation of the decision profile on `cedar-go`: request mapping, combining algorithm, gate |
 | [`bundle/`](bundle/) | Reference implementation of the bundle format: canonical manifests, signatures, verification |
+| [`manifest/`](manifest/) | Reference reader of module manifests written in YAML: MAN-1's refusals, I-JSON, canonical JSON |
 | [`kit/`](kit/) | The kit: a fake core that speaks the module API, the driver client, and the scenarios |
 | [`stubep/`](stubep/) | A minimal enforcement point in Go, enough to run the scenarios end to end. Not a product |
-| [`python/check_vectors.py`](python/check_vectors.py) | The vectors checked with Python: `cedarpy` and `cryptography` |
+| [`python/check_vectors.py`](python/check_vectors.py) | The vectors checked with Python: `cedarpy`, `cryptography` and PyYAML |
 | [`driver-protocol.md`](driver-protocol.md) | How the kit tells a module under test what to do |
 
 ## How the kit works
@@ -25,14 +26,15 @@ Scenarios S-01, "start closed", and S-17, "stale renewals", run today against th
 ## Running it
 
 ```sh
-go test ./test/conformance/...                 # vectors (Go, cedar-go), the stub's own tests, and scenarios S-01 and S-17 against the stub
-python test/conformance/python/check_vectors.py  # the same vectors with cedarpy and cryptography
+go test ./test/conformance/...                 # vectors (Go, cedar-go, yaml.v3), the stub's own tests, and scenarios S-01 and S-17 against the stub
+python test/conformance/python/check_vectors.py  # the same vectors with cedarpy, cryptography and PyYAML
 ```
 
-The Python check needs `cedarpy` and `cryptography`; the virtual environment of `hack/spikes/agt` has both.
+The Python check needs `cedarpy`, `cryptography` and PyYAML; the virtual environment of `hack/spikes/agt` has all three. It reads manifests from PyYAML's events, never its types, since PyYAML reads YAML 1.1.
 
 ## Changing the vectors
 
 - `combination.json` and `fail-closed.json` are edited by hand. Both implementations must still pass.
 - The bundle vectors are generated, because their signatures must match their bytes: change `bundle_vectors_test.go`, then run `go test ./test/conformance -run TestBundleVectorsAreCurrent -update`.
+- The manifest vectors are generated from the examples of `api/manifest`, so that they follow them: after an example changes, run `go test ./test/conformance/manifest -run TestManifestVectorsAreCurrent -update`.
 - Vectors are part of the contract: changing their meaning needs an RFC.
