@@ -8,5 +8,7 @@ spec:
   agents: all
   capabilities:
     - {name: runtime-control, haltLayers: [network_quarantined], platforms: [kubernetes]}
-  events: {emits: [whitetower.quarantine.applied.v1], consumes: []}
-  permissions: [governance.watch]
+  events:
+    emits: [whitetower.lease.expired.v1, whitetower.quarantine.applied.v1, whitetower.quarantine.lifted.v1]
+    consumes: []
+  permissions: [governance.watch, events.publish]

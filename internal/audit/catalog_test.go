@@ -141,6 +141,16 @@ func TestCheckRefusesInvalidEvents(t *testing.T) {
 	if _, err := c.check(checkpoint); err == nil || !strings.Contains(err.Error(), "has no subject") {
 		t.Errorf("a subject where there is none: %v", err)
 	}
+	// A lease expires agent by agent, and its event names the agent as subject
+	// (contract, section 5.3).
+	lease := example("whitetower.lease.expired.v1")
+	if _, err := c.check(lease); err != nil {
+		t.Errorf("a lease expiry with its subject: %v", err)
+	}
+	delete(lease, "subject")
+	if _, err := c.check(lease); err == nil || !strings.Contains(err.Error(), "the subject, its agent, is required") {
+		t.Errorf("a lease expiry without its subject: %v", err)
+	}
 }
 
 func TestEmitterAndAction(t *testing.T) {

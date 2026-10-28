@@ -39,7 +39,10 @@ message RegisterInstanceRequest {
   // Slug of the module, as registered and approved by an operator.
   string module = 1;
   // Lowercase hexadecimal SHA-256 of the RFC 8785 canonical JSON of the manifest
-  // the instance runs. It must match the approved manifest.
+  // the instance runs. It must be the hash of one of the module's approved
+  // manifests (MAN-2). The instance takes it from its release, a constant
+  // computed from the manifest the release ships, never from its configuration
+  // (contract, section 3.2).
   string manifest_sha256 = 2;
   // Version of the module, as in its manifest.
   string module_version = 3;

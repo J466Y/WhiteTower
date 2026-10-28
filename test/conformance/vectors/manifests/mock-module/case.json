@@ -1,0 +1,8 @@
+{
+  "description": "The example mock-module.yaml, with the hash an instance presents when it registers",
+  "obligation": "MAN-2",
+  "expected": {
+    "outcome": "accepted",
+    "sha256": "629e74e85b9791a1bd48ff11408367908c1ae34f2dadc013e3acc747fcf4780d"
+  }
+}

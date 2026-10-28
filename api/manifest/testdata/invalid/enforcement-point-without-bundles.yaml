@@ -8,5 +8,8 @@ spec:
   agents: bound
   capabilities:
     - {name: enforcement-point, interventionPoints: [tool.invoke, model.invoke], haltModes: [block], haltLayers: [gate_closed]}
-  events: {emits: [whitetower.decision.made.v1], consumes: []}
+  events:
+    emits: [whitetower.decision.made.v1, whitetower.action.executed.v1, whitetower.instance.halted.v1,
+      whitetower.bundle.activated.v1, whitetower.bundle.rejected.v1, whitetower.lease.expired.v1]
+    consumes: []
   permissions: [governance.watch, governance.acknowledge, events.publish]

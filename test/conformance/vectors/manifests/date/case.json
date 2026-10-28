@@ -1,0 +1,7 @@
+{
+  "description": "Versions written as a date: a timestamp in YAML 1.1, a string in YAML 1.2",
+  "obligation": "MAN-1",
+  "expected": {
+    "outcome": "refused"
+  }
+}

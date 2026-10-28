@@ -66,12 +66,12 @@
     },
     {
       "type": "whitetower.lease.expired.v1",
-      "summary": "An instance lost contact with the core for longer than its lease.",
+      "summary": "An instance lost contact with the core for longer than an agent's lease: one event per agent, with that agent as subject.",
       "emitters": [
         "enforcement-point",
         "runtime-control"
       ],
-      "subject": "optional",
+      "subject": "required",
       "schema": "schemas/whitetower.lease.expired.v1.json",
       "example": "examples/whitetower.lease.expired.v1.json"
     },

@@ -1,10 +1,12 @@
-"""Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519.
+"""Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519, PyYAML for manifests.
 
-The Go tests in test/conformance check the same vectors with cedar-go. Passing
-both shows the decision profile does not depend on one Cedar implementation,
-and gives the Python enforcement point (plan P1-09) a reference to start from.
+The Go tests in test/conformance check the same vectors with cedar-go, and the
+manifest vectors with yaml.v3. Passing both shows that the decision profile
+does not depend on one Cedar implementation, nor the reading of manifests on
+one YAML parser, and gives the Python enforcement point (plan P1-09) a
+reference to start from.
 
-Run from the repository root with a Python that has cedarpy and cryptography:
+Run from the repository root with a Python that has cedarpy, cryptography and PyYAML:
     python test/conformance/python/check_vectors.py
 """
 
@@ -20,6 +22,8 @@ from pathlib import Path
 import cedarpy
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+import yaml
+from decimal import Decimal
 
 VECTORS = Path(__file__).resolve().parent.parent / "vectors"
 CEDAR_SCHEMA = Path(__file__).resolve().parents[3] / "api" / "policy" / "whitetower.cedarschema"
@@ -300,6 +304,139 @@ def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: di
     return {"outcome": "activated"}
 
 
+class ManifestRefused(Exception):
+    pass
+
+
+# The manifest reader of section 3.1. PyYAML reads YAML 1.1, so the reader takes
+# its events, never its types, and reads each unquoted scalar itself.
+LITERALS = {"true": True, "false": False, "null": None}
+# A plain decimal number as JSON writes it, the one number MAN-1 accepts unquoted.
+PLAIN_DECIMAL = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?")
+# What the YAML 1.2 Core schema or YAML 1.1's types (yaml.org/type) read as
+# other than a string, with a YAML 1.1 float of one decimal point, as PyYAML
+# reads it: the type repository's expression would read 0.1.0 as a float.
+NOT_A_STRING = re.compile("|".join([
+    # Nulls and booleans, of both versions.
+    r"~|null|Null|NULL|",
+    r"y|Y|yes|Yes|YES|n|N|no|No|NO|true|True|TRUE|false|False|FALSE|on|On|ON|off|Off|OFF",
+    # YAML 1.2 Core's integers and floats.
+    r"[-+]?[0-9]+|0o[0-7]+|0x[0-9a-fA-F]+",
+    r"[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)",
+    # YAML 1.1's integers, floats and timestamps, and its merge and value keys.
+    r"[-+]?0b[01_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*)|[-+]?0x[0-9a-fA-F_]+|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+",
+    r"[-+]?(?:[0-9][0-9_]*)?\.[0-9_]*(?:[eE][-+][0-9]+)?|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*",
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}",
+    r"[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt]|[ \t]+)[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]*)?"
+    r"(?:[ \t]*(?:Z|[-+][0-9]{1,2}(?::[0-9]{2})?))?",
+    r"<<|=",
+]))
+
+
+def read_manifest(data: bytes) -> bytes:
+    """Reads a YAML manifest as MAN-1 does and returns its canonical JSON (sections 1 and 3.1).
+
+    It refuses anchors, aliases, tags, and an unquoted scalar that is not a string in
+    both YAML 1.1 and YAML 1.2, a merge key among them, unless it is true, false, null
+    or a plain decimal number; and a manifest that is not I-JSON.
+    """
+    try:
+        events = list(yaml.parse(data.decode("utf-8"), Loader=yaml.SafeLoader))
+    except (UnicodeDecodeError, yaml.YAMLError) as e:
+        raise ManifestRefused(f"not YAML in UTF-8: {e}") from None
+    starts = [i for i, e in enumerate(events) if isinstance(e, yaml.DocumentStartEvent)]
+    if len(starts) != 1:
+        raise ManifestRefused(f"{len(starts)} documents")
+    value, _ = manifest_node(events, starts[0] + 1)
+    return canonical_json(value).encode()
+
+
+def manifest_node(events: list, i: int) -> tuple[object, int]:
+    """Returns the value of the node whose events start at i, and the index of the next event."""
+    e = events[i]
+    if isinstance(e, yaml.AliasEvent) or e.anchor is not None:
+        raise ManifestRefused("an anchor or an alias")
+    if e.tag is not None:
+        raise ManifestRefused(f"the tag {e.tag}")
+    if isinstance(e, yaml.ScalarEvent):
+        # Quoted and block scalars are strings.
+        return (plain_scalar(e.value) if e.style is None else ijson_string(e.value)), i + 1
+    i += 1
+    if isinstance(e, yaml.SequenceStartEvent):
+        items = []
+        while not isinstance(events[i], yaml.SequenceEndEvent):
+            item, i = manifest_node(events, i)
+            items.append(item)
+        return items, i + 1
+    members = {}
+    while not isinstance(events[i], yaml.MappingEndEvent):
+        key, i = manifest_node(events, i)
+        if not isinstance(key, str):
+            raise ManifestRefused(f"the key {key!r} is not a string")
+        if key in members:
+            raise ManifestRefused(f"the key {key!r} twice")
+        members[key], i = manifest_node(events, i)
+    return members, i + 1
+
+
+def plain_scalar(text: str) -> object:
+    """Reads an unquoted scalar."""
+    if text in LITERALS:
+        return LITERALS[text]
+    if PLAIN_DECIMAL.fullmatch(text):
+        return ijson_number(text)
+    if NOT_A_STRING.fullmatch(text):
+        raise ManifestRefused(f"{text!r} is not a string in both YAML 1.1 and YAML 1.2")
+    return ijson_string(text)
+
+
+def ijson_string(text: str) -> str:
+    """I-JSON has no surrogates, which PyYAML reads from escapes, and no noncharacters."""
+    for c in text:
+        if 0xD800 <= ord(c) <= 0xDFFF or 0xFDD0 <= ord(c) <= 0xFDEF or ord(c) & 0xFFFE == 0xFFFE:
+            raise ManifestRefused(f"U+{ord(c):04X} is not I-JSON")
+    return text
+
+
+def ijson_number(text: str) -> int | float:
+    """An integer of a magnitude of at most 2^53 - 1, or a number that a double holds as written."""
+    exact = Decimal(text)
+    if exact == exact.to_integral_value():
+        if exact.copy_abs() > 2**53 - 1:
+            raise ManifestRefused(f"{text} is not I-JSON: an integer's magnitude is at most 2^53 - 1")
+        return int(exact)
+    value = float(text)
+    if Decimal(repr(value)) != exact:
+        raise ManifestRefused(f"{text} is not I-JSON: a double cannot hold it")
+    return value
+
+
+def canonical_json(value: object) -> str:
+    """RFC 8785: members in the order of their UTF-16 code units, numbers as ECMAScript writes them."""
+    if isinstance(value, dict):
+        members = sorted(value.items(), key=lambda m: m[0].encode("utf-16-be"))
+        return "{" + ",".join(json.dumps(k, ensure_ascii=False) + ":" + canonical_json(v) for k, v in members) + "}"
+    if isinstance(value, list):
+        return "[" + ",".join(canonical_json(v) for v in value) + "]"
+    if isinstance(value, float):
+        return ecmascript_number(value)
+    return json.dumps(value, ensure_ascii=False)
+
+
+def ecmascript_number(value: float) -> str:
+    """ECMAScript's Number::toString for a double that is not an integer, from its shortest digits."""
+    sign, digits, exponent = Decimal(repr(value)).as_tuple()
+    digits = "".join(map(str, digits))
+    point = len(digits) + exponent
+    if 0 < point <= 21:
+        text = digits[:point] + "." + digits[point:]
+    elif -6 < point <= 0:
+        text = "0." + "0" * -point + digits
+    else:
+        text = digits[0] + ("." + digits[1:] if len(digits) > 1 else "") + f"e{point - 1:+d}"
+    return ("-" if sign else "") + text
+
+
 def main() -> int:
     failures = 0
 
@@ -340,8 +477,33 @@ def main() -> int:
             got = {"outcome": "rejected", "reason": r.reason}
         check(f"bundle {case_dir.name}", got, case["expected"])
 
-    total = len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases)
-    print(f"{total} vectors, {failures} failures (cedarpy, cryptography)")
+    # A failure may name a character that the console cannot encode, such as
+    # an emoji on Windows: it is printed as an escape instead.
+    sys.stdout.reconfigure(errors="backslashreplace")
+    manifest_cases = sorted(p for p in (VECTORS / "manifests").iterdir() if p.is_dir())
+    for case_dir in manifest_cases:
+        case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+        try:
+            canonical = read_manifest((case_dir / "manifest.yaml").read_bytes())
+        except ManifestRefused:
+            got = {"outcome": "refused"}
+        else:
+            got = {"outcome": "accepted", "sha256": hashlib.sha256(canonical).hexdigest()}
+            if case["expected"]["outcome"] == "accepted" and canonical != (case_dir / "canonical.json").read_bytes():
+                failures += 1
+                print(f"FAIL manifest {case_dir.name}: canonical JSON {canonical.decode()}")
+        check(f"manifest {case_dir.name}", got, case["expected"])
+
+    documents = json.loads((VECTORS / "manifests" / "documents.json").read_text(encoding="utf-8"))["documents"]
+    for doc in documents:
+        try:
+            got = {"outcome": "accepted", "canonical_json": read_manifest(doc["yaml"].encode()).decode()}
+        except ManifestRefused:
+            got = {"outcome": "refused"}
+        check(f"manifest document {doc['name']}", got, doc["expected"])
+
+    total = len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases) + len(documents)
+    print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML)")
     return 1 if failures else 0
 
 
