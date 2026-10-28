@@ -6,6 +6,7 @@
 package bundle
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
@@ -182,13 +183,24 @@ func ParseKeys(data []byte) ([]Key, error) {
 	}
 	var keys []Key
 	for _, k := range set.Keys {
-		pub, err := base64.RawURLEncoding.DecodeString(k.X)
+		pub, err := decodeBase64URL(k.X)
 		if k.Kty != "OKP" || k.Crv != "Ed25519" || k.Kid == "" || err != nil || len(pub) != ed25519.PublicKeySize {
 			continue
 		}
 		keys = append(keys, Key{ID: k.Kid, Public: pub})
 	}
 	return keys, nil
+}
+
+// decodeBase64URL decodes base64url as RFC 7515 defines it: the URL-safe
+// alphabet only, without padding, line breaks or any other character.
+// base64.RawURLEncoding refuses padding and other characters, but skips line
+// breaks, so they are refused first.
+func decodeBase64URL(s string) ([]byte, error) {
+	if strings.ContainsAny(s, "\r\n") {
+		return nil, errors.New("a line break in base64url")
+	}
+	return base64.RawURLEncoding.DecodeString(s)
 }
 
 // KeyID returns the RFC 7638 JWK thumbprint of an Ed25519 public key, the
@@ -252,22 +264,27 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 		return nil, reject(ReasonOversized, "%d bytes in %d files", b.Size(), len(b.Files))
 	}
 
-	// V2. Signature over the exact manifest bytes. The protected header has
-	// exactly alg, kid and typ, in any order (section 7.2): any other member,
-	// such as b64, which would change what is signed (RFC 7797), is refused.
+	// V2. Signature over the exact manifest bytes. The header and the
+	// signature are in base64url as RFC 7515 defines it, and the header is
+	// JSON in UTF-8 (section 1) with exactly alg, kid and typ, in any order
+	// (section 7.2): any other member, such as b64, which would change what
+	// is signed (RFC 7797), or such as jku in place of kid, is refused.
 	parts := strings.Split(b.Signature, ".")
 	if len(parts) != 3 || parts[1] != "" {
 		return nil, reject(ReasonSignature, "not a JWS with a detached payload")
 	}
-	rawHeader, err := base64.RawURLEncoding.DecodeString(parts[0])
+	rawHeader, err := decodeBase64URL(parts[0])
 	if err != nil {
 		return nil, reject(ReasonSignature, "header encoding: %v", err)
+	}
+	if !utf8JSON(rawHeader) {
+		return nil, reject(ReasonSignature, "header: JSON is UTF-8, without a byte order mark")
 	}
 	var header map[string]any
 	if err := json.Unmarshal(rawHeader, &header); err != nil {
 		return nil, reject(ReasonSignature, "header: %v", err)
 	}
-	if len(header) != 3 || header["alg"] != Algorithm || header["typ"] != Type {
+	if _, named := header["kid"]; !named || len(header) != 3 || header["alg"] != Algorithm || header["typ"] != Type {
 		return nil, reject(ReasonSignature, "header must be exactly alg %s, typ %s and kid", Algorithm, Type)
 	}
 	kid, _ := header["kid"].(string)
@@ -275,7 +292,7 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 	if idx < 0 {
 		return nil, reject(ReasonUnknownKey, "key %q is not trusted", kid)
 	}
-	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	sig, err := decodeBase64URL(parts[2])
 	if err != nil {
 		return nil, reject(ReasonSignature, "signature encoding: %v", err)
 	}
@@ -352,14 +369,17 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 }
 
 // ParseManifest applies the checks of step V4 that read the manifest alone,
-// in their order (section 7.4). A manifest that is not an object, or that has
-// an unknown or a missing member, or a member of the wrong type, is
-// invalid_manifest: the types are those of
-// api/policy/bundle-manifest.schema.json, the forms of its strings included.
-// Then a format, combining algorithm or language that is not supported is
-// unsupported, even though the schema's constant fails too. Paths need only
-// be strings here: step V5 builds them from their entries.
+// in their order (section 7.4). A manifest that is not JSON in UTF-8 without a
+// byte order mark (section 1), or not an object, or that has an unknown or a
+// missing member, or a member of the wrong type, is invalid_manifest: the
+// types are those of api/policy/bundle-manifest.schema.json, the forms of its
+// strings included. Then a format, combining algorithm or language that is not
+// supported is unsupported, even though the schema's constant fails too. Paths
+// need only be strings here: step V5 builds them from their entries.
 func ParseManifest(data []byte, languages []string) (*Manifest, error) {
+	if !utf8JSON(data) {
+		return nil, reject(ReasonInvalidManifest, "JSON is UTF-8, without a byte order mark")
+	}
 	if err := checkMembers(data); err != nil {
 		return nil, reject(ReasonInvalidManifest, "%v", err)
 	}
@@ -374,6 +394,13 @@ func ParseManifest(data []byte, languages []string) (*Manifest, error) {
 		return nil, reject(ReasonUnsupported, "format %q, combining algorithm %q, language %q", m.Format, m.CombiningAlgorithm, m.Language)
 	}
 	return &m, nil
+}
+
+// utf8JSON reports whether data is in the encoding of JSON that section 1
+// states: UTF-8 (RFC 8259, section 8.1), without a byte order mark.
+// encoding/json reads an invalid byte as U+FFFD rather than refuse it.
+func utf8JSON(data []byte) bool {
+	return utf8.Valid(data) && !bytes.HasPrefix(data, []byte("\xef\xbb\xbf"))
 }
 
 // checkMembers checks that the manifest, its Cedar schema's entry and each
