@@ -18,7 +18,7 @@ The tamper-evident audit log: every core change recorded in the same transaction
 
 ## Scope
 
-**In:** event model and writer, storage, sealer, checkpoints, ingestion from modules, query API, verification library, export, retention, tamper and throughput tests.
+**In:** event model and writer, storage, sealer, checkpoints, ingestion from modules, query API, verification library, export, retention, evidence bundles, tamper and throughput tests.
 
 **Out:** the `wtctl` commands (P1-11, built on the library from step 7); the console screens (P1-10.4); the transport of the module API (P1-07 wires `EventService.Publish` to step 5).
 
@@ -26,7 +26,7 @@ The tamper-evident audit log: every core change recorded in the same transaction
 
 - `internal/audit`: writer, ingestion, sealer, checkpoints, query, export, retention.
 - `pkg/auditverify`: a verification library usable offline and by third parties.
-- OpenAPI operations for events, checkpoints and keys.
+- OpenAPI operations for events, checkpoints, keys and evidence bundles.
 - The tamper test suite and a throughput benchmark.
 
 ## Steps
@@ -144,6 +144,24 @@ A consistency check that runs on a schedule, against the latest checkpoint the S
 
 **Done when:** all of the above run in CI (fuzzing: a short run on each pull request, a long run nightly).
 
+### 11. Evidence bundles (AUD-10)
+
+Added on 2026-10-27, when AUD-10 became a Should ([progress notes](#progress-notes)). An auditor asks for the evidence behind an article or a control of the [framework mapping](../../security/framework-mapping.md): the events of some types, for some agents, over a period. An evidence bundle hands them over in one file that anyone can check offline, without access to White Tower and without trusting it.
+
+- **Operation.** `GET /api/v1/audit/evidence` takes the filters of `GET /api/v1/audit/events` (step 6), with the time range required, and answers a ZIP file. The OpenAPI document describes it, with the schema of the bundle's manifest, before the code. Those who may export one are those of the permission matrix's row "Verify and export audit evidence" ([requirements, section 5.2.1](../../requirements/mvp-requirements.md#521-permission-matrix-initial-refined-in-plan-p1-03)): steering, advisory, operators and auditors, not owners. Each export records a `whitetower.audit.read.v1` event (AUD-09).
+- **Content.**
+  - `manifest.json`: the format, `whitetower.evidence.v1`; the log's origin; when the bundle was made, and by whom, as a pseudonymous ID; the selection; the number of events; and the ranges of leaves that retention dropped within the time range (step 9);
+  - `events.jsonl`: each selected event's canonical bytes, exactly as sealed, one per line, in the order of the log;
+  - `proofs.jsonl`: each event's leaf index and its inclusion proof, in the same order;
+  - `checkpoint`: the latest signed checkpoint, which every proof leads to. Matching events sealed after it are left out, and the manifest counts them;
+  - `keys.json`: the checkpoint keys, as `GET /api/v1/audit/keys` publishes them.
+- **Never pseudonymized.** Pseudonymization on export (step 8) rewrites events, so their leaves would no longer match. People already appear in events only as pseudonymous principal IDs (step 1).
+- **Bounded.** A bundle holds at most 10,000 events. A larger selection is refused with the bound, and the caller narrows it. The count and the bundle come from one snapshot of the database.
+- **Verification.** `auditverify.VerifyEvidence` checks a bundle offline. It takes the checkpoint keys from its caller, never only from the bundle, whose keys could be forged with it. It opens the checkpoint, recomputes each leaf from its event's bytes, checks each inclusion proof, and checks each event against the manifest's selection. Its report says what a bundle proves: each event it holds is genuine, sealed under a checkpoint that the keys signed. A bundle does not prove that no matching event was left out: only the whole log does (step 7). An auditor ties a bundle to a copy that White Tower cannot change by finding its checkpoint among those the SIEM holds (step 8).
+- **CLI.** `wtctl audit evidence` and `wtctl audit verify --evidence` come with P1-11 step 7.
+
+**Done when:** a bundle verifies offline with the published keys alone, and fails when an event, a proof or the checkpoint in it is altered, or when its checkpoint was signed with another key (ST-87); only the roles of the matrix's row can export one; and a selection over the bound is refused.
+
 ## Acceptance criteria
 
 - No core state change can commit without its audit event (forced-failure test).
@@ -151,7 +169,8 @@ A consistency check that runs on a schedule, against the latest checkpoint the S
 - Every manipulation in the tamper suite is detected; a rewrite of history is detected with an exported checkpoint.
 - Exports reach an OpenTelemetry collector and a JSON Lines file with no gaps across restarts.
 - After a retention drop, the remaining log still verifies.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-02-audit-log) pass: ST-06 to ST-12.
+- An evidence bundle verifies offline, and any alteration of an event, a proof or its checkpoint fails it (AUD-10).
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-02-audit-log) pass: ST-06 to ST-12, and ST-87.
 
 ## Risks and open questions
 
@@ -171,7 +190,7 @@ A consistency check that runs on a schedule, against the latest checkpoint the S
 
 ## Progress notes
 
-The plan lands in seven pull requests. The first holds the writer, which every other plan needs.
+The plan landed in seven pull requests, the first holding the writer, which every other plan needs. An eighth adds the evidence bundles of step 11 (2026-10-27).
 
 | Pull request | Steps | Status |
 | --- | --- | --- |
@@ -182,6 +201,7 @@ The plan lands in seven pull requests. The first holds the writer, which every o
 | 5. Query API | 6, the keys of step 4, ST-12 | Done |
 | 6. Export | 8 | Done |
 | 7. Retention and throughput | 9, the rest of 10 | Done |
+| 8. Evidence bundles | 11, ST-87 | To do |
 
 ### 2026-10-09: event model, writer and storage
 
@@ -338,3 +358,17 @@ The review of RFC-0001 changed what ingestion does with module events (contracts
 - **Repeats.** A source's `wtseq` that repeats, or goes back, under a new event ID is a finding: a new core event type, or an extension of `whitetower.audit.gap_detected.v1`, with every step of AGENTS.md's checklist for audit events.
 - **De-duplication first.** It runs before the check of scope, so a retry of an accepted event stays `DUPLICATE`, even once its agent has left the instance's scope. Evidence about an agent recently unbound from the module is decided with the delivery period that P1-05 step 5 decides, if there is one.
 - **De-duplication for 28 days at least.** The key keeps the month, since the table is partitioned by it, and the check also looks in the previous month's partition, with a test across a month boundary on the fake clock.
+
+### 2026-10-27: evidence bundles, a Should
+
+Feedback on the README found that compliance evidence waited for Phase 3. On 2026-10-27 the maintainer decided that the MVP gives auditors a minimum: AUD-10 becomes a Should, and the [framework mapping](../../security/framework-mapping.md) also covers ISO/IEC 42001 and the GDPR, each article and control naming the event types that evidence it. Step 11 designs the bundles, and pull request 8 builds them, before P1-11's audit commands ([AGENTS.md](../../../AGENTS.md), work queue). Until it lands, the plans index shows P1-02 in progress, and `test/security` asks for the markers of its security tests, ST-87's included, once it is done again.
+
+Designing the bundles showed that pseudonymization on export (step 8) rewrites the events it touches, which then no longer verify against the checkpoints, although the checkpoints themselves still do. A pseudonymized export cannot serve the offline verification of step 7. Threat T-59 now says so (threat model v0.1.6), and bundles are never pseudonymized.
+
+| Choice | Why |
+| --- | --- |
+| A ZIP file of JSON Lines, holding the events' bytes as sealed | One file that an auditor opens anywhere, and that the standard libraries of Go and Python read; bytes from which the leaves recompute |
+| One checkpoint, the latest, for every proof | One signature to check, and one checkpoint to find in the SIEM |
+| Keys from the verifier's caller | Keys taken from the bundle would let a forged bundle vouch for itself, as the note of 2026-10-14 says of the log |
+| No claim of completeness | An inclusion proof shows that an event is in the log, not that a filtered selection holds every match; the verification of the whole log shows that |
+| At most 10,000 events | About 20 MB, which one request carries; an auditor samples, or narrows the period |

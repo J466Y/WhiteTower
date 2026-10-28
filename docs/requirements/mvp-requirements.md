@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Version 0.3: the MCP servers, tools and models of agents join the MVP ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), decision of the maintainer of 2026-10-13). Version 0.2 was the Phase 0 gate's (2026-09-30): targets set from measurements, open questions Q1 to Q6 closed |
-| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)), 2026-10-19 (RFC-0002; the permission matrix's row on reassigning an owner, plan P1-04), 2026-10-20 (HUM-04, KIL-02, KIL-05, KIL-06, KIL-09, the glossary's C3 and sections 5.1.1, 5.2.1 and 9: the maintainer's decisions on halts and drills, in [P1-08's design note](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (POL-02 and questions Q8 to Q10: the maintainer's answers to RFC-0002's open questions), 2026-10-22 (KIL-07, aligned with conformance scenario S-07, and POL-01, with Rego in Phase 2: the maintainer's decisions in the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)) and 2026-10-23 and 2026-10-26 (CAT-07, CAT-10 and MOD-05: the maintainer's decisions in the review of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)) |
+| **Date** | 2026-09-28; updated 2026-09-29 (spikes, ADR-0011, network quarantine), 2026-09-30 ([threat model](../security/threat-model.md)), 2026-10-19 (RFC-0002; the permission matrix's row on reassigning an owner, plan P1-04), 2026-10-20 (HUM-04, KIL-02, KIL-05, KIL-06, KIL-09, the glossary's C3 and sections 5.1.1, 5.2.1 and 9: the maintainer's decisions on halts and drills, in [P1-08's design note](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (POL-02 and questions Q8 to Q10: the maintainer's answers to RFC-0002's open questions), 2026-10-22 (KIL-07, aligned with conformance scenario S-07, and POL-01, with Rego in Phase 2: the maintainer's decisions in the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)), 2026-10-23 and 2026-10-26 (CAT-07, CAT-10 and MOD-05: the maintainer's decisions in the review of [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)) and 2026-10-27 (AUD-10, HUM-09, NFR-22, the permission matrix and section 9: the maintainer's decisions on the evidence the MVP gives auditors and on the erasure of a person, after feedback on the README) |
 | **Sources** | [Project charter](../../Project%20Declaration.pdf), [README](../../README.md) |
 | **Related** | [Architecture](../architecture/mvp-architecture.md), [ADRs](../adr/README.md), [Implementation plans](../plans/README.md) |
 
@@ -136,6 +136,7 @@ stateDiagram-v2
 | HUM-06 | Break-glass: a sealed emergency credential allows halting agents and the fleet while the IdP is unavailable. Every use raises a critical audit event. | S | New |
 | HUM-07 | Service accounts and personal access tokens for automation, with scopes and expiry. | S | New |
 | HUM-08 | SAML IdPs are supported through an OIDC broker (for example Keycloak), with documented setup. Native SAML is a Phase 2 candidate. | S | Non-functional requirements |
+| HUM-09 | Erasure of a person (GDPR, Article 17): the platform administrator replaces the name, email and IdP subject of an inactive human principal with placeholders and clears its groups, keeping its ID, so that the history and the evidence stay consistent. The erasure is final and audited; the sealed log keeps the pseudonymous ID until retention drops it. | S | New (the maintainer's decision of 2026-10-27) |
 
 #### 5.2.1 Permission matrix (initial, refined in plan P1-03)
 
@@ -171,6 +172,7 @@ stateDiagram-v2
 | View the audit log | ✔ | ✔ | own | | ✔ | ✔ | |
 | Verify and export audit evidence | ✔ | ✔ | | | ✔ | ✔ | |
 | Manage role mappings and settings | | | | | | | ✔ |
+| Erase an inactive person (HUM-09) | | | | | | | ✔ |
 
 ### 5.3 Agent identity and credentials (AID)
 
@@ -227,7 +229,7 @@ The decision records the policy versions and rules that produced it, so the audi
 | AUD-07 | Syslog export (RFC 5424 over TLS). | S | Non-functional requirements |
 | AUD-08 | Configurable retention (at least six months by default) that keeps the remaining log verifiable (S); archival to WORM storage compatible with S3 Object Lock (C). | S/C | Non-functional requirements |
 | AUD-09 | Reads of the audit log are themselves audited. | S | New |
-| AUD-10 | Export of a self-verifiable evidence bundle (events, checkpoints and proofs) for a time range. | C | Scope |
+| AUD-10 | Export of a self-verifiable evidence bundle (events, checkpoints and proofs) for a time range, with the filters of AUD-05, which a third party verifies offline. A Should since the maintainer's decision of 2026-10-27, so that the MVP hands auditors the evidence that the framework mapping names for each control (NFR-22). | S | Scope |
 
 ### 5.6 Kill switch (KIL)
 
@@ -338,7 +340,7 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 | NFR-19 | **Time.** UTC RFC 3339 timestamps with milliseconds; the server assigns the ingestion time and keeps the source time; hosts are NTP-synchronized. | Documented and tested | M | P0-02 |
 | NFR-20 | **Privacy.** Personal data in audit events is minimized, human identifiers can be pseudonymized on export, and retention is configurable (GDPR). | Data inventory reviewed | S | P0-02, P0-04 |
 | NFR-21 | **Security of the project itself.** Published threat model, updated each phase; SECURITY.md with coordinated vulnerability disclosure; private vulnerability reporting enabled. | Published at the Phase 0 gate | M | P0-01, P0-04 |
-| NFR-22 | **Framework mapping.** Features mapped to the OWASP Top 10 for Agentic Applications 2026 (ASI01 to ASI10) and to the EU AI Act obligations on logging (Article 12), human oversight including the ability to halt the system (Article 14(4)(e)), and log retention and monitoring (Articles 19 and 26). | Mapping document | S | P0-04 |
+| NFR-22 | **Framework mapping.** Features mapped to the OWASP Top 10 for Agentic Applications 2026 (ASI01 to ASI10) and to the EU AI Act obligations on logging (Article 12), human oversight including the ability to halt the system (Article 14(4)(e)), and log retention and monitoring (Articles 19 and 26); and, since the maintainer's decision of 2026-10-27, to the controls of ISO/IEC 42001's Annex A and the articles of the GDPR that White Tower supports. Each article and control names the event types that evidence it. | Mapping document | S | P0-04 |
 | NFR-23 | **Network quarantine.** Time from a halt issued to the agent's workloads isolated, on the reference CNI (Cilium), for workloads running when the halt is issued. | p95 ≤ 5 s; max ≤ 10 s | S | P1-15 |
 | NFR-24 | **Block propagation to connected EPs**, from block issued to acknowledgement, without a new bundle (CAT-04); and halt propagation while blocks are active. | As halts (NFR-03): p95 ≤ 2 s; max ≤ 5 s at MVP scale, with 500 active blocks. Halts with 500 active blocks still meet NFR-03. Set by RFC-0002, not measured yet | M | P1-16 (ST-80), with the harness of P1-08 |
 
@@ -378,7 +380,7 @@ The charter leaves the decision latency and kill switch targets "to be set in ph
 | Second policy engine (module replacement demonstrated) | 2 | Contracts validated on paper against more than one engine (P0-03) |
 | Microsoft AGT interoperability adapter | 2 | Contracts mapped onto AGT (P0-03); AGT re-tested live in the pilot (P1-14, ADR-0011) |
 | Shadow AI discovery | 3 | Inventory accepts C0 agents and a `discovered` source flag is reserved; owners and operators can declare the tooling of agents without an enforcement point (CAT-08), which discovery could later import from endpoint security tools |
-| Compliance module and GRC export | 3 | Evidence bundles (AUD-10) and framework mapping (NFR-22) |
+| Compliance module and GRC export | 3 | Evidence bundles (AUD-10), and the framework mapping, which names the evidence of each control (NFR-22) |
 | Public third-party module SDK | 3 | Internal Go SDK and conformance kit built in the MVP |
 | Multi-tenancy | Not planned | Single organization per deployment (decision in P0-02) |
 | Hardware security modules and cloud KMS | 2 or later | Key access behind an interface |

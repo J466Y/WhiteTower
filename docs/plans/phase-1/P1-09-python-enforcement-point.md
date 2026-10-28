@@ -31,7 +31,7 @@ Spike S1 tested Microsoft AGT as the foundation of this plan and recommended aga
 ## Deliverables
 
 - `modules/ep-python/`: the package, its manifest, tests and examples.
-- Two example agents (LangGraph 1.x, and a second framework the pilot needs, for example the OpenAI Agents SDK or Microsoft Agent Framework) and a `demo-agent` service in the Compose evaluation profile. Each example agent uses a local (`stdio`) and a remote (`http`) MCP server: a demo server shipped in `modules/ep-python/examples/`, run both ways, with a flag that changes its tool's description (ST-76).
+- Two example agents (LangGraph 1.x, and a second framework the pilot needs, as unlike LangGraph as the pilot allows, for example the OpenAI Agents SDK or Microsoft Agent Framework; step 8) and a `demo-agent` service in the Compose evaluation profile. Each example agent uses a local (`stdio`) and a remote (`http`) MCP server: a demo server shipped in `modules/ep-python/examples/`, run both ways, with a flag that changes its tool's description (ST-76).
 - A conformance report, a measurement report and a compatibility matrix (enforcement point version × contract version × framework versions, with the MCP and provider SDKs).
 
 ## Steps
@@ -130,7 +130,9 @@ A change that carries a halt and blocks closes the gate first; the gate's acknow
 
 ### 8. Framework hooks
 
-Start with LangGraph 1.x, then the second framework the pilot needs. Each integration:
+Start with LangGraph 1.x, then the second framework the pilot needs. Among the frameworks the pilot needs, choose the one least like LangGraph, for example one whose model provider runs tools for it, such as the OpenAI Agents SDK: the second integration then tests how well the contracts' model of agents, actions and decisions fits a framework that works differently (the maintainer's decision of 2026-10-27, after feedback on the README). A gap in that model found there, such as a kind of call that no action describes, is a finding for the contracts, settled through an RFC rather than worked around in the hooks.
+
+Each integration:
 
 - routes every tool call, model call, input and output through the gate and the policies, and denies by raising the framework's own error or refusal;
 - registers the cancellation used by the halt layers;
@@ -239,6 +241,7 @@ These numbers are evidence for the Phase 1 gate.
 | Risk or question | Mitigation or owner |
 | --- | --- |
 | Framework hook points change between releases | Pinned test matrix, weekly job against the latest releases, thin hooks, compatibility matrix |
+| The contracts' model of actions fits LangGraph, and falls short for frameworks that work differently | The second framework chosen as unlike LangGraph as the pilot allows (step 8); a gap in the model goes to an RFC |
 | A tool or model call bypasses the hooks (for example a raw HTTP call) | Document what each integration covers; the generic API for custom code; network quarantine (P1-15) and the Phase 2 gateways as layers that do not depend on the hooks |
 | `cedarpy` and the core's Cedar validator disagree on a language feature | Pin matching versions; the core rejects features the enforcement point cannot evaluate (P1-06); shared vectors run against both in CI |
 | Interrupting in-flight calls is unreliable in some frameworks | Halt modes, with `terminate` as the guaranteed option; honest layered acknowledgements |

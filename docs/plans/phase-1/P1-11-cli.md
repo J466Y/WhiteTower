@@ -16,7 +16,7 @@ A command-line tool for operators, owners and auditors that covers the day-to-da
 
 ## Scope
 
-**In:** login, profiles, agents, credentials, policies, halts, audit (query, export, verification), modules, the catalog and agents' tooling, documentation and packaging.
+**In:** login, profiles, agents, credentials, policies, halts, audit (query, export, evidence bundles, verification), modules, the catalog and agents' tooling, documentation and packaging.
 
 **Out:** anything the public API does not offer (the CLI is a pure API client), except local key generation and offline audit verification.
 
@@ -82,12 +82,13 @@ A command-line tool for operators, owners and auditors that covers the day-to-da
 ### 7. Audit
 
 - `audit query` and `audit export` (JSON Lines).
-- `audit verify`: online through the API, or offline against an export.
+- `audit verify`: online through the API, or offline against an export. An export that was pseudonymized on its way out no longer verifies, since pseudonymization rewrites events (P1-02 step 8); its checkpoints still do.
 - `audit prove --event` and `audit consistency --checkpoint <file>`.
+- `audit evidence` saves an evidence bundle (P1-02 step 11, AUD-10), with the filters of `audit query`. `audit verify --evidence <file>` checks one offline, with the checkpoint keys that the auditor gives, and says what the bundle proves and what it does not.
 
 All are built on `pkg/auditverify` (P1-02).
 
-**Done when:** `wtctl audit verify` detects every manipulation of the P1-02 tamper suite, and a consistency check against a checkpoint saved from the SIEM passes on an untouched log.
+**Done when:** `wtctl audit verify` detects every manipulation of the P1-02 tamper suite, and a consistency check against a checkpoint saved from the SIEM passes on an untouched log; an evidence bundle verifies offline, and an altered one fails.
 
 ### 8. Modules
 
@@ -124,7 +125,7 @@ Build through GoReleaser (P0-01): signed binaries for Linux, macOS and Windows o
 ## Acceptance criteria
 
 - End-to-end tests cover the main flows using a personal access token in CI; interactive login is tested manually on the three operating systems.
-- `wtctl audit verify` detects the P1-02 tamper suite.
+- `wtctl audit verify` detects the P1-02 tamper suite, and an altered evidence bundle.
 - Halting through the CLI works while the console is down, and with a break-glass session while the IdP is down.
 - Blocking a catalog entry through the CLI works while the console is down.
 - The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-11-cli) pass: ST-57 to ST-59, and ST-83.

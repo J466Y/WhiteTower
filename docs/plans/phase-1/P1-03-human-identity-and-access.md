@@ -3,11 +3,11 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | Done |
+| **Status** | In progress: the erasure of a person, step 13, added on 2026-10-27 (see [progress notes](#progress-notes)) |
 | **Size** | M |
 | **Depends on** | P1-01, P1-02 (writer) |
 | **Unblocks** | P1-04, P1-10, P1-11 |
-| **Requirements** | HUM-01 to HUM-08, KIL-08 (break-glass), NFR-12 |
+| **Requirements** | HUM-01 to HUM-09, KIL-08 (break-glass), NFR-12 |
 | **Decisions** | ADR-0009 |
 
 ## Goal
@@ -16,14 +16,14 @@ People log in through the organization's IdP. Their roles come from IdP groups. 
 
 ## Scope
 
-**In:** OIDC login through the backend-for-frontend, sessions, CSRF protection, principals and their status, role mapping and bindings, the authorization engine, API tokens, the CLI token exchange, SCIM, break-glass, SAML through a broker.
+**In:** OIDC login through the backend-for-frontend, sessions, CSRF protection, principals and their status, the erasure of a person, role mapping and bindings, the authorization engine, API tokens, the CLI token exchange, SCIM, break-glass, SAML through a broker.
 
 **Out:** the console screens (P1-10.1 and P1-10.6); the CLI side of login (P1-11); machine identities (P1-05).
 
 ## Deliverables
 
 - `internal/authn` and `internal/authz`.
-- OpenAPI operations: `/me`, principals, role bindings, API tokens, the CLI exchange; `/auth/*` routes; `/scim/v2/Users`.
+- OpenAPI operations: `/me`, principals and their erasure, role bindings, API tokens, the CLI exchange; `/auth/*` routes; `/scim/v2/Users`.
 - A permission test suite generated from the matrix.
 - Integration guides for Keycloak, Microsoft Entra ID and Okta.
 
@@ -128,13 +128,31 @@ Tests from the [P0-04 catalog](../../security/security-tests.md#p1-03-human-iden
 
 **Done when:** all pass in CI.
 
+### 13. Erasure of a person (HUM-09)
+
+Added on 2026-10-27 ([progress notes](#progress-notes)). People have a right to erasure (GDPR, Article 17; [framework mapping](../../security/framework-mapping.md), section 4). Events name people only by pseudonymous principal IDs, and only `principals` links an ID to a person ([domain model, section 7](../../architecture/domain-model.md#7-personal-data)). An erasure breaks that link and keeps the ID, so that the history and the sealed log stay consistent.
+
+- **Operation.** The platform administrator erases a principal, giving a reference to the request, such as a ticket number, rather than the person's name. The operation refuses an active principal, which is deactivated first (HUM-05), and a service account, which is no person.
+- **What changes**, in one transaction, with a new migration:
+  - the name and the email become placeholders, and the groups are cleared;
+  - the IdP subject becomes one that no IdP issues, such as `erased:<principal ID>`, so that the pair of issuer and subject stays unique;
+  - the principal is marked erased, with the reference as the reason of its status, and the time of the change from `clock.Clock`.
+
+  Its ID, its issuer, its last login and every record that refers to it stay. Every check that a principal is inactive treats an erased one the same way, so that an erased owner still suspends their agents (INV-05), and a service account whose responsible principal is erased stays unusable for good (the fix of 2026-10-19).
+- **Final.** An erased principal is never reactivated. If the person logs in again, the login finds no principal with their subject and creates a new one, with a new ID.
+- **Audited.** The erasure records `whitetower.principal.erased.v1`, with its actor, the principal's ID and the reference, and nothing that names the person: a new core event type, with every step of AGENTS.md's checklist.
+- **Nothing else to erase.** No other table holds the name, the email or the subject. Text that people wrote into sealed events, such as halt reasons and agents' names, stays until retention drops it; the domain model's section 7 asks them to keep personal data out of it.
+
+**Done when:** after an erasure, a canary name, email and subject appear in no table and in no API response; an active principal and a service account are refused; an erased principal cannot be reactivated, and the same person logging in again gets a new principal (ST-88).
+
 ## Acceptance criteria
 
 - Login and logout work against Keycloak and against at least one commercial IdP (Entra ID or Okta), or the latter is scheduled as the first pilot task if no tenant is available.
 - The permission tests cover every role and permission pair, including separation of duties.
 - The security tests of step 12 pass.
 - Deactivating a principal revokes their sessions immediately.
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-03-human-identity-and-access) pass: ST-13 to ST-22.
+- An erasure leaves the person's name, email and IdP subject nowhere in White Tower, and keeps the history consistent (HUM-09).
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-03-human-identity-and-access) pass: ST-13 to ST-22, and ST-88.
 
 ## Risks and open questions
 
@@ -152,7 +170,7 @@ Tests from the [P0-04 catalog](../../security/security-tests.md#p1-03-human-iden
 
 ## Progress notes
 
-The plan lands in six pull requests. The first builds the authorization engine and role-to-permission matrix, which API operations and domain services evaluate.
+The plan landed in six pull requests. The first built the authorization engine and role-to-permission matrix, which API operations and domain services evaluate. A seventh adds the erasure of a person, step 13 (2026-10-27).
 
 | Pull request | Steps | Status |
 | --- | --- | --- |
@@ -162,6 +180,7 @@ The plan lands in six pull requests. The first builds the authorization engine a
 | 4. API tokens | 6, ST-19 | Done (PR #39) |
 | 5. CLI token exchange and break-glass | 7, 9, ST-20 | Done (PR #40) |
 | 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Done (PR #41) |
+| 7. Erasure of a person | 13, ST-88 | To do |
 
 ### 2026-10-14: roles, permissions and authorization engine
 
@@ -316,3 +335,11 @@ A review of P1-04's API found two ways around the permission matrix, which this 
   - Creating a service account with the steering, advisory or operator role is a grant that DC-4 asks to notify to the steering committee's inbox, which P1-04 builds (its pull request 7).
   - A person and their own service account are two principals: two-person rules of later plans (policy approvals in P1-06, halt releases in P1-08, enabling and unblocking in P1-16) must not count them as two people, as P1-04 refuses decisions on proposals to service accounts.
   - No operation hands a service account to another person, so one whose responsible principal left stays unusable until they come back.
+
+### 2026-10-27: the erasure of a person (HUM-09)
+
+Mapping the GDPR in the [framework mapping](../../security/framework-mapping.md) found that the domain model designs an erasure of a person's name and email (its section 7), and that no requirement or plan built it. On 2026-10-27 the maintainer decided that the MVP has it: HUM-09, a Should, and step 13, which pull request 7 builds ([AGENTS.md](../../../AGENTS.md), work queue).
+
+The step erases the IdP subject as well as the name and the email, which the domain model's design left out: a subject kept would let the next login match the erased principal and write the person's name back. It erases only inactive people, and it is final.
+
+The threat model gains T-85: an administrator erases a principal to make what that person did unattributable. The mitigations are an erasure only after a deactivation, which is itself audited, a reference to the request, and an audit event that names the actor. The security test catalog gains ST-88. Until pull request 7 lands, the plans index shows P1-03 in progress, and `test/security` asks for the markers of its security tests, ST-88's included, once it is done again.
