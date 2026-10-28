@@ -21,14 +21,20 @@ spec:
       languages: [cedar]
       combiningAlgorithms: [wt-deny-overrides-v1]
       embedded: false
+    - name: runtime-control
+      haltLayers: [network_quarantined]
+      platforms: [kubernetes]
   events:
     emits:
       - whitetower.decision.made.v1
+      - whitetower.action.executed.v1
       - whitetower.instance.started.v1
       - whitetower.instance.halted.v1
       - whitetower.bundle.activated.v1
       - whitetower.bundle.rejected.v1
       - whitetower.lease.expired.v1
+      - whitetower.quarantine.applied.v1
+      - whitetower.quarantine.lifted.v1
     consumes: []
   permissions: [governance.watch, governance.acknowledge, policy.bundles.read, events.publish]
   configSchema:

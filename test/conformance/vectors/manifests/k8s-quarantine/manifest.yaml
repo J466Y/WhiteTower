@@ -1,0 +1,57 @@
+# The Kubernetes network quarantine module (plan P1-15, KIL-10).
+apiVersion: whitetower/v1alpha1
+kind: ModuleManifest
+metadata:
+  name: k8s-quarantine
+  displayName: Kubernetes network quarantine
+  version: 0.1.0
+  vendor: White Tower project
+  license: Apache-2.0
+  homepage: https://github.com/J466Y/WhiteTower
+  description: >-
+    Isolates a halted agent's pods at the network level through the deny rules
+    of the cluster's CNI, independently of the agent's process.
+spec:
+  contractVersions: [v1alpha1]
+  identity: module
+  agents: all
+  capabilities:
+    - name: runtime-control
+      haltLayers: [network_quarantined]
+      platforms: [kubernetes]
+  events:
+    emits:
+      - whitetower.instance.started.v1
+      - whitetower.quarantine.applied.v1
+      - whitetower.quarantine.lifted.v1
+      - whitetower.lease.expired.v1
+    consumes: []
+  permissions: [governance.watch, governance.acknowledge, events.publish]
+  configSchema:
+    type: object
+    required: [coreUrl, cluster, cni]
+    additionalProperties: false
+    properties:
+      coreUrl:
+        type: string
+        pattern: "^https://"
+      cluster:
+        description: Name of the cluster, shown in the console and in events.
+        type: string
+      cni:
+        enum: [cilium, calico, antrea, admin-network-policy]
+      coreEgress:
+        description: How quarantine rules let pods reach the core.
+        type: object
+        additionalProperties: false
+        properties:
+          cidrs:
+            type: array
+            items: {type: string}
+          podSelector:
+            type: object
+            additionalProperties: {type: string}
+      quarantineOnLeaseExpiry:
+        description: Quarantine every covered agent when the module loses contact with the core (contract, section 5.8).
+        type: boolean
+        default: false

@@ -76,6 +76,9 @@ func glob(t *testing.T, pattern string) []string {
 
 type manifest struct {
 	Spec struct {
+		Capabilities []struct {
+			Name string `json:"name"`
+		} `json:"capabilities"`
 		Events struct {
 			Emits []string `json:"emits"`
 		} `json:"events"`
@@ -85,7 +88,10 @@ type manifest struct {
 
 func TestManifestExamplesAreValid(t *testing.T) {
 	sch := compile(t, api+"/manifest/module-manifest.schema.json")
-	catalog := catalogTypes(t)
+	emitters := map[string][]string{}
+	for _, e := range catalogEntries(t) {
+		emitters[e.Type] = e.Emitters
+	}
 	for _, path := range glob(t, api+"/manifest/examples/*.yaml") {
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			inst := loadYAML(t, path)
@@ -97,9 +103,17 @@ func TestManifestExamplesAreValid(t *testing.T) {
 			if err := json.Unmarshal(raw, &m); err != nil {
 				t.Fatal(err)
 			}
+			var capabilities []string
+			for _, c := range m.Spec.Capabilities {
+				capabilities = append(capabilities, c.Name)
+			}
 			for _, e := range m.Spec.Events.Emits {
-				if !slices.Contains(catalog, e) {
+				who, ok := emitters[e]
+				switch {
+				case !ok:
 					t.Errorf("emits %s, which is not in the event catalog", e)
+				case !slices.ContainsFunc(who, func(emitter string) bool { return slices.Contains(capabilities, emitter) }):
+					t.Errorf("emits %s, which none of its capabilities may emit (MAN-6)", e)
 				}
 			}
 			// The configuration schema must itself be a valid JSON Schema.
@@ -145,15 +159,6 @@ func catalogEntries(t *testing.T) []catalogEntry {
 	}
 	loadJSON(t, api+"/events/catalog.json", &catalog)
 	return catalog.Types
-}
-
-func catalogTypes(t *testing.T) []string {
-	t.Helper()
-	var types []string
-	for _, e := range catalogEntries(t) {
-		types = append(types, e.Type)
-	}
-	return types
 }
 
 var eventType = regexp.MustCompile(`^whitetower\.[a-z_]+\.[a-z_]+\.v[1-9][0-9]*$`)

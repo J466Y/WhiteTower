@@ -146,7 +146,10 @@ type RegisterInstanceRequest struct {
 	// Slug of the module, as registered and approved by an operator.
 	Module string `protobuf:"bytes,1,opt,name=module,proto3" json:"module,omitempty"`
 	// Lowercase hexadecimal SHA-256 of the RFC 8785 canonical JSON of the manifest
-	// the instance runs. It must match the approved manifest.
+	// the instance runs. It must be the hash of one of the module's approved
+	// manifests (MAN-2). The instance takes it from its release, a constant
+	// computed from the manifest the release ships, never from its configuration
+	// (contract, section 3.2).
 	ManifestSha256 string `protobuf:"bytes,2,opt,name=manifest_sha256,json=manifestSha256,proto3" json:"manifest_sha256,omitempty"`
 	// Version of the module, as in its manifest.
 	ModuleVersion string `protobuf:"bytes,3,opt,name=module_version,json=moduleVersion,proto3" json:"module_version,omitempty"`

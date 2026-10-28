@@ -224,7 +224,7 @@ func (HaltMode) EnumDescriptor() ([]byte, []int) {
 type HaltLayer int32
 
 const (
-	// Unknown.
+	// Unknown. A report of this layer never counts as done (CORE-19).
 	HaltLayer_HALT_LAYER_UNSPECIFIED HaltLayer = 0
 	// Every further governed call and interaction is denied (KIL-01).
 	HaltLayer_HALT_LAYER_GATE_CLOSED HaltLayer = 1
@@ -285,7 +285,7 @@ func (HaltLayer) EnumDescriptor() ([]byte, []int) {
 type LayerOutcome int32
 
 const (
-	// Unknown. Never counts as done.
+	// Unknown. Never counts as done (CORE-19).
 	LayerOutcome_LAYER_OUTCOME_UNSPECIFIED LayerOutcome = 0
 	// The layer is in place.
 	LayerOutcome_LAYER_OUTCOME_DONE LayerOutcome = 1
@@ -347,7 +347,7 @@ func (LayerOutcome) EnumDescriptor() ([]byte, []int) {
 type BundleOutcome int32
 
 const (
-	// Unknown.
+	// Unknown. Never counts as an activation (CORE-19).
 	BundleOutcome_BUNDLE_OUTCOME_UNSPECIFIED BundleOutcome = 0
 	// Verified and active.
 	BundleOutcome_BUNDLE_OUTCOME_ACTIVATED BundleOutcome = 1

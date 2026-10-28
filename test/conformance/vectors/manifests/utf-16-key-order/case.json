@@ -1,0 +1,8 @@
+{
+  "description": "Two properties of the configuration schema, ｡ (U+FF61) and 😀 (U+1F600), which RFC 8785 sorts by UTF-16 code units: 😀 first, where code points would put ｡ first",
+  "obligation": "MAN-2",
+  "expected": {
+    "outcome": "accepted",
+    "sha256": "7a02cc4585d5b86bf0b3ae2beef291ec7ff71835704295d4a603c85dc5a7b14e"
+  }
+}

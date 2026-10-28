@@ -1,0 +1,8 @@
+{
+  "description": "The example ep-python.yaml, with the hash an instance presents when it registers",
+  "obligation": "MAN-2",
+  "expected": {
+    "outcome": "accepted",
+    "sha256": "36b9854bbd5b89e661f6596cd7b623e251947c347bc7e025466c0909edcdcb20"
+  }
+}
