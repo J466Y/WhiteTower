@@ -34,8 +34,7 @@
     },
     "language": {
       "enum": [
-        "cedar",
-        "rego"
+        "cedar"
       ]
     },
     "content_sha256": {

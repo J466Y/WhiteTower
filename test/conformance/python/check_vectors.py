@@ -156,7 +156,7 @@ def b64url(data: str) -> bytes:
 
 
 ERROR_POLICY = re.compile(r"policy `(policy\d+)`")
-POLICY_PATH = re.compile(r"^policies/(global|agent)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(cedar|rego)$")
+POLICY_PATH = re.compile(r"^policies/(global|agent)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.cedar$")
 
 
 class Rejected(Exception):

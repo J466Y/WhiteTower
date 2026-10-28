@@ -204,11 +204,17 @@
       "additionalProperties": false,
       "properties": {
         "name": { "const": "policy-engine" },
-        "languages": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["cedar", "rego"] } },
+        "languages": {
+          "description": "cedar, the only language of v1alpha1 (section 6.7).",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["cedar"] }
+        },
         "combiningAlgorithms": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["wt-deny-overrides-v1"] } },
         "embedded": {
-          "description": "true when the engine runs inside an enforcement point of the same module; false when it is a decision point other modules call through AuthZEN.",
-          "type": "boolean"
+          "description": "Always true in v1alpha1: the engine runs inside an enforcement point of the same module, serves only that module's enforcement points, and evaluates exactly the bundle they verified. Decision points that other modules call through AuthZEN wait for v1beta1 (sections 2 and 6.8).",
+          "const": true
         }
       }
     },

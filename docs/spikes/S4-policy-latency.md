@@ -28,7 +28,7 @@ What does one policy decision cost, in process and through a remote decision poi
 The program in [`hack/spikes/s4`](../../hack/spikes/s4/main.go) uses the policy shapes of spike S1: one global `forbid` and agent-specific `permit` rules, 1, 10 and 100 policies in total, and a request that the policies permit. It measures:
 
 1. **`cedar-go` in process**, with the policy set parsed once per bundle. Each decision includes mapping the AuthZEN request to a Cedar request and entities, as an enforcement point does, and applies rule 4 of the combining algorithm (any error denies).
-2. **OPA embedded**, with the same policies as Rego packages and the contract's wrapper ([`decision.rego`](../../api/policy/rego/decision.rego)), prepared once per bundle.
+2. **OPA embedded**, with the same policies as Rego packages and the contract's wrapper ([`decision.rego`](../contracts/rego/decision.rego)), prepared once per bundle.
 3. **A remote decision point**: an AuthZEN evaluation endpoint (`POST /access/v1/evaluation`) in front of `cedar-go`, called over HTTP/1.1 with keep-alive on localhost. Each decision includes JSON encoding on both sides.
 
 Each measurement runs 10,000 decisions after 1,000 of warm-up, three times. Go's monotonic clock on Windows ticks about every half millisecond, too coarse for single decisions, so the spike reads `QueryPerformanceCounter`, as Python's `perf_counter` does in S1.

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Lease expired",
-  "description": "What the instance did when its lease expired (sections 5.3 and 5.8). Enforcement points set the subject; runtime-control modules, which cover many agents, do not.",
+  "description": "What the instance did when an agent's lease expired (sections 5.3 and 5.8): one event per agent, with that agent as subject.",
   "type": "object",
   "required": [
     "lease_ttl_ms",

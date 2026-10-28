@@ -11,7 +11,7 @@
     "version": { "description": "Monotonic per agent.", "type": "integer", "minimum": 1 },
     "created_at": { "$ref": "#/$defs/timestamp" },
     "combining_algorithm": { "const": "wt-deny-overrides-v1" },
-    "language": { "enum": ["cedar", "rego"] },
+    "language": { "description": "cedar, the only language of v1alpha1 (section 6.7).", "const": "cedar" },
     "cedar_schema": {
       "description": "The Cedar schema the policies were validated against: the profile's schema with the deployment's ToolArgs.",
       "$ref": "#/$defs/file"
@@ -29,18 +29,12 @@
           "name": { "type": "string", "minLength": 1, "maxLength": 200 },
           "version": { "type": "integer", "minimum": 1 },
           "scope": { "enum": ["global", "agent"] },
-          "path": { "type": "string", "pattern": "^policies/(global|agent)/[0-9a-f-]{36}\\.(cedar|rego)$" },
+          "path": { "type": "string", "pattern": "^policies/(global|agent)/[0-9a-f-]{36}\\.cedar$" },
           "sha256": { "$ref": "#/$defs/sha256" }
         }
       }
     }
   },
-  "allOf": [
-    {
-      "if": { "properties": { "language": { "const": "rego" } } },
-      "then": { "not": { "required": ["cedar_schema"] } }
-    }
-  ],
   "$defs": {
     "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },

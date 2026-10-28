@@ -320,7 +320,7 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Done |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Done |
 | 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Done |
-| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code parts 1 and 2 done (2026-10-27); the others queued in AGENTS.md's work queue |
+| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code parts 1 to 3 done (2026-10-27); the others queued in AGENTS.md's work queue |
 | Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Done |
 
 RFC-0002's review follows, the same way.
@@ -674,3 +674,30 @@ Five details the list of 2026-10-22 does not name:
 - **Two more comments.** `SnapshotPart.agents` says that an agent the snapshot does not carry has left the scope (I-11), and `AcknowledgeResponse` no longer says that every acknowledgement was recorded.
 
 The counts of fail-closed vectors in section 9.1 and in RFC-0001, 13 today, and ep-python's manifest hash in appendix A follow in the reviewer's pull request, as the note of 2026-10-23 says.
+
+### 2026-10-27: corrections, code part 3
+
+The third code part of RFC-0001's review follows the first item of what the third part of the corrections (2026-10-22) leaves to the coding agents, in `api/` and the conformance kit:
+
+| What | Change |
+| --- | --- |
+| `bundle-manifest.schema.json` | The language is `cedar` only, and a policy's path ends in `.cedar`. The `allOf` about `rego` is gone, since it had nothing left to say |
+| `module-manifest.schema.json` | A policy engine has the language `cedar` only, and `embedded: true` only, whose description says why: `v1alpha1` has no decision points (section 6.8). Two invalid manifests, `policy-engine-with-rego.yaml` and `policy-engine-not-embedded.yaml`, differ from `mock-module.yaml` only by the rule each breaks and by the reason in their first line, and fail for that rule alone |
+| `decision-request.schema.json` | `args` keeps its shape, and refuses `null` anywhere inside it, nested values included (section 6.4). `on_behalf_of` is a false schema that keeps its description: a request that carries it, even empty, is invalid. Labels are at most 64, with values of at most 255 characters, and data categories at most 32, of at most 63 characters each: the inventory's limits, so that the state always matches the schema (CORE-17) |
+| `decision.rego` | Moved with `git mv` from `api/policy/rego/` to `docs/contracts/rego/`, as a sketch for the Rego mapping of Phase 2 (section 12). Its header says that it is not normative, and names the cases where the review found it failing open on OPA 1.21 (section 6.7). `api/policy/README.md` loses its row |
+| `governance.proto` | Comments only: `AgentAttributes.labels` follow the syntax and the bounds of the request schema, and `data_categories` its bounds (CORE-17); an instance that serves several agents acknowledges the state per agent (`StateAcknowledgement`, EP-12) |
+| `registry.proto` | Comments only: the served agents of an enforcement point that serves several agents (`RegisterInstanceRequest.agent_ids`, `HeartbeatRequest.served_agents`) are those in its scope for which it holds an active bundle, and never authorize anything (I-6) |
+| `pkg/moduleapi` | Regenerated with `task gen`: comments only, no wire change |
+| `whitetower.cedarschema` | Comments only: `Model.provider` takes a value of section 6.3's table, or a lowercase name of the provider's own such as `ollama`, and no longer suggests `local`; `on_behalf_of` stays declared in the context types, and a `v1alpha1` request never carries it (section 6.4) |
+| Event schemas | Descriptions only: `lease.expired` is one event per agent, with that agent as subject, and no longer says that runtime-control modules leave out the subject (section 5.3); in `decision.made`, a denied `agent.stop` never keeps the agent from stopping (section 6.3). The catalog keeps the subject of `lease.expired` optional until code part 5 makes it required |
+| The kit's path checks | `bundle.go` and `check_vectors.py` accept policy paths that end in `.cedar` only |
+| `test/contracts` | `TestTheDecisionRequestSchemaRefusesRequestsOutsideTheProfile` checks both sides of each new rule of the request schema: `on_behalf_of` with a name and empty; `null` in `args`, at the top and nested in an array and in an object; 64 and 65 labels; label values of 255 and 256 characters, and one of 255 characters of four bytes each; 32 and 33 data categories, and categories of 63 and 64 characters |
+
+Six details the list of 2026-10-22 does not name, the reviewer's two additions among them:
+
+- **References to the moved file,** from the reviewer. `api/README.md` no longer lists Rego among the formats of `policy/`; `docs/contracts/README.md` gains a row for the sketch, which says that it is not normative; the S4 report links to the new place; and the S4 spike reads the sketch there by default, as its README says. The spike, a Go module of its own, builds, passes `go vet`, and runs with the new path.
+- **`whitetower.policy.version_approved.v1`,** from the reviewer. Its `language` allows `cedar` only, since the core approves Cedar policies only and Rego waits for Phase 2 (P1-06). Its example still validates. The `policies` table still allows `rego`, which P1-06 lets a policy's record keep for Phase 2.
+- **The bundle vectors, regenerated.** Each bundle carries a copy of the Cedar schema, so its new comments change every bundle's `schema.cedarschema`, the schema's hash in its manifest, its signature and the reference in its `case.json`. No outcome changes, and both stacks pass the 15 bundle vectors. The valid bundle's manifest hash is now `87188a2a375d9b901158767c6b6f68e6ff820c537e555eeb5e2e4a1df76ed522`, and its size 4506 bytes. Appendix A, which shows `d3309704…` and 4241 bytes, follows in the reviewer's pull request, as the note of 2026-10-23 says.
+- **The language in the path checks.** Both verifiers still check that a policy's path ends in the bundle's language. With V4 accepting Cedar only, that check now repeats the pattern. Code part 6, whose V5 builds each path from its entry, replaces both.
+- **What no test observes.** No test sees the narrowing of the bundle manifest's schema, nor that of `version_approved`: every bundle vector and every example is Cedar, and only the manifests of activated bundles are checked against the schema. Nor does any test see the narrowing of the path checks, since a `.rego` path never gets past V4's check of the language.
+- **C-09.** The combination vector C-09 names the provider `local`, which the Cedar schema's comment no longer suggests. Any lowercase name is valid, so C-09 still is. Step 12 rewrites the vectors that use a model, whose provider, name and endpoint become required.

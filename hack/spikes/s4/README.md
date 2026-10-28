@@ -8,4 +8,4 @@ go run .                          # 2,000 decisions per measurement
 go run . -n 10000 -warmup 1000    # as in the report
 ```
 
-It reads the contract's Rego wrapper from `api/policy/rego/decision.rego`, and on Windows it times decisions with `QueryPerformanceCounter`, because Go's monotonic clock there is too coarse for single decisions.
+It reads the Rego wrapper sketch from `docs/contracts/rego/decision.rego`, the contract's wrapper when the spike ran, and on Windows it times decisions with `QueryPerformanceCounter`, because Go's monotonic clock there is too coarse for single decisions.

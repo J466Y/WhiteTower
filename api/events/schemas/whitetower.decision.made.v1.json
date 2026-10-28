@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Decision made",
-  "description": "One decision of an enforcement point (sections 6 and 8).",
+  "description": "One decision of an enforcement point (sections 6 and 8). A denied agent.stop never keeps the agent from stopping: that action is evaluated for the evidence only (section 6.3).",
   "type": "object",
   "required": [
     "decision",
