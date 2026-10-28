@@ -1,0 +1,15 @@
+{
+  "description": "A combining algorithm the contract does not define, in a bundle for another agent: the values are checked before the agent",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "cf71b5ee491b8be5ef4954b1af2423ff8bee8a5bd9f1f0b593733544fa4d1710",
+    "size_bytes": 4502
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "unsupported"
+  }
+}

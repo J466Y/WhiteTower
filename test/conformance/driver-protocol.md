@@ -10,7 +10,7 @@ The kit starts the harness with these environment variables:
 | --- | --- |
 | `WT_CONFORMANCE_CORE_URL` | Base URL of the fake core's module API |
 | `WT_CONFORMANCE_CA_FILE` | PEM file with the fake core's certificate authority, the module's trust anchor |
-| `WT_CONFORMANCE_BUNDLE_KEYS` | The bundle keys to trust, in the format of `vectors/bundles/keys.json` |
+| `WT_CONFORMANCE_BUNDLE_KEYS_FILE` | JWK Set file (RFC 7517) with the bundle keys to trust: `OKP` keys on the `Ed25519` curve (RFC 8037), each with its `kid`, as section 7.3 of the specification recommends. The kit passes `vectors/bundles/trusted-keys.json` |
 | `WT_CONFORMANCE_AGENT_ID` | For an enforcement point inside an agent: the agent it serves |
 | `WT_CONFORMANCE_ENVIRONMENT` | The environment of the module's credential: `production` or `non_production` |
 | `WT_CONFORMANCE_DRIVER_ADDR` | Where the harness listens for the driver, for example `127.0.0.1:18090` |
