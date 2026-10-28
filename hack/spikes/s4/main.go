@@ -4,7 +4,7 @@
 // 10 and 100 policies in total), it measures:
 //
 //  1. cedar-go in process, with the policy set parsed once per bundle;
-//  2. OPA embedded, with the contract's Rego wrapper, prepared once per bundle;
+//  2. OPA embedded, with the Rego wrapper sketch, prepared once per bundle;
 //  3. a remote decision point: an AuthZEN evaluation endpoint in front of
 //     cedar-go, called over HTTP on localhost with keep-alive.
 //
@@ -34,7 +34,7 @@ import (
 var (
 	iterations = flag.Int("n", 2000, "decisions per measurement")
 	warmup     = flag.Int("warmup", 200, "decisions before measuring")
-	wrapper    = flag.String("wrapper", "../../../api/policy/rego/decision.rego", "the contract's Rego wrapper")
+	wrapper    = flag.String("wrapper", "../../../docs/contracts/rego/decision.rego", "the Rego wrapper sketch")
 )
 
 // stats summarizes a latency distribution.

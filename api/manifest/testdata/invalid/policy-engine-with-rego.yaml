@@ -1,0 +1,42 @@
+# Invalid: a policy engine evaluates Cedar only in v1alpha1.
+apiVersion: whitetower/v1alpha1
+kind: ModuleManifest
+metadata:
+  name: mock-module
+  displayName: Mock enforcement point
+  version: 0.1.0
+  vendor: White Tower project
+  license: Apache-2.0
+  homepage: https://github.com/J466Y/WhiteTower
+spec:
+  contractVersions: [v1alpha1]
+  identity: module
+  agents: bound
+  capabilities:
+    - name: enforcement-point
+      interventionPoints: [tool.invoke, model.invoke]
+      haltModes: [block]
+      haltLayers: [gate_closed]
+    - name: policy-engine
+      languages: [cedar, rego]
+      combiningAlgorithms: [wt-deny-overrides-v1]
+      embedded: true
+  events:
+    emits:
+      - whitetower.decision.made.v1
+      - whitetower.instance.started.v1
+      - whitetower.instance.halted.v1
+      - whitetower.bundle.activated.v1
+      - whitetower.bundle.rejected.v1
+      - whitetower.lease.expired.v1
+    consumes: []
+  permissions: [governance.watch, governance.acknowledge, policy.bundles.read, events.publish]
+  configSchema:
+    type: object
+    required: [coreUrl]
+    properties:
+      coreUrl:
+        type: string
+      scriptedBehavior:
+        description: For tests, make acknowledgements late, missing or false.
+        enum: [normal, slow, silent, lying]

@@ -162,7 +162,9 @@ type RegisterInstanceRequest struct {
 	// Contract versions the instance supports, for example "v1alpha1".
 	ContractVersions []string `protobuf:"bytes,5,rep,name=contract_versions,json=contractVersions,proto3" json:"contract_versions,omitempty"`
 	// Agents the instance serves. An enforcement point embedded in an agent's
-	// process lists exactly that agent.
+	// process lists exactly that agent; one that serves several agents lists
+	// those in its scope for which it holds an active bundle. Served agents never
+	// authorize anything, and the core ignores those outside the scope (I-6).
 	AgentIds []string `protobuf:"bytes,6,rep,name=agent_ids,json=agentIds,proto3" json:"agent_ids,omitempty"`
 	// Descriptive information, shown in the console.
 	Info          *InstanceInfo `protobuf:"bytes,7,opt,name=info,proto3" json:"info,omitempty"`
@@ -396,7 +398,9 @@ type HeartbeatRequest struct {
 	// The complete set of agents the instance serves now. Present only when the
 	// set changed since the last RegisterInstance or Heartbeat that the core
 	// accepted: after a failed heartbeat, the next one carries the set
-	// (contract, section 4.4).
+	// (contract, section 4.4). An enforcement point that serves several agents
+	// lists those in its scope for which it holds an active bundle. Served
+	// agents never authorize anything (I-6).
 	ServedAgents  *ServedAgents `protobuf:"bytes,4,opt,name=served_agents,json=servedAgents,proto3" json:"served_agents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
