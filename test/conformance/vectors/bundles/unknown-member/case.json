@@ -1,0 +1,15 @@
+{
+  "description": "The manifest has a member that its format does not define",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "ec4f0d6768915625a8aebee5de9c576663a5c86672512da2a79553b5a830ea33",
+    "size_bytes": 4555
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "description": "The manifest names the language rego, which v1alpha1 does not have",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "d57991cf9b9966a515557ec611a03d38bd18da7ef65543c6804515adff89e9c6",
+    "size_bytes": 4505
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "unsupported"
+  }
+}

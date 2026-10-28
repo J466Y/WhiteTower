@@ -2,10 +2,13 @@ package stubep
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"slices"
 	"testing"
 	"time"
@@ -16,6 +19,7 @@ import (
 
 	modulev1alpha1 "github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1"
 	"github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1/modulev1alpha1connect"
+	"github.com/J466Y/WhiteTower/test/conformance/bundle"
 	"github.com/J466Y/WhiteTower/test/conformance/kit"
 	"github.com/J466Y/WhiteTower/test/conformance/profile"
 )
@@ -242,6 +246,70 @@ func TestTheStubDeactivatesItsBundleWhenTheStateNamesNone(t *testing.T) {
 	activated := bundleAck{modulev1alpha1.BundleOutcome_BUNDLE_OUTCOME_ACTIVATED, ""}
 	if got, want := bundleAcks(core, refs["valid"].GetVersion()), []bundleAck{activated, activated}; !slices.Equal(got, want) {
 		t.Errorf("acknowledged %v for the valid bundle, want %v", got, want)
+	}
+}
+
+// TestTheStubAcknowledgesEachBundleVectorWithItsReason checks that the stub
+// acknowledges each bundle vector with the outcome and the reason that the
+// vector expects, which the reference verifier gives. The kit's fake core
+// serves the vector's bundle. The stub starts with the vector's active version
+// as its floor for V6, as it keeps the version of a bundle that the state
+// stopped naming.
+func TestTheStubAcknowledgesEachBundleVectorWithItsReason(t *testing.T) {
+	vectors := os.DirFS("../vectors/bundles")
+	keys, err := kit.LoadKeys(vectors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dirs, err := fs.ReadDir(vectors, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range dirs {
+		if !dir.IsDir() {
+			continue
+		}
+		t.Run(dir.Name(), func(t *testing.T) {
+			var c struct {
+				ActiveVersion uint64 `json:"active_version"`
+				ActiveSHA256  string `json:"active_manifest_sha256"`
+				Expected      struct {
+					Outcome string `json:"outcome"`
+					Reason  string `json:"reason"`
+				} `json:"expected"`
+			}
+			data, err := fs.ReadFile(vectors, path.Join(dir.Name(), "case.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(data, &c); err != nil {
+				t.Fatal(err)
+			}
+			b, ref, err := kit.LoadBundle(vectors, dir.Name())
+			if err != nil {
+				t.Fatal(err)
+			}
+			core := kit.NewCore(keys)
+			core.SetAgent(agentState(durationpb.New(time.Minute)))
+			if err := core.PublishBundle(agentID, b, ref); err != nil {
+				t.Fatal(err)
+			}
+			server := httptest.NewServer(core.Handler())
+			t.Cleanup(server.Close)
+			e := New(Config{AgentID: agentID, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()})
+			e.active = bundle.Ref{Version: c.ActiveVersion, ManifestSHA256: c.ActiveSHA256}
+
+			state := agentState(durationpb.New(time.Minute))
+			state.Bundle = &modulev1alpha1.BundleRef{Version: ref.Version, ManifestSha256: ref.ManifestSHA256, SizeBytes: ref.SizeBytes}
+			feed(t, e, snapshot(1, state))
+			want := bundleAck{modulev1alpha1.BundleOutcome_BUNDLE_OUTCOME_ACTIVATED, ""}
+			if c.Expected.Outcome != "activated" {
+				want = bundleAck{modulev1alpha1.BundleOutcome_BUNDLE_OUTCOME_REJECTED, c.Expected.Reason}
+			}
+			if got := bundleAcks(core, ref.Version); !slices.Equal(got, []bundleAck{want}) {
+				t.Errorf("acknowledged %v, want %v", got, []bundleAck{want})
+			}
+		})
 	}
 }
 

@@ -1,0 +1,15 @@
+{
+  "description": "The manifest has no combining_algorithm: a missing member is invalid, not unsupported",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "37f004f6ffc30700b976aa55d49d4b083264191e6ff21e4e283175c8ac704e14",
+    "size_bytes": 4461
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

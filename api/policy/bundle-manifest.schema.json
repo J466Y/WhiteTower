@@ -3,7 +3,7 @@
   "title": "White Tower policy bundle manifest",
   "description": "The signed manifest of a policy bundle, format whitetower.bundle.v1 (docs/contracts/module-contract-v0.1.md, section 7). The signed bytes are the RFC 8785 canonical JSON of this document.",
   "type": "object",
-  "required": ["format", "agent_id", "version", "created_at", "combining_algorithm", "language", "policies"],
+  "required": ["format", "agent_id", "version", "created_at", "combining_algorithm", "language", "cedar_schema", "policies"],
   "additionalProperties": false,
   "properties": {
     "format": { "const": "whitetower.bundle.v1" },
@@ -17,9 +17,8 @@
       "$ref": "#/$defs/file"
     },
     "policies": {
-      "description": "Global and agent-specific policies, in no particular order.",
+      "description": "Global and agent-specific policies, in no particular order. Step V1 bounds the files of a bundle, these policies and the Cedar schema together, at 1,000 (section 7.4), so this list has no bound of its own.",
       "type": "array",
-      "maxItems": 1000,
       "items": {
         "type": "object",
         "required": ["id", "name", "version", "scope", "path", "sha256"],
@@ -29,7 +28,11 @@
           "name": { "type": "string", "minLength": 1, "maxLength": 200 },
           "version": { "type": "integer", "minimum": 1 },
           "scope": { "enum": ["global", "agent"] },
-          "path": { "type": "string", "pattern": "^policies/(global|agent)/[0-9a-f-]{36}\\.cedar$" },
+          "path": {
+            "description": "policies/<scope>/<id>.cedar, built from this entry's scope and ID: step V5 refuses any other path, which this pattern cannot tie to the entry (section 7.4).",
+            "type": "string",
+            "pattern": "^policies/(global|agent)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.cedar$"
+          },
           "sha256": { "$ref": "#/$defs/sha256" }
         }
       }

@@ -3,7 +3,6 @@ package kit
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -55,30 +54,15 @@ func (d *Driver) Decide(ctx context.Context, req DecideRequest) (profile.Respons
 	return out, nil
 }
 
-// LoadKeys reads the trusted keys of the bundle vectors' keys.json.
+// LoadKeys reads the trusted keys of the bundle vectors, trusted-keys.json: a
+// JWK Set, the form in which the driver protocol passes bundle keys to a
+// module (contract, section 7.3).
 func LoadKeys(vectors fs.FS) ([]bundle.Key, error) {
-	data, err := fs.ReadFile(vectors, "keys.json")
+	data, err := fs.ReadFile(vectors, "trusted-keys.json")
 	if err != nil {
 		return nil, err
 	}
-	var file struct {
-		Trusted []struct {
-			Kid string `json:"kid"`
-			X   string `json:"x"`
-		} `json:"trusted"`
-	}
-	if err := json.Unmarshal(data, &file); err != nil {
-		return nil, err
-	}
-	var keys []bundle.Key
-	for _, k := range file.Trusted {
-		pub, err := base64.RawURLEncoding.DecodeString(k.X)
-		if err != nil {
-			return nil, err
-		}
-		keys = append(keys, bundle.Key{ID: k.Kid, Public: pub})
-	}
-	return keys, nil
+	return bundle.ParseKeys(data)
 }
 
 // LoadBundle reads one case of the bundle vectors.

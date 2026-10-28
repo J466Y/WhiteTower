@@ -1,0 +1,15 @@
+{
+  "description": "The manifest is an array that holds a valid manifest",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "ec49550b4783c0e2a5576a5ef2dcc0542f3dba6b4a96f737e6a741c03ecb8791",
+    "size_bytes": 4508
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

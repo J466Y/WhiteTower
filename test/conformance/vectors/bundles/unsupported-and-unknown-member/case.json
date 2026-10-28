@@ -1,0 +1,15 @@
+{
+  "description": "A format the enforcement point does not support, with a member that whitetower.bundle.v1 does not define: the structure is checked first",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "8c3f051677fbe81965b03df1b2683bde70182b05d0be239aba3e250b2aa5ef3a",
+    "size_bytes": 4555
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}
