@@ -1,0 +1,15 @@
+{
+  "description": "The global policy is listed twice, in two versions, at the same path",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "c721006bb0a58f4ae8e626b0f4877cf1aa72c652b25681d55048a17d6e47502b",
+    "size_bytes": 4759
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

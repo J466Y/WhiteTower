@@ -1,0 +1,13 @@
+{
+  "description": "A key that no module under test trusts, which signs the unknown-key and forged-key-id cases. Its seed is public: never trust it anywhere.",
+  "keys": [
+    {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "FV-4p9g8TsMt81YcmAzfjeyTIXIxPTfPrCtjqTqnKDM",
+      "kid": "U4aA_uzkDKQskPyQMN-Jo7tb82tJMjzwVIANNFycLZw",
+      "alg": "EdDSA",
+      "use": "sig"
+    }
+  ]
+}

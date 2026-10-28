@@ -156,7 +156,6 @@ def b64url(data: str) -> bytes:
 
 
 ERROR_POLICY = re.compile(r"policy `(policy\d+)`")
-POLICY_PATH = re.compile(r"^policies/(global|agent)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.cedar$")
 
 
 class Rejected(Exception):
@@ -165,46 +164,125 @@ class Rejected(Exception):
         self.reason = reason
 
 
+# The members of a bundle manifest, of its Cedar schema's entry and of a policy
+# entry: exactly these, each of them required (bundle-manifest.schema.json).
+MANIFEST_MEMBERS = {"format", "agent_id", "version", "created_at", "combining_algorithm", "language",
+                    "cedar_schema", "policies"}
+FILE_MEMBERS = {"path", "sha256"}
+POLICY_MEMBERS = {"id", "name", "version", "scope", "path", "sha256"}
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+SHA256 = re.compile(r"[0-9a-f]{64}")
+TIMESTAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z")
+
+
+def members(value, names: set) -> dict:
+    """An object with exactly the members named, none of them null, or invalid_manifest."""
+    if type(value) is not dict or set(value) != names or None in value.values():
+        raise Rejected("invalid_manifest")
+    return value
+
+
+def form(pattern: re.Pattern, value) -> bool:
+    return type(value) is str and pattern.fullmatch(value) is not None
+
+
+def positive(value) -> bool:
+    return type(value) is int and value >= 1
+
+
+def check_manifest(manifest: bytes) -> dict:
+    """The checks of step V4 that read the manifest alone, in their order (section 7.4).
+
+    A manifest that is not an object, or that has an unknown or a missing member,
+    or a member of the wrong type, is invalid_manifest: the types are those of
+    bundle-manifest.schema.json, the forms of its strings included. Then a format,
+    combining algorithm or language that is not supported is unsupported, even
+    though the schema's constant fails too. Paths need only be strings here: V5
+    builds them from their entries.
+    """
+    try:
+        m = json.loads(manifest)
+    except ValueError:
+        raise Rejected("invalid_manifest") from None
+    members(m, MANIFEST_MEMBERS)
+    schema = members(m["cedar_schema"], FILE_MEMBERS)
+    if type(m["policies"]) is not list:
+        raise Rejected("invalid_manifest")
+    policies = [members(p, POLICY_MEMBERS) for p in m["policies"]]
+    if not (all(type(m[k]) is str for k in ("format", "combining_algorithm", "language"))
+            and form(UUID, m["agent_id"]) and positive(m["version"]) and form(TIMESTAMP, m["created_at"])
+            and type(schema["path"]) is str and form(SHA256, schema["sha256"])
+            and all(form(UUID, p["id"]) and type(p["name"]) is str and 1 <= len(p["name"]) <= 200
+                    and positive(p["version"]) and p["scope"] in ("global", "agent")
+                    and type(p["path"]) is str and form(SHA256, p["sha256"]) for p in policies)):
+        raise Rejected("invalid_manifest")
+    if m["format"] != "whitetower.bundle.v1" or m["combining_algorithm"] != "wt-deny-overrides-v1" \
+            or m["language"] != "cedar":
+        raise Rejected("unsupported")
+    return m
+
+
+def parse_static(policy: bytes) -> None:
+    """Step V7 for one policy: it parses as static Cedar policies. cedarpy parses
+    templates too, so a template is refused here. Nothing validates the policy
+    against the bundle's schema, which is the core's job (POL-07)."""
+    try:
+        if cedarpy.PolicySet.from_str(policy.decode()).templates():
+            raise Rejected("parse_error")
+    except ValueError:  # a parse error, or text that is not UTF-8
+        raise Rejected("parse_error") from None
+
+
 def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: dict) -> dict:
-    """The verification steps V1 to V6 of section 7.4."""
+    """The verification steps V1 to V7 of section 7.4, in their order."""
     files = {p.relative_to(case_dir).as_posix(): p.read_bytes() for p in case_dir.rglob("*") if p.is_file()}
     manifest = files.pop("manifest.json")
     signature = files.pop("manifest.jws", b"").decode()
     files.pop("case.json")
     ref = case["ref"]
+    # V1. Size.
     size = len(manifest) + sum(len(c) for c in files.values())
     if ref["size_bytes"] > 2 << 20 or size > 2 << 20 or len(files) > 1000:
         raise Rejected("oversized")
+    # V2. Signature. The protected header has exactly alg, kid and typ, in any
+    # order (section 7.2): any other member, such as b64, is refused.
     parts = signature.split(".")
     if len(parts) != 3 or parts[1] != "":
         raise Rejected("signature")
-    header = json.loads(b64url(parts[0]))
-    if set(header) != {"alg", "kid", "typ"} or header["alg"] != "EdDSA" or header["typ"] != "whitetower-bundle+jws":
+    try:
+        header = json.loads(b64url(parts[0]))
+    except ValueError:
+        raise Rejected("signature") from None
+    if type(header) is not dict or set(header) != {"alg", "kid", "typ"} \
+            or header["alg"] != "EdDSA" or header["typ"] != "whitetower-bundle+jws":
         raise Rejected("signature")
-    key = trusted.get(header["kid"])
+    key = trusted.get(header["kid"]) if type(header["kid"]) is str else None
     if key is None:
         raise Rejected("unknown_key")
     signing_input = (parts[0] + "." + base64.urlsafe_b64encode(manifest).decode().rstrip("=")).encode()
     try:
         key.verify(b64url(parts[2]), signing_input)
-    except InvalidSignature:
+    except (InvalidSignature, ValueError):
         raise Rejected("signature") from None
+    # V3. Reference.
     digest = hashlib.sha256(manifest).hexdigest()
     if digest != ref["manifest_sha256"]:
         raise Rejected("manifest_mismatch")
-    m = json.loads(manifest)
-    if m["format"] != "whitetower.bundle.v1" or m["combining_algorithm"] != "wt-deny-overrides-v1" or m["language"] != "cedar":
-        raise Rejected("unsupported")
+    # V4. The manifest alone, then against the state.
+    m = check_manifest(manifest)
     if m["agent_id"] != case["agent_id"] or m["version"] != ref["version"]:
         raise Rejected("invalid_manifest")
+    # V5. Each policy's path is built from its entry, with no duplicates, and
+    # the schema sits at schema.cedarschema; then exactly the listed files.
     listed = {}
     for p in m["policies"]:
-        if not POLICY_PATH.match(p["path"]) or not p["path"].endswith("." + m["language"]) \
-                or not p["path"].startswith(f"policies/{p['scope']}/") or p["path"] in listed:
+        path = f"policies/{p['scope']}/{p['id']}.{m['language']}"
+        if p["path"] != path or path in listed:
             raise Rejected("invalid_manifest")
-        listed[p["path"]] = p["sha256"]
-    if "cedar_schema" in m:
-        listed[m["cedar_schema"]["path"]] = m["cedar_schema"]["sha256"]
+        listed[path] = p["sha256"]
+    if m["cedar_schema"]["path"] != "schema.cedarschema":
+        raise Rejected("invalid_manifest")
+    listed["schema.cedarschema"] = m["cedar_schema"]["sha256"]
     for path in sorted(listed):
         if path not in files:
             raise Rejected("missing_file")
@@ -212,13 +290,13 @@ def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: di
             raise Rejected("file_hash")
     if set(files) - set(listed):
         raise Rejected("extra_file")
+    # V6. No rollback.
     if m["version"] < case["active_version"] or (
             m["version"] == case["active_version"] and digest != case.get("active_manifest_sha256")):
         raise Rejected("older_version")
-    try:
-        Engine(m["agent_id"], [{"id": p["id"], "text": files[p["path"]].decode()} for p in m["policies"]])
-    except Exception:  # noqa: BLE001 - any parse failure rejects the bundle
-        raise Rejected("parse_error") from None
+    # V7. Static policies.
+    for p in m["policies"]:
+        parse_static(files[p["path"]])
     return {"outcome": "activated"}
 
 
@@ -248,8 +326,11 @@ def main() -> int:
         reason = gate_reason(case["state"])
         check(case["id"], deny(reason) if reason else engine.evaluate(fail_closed["request"]), case["expected"])
 
-    keys = json.loads((VECTORS / "bundles" / "keys.json").read_text(encoding="utf-8"))
-    trusted = {k["kid"]: Ed25519PublicKey.from_public_bytes(b64url(k["x"])) for k in keys["trusted"]}
+    # The trusted bundle keys, a JWK Set (section 7.3), of which the checker
+    # uses the OKP keys on Ed25519 that have a key ID, as RFC 7517 asks.
+    keys = json.loads((VECTORS / "bundles" / "trusted-keys.json").read_text(encoding="utf-8"))
+    trusted = {k["kid"]: Ed25519PublicKey.from_public_bytes(b64url(k["x"])) for k in keys["keys"]
+               if k.get("kty") == "OKP" and k.get("crv") == "Ed25519" and "kid" in k}
     bundle_cases = sorted(p for p in (VECTORS / "bundles").iterdir() if p.is_dir())
     for case_dir in bundle_cases:
         case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))

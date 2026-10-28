@@ -1,0 +1,15 @@
+{
+  "description": "A policy is a template, with a slot for its principal",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "b237b7b6be3cf4384c804a9b245e7625e44596c9376e3f56468e68b4d4305950",
+    "size_bytes": 4425
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

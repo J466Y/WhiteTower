@@ -1,0 +1,13 @@
+{
+  "description": "The bundle keys that a module under test trusts. Their seeds are public: never trust these keys outside tests.",
+  "keys": [
+    {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "Yj27ObdpnwuMip4egYfDCHVbmtRAyUG8fXAio8Vkx8Q",
+      "kid": "h88MKF4Xti9x8DiokiJuKLOps-ms1fWOUL8eZUM5ZHQ",
+      "alg": "EdDSA",
+      "use": "sig"
+    }
+  ]
+}

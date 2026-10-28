@@ -1,0 +1,14 @@
+{
+  "description": "A policy parses, but fails validation against the bundle's Cedar schema, which is the core's job only",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "d1e7b13746cfd2616098f24487774c738c1738845b8a54ef1f4c98982d69618b",
+    "size_bytes": 4503
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "activated"
+  }
+}

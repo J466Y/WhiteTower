@@ -31,7 +31,8 @@ type Config struct {
 	AgentID string
 	// The environment of its credential: "production" or "non_production".
 	Environment string
-	// Its trust root for bundles.
+	// Its trust root for bundles, which a harness reads from the JWK Set file
+	// that the driver protocol names (bundle.ParseKeys).
 	Trusted []bundle.Key
 	// How it reaches the core.
 	CoreURL    string
@@ -384,6 +385,8 @@ func (e *EP) fetchAndVerify(ctx context.Context, want, active bundle.Ref) (*prof
 	for _, f := range resp.Msg.GetBundle().GetFiles() {
 		b.Files[f.GetPath()] = f.GetContent()
 	}
+	// Verify runs every step of section 7.4, V7's parse of the policies
+	// included, so the engine builds from what it activates.
 	m, err := bundle.Verify(b, e.cfg.Trusted, bundle.Expectation{
 		AgentID: e.cfg.AgentID, Ref: want, ActiveVersion: active.Version, ActiveSHA256: active.ManifestSHA256,
 		Languages: []string{"cedar"},
@@ -395,11 +398,7 @@ func (e *EP) fetchAndVerify(ctx context.Context, want, active bundle.Ref) (*prof
 	for _, p := range m.Policies {
 		policies = append(policies, profile.Policy{ID: p.ID, Text: string(b.Files[p.Path])})
 	}
-	engine, err := profile.NewEngine(e.cfg.AgentID, m.Version, policies)
-	if err != nil {
-		return nil, &bundle.RejectError{Reason: bundle.ReasonParseError, Detail: err.Error()}
-	}
-	return engine, nil
+	return profile.NewEngine(e.cfg.AgentID, m.Version, policies)
 }
 
 // Decide runs the gate, then the policies (obligation EP-2). The request has
