@@ -37,7 +37,7 @@ Each subplan gets its own file in `phase-1/P1-10-web-console/` when work starts.
 - Information architecture and navigation for each role.
 - Wireframes of the key flows: onboarding an agent (owner and advisory committee), approving a policy, halting one agent and the fleet, releasing a halt, verifying audit evidence, reviewing a discovered MCP server and its tools, enabling tooling for an agent, blocking a server, reviewing a changed tool definition.
 - Visual language: design tokens, and a status vocabulary that always pairs an icon with text: lifecycle states, coverage levels, halt layers, the status of catalog entries (discovered or approved, shown as blocked while a block covers them), and an agent's tooling (observed, enabled or both).
-- Validation with two or three prospective users from the pilot organization: a committee member, an operator and an auditor.
+- Directions from the maintainer, who gives them when the console's turn comes (decision of 2026-10-29), and validation with prospective users from the pilot organization when they are available: a committee member, an operator and an auditor.
 
 **Done when:** the wireframes of the key flows are validated and linked from each console subplan.
 

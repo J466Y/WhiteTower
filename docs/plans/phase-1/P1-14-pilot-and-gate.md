@@ -62,8 +62,9 @@ Define how each is measured, which data is collected, and a weekly check-in.
 - IdP integration with group mapping to roles.
 - SIEM export through an OpenTelemetry collector.
 - TLS certificates and backups.
+- The pilot runs on Windows, macOS and Linux. On fresh macOS and Linux machines, `task setup` followed by `task dev` starts the development stack, the criterion that P0-01 verified on Windows only (the maintainer's decision of 2026-10-29).
 
-**Done when:** the smoke test passes in the pilot environment, and the SIEM receives checkpoints.
+**Done when:** the smoke test passes in the pilot environment, the SIEM receives checkpoints, and the development stack starts on macOS and Linux.
 
 ### 4. Onboarding with real people
 
@@ -86,7 +87,9 @@ Define how each is measured, which data is collected, and a weekly check-in.
 
 Watch the dashboards, reviews, drift and the tooling waiting for review; collect user experience feedback; fix blocking issues through v0.1.x patch releases.
 
-**Done when:** the planned period is complete without unresolved blocking issues.
+The external security review runs during this period, on the deployed release, with the scope that P1-13 step 8 prepared: the pilot is the proof that everything works, so the review comes in it rather than before it (the maintainer's decision of 2026-10-29). Fix what it finds, or record the accepted risks.
+
+**Done when:** the planned period is complete without unresolved blocking issues, and the external review has reported.
 
 ### 7. Drills
 
@@ -122,7 +125,7 @@ ADR-0011 replaced AGT with White Tower's own enforcement point for the MVP, and 
 
 ### 10. Gate review (G1)
 
-Write a report with evidence for each charter success criterion and each Must requirement (demonstrated or not), the NFR measurements against their targets, incidents, feedback and known limitations. The maintainers and the pilot sponsor decide go or no-go for Phase 2, and set its priorities (for example, the MCP network gateway or the LLM gateway first, or stateful usage rules).
+Write a report with evidence for each charter success criterion and each Must requirement (demonstrated or not), the NFR measurements against their targets, incidents, feedback and known limitations. The maintainers and the pilot sponsor decide go or no-go for Phase 2, and set its priorities (for example, the MCP network gateway or the LLM gateway first, or stateful usage rules). A pilot that passes, and is approved, opens one or several external security audits, each from its own angle; the report proposes their scope.
 
 **Done when:** the gate decision is recorded, and the roadmap is updated for Phase 2.
 
