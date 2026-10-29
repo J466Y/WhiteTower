@@ -23,7 +23,7 @@ flowchart LR
 | `internal/cli` | `wtctl` | The generated API client, the platform |
 | `pkg/apiclient`, `pkg/moduleapi` | Generated code, public: the API client and the module API's types | |
 | `pkg/auditverify` | Public: the verification library of the audit log, for `wtctl`, the API and auditors | Nothing of White Tower |
-| `api/events`, `api/policy` | The contract files that the core and the conformance kit read, embedded: the event catalog and the schemas of its types, and the decision request's schema | Nothing of White Tower |
+| `api/events`, `api/openapi`, `api/policy` | The contract files that the core and the conformance kit read, embedded: the event catalog and the schemas of its types, the OpenAPI document, and the decision request's schema | Nothing of White Tower |
 
 ## Rules
 

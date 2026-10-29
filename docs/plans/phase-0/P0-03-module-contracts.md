@@ -845,4 +845,4 @@ The review found code part 4 complete (#88): the profile and the checker follow 
 - **The stub's time.** The stub passes the body's time as written, but no test shows it: a stub that replaced it with its clock passed every test. Code part 8, which edits the stub's `Decide` again, adds a body whose time is outside the profile.
 - **S-03.** `kit.DecideRequest` cannot carry a member outside the profile, so the scenario must send each combination vector's request as the vector writes it (P1-07.2, step 9).
 - **Patterns in Python.** The checker reads the `$` that ends a pattern of the request schema as the end of the string, as ECMA-262 does. Every pattern that step 12 adds to that schema ends with `$` and holds no other.
-- **The packages that embed `api/`.** `api/events` and `api/policy` embed contract files for the core and the kit. The table of packages in `docs/development/internals.md` now lists them.
+- **The packages that embed `api/`.** `api/events`, `api/openapi` and `api/policy` embed contract files for the core and the kit. The table of packages in `docs/development/internals.md` now lists them.
