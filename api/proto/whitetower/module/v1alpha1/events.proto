@@ -34,8 +34,11 @@ service EventService {
 message PublishRequest {
   // Identifier returned by RegisterInstance.
   string instance_id = 1;
-  // At most 500 events, each a CloudEvent 1.0 in JSON structured mode (UTF-8),
-  // of at most 64 KiB, in the order they were recorded.
+  // At most 500 events within the message limit, each a CloudEvent 1.0 in JSON
+  // structured mode (UTF-8), of at most 64 KiB, in the order they were
+  // recorded. JSON carries the events as base64, so a JSON request holds about
+  // 47 events of 64 KiB, and a binary one about 63; an instance splits a larger
+  // batch, whose events stay in its buffer (contract, sections 4.8 and 8.4).
   repeated bytes events = 2;
 }
 

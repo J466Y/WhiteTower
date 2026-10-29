@@ -343,8 +343,9 @@ message HaltLayerReport {
   HaltLayer layer = 1;
   // What happened.
   LayerOutcome outcome = 2;
-  // Time from receiving the halt to this outcome, measured on the instance's
-  // monotonic clock.
+  // Time from the moment this process received the halt to this outcome, on
+  // its monotonic clock. For a halt it found at start, the time since it
+  // applied the state that carried the halt (contract, section 5.5).
   google.protobuf.Duration after_receipt = 3;
   // The instance's wall-clock time of the outcome. Informational.
   google.protobuf.Timestamp observed_at = 4;

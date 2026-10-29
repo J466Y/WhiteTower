@@ -21,7 +21,11 @@
       ]
     },
     "reason": {
-      "$ref": "common.schema.json#/$defs/decisionReason"
+      "description": "Why the decision was taken (section 6.6). Never gate.evidence_full: a denial with it is the one decision not recorded, since the evidence buffer cannot take it (EP-8).",
+      "$ref": "common.schema.json#/$defs/decisionReason",
+      "not": {
+        "const": "gate.evidence_full"
+      }
     },
     "action": {
       "$ref": "common.schema.json#/$defs/action"
@@ -201,8 +205,7 @@
               "gate.halted",
               "gate.fleet_halted",
               "gate.lifecycle",
-              "gate.no_bundle",
-              "gate.evidence_full"
+              "gate.no_bundle"
             ]
           }
         }

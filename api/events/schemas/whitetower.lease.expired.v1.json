@@ -10,8 +10,9 @@
   "additionalProperties": false,
   "properties": {
     "lease_ttl_ms": {
+      "description": "The lease's TTL as the instance applied it (section 5.3): one under 10 seconds as it is, never lengthened, and one above 300 seconds as 300.",
       "type": "integer",
-      "minimum": 10000,
+      "minimum": 1,
       "maximum": 300000
     },
     "effect": {

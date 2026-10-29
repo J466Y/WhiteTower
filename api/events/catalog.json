@@ -66,7 +66,7 @@
     },
     {
       "type": "whitetower.lease.expired.v1",
-      "summary": "An instance lost contact with the core for longer than an agent's lease: one event per agent, with that agent as subject.",
+      "summary": "An agent's lease ran out on an instance, because renewals stopped or arrived only stale: one event per agent, with that agent as subject.",
       "emitters": [
         "enforcement-point",
         "runtime-control"

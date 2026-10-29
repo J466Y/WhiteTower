@@ -10,28 +10,31 @@ import (
 )
 
 // reasonRules says, for each reason of section 6.6, whether a decision event
-// requires the environment that the registration returned, which exists
-// whenever policies were evaluated (I-7), and whether a decision carries the
-// version of the bundle that decided: always, never or either (section 6.6).
+// records a decision with it, which a denial with gate.evidence_full never is
+// (EP-8); whether the event requires the environment that the registration
+// returned, which exists whenever policies were evaluated (I-7); and whether a
+// decision carries the version of the bundle that decided: always, never or
+// either (section 6.6).
 var reasonRules = []struct {
 	reason        string
+	recorded      bool
 	environment   bool
 	bundleVersion string
 }{
-	{"policy.permit", true, "always"},
-	{"policy.forbid", true, "always"},
-	{"policy.no_permit", true, "always"},
-	{"error.evaluation", true, "always"},
-	{"error.timeout", true, "either"},
-	{"error.unknown_agent", false, "either"},
-	{"error.invalid_request", false, "either"},
-	{"gate.no_state", false, "never"},
-	{"gate.lease_expired", false, "never"},
-	{"gate.halted", false, "never"},
-	{"gate.fleet_halted", false, "never"},
-	{"gate.lifecycle", false, "never"},
-	{"gate.no_bundle", false, "never"},
-	{"gate.evidence_full", false, "never"},
+	{"policy.permit", true, true, "always"},
+	{"policy.forbid", true, true, "always"},
+	{"policy.no_permit", true, true, "always"},
+	{"error.evaluation", true, true, "always"},
+	{"error.timeout", true, true, "either"},
+	{"error.unknown_agent", true, false, "either"},
+	{"error.invalid_request", true, false, "either"},
+	{"gate.no_state", true, false, "never"},
+	{"gate.lease_expired", true, false, "never"},
+	{"gate.halted", true, false, "never"},
+	{"gate.fleet_halted", true, false, "never"},
+	{"gate.lifecycle", true, false, "never"},
+	{"gate.no_bundle", true, false, "never"},
+	{"gate.evidence_full", false, false, "never"},
 }
 
 // bundleVersionAllowed reports whether a decision whose reason has the rule
@@ -72,7 +75,8 @@ func exampleEvent(t *testing.T, eventType string) map[string]any {
 
 // TestTheDecisionEventTiesItsEnvironmentAndBundleVersionToItsReason gives the
 // example of decision.made each reason, with and without an environment and a
-// bundle version (I-7, section 6.6).
+// bundle version (I-7, section 6.6). It refuses gate.evidence_full whatever
+// the other members, since that denial is never recorded (EP-8).
 func TestTheDecisionEventTiesItsEnvironmentAndBundleVersionToItsReason(t *testing.T) {
 	sch := compile(t, api+"/events/schemas/whitetower.decision.made.v1.json")
 	for _, rule := range reasonRules {
@@ -98,7 +102,7 @@ func TestTheDecisionEventTiesItsEnvironmentAndBundleVersionToItsReason(t *testin
 					if !bundleVersion {
 						delete(data, "bundle_version")
 					}
-					valid := (environment || !rule.environment) && bundleVersionAllowed(rule.bundleVersion, bundleVersion)
+					valid := rule.recorded && (environment || !rule.environment) && bundleVersionAllowed(rule.bundleVersion, bundleVersion)
 					err := validate(t, sch, data)
 					switch {
 					case valid && err != nil:
@@ -183,6 +187,9 @@ func TestTheEventSchemasFollowSections5And8(t *testing.T) {
 		{"an unknown cause", expired, func(e map[string]any) { e["data"].(map[string]any)["cause"] = "core_unreachable" }, false},
 		{"an unknown halt mode", expired, func(e map[string]any) { e["data"].(map[string]any)["halt_mode"] = "pause" }, false},
 		{"no layers", expired, func(e map[string]any) { e["data"].(map[string]any)["layers"] = []any{} }, false},
+		// A lease under 10 seconds is applied as it is, and can run out.
+		{"a lease of 5 seconds", expired, func(e map[string]any) { e["data"].(map[string]any)["lease_ttl_ms"] = 5000 }, true},
+		{"a lease of 0 milliseconds", expired, func(e map[string]any) { e["data"].(map[string]any)["lease_ttl_ms"] = 0 }, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -87,8 +87,11 @@ type PublishRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Identifier returned by RegisterInstance.
 	InstanceId string `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
-	// At most 500 events, each a CloudEvent 1.0 in JSON structured mode (UTF-8),
-	// of at most 64 KiB, in the order they were recorded.
+	// At most 500 events within the message limit, each a CloudEvent 1.0 in JSON
+	// structured mode (UTF-8), of at most 64 KiB, in the order they were
+	// recorded. JSON carries the events as base64, so a JSON request holds about
+	// 47 events of 64 KiB, and a binary one about 63; an instance splits a larger
+	// batch, whose events stay in its buffer (contract, sections 4.8 and 8.4).
 	Events        [][]byte `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

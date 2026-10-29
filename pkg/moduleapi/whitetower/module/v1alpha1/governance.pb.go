@@ -1436,8 +1436,9 @@ type HaltLayerReport struct {
 	Layer HaltLayer `protobuf:"varint,1,opt,name=layer,proto3,enum=whitetower.module.v1alpha1.HaltLayer" json:"layer,omitempty"`
 	// What happened.
 	Outcome LayerOutcome `protobuf:"varint,2,opt,name=outcome,proto3,enum=whitetower.module.v1alpha1.LayerOutcome" json:"outcome,omitempty"`
-	// Time from receiving the halt to this outcome, measured on the instance's
-	// monotonic clock.
+	// Time from the moment this process received the halt to this outcome, on
+	// its monotonic clock. For a halt it found at start, the time since it
+	// applied the state that carried the halt (contract, section 5.5).
 	AfterReceipt *durationpb.Duration `protobuf:"bytes,3,opt,name=after_receipt,json=afterReceipt,proto3" json:"after_receipt,omitempty"`
 	// The instance's wall-clock time of the outcome. Informational.
 	ObservedAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
