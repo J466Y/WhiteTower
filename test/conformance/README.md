@@ -7,12 +7,12 @@ Checks that a module implements the module contracts ([specification, section 9]
 | Path | Content |
 | --- | --- |
 | [`vectors/`](vectors/) | Language-neutral test vectors: combination semantics, the gate, signed bundles, module manifests |
-| [`profile/`](profile/) | Reference implementation of the decision profile on `cedar-go`: request mapping, combining algorithm, gate |
+| [`profile/`](profile/) | Reference implementation of the decision profile on `cedar-go`: the check of requests against the profile, request mapping, combining algorithm, gate |
 | [`bundle/`](bundle/) | Reference implementation of the bundle format: canonical manifests, signatures, verification |
 | [`manifest/`](manifest/) | Reference reader of module manifests written in YAML: MAN-1's refusals, I-JSON, canonical JSON |
 | [`kit/`](kit/) | The kit: a fake core that speaks the module API, the driver client, and the scenarios |
 | [`stubep/`](stubep/) | A minimal enforcement point in Go, enough to run the scenarios end to end. Not a product |
-| [`python/check_vectors.py`](python/check_vectors.py) | The vectors checked with Python: `cedarpy`, `cryptography` and PyYAML |
+| [`python/check_vectors.py`](python/check_vectors.py) | The vectors checked with Python: `cedarpy`, `cryptography`, PyYAML and `jsonschema` |
 | [`driver-protocol.md`](driver-protocol.md) | How the kit tells a module under test what to do |
 
 ## How the kit works
@@ -27,10 +27,10 @@ Scenarios S-01, "start closed", and S-17, "stale renewals", run today against th
 
 ```sh
 go test ./test/conformance/...                 # vectors (Go, cedar-go, yaml.v3), the stub's own tests, and scenarios S-01 and S-17 against the stub
-python test/conformance/python/check_vectors.py  # the same vectors with cedarpy, cryptography and PyYAML
+python test/conformance/python/check_vectors.py  # the same vectors with cedarpy, cryptography, PyYAML and jsonschema
 ```
 
-The Python check needs `cedarpy`, `cryptography` and PyYAML; the virtual environment of `hack/spikes/agt` has all three. It reads manifests from PyYAML's events, never its types, since PyYAML reads YAML 1.1.
+The Python check needs `cedarpy`, `cryptography`, PyYAML and `jsonschema`; the virtual environment of `hack/spikes/agt` has all four. It reads manifests from PyYAML's events, never its types, since PyYAML reads YAML 1.1. It reads the `$` that ends the request schema's patterns at the end of the string only, as ECMA-262 does, where Python's regular expressions also match it before a final line break.
 
 ## Changing the vectors
 

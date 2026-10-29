@@ -320,7 +320,7 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Done |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Done |
 | 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Done |
-| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code parts 1 to 3, 5 and 6 done (2026-10-27 and 2026-10-28); the others queued in AGENTS.md's work queue |
+| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code parts 1 to 6 done (2026-10-27 to 2026-10-29); the others queued in AGENTS.md's work queue |
 | Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Done |
 
 RFC-0002's review follows, the same way.
@@ -794,3 +794,45 @@ What the reviewer's pull request takes at the end of the code parts, with append
 - section 9.1 names the manifest vectors (8 manifests, and the 67 documents of `documents.json`), and counts 50 bundle vectors;
 - section 3.1 says how YAML 1.1's types are read: a float has one decimal point, as YAML 1.1's parsers read it, so that the version `0.1.0` stays a string. It also says whether MAN-1 names the syntax on which the two parsers differ, each time by refusing: the escape `\/`, the `%YAML` directive, tabs, and NEL, LS and PS;
 - appendix A takes ep-python's manifest hash once code part 7 has changed the example, and the valid bundle, `87188a2a…`, of 4506 bytes.
+
+### 2026-10-29: corrections, code part 4
+
+The fourth code part of RFC-0001's review follows the second item of what the third part of the corrections (2026-10-22) leaves to the coding agents, the vectors on both stacks, with the addition from the review of code part 3. It regenerates nothing, so it needed no exception of the endpoint security.
+
+| What | Change |
+| --- | --- |
+| `api/policy` | `policy.go` embeds `decision-request.schema.json`, as `api/events` embeds its catalog, so that the Go profile reads no path at run time. The schema does not change |
+| The Go profile, `profile.go` | `Evaluate` takes the request's JSON, in the order of section 6.6. It reads the subject first: a request whose subject is not an agent with the bundle's agent ID is `error.unknown_agent`. Then it checks the request against the embedded schema. Then `DecodeRequest` decodes it with every number as a `json.Number`, and `ToCedar` checks the rules that the schema does not state, each a named error: `ErrAnotherAgent` (section 6.3), `ErrNotAnInteger` (sections 6.4 and 6.7) and `ErrTime` (section 1). A request outside the profile is `error.invalid_request`. An argument is an integer only when its text is one, in the signed 64-bit range, so no number passes through a float. `Context` loses `on_behalf_of`, and the time is parsed in the form of section 1, `TimeLayout`. The gate takes the environment: `validated` and `ready` open only with `non_production`, and `active` with either |
+| `vectors_test.go` | Requests stay as the vectors write them. A request refused with `error.invalid_request` fails the schema, compiled from its file, or, when its case names a rule, matches the schema and breaks that rule in `ToCedar`. A request for an unknown agent may be outside the profile too, since that reason comes first; every other request matches the schema. The subject of the fail-closed request takes each case's environment, as section 6.2 builds it |
+| The Python checker, `check_vectors.py` | The same order and the same rules, each answered with `error.invalid_request`, never with an exception or with `error.evaluation`. It checks the schema with `jsonschema`, below. Its gate takes the environment |
+| Combination vectors | 17 new cases, C-21 to C-37, below, 37 in all. C-20 names its rule, `another_agent`, and `tool_args_extension` declares `amount?: Long` |
+| Fail-closed vectors | Every case gains the input `environment`: `production`, except F-10, which takes `non_production`. F-15 and F-16 put a `validated` and a `ready` agent in production, closed with `gate.lifecycle`; F-17 and F-18 put a `ready` and an `active` agent in non-production, open. 18 in all |
+| The stub enforcement point | Its gate takes the environment from `Config.Environment` until code part 8 takes it from the registration. `Decide` takes the body of the driver's decide call, adds the subject it builds, never one from the body, and gives the profile the rest as written: a body outside the profile is denied with `error.invalid_request`, where an unknown member got an HTTP 400 before, and its `DecideRequest` type is gone. A subject without labels or data categories carries empty ones, never `null`, so that it matches the schema (CORE-17) |
+| The stub's tests | The gate in each lifecycle state that can open, with each environment; bodies outside the profile, exact numbers, a missing time and a subject in the body, which counts for nothing; and an agent without labels or data categories |
+| `test/contracts` | From the review of code part 3, the table test of the request schema refuses `on_behalf_of: null` |
+
+| Rule | New cases |
+| --- | --- |
+| The time (section 1) | C-21 without milliseconds, C-22 with an offset; C-35, February 29 of 2026, which does not exist (`invalid_time`) |
+| Integers (section 6.4) | C-23, `2.0` (`not_an_integer`); C-24, 2^63 - 1 under a forbid on amounts over 1000 (`policy.forbid`); C-25, 2^63 (`not_an_integer`) |
+| Members outside the profile | C-26, an unknown member; C-27 to C-29, `on_behalf_of` set to a principal, empty and `null`; C-36, a trace ID followed by a line break; C-37, no context |
+| Rule 4 (section 6.5) | C-30 and C-31, an erroring permit beside a satisfied permit and beside a satisfied forbid: both `error.evaluation`, naming the erroring permit only |
+| Determining policies (section 6.6) | C-32, two permits out of ascending order |
+| The order of reasons (section 6.6) | C-33, a request for another agent that is outside the profile too; C-34, a subject that is not an agent: both `error.unknown_agent` |
+
+Before this part, the Python checker failed 10 of the new combination cases and raised on C-37, so it never reached the fail-closed vectors, whose F-15 and F-16 its gate would have opened. The Go profile failed 7 of them, C-21, C-22, C-26 to C-29 and C-36, each by allowing, and opened F-15 and F-16; `vectors_test.go`, which decoded requests strictly, could not even load the file, for the unknown member of C-26 and C-33. Both stacks now pass the 37 combination and the 18 fail-closed vectors, and the checker counts 180 vectors.
+
+Details the list of 2026-10-22 does not name:
+
+- **Seven cases beyond the list.** Each makes a rule observable that no listed case would: C-33 and C-34, the order of section 6.6, which a stack that checks the schema first fails; C-35, a time that does not exist, which the Go profile refused and the checker answered with `error.evaluation`, since cedarpy cannot build the request; C-36, the line break, below; C-37, on which the checker raised; and F-17 and F-18, so that row 5 is checked in each state and environment.
+- **The rules that the vectors name.** A case refused with `error.invalid_request` whose request matches the schema names the rule that refuses it: `another_agent`, `not_an_integer` or `invalid_time`, which the file's description defines. `vectors_test.go` maps each name to the profile's error. It fails a case whose request matches the schema and names no rule, one that names a rule but fails the schema, and one that `ToCedar` refuses for another rule. The Python checker compares the reason only.
+- **A whole float.** The float argument is `2.0`, not `1.5`: a stack that reads numbers through a float takes `2.0` for the integer 2, while it refuses `1.5` by chance. Python's `json.loads` reads a number with a fraction or an exponent as a float, and any other as an exact integer, which is the rule of section 6.4.
+- **`jsonschema`.** Python's standard library has no JSON Schema validator, and checking the schema by hand would copy a normative file that step 12 changes. The checker gains `jsonschema` 4.26.0 (MIT), which the virtual environment of `hack/spikes/agt` already has, through AGT.
+- **`$` in Python.** JSON Schema's patterns are ECMA-262 regular expressions, whose `$` matches at the end of the string only, as Go's does. Python's also matches before a final line break, so `jsonschema` let a trace ID, a slug or a label key followed by a line break through. The checker reads the `$` that ends each pattern of the request schema as `\Z`, and C-36 fails without it.
+- **Times that do not exist.** The schema's pattern checks the form, not the date. Both stacks check that the time exists: Go with `time.Parse`, Python with `calendar`, since `datetime` refuses the year 0, which RFC 3339, Go and cedarpy accept. Both refuse a second of 60, as cedarpy does.
+- **An unknown environment.** Row 5 opens `active` with either environment. An environment that is neither keeps the gate closed in every state, in both stacks (EP-10). I-7 treats a registration that returns one as refused, so no vector covers it.
+- **A request that cannot be read.** The Go profile answers `error.unknown_agent` for a request that is not one JSON value, since it names no agent. Every vector is JSON, so none covers it.
+- **The kit's driver** encodes requests from Go values and decodes only responses, whose `bundle_version` decodes exactly into an integer: it had no decoding to change. Its `DecideRequest` cannot carry a member outside the profile, so S-03, in P1-07.2, needs to send each combination vector's request as written.
+- **What no test observes.** Nothing observes `TimeLayout` in `ToCedar`, since the schema refuses the same forms first: parsing with RFC 3339's layout instead passes every test. Nor does anything observe that `Context` lost `on_behalf_of`, which the schema refuses before the request is decoded. Among the Go vectors, only C-26 to C-29 and C-36 observe the schema check, since `ToCedar` refuses C-21, C-22 and C-37 too. Without the sort of determining policies, the Go profile fails C-32 or C-13 only when cedar-go's map gives them out of order: C-32 failed in 8 of 10 runs, and C-13 in one.
+
+The counts of section 9.1 and of RFC-0001, 20 combination and 13 fail-closed vectors, follow in the reviewer's pull request, as the note of 2026-10-23 says: 37 and 18 now.
