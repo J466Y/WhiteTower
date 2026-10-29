@@ -320,7 +320,7 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Done |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Done |
 | 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Done |
-| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code parts 1 to 3 and 5 done (2026-10-27 and 2026-10-28); the others queued in AGENTS.md's work queue |
+| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code parts 1 to 3, 5 and 6 done (2026-10-27 and 2026-10-28); the others queued in AGENTS.md's work queue |
 | Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Done |
 
 RFC-0002's review follows, the same way.
@@ -730,3 +730,67 @@ Seven details the list of 2026-10-23 does not name:
 - **What no test observes.** Go's regular expressions read `\d` as `[0-9]`, so no test sees that the version's expression is written with `[0-9]`. Nor does any test see the condition on the `network_quarantined` layer, the only layer of runtime control in `v1alpha1`; runtime control's own need of `events.publish`, which the rule on `emits` implies; or that an event source appears once, since no example declares one. The Go reader refuses a named tag both by yaml.v3's `TaggedStyle`, which its API promises, and by where the node starts, so dropping `TaggedStyle` changes no outcome.
 
 The vectors give ep-python's manifest hash for appendix A, `36b9854b…` today, which changes again when code part 7 adds the key of the hashed mode to its evidence settings. Section 9.1 of the specification can name the manifest vectors when the reviewer's pull request updates its counts.
+
+### 2026-10-28: corrections, code part 6
+
+The sixth code part of RFC-0001's review follows the second item of what the fourth part of the corrections (2026-10-23) leaves to the coding agents: bundles and both verifiers, in `api/` and the conformance kit. It ran at the same time as code part 5, at the maintainer's request, so the work queue's "after row 4" did not apply to it; code part 4 follows both. Its review found three places where the two verifiers still disagreed, each settled by the specification. The first pull request had been merged (#84), so a second one corrects them.
+
+| What | Change |
+| --- | --- |
+| `bundle-manifest.schema.json` | `cedar_schema` is required; a policy's path takes the UUID form, `policies/(global\|agent)/<uuid>.cedar`, and its description says that V5 builds it from its entry; `maxItems` is gone (below) |
+| The reference verifier, `bundle.go` | `Verify` runs V1 to V7. V2 decodes the header, the signature and the keys' `x` as RFC 7515's base64url: the URL-safe alphabet, without padding, line breaks or any other character. The header is JSON in UTF-8 without a byte order mark, with exactly `alg`, `kid` and `typ`, by name. V4 is `ParseManifest`: JSON in UTF-8 without a byte order mark (section 1), an object with exactly its members, none of them null, each of its type and form as the schema states them, then the supported format, combining algorithm and language; `Verify` then checks the agent and the version. V5 builds each policy's path from its entry's scope, ID and language, refuses duplicates, and finds the Cedar schema at `schema.cedarschema` only: the path pattern and the language check are gone. V7 parses every policy with cedar-go, which parses no templates, and validates nothing against the schema. `ParseKeys` reads bundle keys from a JWK Set |
+| The Python checker, `check_vectors.py` | The same steps: `b64url` takes RFC 7515's base64url only, `utf8_json` parses the header and the manifest as UTF-8 without a byte order mark, `check_manifest` does V4, V5 builds paths from entries, and `parse_static` does V7, refusing templates, since cedarpy parses them. A header or a signature that does not decode is `signature`, no longer an exception. `trusted_key` reads the trusted keys of `trusted-keys.json` and ignores those it cannot use, as `ParseKeys` does |
+| The bundle vectors | 35 new cases, 50 in all, below. The 15 existing cases do not change, the valid bundle included |
+| Keys | `trusted-keys.json` and `untrusted-keys.json`, JWK Sets of public `OKP` keys on `Ed25519` (RFC 7517, RFC 8037), replace `keys.json`. The seeds leave the files, and the vectors' README says how to derive them |
+| The kit and the stub | `kit.LoadKeys` reads `trusted-keys.json` through `bundle.ParseKeys`. The stub no longer maps the engine's error to `parse_error`, since `Verify` runs V7 |
+| The driver protocol | `WT_CONFORMANCE_BUNDLE_KEYS` becomes `WT_CONFORMANCE_BUNDLE_KEYS_FILE`, a JWK Set file (section 7.3); the kit passes `vectors/bundles/trusted-keys.json` |
+| Tests | From the review of code part 3, `TestTheManifestSchemaAgreesWithStepV4` checks every vector's manifest against the schema: one that V4 refuses on its own fails it, bytes that are not JSON in UTF-8 included, and that of every activated bundle passes it, so `unsupported-language` shows the schema's Cedar-only rule. `TestTheStubAcknowledgesEachBundleVectorWithItsReason` runs every vector through the stub, which acknowledges the verifier's outcome and reason. `ParseKeys` has tests of the keys it ignores, among them an `x` with padding or a line break, and of what is not a JWK Set |
+
+| Step | New cases |
+| --- | --- |
+| V2 | `header-alg-none`, `header-hs256`, `header-alg-ed25519`, `header-other-typ`, `header-b64-crit`, `header-no-kid`, `header-jku-instead-of-kid`, `header-line-break`, `signature-padding`, `header-byte-order-mark`, `header-invalid-utf8`; `header-any-order`, activated |
+| V4 | `byte-order-mark`, `invalid-utf8`, `not-an-object`, `unknown-member`, `unknown-policy-member`, `missing-member`, `missing-policy-member`, `no-schema`, `wrong-type`, `null-member`, `malformed-time`, `unsupported-format`, `unsupported-language`, `wrong-version`; for the order, `unsupported-and-unknown-member` (the structure first) and `unsupported-and-wrong-agent` (the values before the agent) |
+| V5 | `malformed-path`, `mismatched-path`, `mismatched-scope`, `duplicate-path`, `misplaced-schema` |
+| V7 | `template`; `fails-validation`, activated |
+
+Before this part, the Python checker failed 19 of the new cases, raising on 5 of them, and the Go verifier failed 10. Both now pass all 50.
+
+Details the list does not name:
+
+- **`maxItems` is gone, not recomputed.** V1 bounds a bundle at 1,000 files, the Cedar schema included, counted on the bundle as received. A count of policies in the manifest never changes whether a bundle is activated: a manifest that lists more than 999 policies comes with more than 1,000 files (V1, `oversized`) or without some of them (V5, `missing_file`). A recomputed bound would change with every new kind of file: 999 today, 998 with RFC-0002's catalog file. P1-06's builder keeps every bundle within V1.
+- **What V4 calls a type.** V4's structure check takes the schema's types, the forms of its strings included: a UUID, a SHA-256, a time with milliseconds in UTC, a name of 1 to 200 characters, a version from 1, one of the two scopes. The format, combining algorithm and language need only be strings there, so that another value is `unsupported`. Paths need only be strings, since V5 builds them.
+- **The review's three corrections.** Each of their cases failed on one stack before them:
+  - V2 names the header's members. Go counted three, so `header-jku-instead-of-kid` was `unknown_key` in Go and `signature` in Python; section 7.2 makes it `signature`.
+  - Base64url as RFC 7515 defines it, in both stacks. Go's decoder skipped line breaks, so it activated `header-line-break`. Python's `b64url` took padding, so it activated `signature-padding`, and it skipped what is outside the alphabet.
+  - JSON is UTF-8 without a byte order mark (section 1). Go's encoding/json read an invalid byte as U+FFFD, so it activated `invalid-utf8`. Python's `json.loads` took a byte order mark, UTF-16 and UTF-32 from bytes, so it activated `byte-order-mark`. The header's JSON follows the same rule, with `header-byte-order-mark` and `header-invalid-utf8`.
+- **Eight cases of the first pull request beyond the list.** Each makes a rule observable that no listed case would: the order of V4 (two cases); its version check (`wrong-version`: `wrong-agent` covered the agent only); the scope in V5's path (`mismatched-scope`); the header's members in any order; a manifest that is not an object; a null member and a malformed one. The Go verifier would read a null as an empty string, so `null-member` would be `unsupported` there.
+- **The header's `b64`.** `header-b64-crit` carries `b64: true`, listed in `crit`, over the encoded manifest, which is what `b64: true` means under RFC 7797. A verifier that lets the extra members through activates it, whether it ignores them or honors RFC 7797; with `b64: false`, one of the two would reject it for its signature by accident. `header-alg-none` and `header-hs256` carry signatures that no Ed25519 key verifies; `header-alg-ed25519`, which the trusted key signs, is the case that a verifier without the algorithm check activates.
+- **`unsupported-language`** differs from `valid` by its language only, so that the schema refuses it for that alone.
+- **RFC-0002.** Until step 12 brings the catalog file, a manifest that carries `catalog` is refused as an unknown member (`invalid_manifest`), as `unknown-member` is. Step 12 adds the member to V4, V5 and V7, and to both verifiers.
+- **Keys from a JWK Set.** Both stacks take the `OKP` keys on `Ed25519` that have a key ID and an `x` in RFC 7515's base64url of 32 bytes, and ignore the others, as RFC 7517 asks. `ParseKeys` refuses a document without `keys`.
+- **What no test observes.**
+  - The UUID form of the path pattern: path rules are V5's, so the schema test asserts nothing about the manifests that V5 refuses.
+  - In Go, the missing-member check for a policy entry and for the schema's entry, since each member's zero value fails its form check too. In Python, the null check, which the type checks repeat.
+  - Without its checks of missing members or of objects, the Python checker raises rather than reporting a failure.
+  - The Python checker's handling of a key whose `x` is not base64url: the vectors' keys file holds one valid key.
+- **Manifests that are not I-JSON.** Both verifiers keep the last of duplicate member names. For integers beyond 2^53 - 1, Go refuses one beyond 2^64 - 1 as it decodes, while Python takes any. The maintainer decided how V4 treats them (the next note), and step 12 implements it.
+
+The valid bundle did not change: its manifest's SHA-256 is still `87188a2a375d9b901158767c6b6f68e6ff820c537e555eeb5e2e4a1df76ed522`, and its size 4506 bytes.
+
+### 2026-10-28: the review of code parts 3, 5 and 6
+
+The maintainer asked for code parts 5 and 6 at the same time: both regenerate vectors with `-update`, which the maintainer's endpoint security allowed only through an exception, so the exception stayed open for the shortest time. Each part kept to files of its own, code part 5 to the shared documents, and code part 6's progress note comes in the reviewer's pull request. Code part 4, which needs no exception, follows them.
+
+| Part | Review |
+| --- | --- |
+| 3 (#81) | Complete: the schemas and comments say what the specification says, the generated code changes in comments only, and the regenerated bundle vectors change only in the schema's copy, its hash, the signatures and the references. Five of seven break experiments failed a test. Two did not: a request whose `on_behalf_of` is `null`, which the schema refuses but no test checks, goes to code part 4; and nothing checked the bundle manifest's Cedar-only rule, which code part 6's schema test now does |
+| 5 (#85) | Complete, with two additions from the review: `documents.json`, so that both stacks read every document of the reader's tests, among them keys whose order by UTF-16 code units differs from their order by code points; and a test of `lease.expired`'s subject rule. Both readers also gave the same outcome and canonical JSON for 58 further documents of the reviewer's |
+| 6 (#84, then the corrections) | Complete once the three disagreements of its note were corrected, each with vectors that failed on one stack before |
+
+**Bundle manifests that are not I-JSON.** Section 1 says that canonical JSON applies to I-JSON, and that each use says what happens to other input, but the bundle's use said nothing. On 2026-10-28 the maintainer decided that V4 refuses such a manifest as `invalid_manifest` (option A), the reading that denies more: a member name twice, or an integer of a magnitude beyond 2^53 - 1, as well as the byte order mark and the sequences that are not UTF-8 that the corrections of code part 6 already refuse. Sections 1 and 7.4 now say so. Step 12, which regenerates the bundle vectors and changes both verifiers for the catalog file anyway, implements it: both verifiers, a vector for each case, and integers in the bundle manifest's schema bounded at 2^53 - 1, so that the schema and V4 still agree. It needs the endpoint security's exception again for `-update`.
+
+What the reviewer's pull request takes at the end of the code parts, with appendix A and the counts of vectors in section 9.1 and in RFC-0001:
+
+- section 9.1 names the manifest vectors (8 manifests, and the 67 documents of `documents.json`), and counts 50 bundle vectors;
+- section 3.1 says how YAML 1.1's types are read: a float has one decimal point, as YAML 1.1's parsers read it, so that the version `0.1.0` stays a string. It also says whether MAN-1 names the syntax on which the two parsers differ, each time by refusing: the escape `\/`, the `%YAML` directive, tabs, and NEL, LS and PS;
+- appendix A takes ep-python's manifest hash once code part 7 has changed the example, and the valid bundle, `87188a2a…`, of 4506 bytes.
