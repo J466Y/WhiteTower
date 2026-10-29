@@ -1119,10 +1119,11 @@ export interface components {
         ReviewStatus: "scheduled" | "awaiting_signoff" | "completed" | "cancelled";
         /**
          * @description Labels, which filters, selector halts and policies use; policies see
-         *     them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
-         *     digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
-         *     Enforcement points receive them with the agent's governance state, so
-         *     they never hold personal data (CORE-9).
+         *     them as Cedar tags. At most 64, as the decision profile allows
+         *     (CORE-17): keys have 1 to 63 lowercase letters, digits and inner `.`,
+         *     `_`, `-` and `/`, and values at most 255 characters. Enforcement points
+         *     receive them with the agent's governance state, so they never hold
+         *     personal data (CORE-9).
          */
         Labels: {
             [key: string]: string;

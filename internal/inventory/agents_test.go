@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -107,6 +108,61 @@ func TestAProposalNeedsTheMetadataOfINV01(t *testing.T) {
 	}
 	p := proposal("invoice-triage", uc.ID)
 	p.Labels = tooMany
+	_, err := f.inv.Propose(context.Background(), f.olivia, p)
+	refused(t, err, inventory.Invalid)
+}
+
+// Enforcement points build the subject of each decision request from the
+// agent's labels, so the inventory takes only the label keys that the
+// request's schema allows (CORE-17).
+func TestLabelKeysHaveTheSyntaxOfTheDecisionRequest(t *testing.T) {
+	f := setup(t)
+	uc := f.useCase(t, f.olivia)
+	cases := []struct {
+		name, key string
+		valid     bool
+	}{
+		{name: "one character", key: "a", valid: true},
+		{name: "a word", key: "team", valid: true},
+		{name: "inner punctuation", key: "a.b/c-d_e", valid: true},
+		{name: "63 characters", key: strings.Repeat("a.", 31) + "a", valid: true},
+
+		{name: "a leading dot", key: ".team"},
+		{name: "a trailing dot", key: "team."},
+		{name: "a leading underscore", key: "_team"},
+		{name: "a trailing underscore", key: "team_"},
+		{name: "a leading slash", key: "/team"},
+		{name: "a trailing slash", key: "team/"},
+		{name: "a leading hyphen", key: "-team"},
+		{name: "a trailing hyphen", key: "team-"},
+		{name: "64 characters", key: strings.Repeat("a.", 31) + "aa"},
+		{name: "an uppercase letter", key: "teAm"},
+		{name: "an empty key", key: ""},
+	}
+	for i, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := proposal(fmt.Sprintf("agent-%d", i), uc.ID)
+			p.Labels = map[string]string{tc.key: "finance"}
+			a, err := f.inv.Propose(context.Background(), f.olivia, p)
+			switch {
+			case !tc.valid:
+				refused(t, err, inventory.Invalid)
+			case err != nil:
+				t.Fatalf("refused, but the request's schema allows the key: %v", err)
+			case a.Labels[tc.key] != "finance":
+				t.Errorf("labels %v", a.Labels)
+			}
+		})
+	}
+}
+
+// The subject of a decision request never holds an empty data category
+// (CORE-17): the inventory refuses one, even from a setting that holds it.
+func TestADataCategoryIsNeverEmpty(t *testing.T) {
+	f := setup(t)
+	f.set(t, `UPDATE whitetower.settings SET value = value || '[""]' WHERE key = 'inventory.data_categories'`)
+	p := proposal("invoice-triage", f.useCase(t, f.olivia).ID)
+	p.DataCategories = []string{""}
 	_, err := f.inv.Propose(context.Background(), f.olivia, p)
 	refused(t, err, inventory.Invalid)
 }

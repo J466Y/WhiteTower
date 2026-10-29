@@ -11,7 +11,7 @@ import (
 // check: the inventory checks every request against them.
 var (
 	slugPattern     = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
-	labelKeyPattern = regexp.MustCompile(`^[a-z0-9._/-]{1,63}$`)
+	labelKeyPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9._/-]{0,61}[a-z0-9])?$`)
 
 	agentKinds      = []string{"in_house", "third_party"}
 	riskTiers       = []string{"low", "medium", "high", "critical"}
@@ -69,15 +69,16 @@ func environments(list []string) error {
 	return nil
 }
 
-// dataCategories refuses a missing, long or repeated list of categories;
-// checkCategories then checks them against the setting.
+// dataCategories refuses a missing, long or repeated list of categories, and
+// an empty or long category, which the decision request's schema refuses too
+// (CORE-17); checkCategories then checks them against the setting.
 func dataCategories(list []string) error {
 	if len(list) == 0 || len(list) > maxDataCategories {
 		return refuse(Invalid, "dataCategories needs 1 to %d entries", maxDataCategories)
 	}
 	for i, c := range list {
-		if utf8.RuneCountInString(c) > maxCategory {
-			return refuse(Invalid, "data category %q has more than %d characters", c, maxCategory)
+		if n := utf8.RuneCountInString(c); n == 0 || n > maxCategory {
+			return refuse(Invalid, "data category %q must have 1 to %d characters", c, maxCategory)
 		}
 		if slices.Contains(list[:i], c) {
 			return refuse(Invalid, "data category %q is listed twice", c)
@@ -87,15 +88,17 @@ func dataCategories(list []string) error {
 }
 
 // labels refuses too many labels, or a malformed key or value. Labels reach
-// enforcement points, which is why they are bounded (module contracts,
-// section 6.2).
+// enforcement points, which build the subject of each decision request from
+// them, so they follow the syntax and the bounds of the request's schema
+// (module contracts, section 6.2 and CORE-17): a test keeps labelKeyPattern,
+// the schema's pattern and the OpenAPI document's the same.
 func labels(set map[string]string) error {
 	if len(set) > maxLabels {
 		return refuse(Invalid, "an agent has at most %d labels", maxLabels)
 	}
 	for k, v := range set {
 		if !labelKeyPattern.MatchString(k) {
-			return refuse(Invalid, "label key %q must have 1 to 63 lowercase letters, digits, '.', '_', '-' or '/'", k)
+			return refuse(Invalid, "label key %q must have 1 to 63 lowercase letters, digits and inner '.', '_', '-' or '/'", k)
 		}
 		if utf8.RuneCountInString(v) > maxLabelValue {
 			return refuse(Invalid, "the value of label %q has more than %d characters", k, maxLabelValue)

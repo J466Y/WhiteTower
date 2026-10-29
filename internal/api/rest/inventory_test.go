@@ -175,6 +175,60 @@ func TestTheInventoryThroughTheAPI(t *testing.T) {
 	problemOf(t, send(http.MethodGet, "/use-cases?status=draft", olivia, "", nil), problem.NotImplemented)
 }
 
+// Label keys through the API: the keys that the decision request's schema
+// allows reach the agent unchanged, and the others are a bad request
+// (CORE-17).
+func TestLabelKeysThroughTheAPI(t *testing.T) {
+	send := sender(Handler(inventoryOptions(t, map[string]string{olivia: "Olivia Owner"})))
+	res := send(http.MethodPost, "/use-cases", olivia, useCaseJSON, nil)
+	var uc gen.UseCase
+	if res.status != http.StatusCreated || json.Unmarshal(res.body, &uc) != nil {
+		t.Fatalf("createUseCase: %d %s", res.status, res.body)
+	}
+	res = send(http.MethodPost, "/agents", olivia, proposalJSON(uc.Id), nil)
+	var agent gen.Agent
+	if res.status != http.StatusCreated || json.Unmarshal(res.body, &agent) != nil {
+		t.Fatalf("proposeAgent: %d %s", res.status, res.body)
+	}
+	path, etag := "/agents/"+agent.Id.String(), res.header.Get("ETag")
+	for _, tc := range []struct {
+		name, key string
+		valid     bool
+	}{
+		{name: "one character", key: "a", valid: true},
+		{name: "a word", key: "team", valid: true},
+		{name: "inner punctuation", key: "a.b/c-d_e", valid: true},
+		{name: "63 characters", key: strings.Repeat("a.", 31) + "a", valid: true},
+
+		{name: "a leading dot", key: ".team"},
+		{name: "a trailing dot", key: "team."},
+		{name: "a leading underscore", key: "_team"},
+		{name: "a trailing underscore", key: "team_"},
+		{name: "a leading slash", key: "/team"},
+		{name: "a trailing slash", key: "team/"},
+		{name: "a leading hyphen", key: "-team"},
+		{name: "a trailing hyphen", key: "team-"},
+		{name: "64 characters", key: strings.Repeat("a.", 31) + "aa"},
+		{name: "an uppercase letter", key: "teAm"},
+		{name: "an empty key", key: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			res := send(http.MethodPatch, path, olivia, fmt.Sprintf(`{"labels":{%q:"finance"}}`, tc.key), ifMatch(etag))
+			if res.status == http.StatusOK {
+				etag = res.header.Get("ETag")
+			}
+			if !tc.valid {
+				problemOf(t, res, problem.BadRequest)
+				return
+			}
+			var edited gen.Agent
+			if res.status != http.StatusOK || json.Unmarshal(res.body, &edited) != nil || edited.Labels[tc.key] != "finance" {
+				t.Fatalf("editAgent: %d %s", res.status, res.body)
+			}
+		})
+	}
+}
+
 // Owners, delegates and transfers through the API: what each answer carries,
 // and how each refusal becomes a problem.
 func TestOwnershipThroughTheAPI(t *testing.T) {
