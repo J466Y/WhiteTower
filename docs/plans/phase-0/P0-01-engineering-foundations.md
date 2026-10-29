@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress (see [progress notes](#progress-notes)) |
+| **Status** | Done (see [progress notes](#progress-notes)) |
 | **Size** | M |
 | **Depends on** | none |
 | **Unblocks** | Every other plan; directly P1-01 and P1-12 |
@@ -191,3 +191,12 @@ A maintainer with administrator rights sets branch protection on `main` (require
 | 11. Repository settings | Done | The maintainer imported the rulesets and enabled the settings of `GOVERNANCE.md` |
 
 **What remains:** testing the development environment on macOS and Linux; it is verified on Windows only. The code of conduct's private contact address is still needed before the first public release.
+
+### 2026-10-29: done, with two items moved
+
+On 2026-10-29 the maintainer decided that the development environment is tested on macOS and Linux in the pilot, which runs on the three operating systems (P1-14, step 3). So the plan is done, and its last two items move to the plans that need them:
+
+| Item | Where it goes |
+| --- | --- |
+| On fresh macOS and Linux machines, `task setup` followed by `task dev` starts the stack (an acceptance criterion, verified on Windows only) | P1-14, step 3 |
+| The code of conduct's private contact address | P1-13, step 9, before release v0.1.0 |

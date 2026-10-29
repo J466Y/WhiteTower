@@ -16,7 +16,7 @@ The first release, v0.1.0, is secure enough to govern real agents in a pilot: ev
 
 ## Scope
 
-**In:** threat model refresh, the ASVS checklist, security testing, hardening review, key management review, load and soak tests, supply-chain verification, external review, the release itself.
+**In:** threat model refresh, the ASVS checklist, security testing, hardening review, key management review, load and soak tests, supply-chain verification, the preparation of the external review, which runs in the pilot, the release itself.
 
 **Out:** new features. Findings are fixed in the plan that owns the code; this plan tracks them.
 
@@ -96,9 +96,9 @@ Rehearse the generation, storage and rotation of the three keys, and write the c
 
 ### 8. External review
 
-Ask for a review or penetration test of the core by the community, the pilot organization or a volunteer. Fix what it finds, or record the accepted risks.
+The external security review runs in the pilot, on the release that this plan publishes (P1-14, step 6): the maintainer decided on 2026-10-29 that the pilot, a proof that everything works, comes first, and that one or several external security audits, each from its own angle, follow a pilot that passes. Here, prepare it: its scope, who reviews and what they receive, from the threat model, the ASVS checklist and the results of steps 3 to 7.
 
-**Done when:** the review is done, or its absence is recorded as a known limitation of v0.1.0.
+**Done when:** the review is scheduled in the pilot's plan, with its scope.
 
 ### 9. Release v0.1.0
 
@@ -110,6 +110,7 @@ The release checklist:
   - secrets passed to local MCP servers as positional arguments, which redaction cannot recognize (T-76);
   - the declared tooling of agents at C0 and C1, which nothing enforces;
 - a dry run of the private vulnerability reporting process;
+- the code of conduct's private contact address, which P0-01 left for the first release;
 - tag, then publish images, binaries, Helm charts, offline bundle and enforcement point wheel;
 - announcement.
 
@@ -127,7 +128,7 @@ The release checklist:
 
 | Risk or question | Mitigation or owner |
 | --- | --- |
-| No external reviewer available | Record it as a known limitation, and schedule a review for v0.2 |
+| No external reviewer available for the pilot | Record it as a known limitation of the pilot's report; the external audits that follow a pilot that passes take its place |
 | Hardening findings arrive late and delay the pilot | Run the dynamic scans and the permission tests continuously from P1-03 onward, not only here |
 
 ## Notes for implementers
