@@ -175,3 +175,7 @@ Feedback on the README found that compliance evidence waited for Phase 3. On 202
 | [Security test catalog](../../security/security-tests.md), version 0.1.5 | ST-87, for P1-02: an evidence bundle verifies offline with the published keys alone, and fails once altered |
 
 One gap showed up: the domain model designs an erasure of a person's name and email in `principals` (its section 7), which no plan built. The maintainer decided the same day that P1-03 builds it (HUM-09, step 13), with threat T-85 and test ST-88. The evidence of the catalog's controls waits for the event types that plan P1-16 adds.
+
+### 2026-10-29: the external security review moves to the pilot
+
+The note of 2026-09-30 planned an external security review before the pilot (P1-13 step 8). On 2026-10-29 the maintainer decided that it runs in the pilot instead (P1-14 step 6), since the pilot is the proof that everything works, and that one or several external security audits, each from its own angle, follow a pilot that passes. P1-13 step 8 prepares the review, and section 10 of the threat model says so.

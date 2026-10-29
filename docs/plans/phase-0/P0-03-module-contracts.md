@@ -836,3 +836,13 @@ Details the list of 2026-10-22 does not name:
 - **What no test observes.** Nothing observes `TimeLayout` in `ToCedar`, since the schema refuses the same forms first: parsing with RFC 3339's layout instead passes every test. Nor does anything observe that `Context` lost `on_behalf_of`, which the schema refuses before the request is decoded. Among the Go vectors, only C-26 to C-29 and C-36 observe the schema check, since `ToCedar` refuses C-21, C-22 and C-37 too. Without the sort of determining policies, the Go profile fails C-32 or C-13 only when cedar-go's map gives them out of order: C-32 failed in 8 of 10 runs, and C-13 in one.
 
 The counts of section 9.1 and of RFC-0001, 20 combination and 13 fail-closed vectors, follow in the reviewer's pull request, as the note of 2026-10-23 says: 37 and 18 now.
+
+### 2026-10-29: the review of code part 4
+
+The review found code part 4 complete (#88): the profile and the checker follow the order of section 6.6, read numbers exactly, and close the gate as row 5 of section 5.4 says, and both pass every vector. Four of the reviewer's six break experiments failed a test, apart from the agent's 25. The other two, and what the part leaves:
+
+- **An environment that the instance does not know.** Both gates stay closed with one, in every lifecycle state, and no vector covers it. I-7 settles it: an instance treats a registration that returns such an environment as refused, and allows nothing. A real enforcement point never holds that state, so no vector is needed.
+- **The stub's time.** The stub passes the body's time as written, but no test shows it: a stub that replaced it with its clock passed every test. Code part 8, which edits the stub's `Decide` again, adds a body whose time is outside the profile.
+- **S-03.** `kit.DecideRequest` cannot carry a member outside the profile, so the scenario must send each combination vector's request as the vector writes it (P1-07.2, step 9).
+- **Patterns in Python.** The checker reads the `$` that ends a pattern of the request schema as the end of the string, as ECMA-262 does. Every pattern that step 12 adds to that schema ends with `$` and holds no other.
+- **The packages that embed `api/`.** `api/events`, `api/openapi` and `api/policy` embed contract files for the core and the kit. The table of packages in `docs/development/internals.md` now lists them.

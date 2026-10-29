@@ -18,11 +18,12 @@ flowchart LR
 | `internal/api/rest` | The public REST API: the code generated from the OpenAPI document, its middleware, the problem details | Domain packages, the platform |
 | `internal/api/moduleapi` | The module API of the module contracts, on ConnectRPC | Domain packages, the platform |
 | `internal/webui` | The embedded console | The platform |
-| `internal/<domain>` | The domain, from plan P1-02 on: the audit log, identities, the inventory, policies, the module registry, the kill switch | The platform |
+| `internal/<domain>` | The domain, from plan P1-02 on: the audit log, identities, the inventory, policies, the module registry, the kill switch | The platform, the embedded contract files of `api/` |
 | `internal/platform/...` | What every part shares: configuration, logging, metrics, tracing, the database, background jobs, notifications across replicas, the clock, the authentication hooks, rate limits, health, TLS | Other platform packages, `internal/version` |
 | `internal/cli` | `wtctl` | The generated API client, the platform |
 | `pkg/apiclient`, `pkg/moduleapi` | Generated code, public: the API client and the module API's types | |
 | `pkg/auditverify` | Public: the verification library of the audit log, for `wtctl`, the API and auditors | Nothing of White Tower |
+| `api/events`, `api/openapi`, `api/policy` | The contract files that the core and the conformance kit read, embedded: the event catalog and the schemas of its types, the OpenAPI document, and the decision request's schema | Nothing of White Tower |
 
 ## Rules
 
