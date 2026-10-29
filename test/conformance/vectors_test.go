@@ -3,6 +3,7 @@ package conformance_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -126,6 +127,44 @@ func checkResponse(t *testing.T, got profile.Response, want expectation) {
 	}
 }
 
+// namedRules are the rules of the profile that its schema does not state, by
+// the names that the combination vectors give them.
+var namedRules = map[string]error{
+	"another_agent":  profile.ErrAnotherAgent,
+	"not_an_integer": profile.ErrNotAnInteger,
+	"invalid_time":   profile.ErrTime,
+}
+
+// checkRefusal checks why a request that a vector refuses as outside the
+// profile is outside it: it does not match the profile's schema, or, when the
+// vector names a rule, it matches the schema and breaks that rule, which the
+// schema does not state.
+func checkRefusal(t *testing.T, requestSchema *jsonschema.Schema, request json.RawMessage, rule string) {
+	t.Helper()
+	schemaErr := validateJSON(requestSchema, request)
+	if rule == "" {
+		if schemaErr == nil {
+			t.Error("the request matches the profile's schema, and the vector names no rule that refuses it")
+		}
+		return
+	}
+	want, ok := namedRules[rule]
+	switch {
+	case !ok:
+		t.Errorf("the vector names the rule %q, which the profile does not have", rule)
+	case schemaErr != nil:
+		t.Errorf("the request does not match the profile's schema, so the rule %s is not what refuses it: %v", rule, schemaErr)
+	default:
+		req, err := profile.DecodeRequest(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := profile.ToCedar(req); !errors.Is(err, want) {
+			t.Errorf("the profile refuses the request with %v, want the rule %s: %v", err, rule, want)
+		}
+	}
+}
+
 // TestCombinationVectors runs the combination vectors against the reference
 // implementation of the decision profile, on cedar-go.
 func TestCombinationVectors(t *testing.T) {
@@ -135,12 +174,18 @@ func TestCombinationVectors(t *testing.T) {
 		AgentID           string `json:"agent_id"`
 		ToolArgsExtension string `json:"tool_args_extension"`
 		Cases             []struct {
-			ID          string          `json:"id"`
-			Description string          `json:"description"`
-			Section     string          `json:"section"`
-			Policies    []policyVector  `json:"policies"`
-			Request     profile.Request `json:"request"`
-			Expected    expectation     `json:"expected"`
+			ID          string `json:"id"`
+			Description string `json:"description"`
+			Section     string `json:"section"`
+			// The rule of the profile, outside its schema, that refuses
+			// the request; empty when the schema refuses it, or when the
+			// request is inside the profile.
+			Rule     string         `json:"rule"`
+			Policies []policyVector `json:"policies"`
+			// The request as the vector gives it, so that the profile
+			// reads its members and numbers as they are written.
+			Request  json.RawMessage `json:"request"`
+			Expected expectation     `json:"expected"`
 		} `json:"cases"`
 	}
 	loadJSON(t, "vectors/combination.json", &file)
@@ -157,10 +202,20 @@ func TestCombinationVectors(t *testing.T) {
 					t.Errorf("policy %s: validator says %v, the vector says valid=%v", p.ID, err, p.Valid)
 				}
 			}
-			// Every request is valid against the profile's schema, except
-			// those whose point is to be refused.
-			if err := validateJSON(requestSchema, c.Request); err != nil && c.Expected.Reason != profile.ReasonInvalidRequest {
-				t.Errorf("request does not match the profile's schema: %v", err)
+			// A request refused as outside the profile fails the schema, or
+			// breaks the rule that its case names. One refused for another
+			// agent may be outside the profile too, since that reason comes
+			// first (section 6.6). Every other request matches the schema.
+			switch {
+			case c.Expected.Reason == profile.ReasonInvalidRequest:
+				checkRefusal(t, requestSchema, c.Request, c.Rule)
+			case c.Rule != "":
+				t.Errorf("the vector names the rule %s, but expects %s", c.Rule, c.Expected.Reason)
+			case c.Expected.Reason == profile.ReasonUnknownAgent:
+			default:
+				if err := validateJSON(requestSchema, c.Request); err != nil {
+					t.Errorf("request does not match the profile's schema: %v", err)
+				}
 			}
 			engine, err := profile.NewEngine(file.AgentID, 1, policies(c.Policies))
 			if err != nil {
@@ -175,6 +230,30 @@ func TestCombinationVectors(t *testing.T) {
 	}
 }
 
+// withEnvironment returns a request whose subject carries the environment
+// given, as an enforcement point builds it from its registration (section
+// 6.2).
+func withEnvironment(t *testing.T, request json.RawMessage, environment string) json.RawMessage {
+	t.Helper()
+	var req map[string]any
+	dec := json.NewDecoder(bytes.NewReader(request))
+	dec.UseNumber()
+	if err := dec.Decode(&req); err != nil {
+		t.Fatal(err)
+	}
+	subject, _ := req["subject"].(map[string]any)
+	properties, ok := subject["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("the request's subject has no properties")
+	}
+	properties["environment"] = environment
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
 // TestFailClosedVectors runs the gate vectors against the reference gate.
 func TestFailClosedVectors(t *testing.T) {
 	var file struct {
@@ -182,7 +261,7 @@ func TestFailClosedVectors(t *testing.T) {
 		Profile     string          `json:"profile"`
 		AgentID     string          `json:"agent_id"`
 		Policies    []policyVector  `json:"policies"`
-		Request     profile.Request `json:"request"`
+		Request     json.RawMessage `json:"request"`
 		Cases       []struct {
 			ID          string            `json:"id"`
 			Description string            `json:"description"`
@@ -199,7 +278,7 @@ func TestFailClosedVectors(t *testing.T) {
 	responseSchema := compileSchema(t, "../../api/policy/decision-response.schema.json")
 	for _, c := range file.Cases {
 		t.Run(c.ID, func(t *testing.T) {
-			got := engine.Evaluate(file.Request)
+			got := engine.Evaluate(withEnvironment(t, file.Request, c.State.Environment))
 			if reason := profile.GateReason(c.State); reason != "" {
 				got = profile.Deny(reason)
 			}

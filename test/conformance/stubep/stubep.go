@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	mathrand "math/rand/v2"
 	"net/http"
 	"strings"
@@ -30,6 +31,9 @@ type Config struct {
 	// The agent it serves.
 	AgentID string
 	// The environment of its credential: "production" or "non_production".
+	// Its gate and the subject of its decisions take it, as an enforcement
+	// point takes the environment that its registration returned (sections
+	// 5.4 and 6.2).
 	Environment string
 	// Its trust root for bundles, which a harness reads from the JWK Set file
 	// that the driver protocol names (bundle.ParseKeys).
@@ -401,9 +405,13 @@ func (e *EP) fetchAndVerify(ctx context.Context, want, active bundle.Ref) (*prof
 	return profile.NewEngine(e.cfg.AgentID, m.Version, policies)
 }
 
-// Decide runs the gate, then the policies (obligation EP-2). The request has
-// no subject: the enforcement point builds it from its state and credential.
-func (e *EP) Decide(action profile.Action, resource profile.Resource, ctx profile.Context) profile.Response {
+// Decide runs the gate, then the policies (obligation EP-2), on the body of
+// the driver's decide call: an AuthZEN request without its subject
+// (test/conformance/driver-protocol.md). The stub builds the subject from its
+// state and configuration, never from the body, and passes the rest to the
+// profile as the body gives it, so that a body outside the profile is denied
+// with error.invalid_request and its numbers keep their digits (section 6.6).
+func (e *EP) Decide(body []byte) profile.Response {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	gate := profile.GateState{
@@ -413,24 +421,62 @@ func (e *EP) Decide(action profile.Action, resource profile.Resource, ctx profil
 		AgentHalted:    len(e.agent.GetHalts()) > 0,
 		FleetHalted:    len(e.fleet.GetHalts()) > 0,
 		LifecycleState: lifecycleName(e.agent.GetLifecycleState()),
+		Environment:    e.cfg.Environment,
 		BundleActive:   e.engine != nil,
 	}
 	if reason := profile.GateReason(gate); reason != "" {
 		return profile.Deny(reason)
 	}
-	attrs := e.agent.GetAttributes()
-	if ctx.Time == "" {
-		ctx.Time = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	req, err := e.requestLocked(body)
+	if err != nil {
+		return profile.Deny(profile.ReasonInvalidRequest)
 	}
-	return e.engine.Evaluate(profile.Request{
-		Subject: profile.Subject{Type: "agent", ID: e.cfg.AgentID, Properties: profile.SubjectProperties{
-			Slug: e.agent.GetSlug(), Kind: attrs.GetKind(), RiskTier: attrs.GetRiskTier(), Environment: e.cfg.Environment,
-			DataCategories: attrs.GetDataCategories(), Owner: attrs.GetOwnerId(), Labels: attrs.GetLabels(),
-		}},
-		Action:   action,
-		Resource: resource,
-		Context:  ctx,
-	})
+	return e.engine.Evaluate(req)
+}
+
+// requestLocked builds the request of a decide call: the body's members, the
+// subject that the stub builds, and the stub's clock as the context's time
+// when the body gives none, as the driver protocol allows. A context that is
+// not an object is left as it is, for the profile to refuse. Callers hold
+// e.mu.
+func (e *EP) requestLocked(body []byte) ([]byte, error) {
+	var req map[string]json.RawMessage
+	if err := json.Unmarshal(body, &req); err != nil || req == nil {
+		return nil, errors.New("the body is not a JSON object")
+	}
+	ctx := map[string]json.RawMessage{}
+	if raw, ok := req["context"]; ok && (json.Unmarshal(raw, &ctx) != nil || ctx == nil) {
+		ctx = nil
+	}
+	if _, ok := ctx["time"]; ctx != nil && !ok {
+		now, err := json.Marshal(time.Now().UTC().Format(profile.TimeLayout))
+		if err != nil {
+			return nil, err
+		}
+		ctx["time"] = now
+		if req["context"], err = json.Marshal(ctx); err != nil {
+			return nil, err
+		}
+	}
+	// The subject's sets are empty, never null, when the state has none,
+	// so that the subject matches the request schema (CORE-17).
+	attrs := e.agent.GetAttributes()
+	categories, labels := attrs.GetDataCategories(), attrs.GetLabels()
+	if categories == nil {
+		categories = []string{}
+	}
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	subject, err := json.Marshal(profile.Subject{Type: "agent", ID: e.cfg.AgentID, Properties: profile.SubjectProperties{
+		Slug: e.agent.GetSlug(), Kind: attrs.GetKind(), RiskTier: attrs.GetRiskTier(), Environment: e.cfg.Environment,
+		DataCategories: categories, Owner: attrs.GetOwnerId(), Labels: labels,
+	}})
+	if err != nil {
+		return nil, err
+	}
+	req["subject"] = subject
+	return json.Marshal(req)
 }
 
 // lifecycleName maps the enumeration to the profile's lower-case names;
@@ -443,27 +489,17 @@ func lifecycleName(s modulev1alpha1.LifecycleState) string {
 	return strings.ToLower(name)
 }
 
-// DecideRequest is the body of the driver's decide call: an AuthZEN request
-// without its subject (test/conformance/driver-protocol.md).
-type DecideRequest struct {
-	Action   profile.Action   `json:"action"`
-	Resource profile.Resource `json:"resource"`
-	Context  profile.Context  `json:"context"`
-}
-
 // DriverHandler serves the driver protocol the kit uses to exercise the stub.
 func (e *EP) DriverHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/decide", func(w http.ResponseWriter, r *http.Request) {
-		var req DecideRequest
-		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(e.Decide(req.Action, req.Resource, req.Context))
+		_ = json.NewEncoder(w).Encode(e.Decide(body))
 	})
 	return mux
 }

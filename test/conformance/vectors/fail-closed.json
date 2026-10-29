@@ -1,5 +1,5 @@
 {
-  "description": "Gate of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 5.4). Each case gives the enforcement point's state for the agent; the request is the same, and the active bundle, when there is one, permits it. When several conditions hold, the reason is the first one in the order of section 5.4.",
+  "description": "Gate of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 5.4). Each case gives the enforcement point's state for the agent, with the environment that its registration returned; the request is the same, with that environment in its subject (section 6.2), and the active bundle, when there is one, permits it. When several conditions hold, the reason is the first one in the order of section 5.4.",
   "profile": "v1alpha1",
   "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
   "policies": [
@@ -55,6 +55,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "unspecified",
+        "environment": "production",
         "bundle_active": false,
         "evidence_buffer_full": false
       },
@@ -75,6 +76,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "active",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -95,6 +97,7 @@
         "agent_halted": true,
         "fleet_halted": false,
         "lifecycle_state": "active",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -115,6 +118,7 @@
         "agent_halted": false,
         "fleet_halted": true,
         "lifecycle_state": "active",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -135,6 +139,7 @@
         "agent_halted": true,
         "fleet_halted": false,
         "lifecycle_state": "active",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -155,6 +160,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "suspended",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -175,6 +181,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "draft",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -195,6 +202,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "retired",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -215,6 +223,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "unknown",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -235,6 +244,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "validated",
+        "environment": "non_production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -257,6 +267,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "active",
+        "environment": "production",
         "bundle_active": false,
         "evidence_buffer_full": false
       },
@@ -277,6 +288,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "active",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": true
       },
@@ -297,6 +309,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "active",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -319,6 +332,7 @@
         "agent_halted": false,
         "fleet_halted": false,
         "lifecycle_state": "unspecified",
+        "environment": "production",
         "bundle_active": true,
         "evidence_buffer_full": false
       },
@@ -326,6 +340,94 @@
         "decision": false,
         "reason": "gate.no_state",
         "policies": []
+      }
+    },
+    {
+      "id": "F-15",
+      "description": "A validated agent in production: no decision is labeled production for an agent that is not active",
+      "obligation": "EP-6",
+      "state": {
+        "state_received": true,
+        "agent_in_state": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "validated",
+        "environment": "production",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.lifecycle",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-16",
+      "description": "A ready agent in production: no decision is labeled production for an agent that is not active",
+      "obligation": "EP-6",
+      "state": {
+        "state_received": true,
+        "agent_in_state": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "ready",
+        "environment": "production",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.lifecycle",
+        "policies": []
+      }
+    },
+    {
+      "id": "F-17",
+      "description": "A ready agent in non-production: the gate is open",
+      "obligation": "EP-6",
+      "state": {
+        "state_received": true,
+        "agent_in_state": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "ready",
+        "environment": "non_production",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
+      }
+    },
+    {
+      "id": "F-18",
+      "description": "An active agent in non-production: the gate is open",
+      "obligation": "EP-6",
+      "state": {
+        "state_received": true,
+        "agent_in_state": true,
+        "lease_valid": true,
+        "agent_halted": false,
+        "fleet_halted": false,
+        "lifecycle_state": "active",
+        "environment": "non_production",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
       }
     }
   ]

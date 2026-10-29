@@ -33,12 +33,15 @@ import (
 
 const agentID = "0192f1c2-7a3b-7c4d-8e5f-000000000001"
 
+// environment is the stub's environment in these tests, as in the kit's.
+const environment = "production"
+
 // TestTheVersionAppliedNeverGoesBack checks section 5.2: the stub ignores a
 // change or a snapshot below the version it applied, so an older message
 // never undoes a halt, and a fresh renewal raises that version but never
 // lowers it.
 func TestTheVersionAppliedNeverGoesBack(t *testing.T) {
-	e := New(Config{AgentID: agentID})
+	e := New(Config{AgentID: agentID, Environment: environment})
 	running, halted := agentState(durationpb.New(time.Minute)), haltedAgentState()
 
 	feed(t, e, snapshot(5, halted), renewal(5, timestamppb.Now()))
@@ -76,7 +79,7 @@ func TestTheVersionAppliedNeverGoesBack(t *testing.T) {
 // version at 0, so the stub neither resumes past a snapshot it never applied
 // nor ignores that snapshot when it arrives at a lower version.
 func TestARenewalBeforeAnySnapshotLeavesTheVersionApplied(t *testing.T) {
-	e := New(Config{AgentID: agentID})
+	e := New(Config{AgentID: agentID, Environment: environment})
 
 	feed(t, e, renewal(9, timestamppb.Now()))
 	expectApplied(t, e, 0)
@@ -113,7 +116,7 @@ func TestOnlyAFreshRenewalRenewsTheLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			e := New(Config{AgentID: agentID, RenewalTolerance: tc.tolerance})
+			e := New(Config{AgentID: agentID, Environment: environment, RenewalTolerance: tc.tolerance})
 			var serverTime *timestamppb.Timestamp
 			if !tc.noTime {
 				serverTime = timestamppb.New(time.Now().Add(tc.offset))
@@ -148,7 +151,7 @@ func TestTheStubBoundsTheLeaseTTL(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			e := New(Config{AgentID: agentID})
+			e := New(Config{AgentID: agentID, Environment: environment})
 			feed(t, e, snapshot(1, agentState(durationpb.New(time.Minute))), renewal(1, timestamppb.Now()))
 			inForce := leaseDeadline(e)
 
@@ -175,7 +178,7 @@ func TestTheStubBoundsTheLeaseTTL(t *testing.T) {
 // reconnects, and leaves the state as it was. At start there is none, and the
 // gate stays closed with gate.no_state.
 func TestASnapshotWithoutTheFleetStateIsRefused(t *testing.T) {
-	e := New(Config{AgentID: agentID})
+	e := New(Config{AgentID: agentID, Environment: environment})
 	running, halted := agentState(durationpb.New(time.Minute)), haltedAgentState()
 
 	malformed := snapshot(3, running)
@@ -222,7 +225,7 @@ func TestTheStubDeactivatesItsBundleWhenTheStateNamesNone(t *testing.T) {
 	}
 	server := httptest.NewServer(core.Handler())
 	t.Cleanup(server.Close)
-	e := New(Config{AgentID: agentID, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()})
+	e := New(Config{AgentID: agentID, Environment: environment, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()})
 	naming := func(ref *modulev1alpha1.BundleRef) *modulev1alpha1.AgentState {
 		state := agentState(durationpb.New(time.Minute))
 		state.Bundle = ref
@@ -296,7 +299,7 @@ func TestTheStubAcknowledgesEachBundleVectorWithItsReason(t *testing.T) {
 			}
 			server := httptest.NewServer(core.Handler())
 			t.Cleanup(server.Close)
-			e := New(Config{AgentID: agentID, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()})
+			e := New(Config{AgentID: agentID, Environment: environment, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()})
 			e.active = bundle.Ref{Version: c.ActiveVersion, ManifestSHA256: c.ActiveSHA256}
 
 			state := agentState(durationpb.New(time.Minute))
@@ -328,7 +331,7 @@ func TestAnAgentThatLeavesTheScopeLosesItsStateAndItsLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			e := New(Config{AgentID: agentID})
+			e := New(Config{AgentID: agentID, Environment: environment})
 			feed(t, e, snapshot(1, agentState(durationpb.New(time.Minute))), renewal(1, timestamppb.Now()))
 			expectReason(t, e, profile.ReasonNoBundle)
 
@@ -388,6 +391,107 @@ func TestARefusalEndsTheLeaseAtOnce(t *testing.T) {
 	}
 }
 
+// TestTheStubsGateTakesItsEnvironment checks row 5 of section 5.4 and EP-6
+// through the stub, which takes its environment from its configuration:
+// validated and ready open the gate only in non-production, and active in
+// either environment. Without a bundle, a gate that the lifecycle state
+// leaves open closes with gate.no_bundle.
+func TestTheStubsGateTakesItsEnvironment(t *testing.T) {
+	cases := []struct {
+		state       modulev1alpha1.LifecycleState
+		environment string
+		want        string
+	}{
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_VALIDATED, "production", profile.ReasonLifecycle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_VALIDATED, "non_production", profile.ReasonNoBundle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_READY, "production", profile.ReasonLifecycle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_READY, "non_production", profile.ReasonNoBundle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_ACTIVE, "production", profile.ReasonNoBundle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_ACTIVE, "non_production", profile.ReasonNoBundle},
+	}
+	for _, tc := range cases {
+		t.Run(lifecycleName(tc.state)+" in "+tc.environment, func(t *testing.T) {
+			e := New(Config{AgentID: agentID, Environment: tc.environment})
+			state := agentState(durationpb.New(time.Minute))
+			state.LifecycleState = tc.state
+			feed(t, e, snapshot(1, state), renewal(1, timestamppb.Now()))
+			expectReason(t, e, tc.want)
+		})
+	}
+}
+
+// TestTheStubChecksTheBodyAsItIsWritten checks that the stub passes the body
+// of a decide call to the profile as it is written, with the subject that the
+// stub builds from its state and configuration (section 6.2): a body outside
+// the profile is denied with error.invalid_request, a number keeps its
+// digits, and a subject in the body counts for nothing.
+func TestTheStubChecksTheBodyAsItIsWritten(t *testing.T) {
+	e := stubWithBundle(t, agentState(durationpb.New(time.Minute)))
+	cases := []struct {
+		name string
+		body []byte
+		want string
+	}{
+		{name: "a call that the bundle permits", body: callWith(`{"time": "2026-09-29T10:00:00.000Z"}`), want: profile.ReasonPermit},
+		{name: "a call without its time, which the stub's clock gives", body: callWith(`{}`), want: profile.ReasonPermit},
+		{name: "an argument of 2^63 - 1", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"amount": 9223372036854775807}}`), want: profile.ReasonPermit},
+		{name: "an argument written with a fraction", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"amount": 2.0}}`), want: profile.ReasonInvalidRequest},
+		{name: "on_behalf_of empty", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "on_behalf_of": ""}`), want: profile.ReasonInvalidRequest},
+		{name: "an unknown member", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "priority": "high"}`), want: profile.ReasonInvalidRequest},
+		{name: "a context that is not an object", body: callWith(`"2026-09-29T10:00:00.000Z"`), want: profile.ReasonInvalidRequest},
+		{name: "a body that is not an object", body: []byte(`[]`), want: profile.ReasonInvalidRequest},
+		{name: "a subject for another agent, which the stub replaces", want: profile.ReasonPermit, body: []byte(`{
+			"subject": {"type": "agent", "id": "0192f1c2-7a3b-7c4d-8e5f-000000000002"},
+			"action": {"name": "tool.invoke"},
+			"resource": {"type": "tool", "id": "read_invoice", "properties": {"kind": "function"}},
+			"context": {"time": "2026-09-29T10:00:00.000Z"}
+		}`)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := e.Decide(tc.body); got.Context.Reason != tc.want {
+				t.Errorf("decision %v with reason %s, want reason %s", got.Decision, got.Context.Reason, tc.want)
+			}
+		})
+	}
+}
+
+// TestTheStubDecidesForAnAgentWithoutLabelsOrDataCategories checks that the
+// subject the stub builds matches the request schema when the state carries
+// no labels and no data categories (CORE-17): both are empty, never null.
+func TestTheStubDecidesForAnAgentWithoutLabelsOrDataCategories(t *testing.T) {
+	state := agentState(durationpb.New(time.Minute))
+	state.Attributes.Labels, state.Attributes.DataCategories = nil, nil
+	expectReason(t, stubWithBundle(t, state), profile.ReasonPermit)
+}
+
+// stubWithBundle returns a stub that applied the state given, pointed at the
+// valid bundle of the bundle vectors, which the kit's fake core serves, and
+// that renewed its lease: its gate is open, and the bundle decides.
+func stubWithBundle(t *testing.T, state *modulev1alpha1.AgentState) *EP {
+	t.Helper()
+	vectors := os.DirFS("../vectors/bundles")
+	keys, err := kit.LoadKeys(vectors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, ref, err := kit.LoadBundle(vectors, "valid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	core := kit.NewCore(keys)
+	core.SetAgent(agentState(durationpb.New(time.Minute)))
+	if err := core.PublishBundle(agentID, b, ref); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(core.Handler())
+	t.Cleanup(server.Close)
+	e := New(Config{AgentID: agentID, Environment: environment, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()})
+	state.Bundle = &modulev1alpha1.BundleRef{Version: ref.Version, ManifestSha256: ref.ManifestSHA256, SizeBytes: ref.SizeBytes}
+	feed(t, e, snapshot(1, state), renewal(1, timestamppb.Now()))
+	return e
+}
+
 // feed hands messages to the stub one by one, as its session does with a
 // watch stream.
 func feed(t *testing.T, e *EP, msgs ...*modulev1alpha1.WatchResponse) {
@@ -432,11 +536,17 @@ func waitForReason(ctx context.Context, t *testing.T, e *EP, want string) {
 // decide asks the stub to decide on a call that the valid bundle of the
 // bundle vectors permits.
 func decide(e *EP) profile.Response {
-	return e.Decide(
-		profile.Action{Name: "tool.invoke"},
-		profile.Resource{Type: "tool", ID: "read_invoice", Properties: map[string]any{"kind": "function"}},
-		profile.Context{Time: "2026-09-29T10:00:00.000Z"},
-	)
+	return e.Decide(callWith(`{"time": "2026-09-29T10:00:00.000Z"}`))
+}
+
+// callWith returns the body of a decide call on a call that the valid bundle
+// of the bundle vectors permits, with the context given as JSON.
+func callWith(context string) []byte {
+	return []byte(`{
+		"action": {"name": "tool.invoke"},
+		"resource": {"type": "tool", "id": "read_invoice", "properties": {"kind": "function"}},
+		"context": ` + context + `
+	}`)
 }
 
 // expectApplied checks the version the stub applied, from which it resumes
@@ -556,7 +666,7 @@ func startRefusingCore(ctx context.Context, t *testing.T) (*refusingCore, *EP) {
 	server.StartTLS()
 	t.Cleanup(server.Close)
 
-	e := New(Config{AgentID: agentID, CoreURL: server.URL, HTTPClient: server.Client()})
+	e := New(Config{AgentID: agentID, Environment: environment, CoreURL: server.URL, HTTPClient: server.Client()})
 	ctx, cancel := context.WithCancel(ctx)
 	stopped := make(chan struct{})
 	go func() {

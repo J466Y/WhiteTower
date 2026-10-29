@@ -103,6 +103,7 @@ func TestTheDecisionRequestSchemaRefusesRequestsOutsideTheProfile(t *testing.T) 
 
 		{name: "on_behalf_of with a name", edit: withContext("on_behalf_of", "0192f1c2-7a3b-7c4d-8e5f-0000000000a2")},
 		{name: "on_behalf_of empty", edit: withContext("on_behalf_of", "")},
+		{name: "on_behalf_of null", edit: withContext("on_behalf_of", nil)},
 
 		{name: "arguments with nested values", valid: true, edit: withContext("args", map[string]any{
 			"recipients": []any{"a@example.org", "b@example.org"},

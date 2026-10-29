@@ -1,4 +1,5 @@
-"""Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519, PyYAML for manifests.
+"""Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519, PyYAML for manifests,
+jsonschema for the request schema.
 
 The Go tests in test/conformance check the same vectors with cedar-go, and the
 manifest vectors with yaml.v3. Passing both shows that the decision profile
@@ -6,13 +7,15 @@ does not depend on one Cedar implementation, nor the reading of manifests on
 one YAML parser, and gives the Python enforcement point (plan P1-09) a
 reference to start from.
 
-Run from the repository root with a Python that has cedarpy, cryptography and PyYAML:
+Run from the repository root with a Python that has cedarpy, cryptography, PyYAML and jsonschema:
     python test/conformance/python/check_vectors.py
 """
 
 from __future__ import annotations
 
 import base64
+import calendar
+import copy
 import hashlib
 import json
 import re
@@ -22,11 +25,13 @@ from pathlib import Path
 import cedarpy
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+import jsonschema
 import yaml
 from decimal import Decimal
 
 VECTORS = Path(__file__).resolve().parent.parent / "vectors"
 CEDAR_SCHEMA = Path(__file__).resolve().parents[3] / "api" / "policy" / "whitetower.cedarschema"
+REQUEST_SCHEMA = Path(__file__).resolve().parents[3] / "api" / "policy" / "decision-request.schema.json"
 
 ACTION_RESOURCE = {
     "agent.start": "agent", "input.receive": "agent", "output.emit": "agent", "agent.stop": "agent",
@@ -42,12 +47,54 @@ class InvalidRequest(Exception):
     pass
 
 
+def ecma262_pattern(validator, pattern, instance, schema):
+    """The keyword pattern as JSON Schema reads it: an ECMA-262 regular expression, whose $ matches at the end of the
+    string only, where Python's also matches before a final line break. The request schema's patterns end with $,
+    which this reads as \\Z, the end alone."""
+    if validator.is_type(instance, "string") and re.search(re.sub(r"\$\Z", r"\\Z", pattern), instance) is None:
+        yield jsonschema.ValidationError(f"{instance!r} does not match {pattern!r}")
+
+
+# The validator of decision-request.schema.json.
+RequestValidator = jsonschema.validators.extend(jsonschema.Draft202012Validator, {"pattern": ecma262_pattern})
+
+INT64 = range(-2**63, 2**63)
+
+
+def check_integers(value) -> None:
+    """Every number of the arguments is a signed 64-bit integer written without a fraction or an exponent (sections
+    6.4 and 6.7). json.loads reads such a number as an int, exactly, and any other number as a float."""
+    if type(value) is float or (type(value) is int and value not in INT64):
+        raise InvalidRequest(f"{value!r} is not a signed 64-bit integer")
+    if type(value) is list:
+        for item in value:
+            check_integers(item)
+    elif type(value) is dict:
+        for item in value.values():
+            check_integers(item)
+
+
+def check_time(value) -> None:
+    """The time has the form of section 1 and exists: a month of 1 to 12, a day of that month, February 29 in leap
+    years only, and at most 23:59:59. The schema's pattern checks the form only. calendar counts the days of the year
+    0, which RFC 3339 and Go's time allow, and datetime does not."""
+    if type(value) is not str or not TIMESTAMP.fullmatch(value):
+        raise InvalidRequest(f"the time {value!r} is not in the form of section 1")
+    year, month, day = int(value[0:4]), int(value[5:7]), int(value[8:10])
+    hour, minute, second = int(value[11:13]), int(value[14:16]), int(value[17:19])
+    if not (1 <= month <= 12 and 1 <= day <= calendar.monthrange(year, month)[1]
+            and hour <= 23 and minute <= 59 and second <= 59):
+        raise InvalidRequest(f"the time {value!r} does not exist")
+
+
 def uid(entity_type: str, entity_id: str) -> dict:
     return {"type": f"WhiteTower::{entity_type}", "id": entity_id}
 
 
 def to_cedar(req: dict) -> tuple[dict, list]:
-    """Maps an AuthZEN request of the profile to a cedarpy request and entities (section 6.4)."""
+    """Maps an AuthZEN request of the profile to a cedarpy request and entities (section 6.4). It raises
+    InvalidRequest for a request that breaks a rule the schema does not state: an agent action for another agent, an
+    argument that is not a signed 64-bit integer, or a time that does not exist."""
     action, resource, subject, ctx = req["action"]["name"], req["resource"], req["subject"], req["context"]
     want = ACTION_RESOURCE.get(action)
     if want is None or resource["type"] != want or not resource.get("id"):
@@ -75,13 +122,15 @@ def to_cedar(req: dict) -> tuple[dict, list]:
         elif resource["type"] == "model" and "provider" in rprops:
             attrs["provider"] = rprops["provider"]
         entities.append({"uid": uid(RESOURCE_TYPES[resource["type"]], resource["id"]), "attrs": attrs, "parents": []})
+    check_time(ctx["time"])
     context = {"time": {"__extn": {"fn": "datetime", "arg": ctx["time"]}}}
-    for key in ("task_id", "trace_id", "on_behalf_of"):
+    for key in ("task_id", "trace_id"):
         if key in ctx:
             context[key] = ctx[key]
     if "args" in ctx:
         if want != "tool":
             raise InvalidRequest("args on a non-tool action")
+        check_integers(ctx["args"])
         context["args"] = ctx["args"]
     request = {
         "principal": f'WhiteTower::Agent::"{subject["id"]}"',
@@ -95,8 +144,9 @@ def to_cedar(req: dict) -> tuple[dict, list]:
 class Engine:
     """One bundle's policies for one agent, with the combining algorithm wt-deny-overrides-v1."""
 
-    def __init__(self, agent_id: str, policies: list[dict]):
+    def __init__(self, agent_id: str, policies: list[dict], validator: RequestValidator):
         self.agent_id = agent_id
+        self.validator = validator
         self.owner_of: list[str] = []
         texts = []
         for p in policies:
@@ -108,9 +158,16 @@ class Engine:
     def owners(self, policy_ids) -> list[str]:
         return sorted({self.owner_of[int(pid.removeprefix("policy"))] for pid in policy_ids})
 
-    def evaluate(self, req: dict) -> dict:
-        if req["subject"]["type"] != "agent" or req["subject"]["id"] != self.agent_id:
+    def evaluate(self, req) -> dict:
+        """Decides a request after the gate, with the reasons of section 6.6 in their order: error.unknown_agent for a
+        request whose subject is not the bundle's agent, read before the profile is checked; error.invalid_request for
+        a request outside the profile, which does not match the schema or breaks a rule it does not state; then the
+        policies."""
+        subject = req.get("subject") if type(req) is dict else None
+        if type(subject) is not dict or subject.get("type") != "agent" or subject.get("id") != self.agent_id:
             return deny("error.unknown_agent")
+        if not self.validator.is_valid(req):
+            return deny("error.invalid_request")
         try:
             request, entities = to_cedar(req)
         except InvalidRequest:
@@ -146,13 +203,32 @@ def gate_reason(state: dict) -> str:
         return "gate.halted"
     if state["fleet_halted"]:
         return "gate.fleet_halted"
-    if state["lifecycle_state"] not in ("validated", "ready", "active"):
+    if not gate_opens_in(state["lifecycle_state"], state["environment"]):
         return "gate.lifecycle"
     if not state["bundle_active"]:
         return "gate.no_bundle"
     if state["evidence_buffer_full"]:
         return "gate.evidence_full"
     return ""
+
+
+def gate_opens_in(lifecycle_state: str, environment: str) -> bool:
+    """Row 5 of section 5.4 and EP-6: active opens the gate with either environment that the registration returns,
+    and validated and ready only with non_production, so that no decision is labeled production for an agent that is
+    not active. An unknown state, or an environment that is neither, keeps it closed (EP-10)."""
+    if environment not in ("production", "non_production"):
+        return False
+    if lifecycle_state == "active":
+        return True
+    return lifecycle_state in ("validated", "ready") and environment == "non_production"
+
+
+def with_environment(req: dict, environment: str) -> dict:
+    """A copy of the request whose subject carries the environment given, as an enforcement point builds it from its
+    registration (section 6.2)."""
+    req = copy.deepcopy(req)
+    req["subject"]["properties"]["environment"] = environment
+    return req
 
 
 def b64url(data: str) -> bytes:
@@ -472,6 +548,7 @@ def main() -> int:
             failures += 1
             print(f"FAIL {name}: got {got}, want {want}")
 
+    request_validator = RequestValidator(json.loads(REQUEST_SCHEMA.read_text(encoding="utf-8")))
     combination = json.loads((VECTORS / "combination.json").read_text(encoding="utf-8"))
     schema = CEDAR_SCHEMA.read_text(encoding="utf-8").replace("type ToolArgs = {};", combination["tool_args_extension"], 1)
     for case in combination["cases"]:
@@ -480,14 +557,15 @@ def main() -> int:
             if passes != p["valid"]:
                 failures += 1
                 print(f"FAIL {case['id']}: policy {p['id']} validation {passes}, want {p['valid']}")
-        engine = Engine(combination["agent_id"], case["policies"])
+        engine = Engine(combination["agent_id"], case["policies"], request_validator)
         check(case["id"], engine.evaluate(case["request"]), case["expected"])
 
     fail_closed = json.loads((VECTORS / "fail-closed.json").read_text(encoding="utf-8"))
-    engine = Engine(fail_closed["agent_id"], fail_closed["policies"])
+    engine = Engine(fail_closed["agent_id"], fail_closed["policies"], request_validator)
     for case in fail_closed["cases"]:
         reason = gate_reason(case["state"])
-        check(case["id"], deny(reason) if reason else engine.evaluate(fail_closed["request"]), case["expected"])
+        request = with_environment(fail_closed["request"], case["state"]["environment"])
+        check(case["id"], deny(reason) if reason else engine.evaluate(request), case["expected"])
 
     # The trusted bundle keys, a JWK Set (section 7.3).
     keys = json.loads((VECTORS / "bundles" / "trusted-keys.json").read_text(encoding="utf-8"))
@@ -527,7 +605,7 @@ def main() -> int:
         check(f"manifest document {doc['name']}", got, doc["expected"])
 
     total = len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases) + len(documents)
-    print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML)")
+    print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML, jsonschema)")
     return 1 if failures else 0
 
 
