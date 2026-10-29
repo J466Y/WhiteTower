@@ -283,3 +283,24 @@ On 2026-10-21 the maintainer decided that the settings get a plan of their own, 
 - Nothing reads the four `lifecycle.review_*` keys before pull request 5, which reads them at use and may tighten these rules in their registration.
 - `lifecycle.review_unused_tooling_days` is P1-16's: its pull request 2 adds it, and registers it with P1-17, or P1-17 registers it if P1-17 lands second (P1-16, step 3).
 - P1-17's notifications to the steering committee, like DC-4's notices of grants (P1-03, step 4), ask for no action, so no handling takes them out of the inbox. Pull request 7 adds a way for such an item to leave it: each member of the role the item is addressed to has their own copy, and dismissing it takes it out of that member's inbox only, with the record of who dismissed what (the maintainer's decision of 2026-10-22; P1-17, step 4).
+
+### 2026-10-29: label keys follow the decision request schema (fix)
+
+A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-03's progress notes](../phase-0/P0-03-module-contracts.md#progress-notes) of 2026-10-22, corrections, part 3).
+
+- **Label keys.** The inventory accepted the keys that match `^[a-z0-9._/-]{1,63}$`, so a key could start or end with `.`, `_`, `-` or `/`. The decision request's schema refuses such a key: an enforcement point that validates the subject it builds from the agent's state would deny every call of that agent with `error.invalid_request`. CORE-17 (module contracts, section 5.9) says that this subject always matches the schema. The inventory (`labelKeyPattern`) and the `Labels` schema of the OpenAPI document now take the schema's pattern, `^[a-z0-9]([a-z0-9._/-]{0,61}[a-z0-9])?$`: 1 to 63 lowercase letters, digits and inner `.`, `_`, `-` and `/`. The refusal and the document's description say so, and `task gen` changed only the comments of the generated code.
+- **No migration.** There is no release yet, so no stored agent needs its keys changed.
+- **The other subject properties,** compared with the schema as CORE-17 asks:
+
+  | Property | Request schema | Inventory | Result |
+  | --- | --- | --- | --- |
+  | `slug` | `^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$` | The same pattern, in the inventory, the OpenAPI document and the database's check; a slug never changes | Agrees |
+  | `kind`, `risk_tier` | `in_house` or `third_party`; `low`, `medium`, `high` or `critical` | The same values, in the inventory and the database's checks | Agrees |
+  | `owner` | A UUID in lowercase | The primary owner's principal ID, which the state encodes in lowercase; every agent has exactly one primary owner | Agrees |
+  | `labels` | At most 64, with values of at most 255 characters | The same bounds, counted in characters | Agrees |
+  | `data_categories` | At most 32, distinct, each of 1 to 63 characters | 1 to 32, distinct, each of at most 63 characters and held by the setting `inventory.data_categories` | An empty category passed the inventory's own checks, and only the setting, which holds none, refused it. `dataCategories` now refuses one whatever the setting holds |
+
+  `environment` comes from the enforcement point's registration, not from the inventory.
+- **The OpenAPI document keeps its data categories as they were.** `minLength: 1` on the items of `dataCategories` is a breaking change for oasdiff 1.32.1 (`request-property-min-length-set`, an error) in `proposeAgent`, `editAgent`, `createUseCase` and `editUseCase`, which fails CI. An empty category was already refused as `bad_request`, so the API answers as before; only the refusal's detail changes. The new pattern of `Labels` gives warnings only (`request-property-pattern-changed` and `response-property-pattern-changed`).
+- Use cases share the check of data categories, so they refuse an empty category too.
+- Tests: label keys through the inventory and through the API, one case per rule: keys that the schema allows, up to 63 characters, then a leading or trailing `.`, `_`, `/` or `-`, 64 characters, an uppercase letter and an empty key; the inventory's pattern, the OpenAPI document's and the schema's are the same (`TestTheInventoryTheAPIAndTheDecisionRequestShareTheLabelKeyPattern`); and an empty data category is refused, even from a setting that holds one.
