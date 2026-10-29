@@ -38,7 +38,7 @@
           "uniqueItems": true
         },
         "bundle_version": {
-          "description": "The bundle the decision was evaluated with. Absent when no bundle was used.",
+          "description": "The version of the bundle that decided (section 6.6): always with policy.permit, policy.forbid, policy.no_permit and error.evaluation, never with the gate's reasons, and optional with error.timeout, error.unknown_agent and error.invalid_request.",
           "type": "integer",
           "minimum": 1
         },
@@ -53,8 +53,16 @@
   "allOf": [
     {
       "if": { "properties": { "decision": { "const": true } } },
-      "then": { "properties": { "context": { "properties": { "reason": { "const": "policy.permit" } }, "required": ["bundle_version"] } } },
+      "then": { "properties": { "context": { "properties": { "reason": { "const": "policy.permit" } } } } },
       "else": { "properties": { "context": { "properties": { "reason": { "not": { "const": "policy.permit" } } } } } }
+    },
+    {
+      "if": { "properties": { "context": { "properties": { "reason": { "enum": ["policy.permit", "policy.forbid", "policy.no_permit", "error.evaluation"] } } } } },
+      "then": { "properties": { "context": { "required": ["bundle_version"] } } }
+    },
+    {
+      "if": { "properties": { "context": { "properties": { "reason": { "enum": ["gate.no_state", "gate.lease_expired", "gate.halted", "gate.fleet_halted", "gate.lifecycle", "gate.no_bundle", "gate.evidence_full"] } } } } },
+      "then": { "properties": { "context": { "not": { "required": ["bundle_version"] } } } }
     }
   ]
 }

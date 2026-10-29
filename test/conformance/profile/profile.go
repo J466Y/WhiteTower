@@ -119,12 +119,18 @@ type Response struct {
 
 // ResponseContext explains the decision.
 type ResponseContext struct {
-	Reason        string   `json:"reason"`
-	Policies      []string `json:"policies"`
-	BundleVersion uint64   `json:"bundle_version,omitempty"`
+	Reason   string   `json:"reason"`
+	Policies []string `json:"policies"`
+	// BundleVersion is the version of the bundle that decided. Evaluate
+	// gives it whenever the bundle's policies are evaluated, and Deny never
+	// does, as section 6.6 asks: always with policy.permit, policy.forbid,
+	// policy.no_permit and error.evaluation, never with the gate's reasons,
+	// and optionally with error.unknown_agent and error.invalid_request.
+	BundleVersion uint64 `json:"bundle_version,omitempty"`
 }
 
-// Deny returns a denial with a reason and no determining policies.
+// Deny returns a denial with a reason, no determining policies and no bundle
+// version.
 func Deny(reason string) Response {
 	return Response{Context: ResponseContext{Reason: reason, Policies: []string{}}}
 }

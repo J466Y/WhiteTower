@@ -1,0 +1,76 @@
+{
+  "description": "The hashed mode of a decision event's arguments (docs/contracts/module-contract-v0.1.md, section 8.3): the HMAC-SHA-256, in lowercase hexadecimal, of the canonical JSON (RFC 8785, section 1) of the arguments object as the tool receives it, with a key that the deployment holds. key is that key, in hexadecimal. Each case gives the arguments, their canonical JSON, whose UTF-8 bytes are hashed, and hmac_sha256, the value that the event records with the key's ID. The arguments stay within I-JSON, to which section 1 applies canonical JSON. Strings escape every character beyond printable ASCII, so that invisible ones show. The key is for tests only: it is the SHA-256 of \"White Tower conformance test key: hashed-arguments. Never trust it outside tests.\", so anyone can compute with it. Never configure it anywhere else.",
+  "key": "c853a7252e414793526a4d9100cf1c3660377161aab308dcf3f2290af2f94d03",
+  "cases": [
+    {
+      "id": "H-01",
+      "description": "Text beyond ASCII, which RFC 8785 writes as it is, in UTF-8: letters with diacritics, Japanese, a character beyond the Basic Multilingual Plane (U+1D49C, a surrogate pair in UTF-16) and the line separator U+2028",
+      "arguments": {
+        "subject": "R\u00e9union \u00e0 G\u00f6teborg",
+        "greeting": "\u3053\u3093\u306b\u3061\u306f",
+        "signature": "\ud835\udc9c",
+        "body": "first line\u2028second line"
+      },
+      "canonical_json": "{\"body\":\"first line\u2028second line\",\"greeting\":\"\u3053\u3093\u306b\u3061\u306f\",\"signature\":\"\ud835\udc9c\",\"subject\":\"R\u00e9union \u00e0 G\u00f6teborg\"}",
+      "hmac_sha256": "84ebc3c554adb49c91a33e4d0f625638cc092efc4c4443e79ce86b3094b9af1f"
+    },
+    {
+      "id": "H-02",
+      "description": "The characters that RFC 8785 escapes in a string, a quote, a backslash and the control characters, five of them with their short escapes and the others as \\u with four lowercase hexadecimal digits; and those it writes as they are: the solidus, <, >, & and DEL",
+      "arguments": {
+        "text": "a \"quote\" and a \\ backslash; \b\f\n\r\t; \u0000 and \u001f; / < > & \u007f"
+      },
+      "canonical_json": "{\"text\":\"a \\\"quote\\\" and a \\\\ backslash; \\b\\f\\n\\r\\t; \\u0000 and \\u001f; / < > & \u007f\"}",
+      "hmac_sha256": "1ad23450f050c2d2f5c71f0d7a36e4eb7178e0d9a1525e75a2a64dcc4d02919b"
+    },
+    {
+      "id": "H-03",
+      "description": "Nested objects and arrays: the members of every object sorted, at every depth, and the items of every array kept in their order, repeats and empty arrays and objects included; and the largest integer of I-JSON, 2^53 - 1",
+      "arguments": {
+        "recipients": [
+          {
+            "type": "to",
+            "domain": "example.org"
+          },
+          {
+            "type": "cc",
+            "domain": "example.com",
+            "notify": true
+          }
+        ],
+        "options": {
+          "retry": {
+            "max": 3,
+            "backoff": "exponential",
+            "jitter": false
+          },
+          "labels": [
+            "invoice",
+            "2026-10",
+            "invoice"
+          ],
+          "metadata": {}
+        },
+        "attachments": [],
+        "invoice_number": 9007199254740991
+      },
+      "canonical_json": "{\"attachments\":[],\"invoice_number\":9007199254740991,\"options\":{\"labels\":[\"invoice\",\"2026-10\",\"invoice\"],\"metadata\":{},\"retry\":{\"backoff\":\"exponential\",\"jitter\":false,\"max\":3}},\"recipients\":[{\"domain\":\"example.org\",\"type\":\"to\"},{\"domain\":\"example.com\",\"notify\":true,\"type\":\"cc\"}]}",
+      "hmac_sha256": "514e777d7037fb0773d6f0fb5a0a6a5444a39c60c4f71bf04802892de1e1c1a2"
+    },
+    {
+      "id": "H-04",
+      "description": "Members sorted by their UTF-16 code units: B before a, a before aa, aa before b, then U+00E9, then U+1F600 before U+FF61, which their code points, and their UTF-8 bytes, would put the other way",
+      "arguments": {
+        "\uff61": 1,
+        "b": 2,
+        "aa": 3,
+        "\ud83d\ude00": 4,
+        "a": 5,
+        "\u00e9": 6,
+        "B": 7
+      },
+      "canonical_json": "{\"B\":7,\"a\":5,\"aa\":3,\"b\":2,\"\u00e9\":6,\"\ud83d\ude00\":4,\"\uff61\":1}",
+      "hmac_sha256": "68b086ce0b981aaef6f69fc8b15a2ce2b7b7a5358644a4207f60ce366081ec5a"
+    }
+  ]
+}

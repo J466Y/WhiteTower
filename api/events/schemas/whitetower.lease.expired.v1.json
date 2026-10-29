@@ -20,6 +20,25 @@
         "quarantines_kept",
         "all_quarantined"
       ]
+    },
+    "cause": {
+      "description": "Why the lease ran out: no renewal arrived, or only stale ones did (section 5.3).",
+      "enum": [
+        "no_renewal",
+        "stale_renewals"
+      ]
+    },
+    "halt_mode": {
+      "description": "The halt mode that the instance applied (section 5.3).",
+      "$ref": "common.schema.json#/$defs/haltMode"
+    },
+    "layers": {
+      "description": "The layers of the halt mode applied, each with its outcome (sections 5.3 and 5.8).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "common.schema.json#/$defs/haltLayerReport"
+      }
     }
   }
 }

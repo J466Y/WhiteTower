@@ -230,7 +230,13 @@ const (
 	HaltLayer_HALT_LAYER_GATE_CLOSED HaltLayer = 1
 	// The work in flight was interrupted.
 	HaltLayer_HALT_LAYER_IN_FLIGHT_INTERRUPTED HaltLayer = 2
-	// The agent's process ended.
+	// The agent's process ends. In the terminate mode, it ends only if work
+	// still runs at the end of the grace period, and a release during the grace
+	// period cancels the end. An instance inside the process that ends it
+	// reports this layer done just before, as its last report for the halt: it
+	// first writes whitetower.instance.halted.v1 to its durable buffer, and
+	// waits at most about a second for the acknowledgement's response (contract,
+	// section 5.5, EP-4).
 	HaltLayer_HALT_LAYER_PROCESS_TERMINATED HaltLayer = 3
 	// The agent's workloads were isolated at the network level (KIL-10).
 	HaltLayer_HALT_LAYER_NETWORK_QUARANTINED HaltLayer = 4
@@ -287,7 +293,9 @@ type LayerOutcome int32
 const (
 	// Unknown. Never counts as done (CORE-19).
 	LayerOutcome_LAYER_OUTCOME_UNSPECIFIED LayerOutcome = 0
-	// The layer is in place.
+	// The layer is in place. For HALT_LAYER_PROCESS_TERMINATED, the process that
+	// ends reports it just before it ends, as its last report for the halt
+	// (contract, section 5.5).
 	LayerOutcome_LAYER_OUTCOME_DONE LayerOutcome = 1
 	// Attempted but not achieved, for example blocking work that is still running.
 	LayerOutcome_LAYER_OUTCOME_NOT_DONE LayerOutcome = 2

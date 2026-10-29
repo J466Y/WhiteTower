@@ -43,8 +43,15 @@ const (
 // EventServiceClient is a client for the whitetower.module.v1alpha1.EventService service.
 type EventServiceClient interface {
 	// Publish delivers a batch of events. Delivery is at least once: the core
-	// de-duplicates on the event's source and ID, so a batch can be retried
-	// as is.
+	// de-duplicates on the event's source and ID, and recognizes an event by
+	// them for at least 28 days, so a batch can be retried as is (contract,
+	// section 8.4).
+	//
+	// An instance sends each source's events in wtseq order, and sends an
+	// event only once every earlier event of its source has a result, so that
+	// at most one Publish call that carries a given source is in flight. After
+	// a failure, whatever its code, it sends those events again, in batches of
+	// its choosing, before any later event of the source (I-12).
 	//
 	// A failure of the call itself, such as an instance that the caller's
 	// principal did not register, refuses the whole call with
@@ -90,8 +97,15 @@ func (c *eventServiceClient) Publish(ctx context.Context, req *connect.Request[v
 // EventServiceHandler is an implementation of the whitetower.module.v1alpha1.EventService service.
 type EventServiceHandler interface {
 	// Publish delivers a batch of events. Delivery is at least once: the core
-	// de-duplicates on the event's source and ID, so a batch can be retried
-	// as is.
+	// de-duplicates on the event's source and ID, and recognizes an event by
+	// them for at least 28 days, so a batch can be retried as is (contract,
+	// section 8.4).
+	//
+	// An instance sends each source's events in wtseq order, and sends an
+	// event only once every earlier event of its source has a result, so that
+	// at most one Publish call that carries a given source is in flight. After
+	// a failure, whatever its code, it sends those events again, in batches of
+	// its choosing, before any later event of the source (I-12).
 	//
 	// A failure of the call itself, such as an instance that the caller's
 	// principal did not register, refuses the whole call with

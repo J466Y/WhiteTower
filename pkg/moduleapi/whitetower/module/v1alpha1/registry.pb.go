@@ -82,18 +82,25 @@ func (Environment) EnumDescriptor() ([]byte, []int) {
 	return file_whitetower_module_v1alpha1_registry_proto_rawDescGZIP(), []int{0}
 }
 
-// Health is the health an instance reports about itself.
+// Health is the health an instance reports about itself: whether it can do
+// what the governance state asks (contract, section 4.9). A gate that the
+// state closes, for a halt or a drill, a lifecycle state, or a state that names
+// no bundle, leaves health as it is.
 type Health int32
 
 const (
 	// Not reported. Treated as unhealthy.
 	Health_HEALTH_UNSPECIFIED Health = 0
-	// Working normally.
+	// The instance can do what the state asks.
 	Health_HEALTH_HEALTHY Health = 1
-	// Working, with a problem an operator should look at, for example events
-	// rejected by the core.
+	// Enforcement works, but needs an operator: for example, renewals arrive
+	// stale while the lease still holds, events are rejected by the core, or the
+	// oldest undelivered event is older than a threshold (contract, section 8.4).
 	Health_HEALTH_DEGRADED Health = 2
-	// Not working; its gate is closed or its layer cannot be applied.
+	// The instance cannot enforce what the state asks: the lease ran out while
+	// it was connected, the evidence buffer is full, a bundle the state names
+	// could not be activated and none is active, or a halt layer failed. An
+	// instance reports it while its gate is closed with gate.evidence_full.
 	Health_HEALTH_UNHEALTHY Health = 3
 )
 

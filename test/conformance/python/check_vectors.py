@@ -1,10 +1,11 @@
 """Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519, PyYAML for manifests,
-jsonschema for the request schema.
+jsonschema for the request schema, and the standard library's hmac for hashed arguments.
 
-The Go tests in test/conformance check the same vectors with cedar-go, and the
-manifest vectors with yaml.v3. Passing both shows that the decision profile
-does not depend on one Cedar implementation, nor the reading of manifests on
-one YAML parser, and gives the Python enforcement point (plan P1-09) a
+The Go tests in test/conformance check the same vectors with cedar-go, the
+manifest vectors with yaml.v3, and hashed arguments with gowebpki/jcs. Passing
+both shows that the decision profile does not depend on one Cedar
+implementation, nor the reading of manifests on one YAML parser, nor canonical
+JSON on one writer, and gives the Python enforcement point (plan P1-09) a
 reference to start from.
 
 Run from the repository root with a Python that has cedarpy, cryptography, PyYAML and jsonschema:
@@ -17,6 +18,7 @@ import base64
 import calendar
 import copy
 import hashlib
+import hmac
 import json
 import re
 import sys
@@ -144,8 +146,9 @@ def to_cedar(req: dict) -> tuple[dict, list]:
 class Engine:
     """One bundle's policies for one agent, with the combining algorithm wt-deny-overrides-v1."""
 
-    def __init__(self, agent_id: str, policies: list[dict], validator: RequestValidator):
+    def __init__(self, agent_id: str, bundle_version: int, policies: list[dict], validator: RequestValidator):
         self.agent_id = agent_id
+        self.bundle_version = bundle_version
         self.validator = validator
         self.owner_of: list[str] = []
         texts = []
@@ -162,7 +165,7 @@ class Engine:
         """Decides a request after the gate, with the reasons of section 6.6 in their order: error.unknown_agent for a
         request whose subject is not the bundle's agent, read before the profile is checked; error.invalid_request for
         a request outside the profile, which does not match the schema or breaks a rule it does not state; then the
-        policies."""
+        policies, whose decisions carry the bundle's version."""
         subject = req.get("subject") if type(req) is dict else None
         if type(subject) is not dict or subject.get("type") != "agent" or subject.get("id") != self.agent_id:
             return deny("error.unknown_agent")
@@ -178,19 +181,45 @@ class Engine:
         # "error while evaluating policy `policy1`: ...".
         errors = [m.group(1) for e in (diag.errors if diag else []) for m in [ERROR_POLICY.search(e)] if m]
         if diag and len(errors) != len(diag.errors):
-            return deny("error.evaluation")
+            return self.decided(False, "error.evaluation", [])
         reasons = list(diag.reasons) if diag else []
         if errors or result.decision not in (cedarpy.Decision.Allow, cedarpy.Decision.Deny):
-            return {"decision": False, "reason": "error.evaluation", "policies": self.owners(errors)}
+            return self.decided(False, "error.evaluation", self.owners(errors))
         if result.decision == cedarpy.Decision.Allow:
-            return {"decision": True, "reason": "policy.permit", "policies": self.owners(reasons)}
+            return self.decided(True, "policy.permit", self.owners(reasons))
         if reasons:
-            return {"decision": False, "reason": "policy.forbid", "policies": self.owners(reasons)}
-        return deny("policy.no_permit")
+            return self.decided(False, "policy.forbid", self.owners(reasons))
+        return self.decided(False, "policy.no_permit", [])
+
+    def decided(self, decision: bool, reason: str, policies: list[str]) -> dict:
+        """A decision of the bundle's policies, which carries the version of the bundle that decided (section 6.6)."""
+        return {"decision": decision, "reason": reason, "policies": policies, "bundle_version": self.bundle_version}
 
 
 def deny(reason: str) -> dict:
+    """A denial before the bundle's policies decide, which carries no bundle version: a gate's reason, which never
+    carries one, error.unknown_agent or error.invalid_request (section 6.6)."""
     return {"decision": False, "reason": reason, "policies": []}
+
+
+# The reasons with which a response always carries the version of the bundle that decided, and those with which it
+# never does (section 6.6). It may carry it, or not, with error.timeout, error.unknown_agent and error.invalid_request.
+ALWAYS_BUNDLE_VERSION = {"policy.permit", "policy.forbid", "policy.no_permit", "error.evaluation"}
+NEVER_BUNDLE_VERSION = {"gate.no_state", "gate.lease_expired", "gate.halted", "gate.fleet_halted", "gate.lifecycle",
+                        "gate.no_bundle", "gate.evidence_full"}
+
+# The version of the bundle that the policies of a vector make up. Any version would do: what the checker checks is
+# that a response carries it where section 6.6 says it always does.
+VECTOR_BUNDLE_VERSION = 42
+
+
+def bundle_version_error(response: dict) -> str | None:
+    """What is wrong with a response's bundle_version for its reason (section 6.6), or None."""
+    if response["reason"] in ALWAYS_BUNDLE_VERSION and response.get("bundle_version") != VECTOR_BUNDLE_VERSION:
+        return f"bundle_version {response.get('bundle_version')}, want {VECTOR_BUNDLE_VERSION}"
+    if response["reason"] in NEVER_BUNDLE_VERSION and "bundle_version" in response:
+        return f"bundle_version {response['bundle_version']}, want none"
+    return None
 
 
 def gate_reason(state: dict) -> str:
@@ -548,6 +577,15 @@ def main() -> int:
             failures += 1
             print(f"FAIL {name}: got {got}, want {want}")
 
+    def check_response(name: str, got: dict, want: dict) -> None:
+        """Compares a response's decision, reason and policies with the vector's, and checks its bundle_version by its
+        reason (section 6.6)."""
+        nonlocal failures
+        check(name, {k: got[k] for k in ("decision", "reason", "policies")}, want)
+        if (error := bundle_version_error(got)) is not None:
+            failures += 1
+            print(f"FAIL {name}: reason {got['reason']} with {error}")
+
     request_validator = RequestValidator(json.loads(REQUEST_SCHEMA.read_text(encoding="utf-8")))
     combination = json.loads((VECTORS / "combination.json").read_text(encoding="utf-8"))
     schema = CEDAR_SCHEMA.read_text(encoding="utf-8").replace("type ToolArgs = {};", combination["tool_args_extension"], 1)
@@ -557,15 +595,15 @@ def main() -> int:
             if passes != p["valid"]:
                 failures += 1
                 print(f"FAIL {case['id']}: policy {p['id']} validation {passes}, want {p['valid']}")
-        engine = Engine(combination["agent_id"], case["policies"], request_validator)
-        check(case["id"], engine.evaluate(case["request"]), case["expected"])
+        engine = Engine(combination["agent_id"], VECTOR_BUNDLE_VERSION, case["policies"], request_validator)
+        check_response(case["id"], engine.evaluate(case["request"]), case["expected"])
 
     fail_closed = json.loads((VECTORS / "fail-closed.json").read_text(encoding="utf-8"))
-    engine = Engine(fail_closed["agent_id"], fail_closed["policies"], request_validator)
+    engine = Engine(fail_closed["agent_id"], VECTOR_BUNDLE_VERSION, fail_closed["policies"], request_validator)
     for case in fail_closed["cases"]:
         reason = gate_reason(case["state"])
         request = with_environment(fail_closed["request"], case["state"]["environment"])
-        check(case["id"], deny(reason) if reason else engine.evaluate(request), case["expected"])
+        check_response(case["id"], deny(reason) if reason else engine.evaluate(request), case["expected"])
 
     # The trusted bundle keys, a JWK Set (section 7.3).
     keys = json.loads((VECTORS / "bundles" / "trusted-keys.json").read_text(encoding="utf-8"))
@@ -604,7 +642,17 @@ def main() -> int:
             got = {"outcome": "refused"}
         check(f"manifest document {doc['name']}", got, doc["expected"])
 
-    total = len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases) + len(documents)
+    # The hashed mode of arguments (section 8.3): the HMAC-SHA-256 of their canonical JSON, which canonical_json
+    # writes, as it does for manifests.
+    hashed = json.loads((VECTORS / "hashed-arguments.json").read_text(encoding="utf-8"))
+    key = bytes.fromhex(hashed["key"])
+    for case in hashed["cases"]:
+        canonical = canonical_json(case["arguments"]).encode()
+        got = {"canonical_json": canonical.decode(), "hmac_sha256": hmac.new(key, canonical, hashlib.sha256).hexdigest()}
+        check(f"hashed arguments {case['id']}", got, {k: case[k] for k in ("canonical_json", "hmac_sha256")})
+
+    total = (len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases)
+             + len(documents) + len(hashed["cases"]))
     print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML, jsonschema)")
     return 1 if failures else 0
 

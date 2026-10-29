@@ -38,6 +38,17 @@
         "agent.stop"
       ]
     },
+    "resourceType": {
+      "enum": [
+        "agent",
+        "tool",
+        "model",
+        "mcp_server",
+        "dataset",
+        "skill",
+        "url"
+      ]
+    },
     "resource": {
       "type": "object",
       "required": [
@@ -47,15 +58,7 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "enum": [
-            "agent",
-            "tool",
-            "model",
-            "mcp_server",
-            "dataset",
-            "skill",
-            "url"
-          ]
+          "$ref": "#/$defs/resourceType"
         },
         "id": {
           "type": "string",
@@ -114,6 +117,13 @@
         "agent",
         "selector",
         "fleet"
+      ]
+    },
+    "haltMode": {
+      "enum": [
+        "block",
+        "interrupt",
+        "terminate"
       ]
     },
     "haltLayerReport": {

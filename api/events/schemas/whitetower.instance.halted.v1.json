@@ -5,7 +5,6 @@
   "type": "object",
   "required": [
     "halt_id",
-    "scope",
     "halt_mode",
     "layers"
   ],
@@ -15,14 +14,11 @@
       "$ref": "common.schema.json#/$defs/uuid"
     },
     "scope": {
+      "description": "The halt's scope. Left out when the instance does not know it (section 5.5, EP-10).",
       "$ref": "common.schema.json#/$defs/haltScope"
     },
     "halt_mode": {
-      "enum": [
-        "block",
-        "interrupt",
-        "terminate"
-      ]
+      "$ref": "common.schema.json#/$defs/haltMode"
     },
     "layers": {
       "type": "array",

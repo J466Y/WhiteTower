@@ -6,7 +6,7 @@ Checks that a module implements the module contracts ([specification, section 9]
 
 | Path | Content |
 | --- | --- |
-| [`vectors/`](vectors/) | Language-neutral test vectors: combination semantics, the gate, signed bundles, module manifests |
+| [`vectors/`](vectors/) | Language-neutral test vectors: combination semantics, the gate, signed bundles, module manifests, the hashed mode of arguments |
 | [`profile/`](profile/) | Reference implementation of the decision profile on `cedar-go`: the check of requests against the profile, request mapping, combining algorithm, gate |
 | [`bundle/`](bundle/) | Reference implementation of the bundle format: canonical manifests, signatures, verification |
 | [`manifest/`](manifest/) | Reference reader of module manifests written in YAML: MAN-1's refusals, I-JSON, canonical JSON |
@@ -26,7 +26,7 @@ Scenarios S-01, "start closed", and S-17, "stale renewals", run today against th
 ## Running it
 
 ```sh
-go test ./test/conformance/...                 # vectors (Go, cedar-go, yaml.v3), the stub's own tests, and scenarios S-01 and S-17 against the stub
+go test ./test/conformance/...                 # vectors (Go, cedar-go, yaml.v3, gowebpki/jcs), the stub's own tests, and scenarios S-01 and S-17 against the stub
 python test/conformance/python/check_vectors.py  # the same vectors with cedarpy, cryptography, PyYAML and jsonschema
 ```
 
@@ -34,7 +34,7 @@ The Python check needs `cedarpy`, `cryptography`, PyYAML and `jsonschema`; the v
 
 ## Changing the vectors
 
-- `combination.json` and `fail-closed.json` are edited by hand. Both implementations must still pass.
+- `combination.json`, `fail-closed.json` and `hashed-arguments.json` are edited by hand. Both implementations must still pass.
 - The bundle vectors are generated, because their signatures must match their bytes: change `bundle_vectors_test.go`, then run `go test ./test/conformance -run TestBundleVectorsAreCurrent -update`.
 - The manifest vectors are generated from the examples of `api/manifest` and the documents of the reader's tests, so that they follow both: after either changes, run `go test ./test/conformance/manifest -run TestManifestVectorsAreCurrent -update`.
 - Vectors are part of the contract: changing their meaning needs an RFC.
