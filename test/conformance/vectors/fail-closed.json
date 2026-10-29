@@ -1,5 +1,5 @@
 {
-  "description": "Gate of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 5.4). Each case gives the enforcement point's state for the agent, with the environment that its registration returned; the request is the same, with that environment in its subject (section 6.2), and the active bundle, when there is one, permits it. When several conditions hold, the reason is the first one in the order of section 5.4.",
+  "description": "Gate of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 5.4). Each case gives the enforcement point's state for the agent, with the environment that its registration returned; the request is the same, with that environment in its subject (section 6.2), and the active bundle, when there is one, permits it. When several conditions hold, the reason is the first one in the order of section 5.4. A response with a gate's reason carries no bundle_version, and one with policy.permit carries the version of the active bundle (section 6.6).",
   "profile": "v1alpha1",
   "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
   "policies": [

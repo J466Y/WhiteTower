@@ -308,7 +308,13 @@ enum HaltLayer {
   HALT_LAYER_GATE_CLOSED = 1;
   // The work in flight was interrupted.
   HALT_LAYER_IN_FLIGHT_INTERRUPTED = 2;
-  // The agent's process ended.
+  // The agent's process ends. In the terminate mode, it ends only if work
+  // still runs at the end of the grace period, and a release during the grace
+  // period cancels the end. An instance inside the process that ends it
+  // reports this layer done just before, as its last report for the halt: it
+  // first writes whitetower.instance.halted.v1 to its durable buffer, and
+  // waits at most about a second for the acknowledgement's response (contract,
+  // section 5.5, EP-4).
   HALT_LAYER_PROCESS_TERMINATED = 3;
   // The agent's workloads were isolated at the network level (KIL-10).
   HALT_LAYER_NETWORK_QUARANTINED = 4;
@@ -318,7 +324,9 @@ enum HaltLayer {
 enum LayerOutcome {
   // Unknown. Never counts as done (CORE-19).
   LAYER_OUTCOME_UNSPECIFIED = 0;
-  // The layer is in place.
+  // The layer is in place. For HALT_LAYER_PROCESS_TERMINATED, the process that
+  // ends reports it just before it ends, as its last report for the halt
+  // (contract, section 5.5).
   LAYER_OUTCOME_DONE = 1;
   // Attempted but not achieved, for example blocking work that is still running.
   LAYER_OUTCOME_NOT_DONE = 2;
@@ -335,8 +343,9 @@ message HaltLayerReport {
   HaltLayer layer = 1;
   // What happened.
   LayerOutcome outcome = 2;
-  // Time from receiving the halt to this outcome, measured on the instance's
-  // monotonic clock.
+  // Time from the moment this process received the halt to this outcome, on
+  // its monotonic clock. For a halt it found at start, the time since it
+  // applied the state that carried the halt (contract, section 5.5).
   google.protobuf.Duration after_receipt = 3;
   // The instance's wall-clock time of the outcome. Informational.
   google.protobuf.Timestamp observed_at = 4;

@@ -151,6 +151,41 @@ func TestCheckRefusesInvalidEvents(t *testing.T) {
 	if _, err := c.check(lease); err == nil || !strings.Contains(err.Error(), "the subject, its agent, is required") {
 		t.Errorf("a lease expiry without its subject: %v", err)
 	}
+	// A decision carries an environment whenever policies were evaluated
+	// (I-7), and never a bundle version when the gate decided (section 6.6);
+	// traceparent takes any version but ff (section 8.2).
+	for _, tt := range []struct {
+		name string
+		edit func(map[string]any)
+		want string // empty for an event the check accepts
+	}{
+		{"a permit without an environment", func(e map[string]any) {
+			data := e["data"].(map[string]any)
+			data["decision"], data["reason"] = "allow", "policy.permit"
+			delete(data, "environment")
+		}, "invalid data"},
+		{"a gate's denial with a bundle version", func(e map[string]any) {
+			e["data"].(map[string]any)["reason"] = "gate.halted"
+		}, "invalid data"},
+		{"a traceparent of version ff", func(e map[string]any) {
+			e["traceparent"] = "ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+		}, "invalid envelope"},
+		{"a traceparent of a higher version, with a field after its flags", func(e map[string]any) {
+			e["traceparent"] = "cc-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-what-comes-next"
+		}, ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			e := example("whitetower.decision.made.v1")
+			tt.edit(e)
+			_, err := c.check(e)
+			switch {
+			case tt.want == "" && err != nil:
+				t.Fatalf("refused: %v", err)
+			case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+				t.Fatalf("got %v, want %q", err, tt.want)
+			}
+		})
+	}
 }
 
 func TestEmitterAndAction(t *testing.T) {

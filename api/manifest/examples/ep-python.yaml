@@ -80,3 +80,15 @@ spec:
             description: What decision events record about tool arguments (contract, section 8.3).
             enum: [none, names, hashed]
             default: names
+          hmacKeyFile:
+            description: File with the key of the hashed mode, which the deployment holds (contract, section 8.3).
+            type: string
+          hmacKeyId:
+            description: The key's ID, which decision events record as key_id with each HMAC.
+            type: string
+        if:
+          required: [arguments]
+          properties:
+            arguments: {const: hashed}
+        then:
+          required: [hmacKeyFile, hmacKeyId]

@@ -1,5 +1,5 @@
 {
-  "description": "Combination semantics of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6). Each case is one bundle for agent_id holding the listed policies, one AuthZEN request and the expected response. bundle_version is not compared. valid says whether the policy passes the validator against the profile's Cedar schema, extended with tool_args_extension. A request that a case refuses with error.invalid_request does not match decision-request.schema.json, unless the case's rule names the rule of the profile, outside the schema, that refuses it: another_agent, an agent action that names another agent (section 6.3); not_an_integer, an argument that is not a signed 64-bit integer written without a fraction or an exponent (section 6.4); or invalid_time, a time that does not exist (section 1).",
+  "description": "Combination semantics of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6). Each case is one bundle for agent_id holding the listed policies, one AuthZEN request and the expected response. The response carries bundle_version, the version of the case's bundle, with policy.permit, policy.forbid, policy.no_permit and error.evaluation, and may carry it or not with error.unknown_agent and error.invalid_request (section 6.6). valid says whether the policy passes the validator against the profile's Cedar schema, extended with tool_args_extension. A request that a case refuses with error.invalid_request does not match decision-request.schema.json, unless the case's rule names the rule of the profile, outside the schema, that refuses it: another_agent, an agent action that names another agent (section 6.3); not_an_integer, an argument that is not a signed 64-bit integer written without a fraction or an exponent (section 6.4); or invalid_time, a time that does not exist (section 1).",
   "profile": "v1alpha1",
   "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
   "tool_args_extension": "type ToolArgs = { recipient_domain?: String, amount?: Long };",
@@ -2045,6 +2045,110 @@
         "decision": false,
         "reason": "error.invalid_request",
         "policies": []
+      }
+    },
+    {
+      "id": "C-38",
+      "description": "A resource ID of 513 characters is outside the profile: 512 letters a, then U+1D49C",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-39",
+      "description": "A resource ID of 512 characters is inside the profile: 511 letters a, then U+1D49C, which takes 4 bytes in UTF-8 and 2 code units in UTF-16, so that a stack that counts 515 bytes or 513 code units refuses it",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+          "properties": {
+            "kind": "function"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
       }
     }
   ]

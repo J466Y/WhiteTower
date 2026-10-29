@@ -2,6 +2,9 @@ package conformance_test
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +17,7 @@ import (
 	internalast "github.com/cedar-policy/cedar-go/x/exp/ast"
 	"github.com/cedar-policy/cedar-go/x/exp/schema"
 	"github.com/cedar-policy/cedar-go/x/exp/schema/validate"
+	"github.com/gowebpki/jcs"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/J466Y/WhiteTower/test/conformance/profile"
@@ -127,6 +131,42 @@ func checkResponse(t *testing.T, got profile.Response, want expectation) {
 	}
 }
 
+// vectorBundleVersion is the version of the bundle that the policies of a
+// vector make up. Any version would do: what the tests check is that a
+// response carries it where section 6.6 says it always does.
+const vectorBundleVersion = 42
+
+// withBundleVersion says, for each reason, whether a response carries the
+// version of the bundle that decided: always (true) or never (false), as
+// section 6.6 says. A response with any other reason, error.timeout,
+// error.unknown_agent or error.invalid_request, may carry it or not.
+var withBundleVersion = map[string]bool{
+	profile.ReasonPermit:          true,
+	profile.ReasonForbid:          true,
+	profile.ReasonNoPermit:        true,
+	profile.ReasonEvaluationError: true,
+	profile.ReasonNoState:         false,
+	profile.ReasonLeaseExpired:    false,
+	profile.ReasonHalted:          false,
+	profile.ReasonFleetHalted:     false,
+	profile.ReasonLifecycle:       false,
+	profile.ReasonNoBundle:        false,
+	profile.ReasonEvidenceFull:    false,
+}
+
+// checkBundleVersion checks a response's bundle_version by its reason.
+func checkBundleVersion(t *testing.T, got profile.Response) {
+	t.Helper()
+	always, ruled := withBundleVersion[got.Context.Reason]
+	switch {
+	case !ruled:
+	case always && got.Context.BundleVersion != vectorBundleVersion:
+		t.Errorf("reason %s with bundle_version %d, want %d", got.Context.Reason, got.Context.BundleVersion, vectorBundleVersion)
+	case !always && got.Context.BundleVersion != 0:
+		t.Errorf("reason %s with bundle_version %d, want none", got.Context.Reason, got.Context.BundleVersion)
+	}
+}
+
 // namedRules are the rules of the profile that its schema does not state, by
 // the names that the combination vectors give them.
 var namedRules = map[string]error{
@@ -217,12 +257,13 @@ func TestCombinationVectors(t *testing.T) {
 					t.Errorf("request does not match the profile's schema: %v", err)
 				}
 			}
-			engine, err := profile.NewEngine(file.AgentID, 1, policies(c.Policies))
+			engine, err := profile.NewEngine(file.AgentID, vectorBundleVersion, policies(c.Policies))
 			if err != nil {
 				t.Fatal(err)
 			}
 			got := engine.Evaluate(c.Request)
 			checkResponse(t, got, c.Expected)
+			checkBundleVersion(t, got)
 			if err := validateJSON(responseSchema, got); err != nil {
 				t.Errorf("response does not match the profile's schema: %v", err)
 			}
@@ -271,7 +312,7 @@ func TestFailClosedVectors(t *testing.T) {
 		} `json:"cases"`
 	}
 	loadJSON(t, "vectors/fail-closed.json", &file)
-	engine, err := profile.NewEngine(file.AgentID, 1, policies(file.Policies))
+	engine, err := profile.NewEngine(file.AgentID, vectorBundleVersion, policies(file.Policies))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,8 +324,53 @@ func TestFailClosedVectors(t *testing.T) {
 				got = profile.Deny(reason)
 			}
 			checkResponse(t, got, c.Expected)
+			checkBundleVersion(t, got)
 			if err := validateJSON(responseSchema, got); err != nil {
 				t.Errorf("response does not match the profile's schema: %v", err)
+			}
+		})
+	}
+}
+
+// TestHashedArgumentsVectors computes the hashed mode of a decision event's
+// arguments (section 8.3): the HMAC-SHA-256, in lowercase hexadecimal, of the
+// canonical JSON of the arguments object, which gowebpki/jcs writes, with the
+// vectors' key.
+func TestHashedArgumentsVectors(t *testing.T) {
+	var file struct {
+		Description string `json:"description"`
+		Key         string `json:"key"`
+		Cases       []struct {
+			ID          string `json:"id"`
+			Description string `json:"description"`
+			// The arguments as the vector writes them, members out of order
+			// and escapes included, for jcs to read.
+			Arguments     json.RawMessage `json:"arguments"`
+			CanonicalJSON string          `json:"canonical_json"`
+			HMACSHA256    string          `json:"hmac_sha256"`
+		} `json:"cases"`
+	}
+	loadJSON(t, "vectors/hashed-arguments.json", &file)
+	key, err := hex.DecodeString(file.Key)
+	if err != nil || len(key) == 0 {
+		t.Fatalf("key %q: want bytes in hexadecimal (%v)", file.Key, err)
+	}
+	if len(file.Cases) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range file.Cases {
+		t.Run(c.ID, func(t *testing.T) {
+			canonical, err := jcs.Transform(c.Arguments)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(canonical) != c.CanonicalJSON {
+				t.Errorf("canonical JSON %s, want %s", canonical, c.CanonicalJSON)
+			}
+			mac := hmac.New(sha256.New, key)
+			mac.Write(canonical)
+			if got := hex.EncodeToString(mac.Sum(nil)); got != c.HMACSHA256 {
+				t.Errorf("HMAC-SHA-256 %s, want %s", got, c.HMACSHA256)
 			}
 		})
 	}

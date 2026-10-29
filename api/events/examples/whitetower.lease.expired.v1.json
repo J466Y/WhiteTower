@@ -9,6 +9,26 @@
   "wtseq": "1060",
   "data": {
     "lease_ttl_ms": 30000,
-    "effect": "gate_closed"
+    "effect": "gate_closed",
+    "cause": "no_renewal",
+    "halt_mode": "interrupt",
+    "layers": [
+      {
+        "layer": "gate_closed",
+        "outcome": "done",
+        "after_ms": 0
+      },
+      {
+        "layer": "in_flight_interrupted",
+        "outcome": "done",
+        "after_ms": 120
+      },
+      {
+        "layer": "process_terminated",
+        "outcome": "not_applicable",
+        "after_ms": 120,
+        "detail": "halt mode interrupt"
+      }
+    ]
   }
 }

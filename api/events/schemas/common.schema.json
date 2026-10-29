@@ -38,6 +38,17 @@
         "agent.stop"
       ]
     },
+    "resourceType": {
+      "enum": [
+        "agent",
+        "tool",
+        "model",
+        "mcp_server",
+        "dataset",
+        "skill",
+        "url"
+      ]
+    },
     "resource": {
       "type": "object",
       "required": [
@@ -47,15 +58,7 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "enum": [
-            "agent",
-            "tool",
-            "model",
-            "mcp_server",
-            "dataset",
-            "skill",
-            "url"
-          ]
+          "$ref": "#/$defs/resourceType"
         },
         "id": {
           "type": "string",
@@ -116,6 +119,13 @@
         "fleet"
       ]
     },
+    "haltMode": {
+      "enum": [
+        "block",
+        "interrupt",
+        "terminate"
+      ]
+    },
     "haltLayerReport": {
       "type": "object",
       "required": [
@@ -142,7 +152,7 @@
           ]
         },
         "after_ms": {
-          "description": "Time from receiving the halt to the outcome (monotonic clock).",
+          "description": "Milliseconds from the moment the process that reports received the halt to the outcome, on its monotonic clock. For a halt it found at start, the time since it applied the state that carried the halt (section 5.5).",
           "type": "integer",
           "minimum": 0
         },

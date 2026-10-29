@@ -8,7 +8,6 @@
     "reason",
     "action",
     "resource",
-    "environment",
     "policies",
     "state_version",
     "evaluation_us"
@@ -22,15 +21,42 @@
       ]
     },
     "reason": {
-      "$ref": "common.schema.json#/$defs/decisionReason"
+      "description": "Why the decision was taken (section 6.6). Never gate.evidence_full: a denial with it is the one decision not recorded, since the evidence buffer cannot take it (EP-8).",
+      "$ref": "common.schema.json#/$defs/decisionReason",
+      "not": {
+        "const": "gate.evidence_full"
+      }
     },
     "action": {
       "$ref": "common.schema.json#/$defs/action"
     },
     "resource": {
-      "$ref": "common.schema.json#/$defs/resource"
+      "description": "What the action applies to (section 6.3). A resource ID longer than 512 characters, which makes the request invalid, is recorded as its SHA-256, in id_sha256 rather than id (section 8.3).",
+      "oneOf": [
+        {
+          "$ref": "common.schema.json#/$defs/resource"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "id_sha256"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "$ref": "common.schema.json#/$defs/resourceType"
+            },
+            "id_sha256": {
+              "description": "The SHA-256 of a resource ID longer than 512 characters, recorded in place of the ID.",
+              "$ref": "common.schema.json#/$defs/sha256"
+            }
+          }
+        }
+      ]
     },
     "environment": {
+      "description": "The environment that the enforcement point's registration returned (I-7). Required with the reasons of a decision that evaluated policies: policy.permit, policy.forbid, policy.no_permit, error.evaluation and error.timeout. A decision taken before a registration returned one carries none.",
       "enum": [
         "production",
         "non_production"
@@ -45,6 +71,7 @@
       }
     },
     "bundle_version": {
+      "description": "The version of the bundle that decided (section 6.6): always with policy.permit, policy.forbid, policy.no_permit and error.evaluation, never with the gate's reasons, and optional with error.timeout, error.unknown_agent and error.invalid_request.",
       "$ref": "common.schema.json#/$defs/version"
     },
     "state_version": {
@@ -60,11 +87,12 @@
       "maxLength": 256
     },
     "arguments": {
-      "description": "What the enforcement point records about the call's arguments (section 8.3). Never their values.",
+      "description": "What the enforcement point records about the call's arguments, as configured (section 8.3): their names, or, in the hashed mode, an HMAC with its key's ID. Never their values.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "names": {
+          "description": "The arguments' names, each of at most 128 characters.",
           "type": "array",
           "uniqueItems": true,
           "items": {
@@ -72,11 +100,33 @@
             "maxLength": 128
           }
         },
+        "names_sha256": {
+          "description": "The SHA-256 of each argument name longer than 128 characters, recorded in place of the name.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "common.schema.json#/$defs/sha256"
+          }
+        },
         "hmac_sha256": {
-          "description": "HMAC-SHA-256 of the canonical arguments with a key held by the deployment.",
+          "description": "The hashed mode: the HMAC-SHA-256, in lowercase hexadecimal, of the canonical JSON (section 1) of the arguments object as the tool receives it, with the deployment's key that key_id names.",
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "key_id": {
+          "description": "The ID of the deployment's key that computed hmac_sha256.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         }
+      },
+      "dependentRequired": {
+        "hmac_sha256": [
+          "key_id"
+        ],
+        "key_id": [
+          "hmac_sha256"
+        ]
       }
     }
   },
@@ -90,9 +140,6 @@
         }
       },
       "then": {
-        "required": [
-          "bundle_version"
-        ],
         "properties": {
           "reason": {
             "const": "policy.permit"
@@ -106,6 +153,68 @@
               "const": "policy.permit"
             }
           }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "enum": [
+              "policy.permit",
+              "policy.forbid",
+              "policy.no_permit",
+              "error.evaluation",
+              "error.timeout"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "environment"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "enum": [
+              "policy.permit",
+              "policy.forbid",
+              "policy.no_permit",
+              "error.evaluation"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "bundle_version"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "enum": [
+              "gate.no_state",
+              "gate.lease_expired",
+              "gate.halted",
+              "gate.fleet_halted",
+              "gate.lifecycle",
+              "gate.no_bundle"
+            ]
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "bundle_version"
+          ]
         }
       }
     }
