@@ -2,7 +2,7 @@
 
 **An open source, modular, self-hosted control plane for centralized AI agent governance.**
 
-> **Status:** pre-alpha. Nothing here is production-ready yet. The module contracts v0.1, which close Phase 0 (foundations), are accepted provisionally and are being brought into the code, and Phase 1 (the core MVP) is being built alongside them. Feedback and contributors are welcome.
+> **Status:** pre-alpha. Nothing here is production-ready yet. Phase 0 (foundations) is closing: the module contracts v0.1 are accepted provisionally, and their last parts are being brought into the code before they are tagged. Phase 1, the core MVP, is under way: see [where the project stands](#where-the-project-stands). Feedback and contributors are welcome.
 
 ---
 
@@ -24,6 +24,7 @@ White Tower does **not** try to reimplement every capability. It provides a smal
 | --- | --- |
 | **Registry and inventory** of in-house and third-party agents, each with an accountable owner and a validated use case | 1, the MVP |
 | **Discovery of agents nobody registered** (shadow AI) | 3 |
+| **People's identity and access:** sign-in through the organization's identity provider (OIDC, or SAML through a broker), roles from its groups, separation of duties, break-glass, and the erasure of a person on request | 1, the MVP |
 | **Agent identity** with short-lived credentials | 1, the MVP |
 | Per-task credentials, delegated on behalf of a user | 2 |
 | **Two-level policies:** organization-wide and agent-specific | 1, the MVP |
@@ -81,8 +82,10 @@ Each **module** declares in a manifest which capability it covers, which events 
 The MVP is deliberately narrow. These are its main limits, and what lifts each:
 
 - **The enforcement point trusts the agent's process.** It runs inside the agent because that is where every call can be seen: calls to local MCP servers and to the agent's own functions, and the tools a model's provider runs for it, none of which a network gateway sees. An agent or an owner who takes control of that process can bypass it (the [threat model](docs/security/threat-model.md)'s accepted risk R-01). Outside the process, the MVP isolates halted agents on Kubernetes at the network level. The MCP and LLM gateways and an enforced sandbox add controls outside the process in Phase 2.
+- **A halt stops what comes next.** From the moment an enforcement point receives a halt, every further governed call is denied. Work already in flight is interrupted where the framework allows it, and the acknowledgement says whether it was. The agent's process ends only in the halt mode that its owner chooses for that.
 - **Only registered agents are governed.** The inventory holds the agents someone registered, third-party agents without runtime integration included, whose tooling can be declared by hand. Agents nobody registered stay invisible until shadow AI discovery, in Phase 3.
 - **Python agents first.** The enforcement point is a Python package, with hooks for LangGraph 1.x and for a second framework that the pilot needs. The hooks of each framework follow its releases, tested every week against the latest ones.
+- **One organization per deployment.** Multi-tenancy is not planned.
 - **Evidence, not compliance.** The MVP gives the evidence that frameworks ask for, and maps it to their controls. It does not make an agent or an organization compliant, and the compliance module comes in Phase 3.
 
 ## Candidate integrations
@@ -93,13 +96,27 @@ These are the first components we plan to integrate or build. None of them is fi
 | --- | --- |
 | Policy engine | Cedar, evaluated inside White Tower's enforcement point (`cedarpy`), with policies validated by the core (`cedar-go`). OPA, and engines with native AuthZEN, in Phase 2 ([engine mappings](docs/contracts/engine-mappings.md)) |
 | Runtime governance and kill switch | Built in this project: White Tower's enforcement point for Python agents, and network quarantine on Kubernetes ([ADR-0011](docs/adr/0011-own-python-enforcement-point.md)). [Microsoft Agent Governance Toolkit](https://opensource.microsoft.com/blog/2026/04/02/introducing-the-agent-governance-toolkit-open-source-runtime-security-for-ai-agents/) as an interoperability adapter in Phase 2 |
-| Identity | Built in this project: an OAuth 2.0 token issuer for agents ([ADR-0010](docs/adr/0010-built-in-agent-token-issuer.md)). Any OIDC identity provider for people, Keycloak in development. SPIFFE/SPIRE later |
+| Identity | Built in this project: an OAuth 2.0 token issuer for agents ([ADR-0010](docs/adr/0010-built-in-agent-token-issuer.md)). Any OIDC identity provider for people, and SAML through a broker such as Keycloak, which development uses. SPIFFE/SPIRE later |
 | MCP servers, tools and models | Built in this project: a catalog in the core, applied by the enforcement point ([RFC-0002](docs/rfcs/0002-mcp-servers-tools-and-models.md)) |
 | Audit | Built in this project: a tamper-evident log on PostgreSQL ([ADR-0006](docs/adr/0006-tamper-evident-audit-log.md)), exported over OpenTelemetry and JSON Lines |
 | Sandbox / harness (Phase 2) | gVisor, Firecracker, containers with seccomp |
 | LLM gateway, quotas, cost (Phase 2) | LiteLLM |
 | MCP and tool gateway (Phase 2) | Obot, open MCP gateways |
 | Observability | OpenTelemetry |
+
+## Where the project stands
+
+| | |
+| --- | --- |
+| **Works today** | The core's platform: TLS listeners, configuration, structured logs, metrics and traces, PostgreSQL with forward-only migrations and a runtime role that cannot change the schema, and background jobs |
+| | The tamper-evident audit log: every change of the core recorded in the transaction that makes it, sealed into a Merkle tree under signed checkpoints, searchable through the API, exported over OpenTelemetry and JSON Lines, kept by a retention that leaves the rest verifiable, and checked by a verification library that third parties can use ([`pkg/auditverify`](pkg/auditverify/)) |
+| | People's identity and access: sign-in through OIDC, whose tokens never reach the browser, sessions, roles from the identity provider's groups, a permission matrix with separation of duties, API tokens, SCIM deprovisioning, break-glass, and SAML through a broker |
+| | The first part of the inventory: agents, use cases and their owners, through the API |
+| | Container images, an evaluation stack with sample data, and a Helm chart |
+| | The module contracts in machine-readable form, and their conformance kit: test vectors that two independent stacks, in Go and in Python, check alike |
+| **Next** | The agents' lifecycle, identities and policies; the module API; the kill switch; the enforcement point for Python agents; the catalog of MCP servers, tools and models; network quarantine; the console and the CLI. Then hardening, release v0.1.0 and the pilot |
+
+The [plans index](docs/plans/README.md) tracks the status of every plan, and the work queue of [AGENTS.md](AGENTS.md) what comes next.
 
 ## Roadmap
 
@@ -110,11 +127,20 @@ These are the first components we plan to integrate or build. None of them is fi
 | **2: Key modules** | LLM gateway and quotas, MCP gateway, per-agent harness | One use case in production |
 | **3: Ecosystem** | Shadow AI discovery, compliance module, third-party module SDK, public release | First third-party module |
 
+The pilot runs on Windows, macOS and Linux, and includes an external security review. Once a pilot passes, external security audits follow, each from its own angle.
+
 Phases are not dated yet. The implementation roadmap to the MVP, with its milestones and an illustrative calendar, is in [docs/roadmap.md](docs/roadmap.md).
 
 ## Design documents
 
-The design package lives in [`docs/`](docs/README.md): the [MVP requirements](docs/requirements/mvp-requirements.md), the [architecture decision records](docs/adr/README.md), the [MVP architecture](docs/architecture/mvp-architecture.md), the [module contracts](docs/contracts/README.md), the [threat model](docs/security/threat-model.md) with its [framework mapping](docs/security/framework-mapping.md), and the [implementation plans](docs/plans/README.md). All of them are open for review.
+The design package lives in [`docs/`](docs/README.md):
+
+- the [MVP requirements](docs/requirements/mvp-requirements.md), the [architecture decision records](docs/adr/README.md) and the [MVP architecture](docs/architecture/mvp-architecture.md);
+- the [module contracts](docs/contracts/README.md), with their machine-readable parts in [`api/`](api/README.md) and their [conformance kit](test/conformance/README.md);
+- the [security design](docs/security/README.md): the threat model, the security tests and the framework mapping;
+- the [implementation plans](docs/plans/README.md) and the [roadmap](docs/roadmap.md).
+
+All of them are open for review.
 
 ## Out of scope
 
@@ -130,9 +156,11 @@ The project is young, which is the best time to shape it. The most useful contri
 - Proposing adapters for tools you already run.
 - Threat modeling the core.
 
-Changes to module contracts go through an **RFC process**. See [CONTRIBUTING.md](CONTRIBUTING.md) and [GOVERNANCE.md](GOVERNANCE.md). To build and run the code, follow the [development guide](docs/development.md).
+Changes to module contracts go through an **RFC process**. See [CONTRIBUTING.md](CONTRIBUTING.md) and [GOVERNANCE.md](GOVERNANCE.md). Code lands in small parts that follow the implementation plans, each reviewed as [AGENTS.md](AGENTS.md) describes. To build and run the code, follow the [development guide](docs/development.md).
 
 ## Security
+
+The [threat model](docs/security/threat-model.md) and the [security tests](docs/security/security-tests.md) that each plan must pass are public. An external security review runs in the pilot.
 
 Please do not open public issues for security vulnerabilities. See [SECURITY.md](SECURITY.md) for coordinated disclosure.
 
