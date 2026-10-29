@@ -710,10 +710,11 @@ type Agent struct {
 	Kind AgentKind `json:"kind"`
 
 	// Labels Labels, which filters, selector halts and policies use; policies see
-	// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
-	// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
-	// Enforcement points receive them with the agent's governance state, so
-	// they never hold personal data (CORE-9).
+	// them as Cedar tags. At most 64, as the decision profile allows
+	// (CORE-17): keys have 1 to 63 lowercase letters, digits and inner `.`,
+	// `_`, `-` and `/`, and values at most 255 characters. Enforcement points
+	// receive them with the agent's governance state, so they never hold
+	// personal data (CORE-9).
 	Labels Labels `json:"labels"`
 
 	// LifecycleState Where the agent is in its lifecycle (docs/architecture/lifecycle.md, section 1).
@@ -959,10 +960,11 @@ type EditAgentRequest struct {
 	Harness *Harness `json:"harness,omitempty"`
 
 	// Labels Labels, which filters, selector halts and policies use; policies see
-	// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
-	// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
-	// Enforcement points receive them with the agent's governance state, so
-	// they never hold personal data (CORE-9).
+	// them as Cedar tags. At most 64, as the decision profile allows
+	// (CORE-17): keys have 1 to 63 lowercase letters, digits and inner `.`,
+	// `_`, `-` and `/`, and values at most 255 characters. Enforcement points
+	// receive them with the agent's governance state, so they never hold
+	// personal data (CORE-9).
 	Labels *Labels `json:"labels,omitempty"`
 	Name   *string `json:"name,omitempty"`
 
@@ -1067,10 +1069,11 @@ type InstanceList struct {
 }
 
 // Labels Labels, which filters, selector halts and policies use; policies see
-// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
-// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
-// Enforcement points receive them with the agent's governance state, so
-// they never hold personal data (CORE-9).
+// them as Cedar tags. At most 64, as the decision profile allows
+// (CORE-17): keys have 1 to 63 lowercase letters, digits and inner `.`,
+// `_`, `-` and `/`, and values at most 255 characters. Enforcement points
+// receive them with the agent's governance state, so they never hold
+// personal data (CORE-9).
 type Labels map[string]string
 
 // LifecycleAction An action of the lifecycle, as agent-lifecycle.yaml names it.
@@ -1230,10 +1233,11 @@ type ProposeAgentRequest struct {
 	Kind AgentKind `json:"kind"`
 
 	// Labels Labels, which filters, selector halts and policies use; policies see
-	// them as Cedar tags. At most 64: keys have 1 to 63 lowercase letters,
-	// digits, `.`, `_`, `-` and `/`, and values at most 255 characters.
-	// Enforcement points receive them with the agent's governance state, so
-	// they never hold personal data (CORE-9).
+	// them as Cedar tags. At most 64, as the decision profile allows
+	// (CORE-17): keys have 1 to 63 lowercase letters, digits and inner `.`,
+	// `_`, `-` and `/`, and values at most 255 characters. Enforcement points
+	// receive them with the agent's governance state, so they never hold
+	// personal data (CORE-9).
 	Labels *Labels `json:"labels,omitempty"`
 	Name   string  `json:"name"`
 
