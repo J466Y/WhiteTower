@@ -1,15 +1,21 @@
 -- Evaluation seed data for White Tower (P1-12.1).
 -- Seeds principals, use cases, sample agents across lifecycle states, and ownership.
+-- It runs on every start of the stack: each insert skips the rows it wrote before.
 
+-- The people of the realm (keycloak/whitetower-realm.json). Each principal has
+-- the core's issuer, and the ID of its user in the realm as its subject: the
+-- sub of the user's ID tokens. Signing in as a user therefore finds its
+-- principal, matched on issuer and subject, and updates it. The groups are
+-- written as ID tokens carry them, without a leading slash.
 INSERT INTO whitetower.principals (id, kind, issuer, subject, display_name, email, status, idp_groups)
 VALUES
-  ('00000000-0000-7000-8000-000000000001', 'human', 'http://keycloak:8080/realms/whitetower', 'owner', 'Olivia Owner', 'owner@example.test', 'active', ARRAY['/wt-owners']),
-  ('00000000-0000-7000-8000-000000000002', 'human', 'http://keycloak:8080/realms/whitetower', 'auditor', 'Ana Auditor', 'auditor@example.test', 'active', ARRAY['/wt-auditors']),
-  ('00000000-0000-7000-8000-000000000003', 'human', 'http://keycloak:8080/realms/whitetower', 'steering', 'Sam Steering', 'steering@example.test', 'active', ARRAY['/wt-steering']),
-  ('00000000-0000-7000-8000-000000000004', 'human', 'http://keycloak:8080/realms/whitetower', 'operator', 'Omar Operator', 'operator@example.test', 'active', ARRAY['/wt-operators']),
-  ('00000000-0000-7000-8000-000000000005', 'human', 'http://keycloak:8080/realms/whitetower', 'advisory', 'Alex Advisory', 'advisory@example.test', 'active', ARRAY['/wt-advisory']),
-  ('00000000-0000-7000-8000-000000000006', 'human', 'http://keycloak:8080/realms/whitetower', 'user', 'Uma User', 'user@example.test', 'active', ARRAY['/wt-users']),
-  ('00000000-0000-7000-8000-000000000007', 'human', 'http://keycloak:8080/realms/whitetower', 'admin', 'Adrian Admin', 'admin@example.test', 'active', ARRAY['/wt-admins'])
+  ('00000000-0000-7000-8000-000000000001', 'human', 'http://127.0.0.1:8180/realms/whitetower', '00000000-0000-4000-8000-000000000001', 'Olivia Owner', 'owner@example.test', 'active', ARRAY['wt-owners']),
+  ('00000000-0000-7000-8000-000000000002', 'human', 'http://127.0.0.1:8180/realms/whitetower', '00000000-0000-4000-8000-000000000002', 'Ana Auditor', 'auditor@example.test', 'active', ARRAY['wt-auditors']),
+  ('00000000-0000-7000-8000-000000000003', 'human', 'http://127.0.0.1:8180/realms/whitetower', '00000000-0000-4000-8000-000000000003', 'Sam Steering', 'steering@example.test', 'active', ARRAY['wt-steering']),
+  ('00000000-0000-7000-8000-000000000004', 'human', 'http://127.0.0.1:8180/realms/whitetower', '00000000-0000-4000-8000-000000000004', 'Omar Operator', 'operator@example.test', 'active', ARRAY['wt-operators']),
+  ('00000000-0000-7000-8000-000000000005', 'human', 'http://127.0.0.1:8180/realms/whitetower', '00000000-0000-4000-8000-000000000005', 'Alex Advisory', 'advisory@example.test', 'active', ARRAY['wt-advisory']),
+  ('00000000-0000-7000-8000-000000000006', 'human', 'http://127.0.0.1:8180/realms/whitetower', '00000000-0000-4000-8000-000000000006', 'Uma User', 'user@example.test', 'active', ARRAY['wt-users']),
+  ('00000000-0000-7000-8000-000000000007', 'human', 'http://127.0.0.1:8180/realms/whitetower', '00000000-0000-4000-8000-000000000007', 'Adrian Admin', 'admin@example.test', 'active', ARRAY['wt-admins'])
 ON CONFLICT (id) DO NOTHING;
 
 -- Role bindings for local authority
