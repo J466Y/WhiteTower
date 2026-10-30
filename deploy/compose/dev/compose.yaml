@@ -9,6 +9,8 @@
 # (WT_POSTGRES_PORT, WT_KEYCLOAK_PORT, WT_CONSOLE_PORT, WT_MACHINE_PORT,
 # WT_OPERATIONS_PORT, WT_OTLP_GRPC_PORT, WT_OTLP_HTTP_PORT), and so can
 # WT_TRACING_OTLP_ENDPOINT, which sends the core's traces to a collector.
+# Signing in needs the console on port 8443, the one that the realm registers
+# (README.md).
 name: whitetower-dev
 
 services:
@@ -38,6 +40,11 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin-dev-only
       KC_HEALTH_ENABLED: "true"
+      # Browsers reach Keycloak at this URL, which every token names as its
+      # issuer. Containers reach it at http://keycloak:8080, the back channel,
+      # whose endpoints follow the address of each request.
+      KC_HOSTNAME: http://127.0.0.1:${WT_KEYCLOAK_PORT:-8180}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports:
       - "127.0.0.1:${WT_KEYCLOAK_PORT:-8180}:8080"
     volumes:
@@ -87,7 +94,18 @@ services:
       # Empty: no trace leaves the core. http://otel-collector:4318 sends them
       # to the collector of the otel profile.
       WT_TRACING_OTLP_ENDPOINT: ${WT_TRACING_OTLP_ENDPOINT:-}
-    secrets: [db-app-password, audit-checkpoint-key]
+      # Sign-in through the realm in keycloak/. The issuer is the URL that
+      # browsers use; the core fetches the provider's metadata, keys and
+      # tokens at the discovery URL, through Docker's network.
+      WT_AUTH_OIDC_ISSUER: http://127.0.0.1:${WT_KEYCLOAK_PORT:-8180}/realms/whitetower
+      WT_AUTH_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/whitetower
+      WT_AUTH_OIDC_CLIENT_ID: whitetower-console
+      WT_AUTH_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc-client-secret
+      WT_AUTH_OIDC_REDIRECT_URL: https://127.0.0.1:${WT_CONSOLE_PORT:-8443}/auth/callback
+      # Keycloak defines no groups scope, and refuses a request for one: the
+      # client's own mapper puts the groups in the ID token.
+      WT_AUTH_OIDC_SCOPES: openid,profile,email
+    secrets: [db-app-password, audit-checkpoint-key, oidc-client-secret]
     ports:
       - "127.0.0.1:${WT_CONSOLE_PORT:-8443}:8443"
       - "127.0.0.1:${WT_MACHINE_PORT:-9443}:9443"
@@ -102,6 +120,10 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      # The core discovers the provider once, at start, and stops if it
+      # cannot.
+      keycloak:
+        condition: service_healthy
     healthcheck:
       # Distroless images have no shell: the binary checks itself.
       test: ["CMD", "/usr/local/bin/whitetower", "healthcheck"]
@@ -130,3 +152,5 @@ secrets:
     file: ./secrets/db-migrator-password
   audit-checkpoint-key:
     file: ./secrets/audit-checkpoint-key
+  oidc-client-secret:
+    file: ./secrets/oidc-client-secret

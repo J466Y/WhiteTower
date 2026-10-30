@@ -205,6 +205,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		}
 		oidcSvc, err = authn.NewOIDCService(ctx, authn.OIDCOptions{
 			Issuer:            cfg.Auth.OIDC.Issuer,
+			DiscoveryURL:      cfg.Auth.OIDC.DiscoveryURL,
 			ClientID:          cfg.Auth.OIDC.ClientID,
 			CLIClientID:       cfg.Auth.OIDC.CLIClientID,
 			ClientSecret:      strings.TrimSpace(string(clientSecret)),

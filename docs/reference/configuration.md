@@ -94,6 +94,7 @@ OpenID Connect authentication and backend-for-frontend settings (ADR-0009).
 | Key | Environment variable | Type | Default | Description |
 | --- | --- | --- | --- | --- |
 | `auth.oidc.issuer` | `WT_AUTH_OIDC_ISSUER` | string | none | Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled. |
+| `auth.oidc.discovery_url` | `WT_AUTH_OIDC_DISCOVERY_URL` | string | none | Base URL that the server fetches the identity provider's discovery document from, under /.well-known/openid-configuration, when the server reaches the provider at another address than browsers do, such as http://keycloak:8080/realms/whitetower inside a container network. The document must still name auth.oidc.issuer as its issuer, and ID tokens are verified against auth.oidc.issuer. The server sends the client secret and the authorization code to the endpoints the document names and takes the signing keys from them, so the URL is https when the issuer is. Empty: the issuer. |
 | `auth.oidc.client_id` | `WT_AUTH_OIDC_CLIENT_ID` | string | none | Client ID of the confidential client in the IdP. |
 | `auth.oidc.cli_client_id` | `WT_AUTH_OIDC_CLI_CLIENT_ID` | string | `wtctl` | Client ID of the public client used by the CLI (wtctl): wtctl by default. |
 | `auth.oidc.client_secret_file` | `WT_AUTH_OIDC_CLIENT_SECRET_FILE` | string | none | File with the confidential client secret: the secret never belongs in the configuration file or the environment. |

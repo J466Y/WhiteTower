@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/uuid"
 
 	"github.com/J466Y/WhiteTower/internal/authn"
@@ -32,6 +33,13 @@ type mockIDP struct {
 	keyID        string
 	customToken  string
 	tokenHandler func(w http.ResponseWriter, r *http.Request)
+	// discovery replaces the discovery document, which otherwise names the
+	// mock itself; set it before the first request.
+	discovery map[string]any
+	// hangUp is a path at which the mock closes the connection without an
+	// answer, as a provider that went away does; set it before the first
+	// request.
+	hangUp string
 }
 
 func newMockIDP(t *testing.T) *mockIDP {
@@ -49,17 +57,21 @@ func newMockIDP(t *testing.T) *mockIDP {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		document := m.discovery
+		if document == nil {
+			document = map[string]any{
+				"issuer":                                m.server.URL,
+				"authorization_endpoint":                m.server.URL + "/auth",
+				"token_endpoint":                        m.server.URL + "/token",
+				"jwks_uri":                              m.server.URL + "/jwks",
+				"end_session_endpoint":                  m.server.URL + "/logout",
+				"id_token_signing_alg_values_supported": []string{"RS256"},
+				"response_types_supported":              []string{"code"},
+				"subject_types_supported":               []string{"public"},
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"issuer":                                m.server.URL,
-			"authorization_endpoint":                m.server.URL + "/auth",
-			"token_endpoint":                        m.server.URL + "/token",
-			"jwks_uri":                              m.server.URL + "/jwks",
-			"end_session_endpoint":                  m.server.URL + "/logout",
-			"id_token_signing_alg_values_supported": []string{"RS256"},
-			"response_types_supported":              []string{"code"},
-			"subject_types_supported":               []string{"public"},
-		})
+		_ = json.NewEncoder(w).Encode(document)
 	})
 
 	mux.HandleFunc("/jwks", func(w http.ResponseWriter, r *http.Request) {
@@ -102,9 +114,39 @@ func newMockIDP(t *testing.T) *mockIDP {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	m.server = httptest.NewServer(mux)
+	m.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if m.hangUp != "" && r.URL.Path == m.hangUp {
+			if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
+				_ = conn.Close()
+			}
+			return
+		}
+		mux.ServeHTTP(w, r)
+	}))
 	t.Cleanup(m.server.Close)
 	return m
+}
+
+// frontIssuer is the issuer of a provider that the server reaches through a
+// back channel, the mock: only browsers would reach the issuer, so the tests
+// never call it.
+const frontIssuer = "https://idp.example.test/realms/whitetower"
+
+// backChannelDocument returns the discovery document that the mock serves as
+// the back channel of the issuer, as Keycloak does with a fixed hostname and a
+// dynamic back channel: the issuer and the endpoints that browsers use are
+// the issuer's, and the endpoints that the server calls are the mock's.
+func (m *mockIDP) backChannelDocument(issuer string) map[string]any {
+	return map[string]any{
+		"issuer":                                issuer,
+		"authorization_endpoint":                issuer + "/protocol/openid-connect/auth",
+		"end_session_endpoint":                  issuer + "/protocol/openid-connect/logout",
+		"token_endpoint":                        m.server.URL + "/token",
+		"jwks_uri":                              m.server.URL + "/jwks",
+		"id_token_signing_alg_values_supported": []string{"RS256"},
+		"response_types_supported":              []string{"code"},
+		"subject_types_supported":               []string{"public"},
+	}
 }
 
 func (m *mockIDP) signIDToken(header map[string]any, payload map[string]any) string {
@@ -131,6 +173,63 @@ func (m *mockIDP) signIDToken(header map[string]any, payload map[string]any) str
 		panic(err)
 	}
 	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+// initiateLogin performs the login step: it returns the state cookie, and the
+// state and nonce of the authorization request.
+func initiateLogin(t *testing.T, svc *authn.OIDCService, returnURL string) (*http.Cookie, string, string) {
+	t.Helper()
+	reqURL := "/auth/login"
+	if returnURL != "" {
+		reqURL += "?return_url=" + url.QueryEscape(returnURL)
+	}
+	loginReq := httptest.NewRequest(http.MethodGet, reqURL, nil)
+	loginRec := httptest.NewRecorder()
+	svc.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusFound {
+		t.Fatalf("expected 302 Found from /auth/login, got %d: %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	cookies := loginRec.Result().Cookies()
+	var stateCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "__Host-wt_oidc" || c.Name == "wt_oidc" {
+			stateCookie = c
+			break
+		}
+	}
+	if stateCookie == nil {
+		t.Fatalf("missing state cookie in login response")
+	}
+
+	location := loginRec.Header().Get("Location")
+	locURL, err := url.Parse(location)
+	if err != nil {
+		t.Fatalf("parsing redirect Location: %v", err)
+	}
+	stateParam := locURL.Query().Get("state")
+	nonceParam := locURL.Query().Get("nonce")
+	return stateCookie, stateParam, nonceParam
+}
+
+// checkEndSessionRedirect checks that a logout sends the browser to the
+// provider's end session endpoint with the client's ID, which Keycloak needs
+// to accept a post-logout redirect without an ID token, and with the console's
+// root on the redirect URL's origin as the page to come back to.
+func checkEndSessionRedirect(t *testing.T, location, endSession, clientID string) {
+	t.Helper()
+	u, err := url.Parse(location)
+	if err != nil {
+		t.Fatalf("parsing the logout's Location %q: %v", location, err)
+	}
+	if got := u.Scheme + "://" + u.Host + u.Path; got != endSession {
+		t.Errorf("logout redirects to %s, want the end session endpoint %s", got, endSession)
+	}
+	want := url.Values{"client_id": {clientID}, "post_logout_redirect_uri": {"https://127.0.0.1:8443/"}}
+	if got := u.Query(); got.Encode() != want.Encode() {
+		t.Errorf("logout parameters %v, want %v", got, want)
+	}
 }
 
 // Security test ST-15: Return URLs outside the console's own paths are refused
@@ -265,45 +364,8 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
 
-	// Helper to perform the login step to obtain the state cookie and authorization URL
-	initiateLogin := func(t *testing.T, returnURL string) (*http.Cookie, string, string) {
-		t.Helper()
-		reqURL := "/auth/login"
-		if returnURL != "" {
-			reqURL += "?return_url=" + url.QueryEscape(returnURL)
-		}
-		loginReq := httptest.NewRequest(http.MethodGet, reqURL, nil)
-		loginRec := httptest.NewRecorder()
-		svc.ServeHTTP(loginRec, loginReq)
-
-		if loginRec.Code != http.StatusFound {
-			t.Fatalf("expected 302 Found from /auth/login, got %d: %s", loginRec.Code, loginRec.Body.String())
-		}
-
-		cookies := loginRec.Result().Cookies()
-		var stateCookie *http.Cookie
-		for _, c := range cookies {
-			if c.Name == "__Host-wt_oidc" || c.Name == "wt_oidc" {
-				stateCookie = c
-				break
-			}
-		}
-		if stateCookie == nil {
-			t.Fatalf("missing state cookie in login response")
-		}
-
-		location := loginRec.Header().Get("Location")
-		locURL, err := url.Parse(location)
-		if err != nil {
-			t.Fatalf("parsing redirect Location: %v", err)
-		}
-		stateParam := locURL.Query().Get("state")
-		nonceParam := locURL.Query().Get("nonce")
-		return stateCookie, stateParam, nonceParam
-	}
-
 	t.Run("successful login provisions principal and session", func(t *testing.T) {
-		stateCookie, stateParam, nonceParam := initiateLogin(t, "/dashboard")
+		stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/dashboard")
 
 		now := clk.Now()
 		token := idp.signIDToken(
@@ -367,7 +429,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 	})
 
 	t.Run("ID token with wrong issuer is refused", func(t *testing.T) {
-		stateCookie, stateParam, nonceParam := initiateLogin(t, "/")
+		stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/")
 		now := clk.Now()
 		idp.customToken = idp.signIDToken(
 			map[string]any{"alg": "RS256"},
@@ -391,7 +453,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 	})
 
 	t.Run("ID token with wrong audience is refused", func(t *testing.T) {
-		stateCookie, stateParam, nonceParam := initiateLogin(t, "/")
+		stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/")
 		now := clk.Now()
 		idp.customToken = idp.signIDToken(
 			map[string]any{"alg": "RS256"},
@@ -415,7 +477,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 	})
 
 	t.Run("expired ID token is refused", func(t *testing.T) {
-		stateCookie, stateParam, nonceParam := initiateLogin(t, "/")
+		stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/")
 		now := clk.Now()
 		idp.customToken = idp.signIDToken(
 			map[string]any{"alg": "RS256"},
@@ -439,7 +501,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 	})
 
 	t.Run("replayed or mismatched nonce is refused", func(t *testing.T) {
-		stateCookie, stateParam, _ := initiateLogin(t, "/")
+		stateCookie, stateParam, _ := initiateLogin(t, svc, "/")
 		now := clk.Now()
 		idp.customToken = idp.signIDToken(
 			map[string]any{"alg": "RS256"},
@@ -463,7 +525,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 	})
 
 	t.Run("disallowed algorithm none is refused", func(t *testing.T) {
-		stateCookie, stateParam, nonceParam := initiateLogin(t, "/")
+		stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/")
 		now := clk.Now()
 		idp.customToken = idp.signIDToken(
 			map[string]any{"alg": "none"},
@@ -498,7 +560,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		stateCookie, stateParam, nonceParam := initiateLogin(t, "/")
+		stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/")
 		now := clk.Now()
 		idp.customToken = idp.signIDToken(
 			map[string]any{"alg": "RS256"},
@@ -523,7 +585,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 	})
 
 	t.Run("IdP error callback returns unauthorized and sanitizes input", func(t *testing.T) {
-		stateCookie, stateParam, _ := initiateLogin(t, "/")
+		stateCookie, stateParam, _ := initiateLogin(t, svc, "/")
 		req := httptest.NewRequest(http.MethodGet, "/auth/callback?state="+url.QueryEscape(stateParam)+"&error=access_denied&error_description=user%0Acanceled", nil)
 		req.AddCookie(stateCookie)
 		rec := httptest.NewRecorder()
@@ -556,6 +618,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		if rec.Code != http.StatusFound {
 			t.Errorf("expected 302 Found on logout, got %d", rec.Code)
 		}
+		checkEndSessionRedirect(t, rec.Header().Get("Location"), idp.server.URL+"/logout", clientID)
 
 		// Session in PostgreSQL must now be revoked
 		_, err = sessionStore.Get(context.Background(), sess.Token)
@@ -710,4 +773,256 @@ func TestExchangeIDToken(t *testing.T) {
 			t.Errorf("expected ErrPrincipalInactive, got %v", err)
 		}
 	})
+}
+
+// backChannelOptions returns the options of a service that reaches the mock at
+// its discovery URL, as a core in a container reaches Keycloak, while browsers
+// reach the provider at frontIssuer.
+func backChannelOptions(idp *mockIDP, clk *clocktest.Fake) authn.OIDCOptions {
+	return authn.OIDCOptions{
+		Issuer:            frontIssuer,
+		DiscoveryURL:      idp.server.URL,
+		ClientID:          "whitetower-console",
+		ClientSecret:      "test-secret",
+		RedirectURL:       "https://127.0.0.1:8443/auth/callback",
+		Clock:             clk,
+		RoleMapping:       map[string]string{"wt-owners": "owner"},
+		AllowedAlgorithms: []string{"RS256"},
+		HTTPClient:        idp.server.Client(),
+	}
+}
+
+// signInThroughBackChannel completes a sign-in whose ID token names issuer,
+// and returns the service's answer to the callback.
+func signInThroughBackChannel(t *testing.T, svc *authn.OIDCService, idp *mockIDP, clk *clocktest.Fake, issuer string) *httptest.ResponseRecorder {
+	t.Helper()
+	stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/")
+	now := clk.Now()
+	idp.customToken = idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{
+		"iss":    issuer,
+		"aud":    "whitetower-console",
+		"sub":    "usr-back-channel",
+		"exp":    now.Add(time.Hour).Unix(),
+		"iat":    now.Unix(),
+		"nonce":  nonceParam,
+		"name":   "Bea Back",
+		"groups": []string{"wt-owners"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/auth/callback?code=mock-code&state="+url.QueryEscape(stateParam), nil)
+	req.AddCookie(stateCookie)
+	rec := httptest.NewRecorder()
+	svc.ServeHTTP(rec, req)
+	return rec
+}
+
+// Security test ST-16: a provider that the server reaches at a discovery URL,
+// a back channel, keeps the configured issuer: browsers go to the issuer's
+// endpoints, principals keep the issuer, and an ID token issued at the back
+// channel is refused.
+func TestTheProviderIsDiscoveredThroughItsBackChannel(t *testing.T) {
+	idp := newMockIDP(t)
+	idp.discovery = idp.backChannelDocument(frontIssuer)
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+
+	opts := backChannelOptions(idp, clk)
+	opts.Tokens = tokenStore
+	svc, err := authn.NewOIDCService(context.Background(), opts, database, principalStore, sessionStore)
+	if err != nil {
+		t.Fatalf("creating OIDC service: %v", err)
+	}
+
+	t.Run("sign-in sends the browser to the issuer, and the principal keeps it", func(t *testing.T) {
+		loginRec := httptest.NewRecorder()
+		svc.ServeHTTP(loginRec, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
+		if loc := loginRec.Header().Get("Location"); !strings.HasPrefix(loc, frontIssuer+"/protocol/openid-connect/auth?") {
+			t.Fatalf("login redirects to %q, want the issuer's authorization endpoint", loc)
+		}
+
+		rec := signInThroughBackChannel(t, svc, idp, clk, frontIssuer)
+		if rec.Code != http.StatusFound {
+			t.Fatalf("callback: got %d %q, want 302", rec.Code, rec.Body.String())
+		}
+		var session *authn.Session
+		for _, c := range rec.Result().Cookies() {
+			if c.Name == authn.CookieNameInsecure && c.Value != "" {
+				s, err := sessionStore.Get(context.Background(), c.Value)
+				if err != nil {
+					t.Fatalf("reading the session: %v", err)
+				}
+				session = s
+			}
+		}
+		if session == nil || len(session.Roles) != 1 || session.Roles[0] != "owner" {
+			t.Fatalf("session %+v, want one with the owner role", session)
+		}
+		p, err := principalStore.GetByID(context.Background(), session.PrincipalID)
+		if err != nil {
+			t.Fatalf("reading the principal: %v", err)
+		}
+		if p.Issuer == nil || *p.Issuer != frontIssuer {
+			t.Errorf("the principal's issuer is %v, want %s", p.Issuer, frontIssuer)
+		}
+	})
+
+	t.Run("an ID token issued at the back channel is refused", func(t *testing.T) {
+		if rec := signInThroughBackChannel(t, svc, idp, clk, idp.server.URL); rec.Code != http.StatusBadRequest {
+			t.Errorf("callback: got %d %q, want 400", rec.Code, rec.Body.String())
+		}
+		now := clk.Now()
+		rawToken := idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{
+			"iss": idp.server.URL,
+			"aud": "wtctl",
+			"sub": "cli-back-channel",
+			"exp": now.Add(time.Hour).Unix(),
+		})
+		if _, err := svc.ExchangeIDToken(context.Background(), rawToken); !errors.Is(err, authn.ErrInvalidToken) {
+			t.Errorf("exchange: got %v, want ErrInvalidToken", err)
+		}
+	})
+
+	t.Run("logout sends the browser to the issuer's end session endpoint", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		svc.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/auth/logout", nil))
+		if rec.Code != http.StatusFound {
+			t.Fatalf("logout: got %d, want 302", rec.Code)
+		}
+		checkEndSessionRedirect(t, rec.Header().Get("Location"), frontIssuer+"/protocol/openid-connect/logout", opts.ClientID)
+	})
+}
+
+// Security test ST-16: a discovery document that names another issuer than
+// the configured one is refused, whether the server fetched it at a discovery
+// URL or at the issuer itself.
+func TestADiscoveryDocumentThatNamesAnotherIssuerIsRefused(t *testing.T) {
+	tests := []struct {
+		name string
+		// atIssuer runs discovery at the issuer, without a discovery URL.
+		atIssuer bool
+		// named returns the issuer that the document names; nil: none.
+		named func(idp *mockIDP) string
+	}{
+		{"the back channel's URL", false, func(idp *mockIDP) string { return idp.server.URL }},
+		{"the issuer with a trailing slash", false, func(*mockIDP) string { return frontIssuer + "/" }},
+		{"no issuer", false, nil},
+		{"another provider", false, func(*mockIDP) string { return "https://attacker.example/realms/whitetower" }},
+		{"another provider, at the issuer", true, func(*mockIDP) string { return "https://attacker.example/realms/whitetower" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			idp := newMockIDP(t)
+			opts := backChannelOptions(idp, clocktest.New(testEpoch))
+			if tt.atIssuer {
+				opts.Issuer, opts.DiscoveryURL = idp.server.URL, ""
+			}
+			idp.discovery = idp.backChannelDocument(opts.Issuer)
+			delete(idp.discovery, "issuer")
+			if tt.named != nil {
+				idp.discovery["issuer"] = tt.named(idp)
+			}
+
+			_, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil)
+			var mismatch *oidc.IssuerMismatchError
+			if !errors.As(err, &mismatch) || mismatch.Provided != opts.Issuer {
+				t.Fatalf("got %v, want an issuer mismatch with %s", err, opts.Issuer)
+			}
+			if document := idp.server.URL + "/.well-known/openid-configuration"; !strings.Contains(err.Error(), document) {
+				t.Errorf("error %q does not name the document's URL %s", err, document)
+			}
+		})
+	}
+}
+
+// A discovery that fails stops the service with an error that names the URL
+// it fetched, for the operator who reads the server's log.
+func TestAFailedDiscoveryNamesTheDocumentItFetched(t *testing.T) {
+	idp := newMockIDP(t)
+	idp.hangUp = "/.well-known/openid-configuration"
+	_, err := authn.NewOIDCService(context.Background(), backChannelOptions(idp, clocktest.New(testEpoch)), nil, nil, nil)
+	if document := idp.server.URL + "/.well-known/openid-configuration"; err == nil || !strings.Contains(err.Error(), document) {
+		t.Fatalf("got %v, want an error that names %s", err, document)
+	}
+}
+
+// The service refuses options that leave it no issuer to check documents and
+// ID tokens against, or no origin to come back to after a logout.
+func TestTheServiceNeedsAnIssuerAndAnAbsoluteRedirectURL(t *testing.T) {
+	for name, change := range map[string]func(*authn.OIDCOptions){
+		"no issuer":               func(o *authn.OIDCOptions) { o.Issuer = "" },
+		"a relative redirect URL": func(o *authn.OIDCOptions) { o.RedirectURL = "/auth/callback" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			idp := newMockIDP(t)
+			opts := backChannelOptions(idp, clocktest.New(testEpoch))
+			change(&opts)
+			// The document names the configured issuer, even an empty one, so
+			// that only the refusal under test can stop the service.
+			idp.discovery = idp.backChannelDocument(opts.Issuer)
+			if _, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil); err == nil {
+				t.Fatal("the service was created")
+			}
+		})
+	}
+}
+
+// Security test ST-16: the errors of a call on the back channel name its URL,
+// and a browser that signs in gets none of them.
+func TestAFailureOnTheBackChannelNamesNothingOfItToTheBrowser(t *testing.T) {
+	for _, tt := range []struct {
+		path string
+		want int
+	}{
+		{"/token", http.StatusBadGateway},
+		{"/jwks", http.StatusBadRequest},
+	} {
+		t.Run(tt.path, func(t *testing.T) {
+			idp := newMockIDP(t)
+			idp.discovery = idp.backChannelDocument(frontIssuer)
+			idp.hangUp = tt.path
+			clk := clocktest.New(testEpoch)
+			svc, err := authn.NewOIDCService(context.Background(), backChannelOptions(idp, clk), nil, nil, nil)
+			if err != nil {
+				t.Fatalf("creating OIDC service: %v", err)
+			}
+
+			rec := signInThroughBackChannel(t, svc, idp, clk, frontIssuer)
+			if rec.Code != tt.want {
+				t.Errorf("callback: got %d, want %d", rec.Code, tt.want)
+			}
+			if backChannel := idp.server.Listener.Addr().String(); strings.Contains(rec.Body.String(), backChannel) {
+				t.Errorf("the browser learns the back channel %s: %q", backChannel, rec.Body.String())
+			}
+		})
+	}
+}
+
+// Security test ST-16: the exchange of an ID token that does not verify fails
+// without its cause, which can name the back channel: the API repeats the
+// error to its client.
+func TestARefusedExchangeNamesNothingOfTheBackChannel(t *testing.T) {
+	idp := newMockIDP(t)
+	idp.discovery = idp.backChannelDocument(frontIssuer)
+	idp.hangUp = "/jwks"
+	clk := clocktest.New(testEpoch)
+	opts := backChannelOptions(idp, clk)
+	// The token store is never reached: the ID token does not verify.
+	opts.Tokens = authn.NewTokenStore(nil, clk, nil)
+	svc, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("creating OIDC service: %v", err)
+	}
+
+	rawToken := idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{
+		"iss": frontIssuer,
+		"aud": "wtctl",
+		"sub": "cli-back-channel",
+		"exp": clk.Now().Add(time.Hour).Unix(),
+	})
+	_, err = svc.ExchangeIDToken(context.Background(), rawToken)
+	if !errors.Is(err, authn.ErrInvalidToken) {
+		t.Fatalf("got %v, want ErrInvalidToken", err)
+	}
+	if backChannel := idp.server.Listener.Addr().String(); strings.Contains(err.Error(), backChannel) {
+		t.Errorf("the client learns the back channel %s: %v", backChannel, err)
+	}
 }

@@ -141,6 +141,8 @@ type Breakglass struct {
 type OIDC struct {
 	// Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled.
 	Issuer string `yaml:"issuer"`
+	// Base URL that the server fetches the identity provider's discovery document from, under /.well-known/openid-configuration, when the server reaches the provider at another address than browsers do, such as http://keycloak:8080/realms/whitetower inside a container network. The document must still name auth.oidc.issuer as its issuer, and ID tokens are verified against auth.oidc.issuer. The server sends the client secret and the authorization code to the endpoints the document names and takes the signing keys from them, so the URL is https when the issuer is. Empty: the issuer.
+	DiscoveryURL string `yaml:"discovery_url"`
 	// Client ID of the confidential client in the IdP.
 	ClientID string `yaml:"client_id"`
 	// Client ID of the public client used by the CLI (wtctl): wtctl by default.
@@ -473,6 +475,11 @@ func (c Config) Validate() error {
 			}
 		}
 	}
+	if u := c.Auth.OIDC.DiscoveryURL; u != "" {
+		if err := checkDiscoveryURL(u, c.Auth.OIDC.Issuer); err != nil {
+			add("auth.oidc.discovery_url", "%v", err)
+		}
+	}
 	if c.Auth.Breakglass.Enabled && c.Auth.Breakglass.CredentialHashFile == "" {
 		add("auth.breakglass.credential_hash_file", "required when auth.breakglass.enabled is true")
 	}
@@ -551,8 +558,9 @@ func checkDatabaseURL(s string) error {
 	return nil
 }
 
-// checkEndpoint accepts the base URL of an OTLP/HTTP receiver. Its errors
-// never repeat the URL, which could hold a credential.
+// checkEndpoint accepts the base URL of a service that the server calls, such
+// as an OTLP/HTTP receiver. Its errors never repeat the URL, which could hold a
+// credential.
 func checkEndpoint(s string) error {
 	u, err := url.Parse(s)
 	switch {
@@ -566,6 +574,30 @@ func checkEndpoint(s string) error {
 		return errors.New("the URL has no host")
 	case u.RawQuery != "" || u.Fragment != "":
 		return errors.New("want a base URL, without a query or a fragment")
+	}
+	return nil
+}
+
+// checkDiscoveryURL accepts the base URL that the server reaches an identity
+// provider at when it is not the issuer: a back channel, which carries the
+// client secret, the authorization code and the signing keys. Its errors never
+// repeat either URL.
+func checkDiscoveryURL(s, issuer string) error {
+	if issuer == "" {
+		return errors.New("set it only with auth.oidc.issuer")
+	}
+	if err := checkEndpoint(s); err != nil {
+		return err
+	}
+	u, _ := url.Parse(s) // checkEndpoint parsed it.
+	iss, err := url.Parse(issuer)
+	switch {
+	case err == nil && iss.Scheme == "https" && u.Scheme != "https":
+		return errors.New("want https, as auth.oidc.issuer is: the back channel carries the client secret, the authorization code and the signing keys")
+	case strings.TrimSuffix(s, "/") == strings.TrimSuffix(issuer, "/"):
+		return errors.New("the same as auth.oidc.issuer: leave it empty")
+	case strings.HasSuffix(strings.TrimSuffix(u.Path, "/"), "/.well-known/openid-configuration"):
+		return errors.New("want the base URL that /.well-known/openid-configuration follows, not the document's URL")
 	}
 	return nil
 }

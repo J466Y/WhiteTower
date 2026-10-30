@@ -29,6 +29,10 @@ type composeConfig struct {
 		CapDrop     []string          `yaml:"cap_drop"`
 		Environment map[string]string `yaml:"environment"`
 		Secrets     []string          `yaml:"secrets"`
+		Ports       []string          `yaml:"ports"`
+		DependsOn   map[string]struct {
+			Condition string `yaml:"condition"`
+		} `yaml:"depends_on"`
 		Healthcheck *struct {
 			Test []string `yaml:"test"`
 		} `yaml:"healthcheck"`

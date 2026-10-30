@@ -28,6 +28,11 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin-dev-only
       KC_HEALTH_ENABLED: "true"
+      # Browsers reach Keycloak at this URL, which every token names as its
+      # issuer. Containers reach it at http://keycloak:8080, the back channel,
+      # whose endpoints follow the address of each request.
+      KC_HOSTNAME: http://127.0.0.1:${WT_KEYCLOAK_PORT:-8180}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports:
       - "127.0.0.1:${WT_KEYCLOAK_PORT:-8180}:8080"
     volumes:
@@ -77,7 +82,8 @@ services:
       PGDATABASE: whitetower
     volumes:
       - ./seed/seed.sql:/seed.sql:ro
-    command: ["psql", "-f", "/seed.sql"]
+    # A statement that fails stops the seed, and the core does not start.
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/seed.sql"]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -92,10 +98,18 @@ services:
       WT_AUDIT_ORIGIN: whitetower.localhost/audit
       WT_AUDIT_CHECKPOINT_KEY_FILE: /run/secrets/audit-checkpoint-key
       WT_TRACING_OTLP_ENDPOINT: http://otel-collector:4318
-      WT_AUTH_OIDC_ISSUER: http://keycloak:8080/realms/whitetower
+      # Sign-in through the realm in keycloak/. The issuer is the URL that
+      # browsers use, and the seed's; the core fetches the provider's
+      # metadata, keys and tokens at the discovery URL, through Docker's
+      # network.
+      WT_AUTH_OIDC_ISSUER: http://127.0.0.1:${WT_KEYCLOAK_PORT:-8180}/realms/whitetower
+      WT_AUTH_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/whitetower
       WT_AUTH_OIDC_CLIENT_ID: whitetower-console
       WT_AUTH_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc-client-secret
-      WT_AUTH_OIDC_REDIRECT_URL: https://127.0.0.1:8443/auth/callback
+      WT_AUTH_OIDC_REDIRECT_URL: https://127.0.0.1:${WT_CONSOLE_PORT:-8443}/auth/callback
+      # Keycloak defines no groups scope, and refuses a request for one: the
+      # client's own mapper puts the groups in the ID token.
+      WT_AUTH_OIDC_SCOPES: openid,profile,email
     secrets:
       - db-app-password
       - audit-checkpoint-key

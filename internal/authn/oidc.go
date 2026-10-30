@@ -39,6 +39,7 @@ const (
 // OIDCOptions holds options for configuring the OpenID Connect backend-for-frontend service.
 type OIDCOptions struct {
 	Issuer            string
+	DiscoveryURL      string // The discovery document's base URL, when not the issuer: a back channel.
 	ClientID          string
 	CLIClientID       string
 	ClientSecret      string
@@ -64,6 +65,7 @@ type oidcState struct {
 }
 
 type discoveryClaims struct {
+	Issuer             string `json:"issuer"`
 	EndSessionEndpoint string `json:"end_session_endpoint"`
 }
 
@@ -88,11 +90,25 @@ type OIDCService struct {
 	tokens        *TokenStore
 	stateKey      []byte
 	endSessionURL string
+	postLogoutURL string
 	logger        *slog.Logger
 }
 
 // NewOIDCService initializes an OIDCService against the configured OpenID Connect provider.
 func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, principals *PrincipalStore, sessions *SessionStore) (*OIDCService, error) {
+	// Without an issuer, a discovery document without one would pass the
+	// issuer check below.
+	if opts.Issuer == "" {
+		return nil, errors.New("an OIDC issuer is required")
+	}
+	// After the identity provider ends its session, it sends the browser back
+	// to the console's root, on the origin of the redirect URL: the core's.
+	redirect, err := url.Parse(opts.RedirectURL)
+	if err != nil || redirect.Scheme == "" || redirect.Host == "" {
+		return nil, fmt.Errorf("the OIDC redirect URL %q must be an absolute URL", opts.RedirectURL)
+	}
+	postLogoutURL := (&url.URL{Scheme: redirect.Scheme, Host: redirect.Host, Path: "/"}).String()
+
 	if opts.Clock == nil {
 		opts.Clock = clock.System
 	}
@@ -114,13 +130,31 @@ func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, prin
 		pCtx = oidc.ClientContext(ctx, opts.HTTPClient)
 	}
 
-	provider, err := oidc.NewProvider(pCtx, opts.Issuer)
+	// Discovery runs at the discovery URL when the server reaches the provider
+	// at another address than browsers do, and at the issuer otherwise. go-oidc
+	// would compare the document's issuer with the URL it fetched the document
+	// from. With the issuer URL context, it skips that comparison and verifies
+	// ID tokens against the configured issuer, and the check below compares the
+	// document's issuer with the configured one, whichever URL served it, so
+	// that one tested path decides (ST-16).
+	discoveryURL := opts.Issuer
+	if opts.DiscoveryURL != "" {
+		discoveryURL = opts.DiscoveryURL
+	}
+	documentURL := strings.TrimSuffix(discoveryURL, "/") + "/.well-known/openid-configuration"
+	provider, err := oidc.NewProvider(oidc.InsecureIssuerURLContext(pCtx, opts.Issuer), discoveryURL)
 	if err != nil {
-		return nil, fmt.Errorf("discovering OIDC provider at %s: %w", opts.Issuer, err)
+		return nil, fmt.Errorf("discovering OIDC provider at %s: %w", documentURL, err)
 	}
 
 	var disc discoveryClaims
-	_ = provider.Claims(&disc)
+	if err := provider.Claims(&disc); err != nil {
+		return nil, fmt.Errorf("discovering OIDC provider at %s: %w", documentURL, err)
+	}
+	if disc.Issuer != opts.Issuer {
+		return nil, fmt.Errorf("discovering OIDC provider at %s: %w", documentURL,
+			&oidc.IssuerMismatchError{Provided: opts.Issuer, Discovered: disc.Issuer})
+	}
 
 	verifier := provider.Verifier(&oidc.Config{
 		ClientID:             opts.ClientID,
@@ -163,6 +197,7 @@ func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, prin
 		tokens:        opts.Tokens,
 		stateKey:      stateKey,
 		endSessionURL: disc.EndSessionEndpoint,
+		postLogoutURL: postLogoutURL,
 		logger:        opts.Logger,
 	}, nil
 }
@@ -325,8 +360,10 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
 		oauth2.SetAuthURLParam("code_verifier", state.CodeVerifier),
 	)
 	if err != nil {
+		// The error can name the provider's back channel, which browsers
+		// must not learn: only the log holds it.
 		s.logger.Error("exchanging code for token", "error", err)
-		http.Error(w, fmt.Sprintf("token exchange failed: %v", err), http.StatusBadGateway)
+		http.Error(w, "token exchange failed", http.StatusBadGateway)
 		return
 	}
 
@@ -340,8 +377,9 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
 	// a replayed nonce or an unexpected algorithm are refused.
 	idToken, err := s.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
+		// Fetching the signing keys can fail on the back channel too.
 		s.logger.Warn("verifying id_token failed", "error", err)
-		http.Error(w, fmt.Sprintf("id token verification failed: %v", err), http.StatusBadRequest)
+		http.Error(w, "id token verification failed", http.StatusBadRequest)
 		return
 	}
 
@@ -456,10 +494,14 @@ func (s *OIDCService) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, s.sessions.ClearCookie(s.opts.SecureCookies))
 
 	if s.endSessionURL != "" {
-		postLogout := s.opts.RedirectURL
 		if u, err := url.Parse(s.endSessionURL); err == nil {
 			q := u.Query()
-			q.Set("post_logout_redirect_uri", postLogout)
+			// A provider needs the ID token or the client to accept a
+			// post-logout redirect: Keycloak refuses one with neither. The
+			// core keeps no ID token, so it names its client, and the
+			// provider asks the person to confirm before it ends its session.
+			q.Set("client_id", s.opts.ClientID)
+			q.Set("post_logout_redirect_uri", s.postLogoutURL)
 			u.RawQuery = q.Encode()
 			http.Redirect(w, r, u.String(), http.StatusFound)
 			return
@@ -569,8 +611,11 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 		}
 	}
 	if err != nil {
+		// The API repeats this error to the client, and fetching the signing
+		// keys can fail on the provider's back channel: only the log holds
+		// the cause.
 		s.logger.Warn("verifying exchange id_token failed", "error", err)
-		return nil, fmt.Errorf("%w: %w", ErrInvalidToken, err)
+		return nil, fmt.Errorf("%w: the ID token does not verify", ErrInvalidToken)
 	}
 
 	var claims idTokenClaims
