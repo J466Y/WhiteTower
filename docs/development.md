@@ -35,6 +35,8 @@ go run ./cmd/wtctl version --insecure-skip-tls-verify --server https://127.0.0.1
 
 `task run` serves a placeholder page; [Working on the console](#working-on-the-console) shows how to run the real console. `task build` builds both into `bin/whitetower`, with the CLI next to it.
 
+`task run` signs in through the Keycloak of `task dev`, which it needs running: open <https://127.0.0.1:8443/auth/login> and sign in as one of the [test users](../deploy/compose/dev/README.md#test-users). <https://127.0.0.1:8443/api/v1/me> then shows who you are, and <https://127.0.0.1:8443/auth/logout> signs you out. Use `127.0.0.1`, never `localhost`: the cookies of a sign-in belong to one host name.
+
 The core has three listeners: the console and public API on `127.0.0.1:8443`, the module API on `127.0.0.1:9443`, and operations on `http://127.0.0.1:9090`, with `/healthz`, `/readyz` and `/metrics`. Its settings are in the [configuration reference](reference/configuration.md); `whitetower config print` shows the effective values.
 
 ## Everyday tasks
@@ -47,7 +49,7 @@ The core has three listeners: the console and public API on `127.0.0.1:8443`, th
 | `task lint` | Runs `go vet`, golangci-lint, Biome, the TypeScript compiler and `buf lint` |
 | `task fmt` | Formats Go and console code |
 | `task vuln` | Checks Go dependencies for reachable known vulnerabilities |
-| `task run` | Migrates the development database, then runs the core from source with a development certificate and a placeholder console |
+| `task run` | Migrates the development database, then runs the core from source with a development certificate, sign-in through the development Keycloak and a placeholder console |
 | `task migrate` | Applies the database migrations to the development database |
 | `task dev` | Starts PostgreSQL and Keycloak in Docker |
 | `task dev:web` | Runs the console with live reload |
@@ -67,13 +69,21 @@ task dev:web   # console on http://localhost:5173, with live reload
 
 Vite forwards `/api` and `/auth` to the core, accepting its development certificate. The console's API types come from the OpenAPI document: after changing `api/openapi/openapi.yaml`, run `task gen`.
 
+To sign in through Vite, give the core the console's callback as its redirect URL, which the realm registers, then open <http://localhost:5173/auth/login>:
+
+```sh
+WT_AUTH_OIDC_REDIRECT_URL=http://localhost:5173/auth/callback task run
+```
+
+On Windows, set the variable first: `$env:WT_AUTH_OIDC_REDIRECT_URL = "http://localhost:5173/auth/callback"`. A session belongs to the host name where you signed in: a sign-in through Vite holds for <http://localhost:5173> only.
+
 ## Development services
 
-`task dev` starts PostgreSQL and Keycloak. Keycloak comes with one test user per role. Addresses, users and credentials, all for local use only, are in [deploy/compose/dev/README.md](../deploy/compose/dev/README.md).
+`task dev` starts PostgreSQL and Keycloak. Keycloak comes with one test user per role, which `task run` and the core in Docker sign in with. Addresses, users and credentials, all for local use only, and how the core reaches Keycloak, are in [deploy/compose/dev/README.md](../deploy/compose/dev/README.md).
 
 PostgreSQL has the roles of a deployment. `whitetower_migrator` owns the schema, and only `whitetower migrate` uses it. The core connects as `whitetower_app`, which may read and write data but never change the schema ([threat model](security/threat-model.md), DC-3). The roles are created when the database starts on an empty volume. A volume from before October 2026 lacks them: recreate it with `docker compose -f deploy/compose/dev/compose.yaml down --volumes`, which deletes the development data.
 
-To run the core in Docker as well, built from source, after a one-off `migrate` service:
+To run the core in Docker as well, built from source, after a one-off `migrate` service and once Keycloak is healthy:
 
 ```sh
 docker compose -f deploy/compose/dev/compose.yaml --profile core up -d --build
@@ -112,7 +122,7 @@ The test helpers, and how a package writes its tests, are in [internals](develop
 
 - **Unit tests:** `task test`.
 - **Database tests:** they start PostgreSQL in Docker with testcontainers, through `internal/platform/db/dbtest`, which gives each test a fresh database with the roles of a deployment. Without Docker they are skipped, except in CI, where they fail. `WT_TEST_POSTGRES_IMAGE` picks another PostgreSQL version, for example `postgres:16-alpine`.
-- **End-to-end tests:** start a core that serves the built console (`task build` then `./bin/whitetower serve` with a development certificate, or the Compose `core` profile), then run `task e2e`. The browser test needs Chromium, installed once with `pnpm --dir web exec playwright install chromium`. Set `WT_E2E_URL`, `WT_E2E_MACHINE_URL` and `WT_E2E_OPERATIONS_URL` to test another deployment.
+- **End-to-end tests:** start a core that serves the built console and signs in through the development Keycloak, as CI does with the Compose `core` profile (`docker compose -f deploy/compose/dev/compose.yaml --profile core up -d --build --wait whitetower`), then run `task e2e`. The browser tests need Chromium, installed once with `pnpm --dir web exec playwright install chromium`; the sign-in test signs in as each test user of the realm. Set `WT_E2E_URL`, `WT_E2E_MACHINE_URL` and `WT_E2E_OPERATIONS_URL` to test another deployment.
 - **Race detector:** `go test -race ./...` needs cgo (a C compiler). CI runs it on Linux.
 
 ## Repository layout
@@ -145,4 +155,5 @@ The reasoning behind the layout is in [ADR-0007](adr/0007-monorepo-layout.md). T
 | `ERR_PNPM_... Command "...\pnpm.cjs" not found` | An old standalone pnpm failed to switch to pnpm 12. Install pnpm 12 with npm, or pass `PNPM="npx --yes pnpm@12.6.0"` to Task. |
 | `corepack` fails with a signature or key error | The corepack bundled with Node.js 22.12 has outdated signing keys. Install pnpm with npm instead. |
 | `The console is not built` when running `task build:go` | Run `task build`, which builds the console first. |
-| `bind: An attempt was made to access a socket in a way forbidden by its access permissions` | Windows reserves port ranges for Hyper-V, and they can change after a restart: `netsh interface ipv4 show excludedportrange protocol=tcp` lists them. Choose a port outside them: `WT_CONSOLE_PORT` and the like in `deploy/compose/dev/.env` for Compose, or `WT_LISTENERS_CONSOLE_ADDRESS` for the binary. |
+| `task run` stops with `oidc service: discovering OIDC provider at http://127.0.0.1:8180/...` | Keycloak is not running, or not ready yet: start it with `task dev`, which waits until it is healthy. |
+| `bind: An attempt was made to access a socket in a way forbidden by its access permissions` | Windows reserves port ranges for Hyper-V, and they can change after a restart: `netsh interface ipv4 show excludedportrange protocol=tcp` lists them. Choose a port outside them: `WT_CONSOLE_PORT` and the like in `deploy/compose/dev/.env` for Compose, or `WT_LISTENERS_CONSOLE_ADDRESS` for the binary. Signing in needs the console on port 8443, which the realm registers ([deploy/compose/dev/README.md](../deploy/compose/dev/README.md#ports-already-in-use)). |
