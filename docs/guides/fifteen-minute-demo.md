@@ -57,7 +57,7 @@ Use `127.0.0.1` in every address of this guide, never `localhost`: the cookies o
 
 ## 3. Sign in
 
-The stack's Keycloak imports the realm [`deploy/compose/eval/keycloak/whitetower-realm.json`](../../deploy/compose/eval/keycloak/whitetower-realm.json), with one user per role of the White Tower governance matrix. Every user's password is `whitetower`. The seed gives seven of them a principal in White Tower, with the sample agents and role bindings, and signing in as one of them finds that principal.
+The stack's Keycloak imports the realm [`deploy/compose/eval/keycloak/whitetower-realm.json`](../../deploy/compose/eval/keycloak/whitetower-realm.json), with one user per role of the White Tower governance matrix. Every user's password is `whitetower`. The seed gives seven of them a principal in White Tower, and signing in as one of them finds that principal: Olivia Owner, signed in as `owner`, owns the sample agents.
 
 | Username | Role | Primary responsibility | In this guide |
 | --- | --- | --- | --- |
