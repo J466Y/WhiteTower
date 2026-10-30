@@ -147,6 +147,15 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 		{"checkpoints too frequent", []string{"WT_AUDIT_CHECKPOINT_INTERVAL=100ms"}, "audit.checkpoint_interval"},
 		{"retention negative", []string{"WT_AUDIT_RETENTION_DAYS=-5"}, "audit.retention.days"},
 		{"retention too short without override", []string{"WT_AUDIT_RETENTION_DAYS=90"}, "audit.retention.days"},
+		{"discovery URL without an issuer", []string{"WT_AUTH_OIDC_DISCOVERY_URL=http://keycloak:8080/realms/whitetower"}, "auth.oidc.discovery_url"},
+		{"discovery URL over FTP", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "ftp://keycloak:8080/realms/whitetower"), "auth.oidc.discovery_url"},
+		{"discovery URL without host", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http:///realms/whitetower"), "auth.oidc.discovery_url"},
+		{"discovery URL with a user", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://admin@keycloak:8080/realms/whitetower"), "auth.oidc.discovery_url"},
+		{"discovery URL with a query", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower?tenant=a"), "auth.oidc.discovery_url"},
+		{"discovery URL with a fragment", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower#a"), "auth.oidc.discovery_url"},
+		{"plain discovery URL for an https issuer", oidcWithDiscovery("https://idp.example.test/realms/whitetower", "http://keycloak:8080/realms/whitetower"), "auth.oidc.discovery_url"},
+		{"discovery URL that is the issuer", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://127.0.0.1:8180/realms/whitetower/"), "auth.oidc.discovery_url"},
+		{"discovery document instead of its base URL", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower/.well-known/openid-configuration"), "auth.oidc.discovery_url"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -155,6 +164,35 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 				t.Fatalf("error %v, want it to name %s", err, tt.want)
 			}
 		})
+	}
+}
+
+// oidcWithDiscovery returns the variables of an OIDC login whose identity
+// provider the server reaches at discovery, and browsers at issuer.
+func oidcWithDiscovery(issuer, discovery string) []string {
+	return []string{
+		"WT_AUTH_OIDC_ISSUER=" + issuer,
+		"WT_AUTH_OIDC_DISCOVERY_URL=" + discovery,
+		"WT_AUTH_OIDC_CLIENT_ID=whitetower-console",
+		"WT_AUTH_OIDC_REDIRECT_URL=https://127.0.0.1:8443/auth/callback",
+	}
+}
+
+// A core in a container reaches the identity provider through the container
+// network, at another address than the issuer that browsers use.
+func TestTheDiscoveryURLIsABackChannelOfTheIssuer(t *testing.T) {
+	for _, tt := range []struct{ issuer, discovery string }{
+		{"http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower"},
+		{"http://127.0.0.1:8180/realms/whitetower", "https://keycloak:8443/realms/whitetower"},
+		{"https://idp.example.test/realms/whitetower", "https://keycloak.internal:8443/realms/whitetower"},
+	} {
+		cfg, err := Load("", append([]string{"WT_DEV_SELF_SIGNED_TLS=true"}, oidcWithDiscovery(tt.issuer, tt.discovery)...))
+		if err != nil {
+			t.Fatalf("issuer %s, discovery URL %s: %v", tt.issuer, tt.discovery, err)
+		}
+		if cfg.Auth.OIDC.DiscoveryURL != tt.discovery {
+			t.Errorf("discovery URL %q, want %q", cfg.Auth.OIDC.DiscoveryURL, tt.discovery)
+		}
 	}
 }
 
