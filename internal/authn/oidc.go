@@ -96,6 +96,8 @@ type OIDCService struct {
 
 // NewOIDCService initializes an OIDCService against the configured OpenID Connect provider.
 func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, principals *PrincipalStore, sessions *SessionStore) (*OIDCService, error) {
+	// Without an issuer, a discovery document without one would pass the
+	// issuer check below.
 	if opts.Issuer == "" {
 		return nil, errors.New("an OIDC issuer is required")
 	}
@@ -103,7 +105,7 @@ func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, prin
 	// to the console's root, on the origin of the redirect URL: the core's.
 	redirect, err := url.Parse(opts.RedirectURL)
 	if err != nil || redirect.Scheme == "" || redirect.Host == "" {
-		return nil, errors.New("the OIDC redirect URL must be an absolute URL")
+		return nil, fmt.Errorf("the OIDC redirect URL %q must be an absolute URL", opts.RedirectURL)
 	}
 	postLogoutURL := (&url.URL{Scheme: redirect.Scheme, Host: redirect.Host, Path: "/"}).String()
 

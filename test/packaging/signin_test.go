@@ -32,7 +32,6 @@ type realm struct {
 		ID       string   `json:"id"`
 		Username string   `json:"username"`
 		Email    string   `json:"email"`
-		Enabled  bool     `json:"enabled"`
 		Groups   []string `json:"groups"`
 	} `json:"users"`
 }
@@ -86,7 +85,7 @@ func (r realm) checkClient(t *testing.T, env map[string]string, secret string) {
 		t.Error("the core's client secret is not the realm's")
 	}
 
-	// Keycloak defines openid, profile and email in every realm.
+	// Keycloak accepts openid, and defines profile and email in every realm.
 	defined := []string{"openid", "profile", "email"}
 	for _, s := range r.ClientScopes {
 		defined = append(defined, s.Name)

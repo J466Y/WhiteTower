@@ -37,7 +37,8 @@ type mockIDP struct {
 	// mock itself; set it before the first request.
 	discovery map[string]any
 	// hangUp is a path at which the mock closes the connection without an
-	// answer, as a provider that went away does.
+	// answer, as a provider that went away does; set it before the first
+	// request.
 	hangUp string
 }
 
@@ -792,12 +793,12 @@ func backChannelOptions(idp *mockIDP, clk *clocktest.Fake) authn.OIDCOptions {
 }
 
 // signInThroughBackChannel completes a sign-in whose ID token names issuer,
-// with the given header, and returns the service's answer to the callback.
-func signInThroughBackChannel(t *testing.T, svc *authn.OIDCService, idp *mockIDP, clk *clocktest.Fake, issuer string, header map[string]any) *httptest.ResponseRecorder {
+// and returns the service's answer to the callback.
+func signInThroughBackChannel(t *testing.T, svc *authn.OIDCService, idp *mockIDP, clk *clocktest.Fake, issuer string) *httptest.ResponseRecorder {
 	t.Helper()
 	stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/")
 	now := clk.Now()
-	idp.customToken = idp.signIDToken(header, map[string]any{
+	idp.customToken = idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{
 		"iss":    issuer,
 		"aud":    "whitetower-console",
 		"sub":    "usr-back-channel",
@@ -838,16 +839,18 @@ func TestTheProviderIsDiscoveredThroughItsBackChannel(t *testing.T) {
 			t.Fatalf("login redirects to %q, want the issuer's authorization endpoint", loc)
 		}
 
-		rec := signInThroughBackChannel(t, svc, idp, clk, frontIssuer, map[string]any{"alg": "RS256"})
+		rec := signInThroughBackChannel(t, svc, idp, clk, frontIssuer)
 		if rec.Code != http.StatusFound {
 			t.Fatalf("callback: got %d %q, want 302", rec.Code, rec.Body.String())
 		}
 		var session *authn.Session
 		for _, c := range rec.Result().Cookies() {
 			if c.Name == authn.CookieNameInsecure && c.Value != "" {
-				if session, err = sessionStore.Get(context.Background(), c.Value); err != nil {
+				s, err := sessionStore.Get(context.Background(), c.Value)
+				if err != nil {
 					t.Fatalf("reading the session: %v", err)
 				}
+				session = s
 			}
 		}
 		if session == nil || len(session.Roles) != 1 || session.Roles[0] != "owner" {
@@ -863,7 +866,7 @@ func TestTheProviderIsDiscoveredThroughItsBackChannel(t *testing.T) {
 	})
 
 	t.Run("an ID token issued at the back channel is refused", func(t *testing.T) {
-		if rec := signInThroughBackChannel(t, svc, idp, clk, idp.server.URL, map[string]any{"alg": "RS256"}); rec.Code != http.StatusBadRequest {
+		if rec := signInThroughBackChannel(t, svc, idp, clk, idp.server.URL); rec.Code != http.StatusBadRequest {
 			t.Errorf("callback: got %d %q, want 400", rec.Code, rec.Body.String())
 		}
 		now := clk.Now()
@@ -941,6 +944,27 @@ func TestAFailedDiscoveryNamesTheDocumentItFetched(t *testing.T) {
 	}
 }
 
+// The service refuses options that leave it no issuer to check documents and
+// ID tokens against, or no origin to come back to after a logout.
+func TestTheServiceNeedsAnIssuerAndAnAbsoluteRedirectURL(t *testing.T) {
+	for name, change := range map[string]func(*authn.OIDCOptions){
+		"no issuer":               func(o *authn.OIDCOptions) { o.Issuer = "" },
+		"a relative redirect URL": func(o *authn.OIDCOptions) { o.RedirectURL = "/auth/callback" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			idp := newMockIDP(t)
+			opts := backChannelOptions(idp, clocktest.New(testEpoch))
+			change(&opts)
+			// The document names the configured issuer, even an empty one, so
+			// that only the refusal under test can stop the service.
+			idp.discovery = idp.backChannelDocument(opts.Issuer)
+			if _, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil); err == nil {
+				t.Fatal("the service was created")
+			}
+		})
+	}
+}
+
 // Security test ST-16: the errors of a call on the back channel name its URL,
 // and a browser that signs in gets none of them.
 func TestAFailureOnTheBackChannelNamesNothingOfItToTheBrowser(t *testing.T) {
@@ -961,7 +985,7 @@ func TestAFailureOnTheBackChannelNamesNothingOfItToTheBrowser(t *testing.T) {
 				t.Fatalf("creating OIDC service: %v", err)
 			}
 
-			rec := signInThroughBackChannel(t, svc, idp, clk, frontIssuer, map[string]any{"alg": "RS256"})
+			rec := signInThroughBackChannel(t, svc, idp, clk, frontIssuer)
 			if rec.Code != tt.want {
 				t.Errorf("callback: got %d, want %d", rec.Code, tt.want)
 			}
