@@ -995,3 +995,34 @@ func TestAFailureOnTheBackChannelNamesNothingOfItToTheBrowser(t *testing.T) {
 		})
 	}
 }
+
+// Security test ST-16: the exchange of an ID token that does not verify fails
+// without its cause, which can name the back channel: the API repeats the
+// error to its client.
+func TestARefusedExchangeNamesNothingOfTheBackChannel(t *testing.T) {
+	idp := newMockIDP(t)
+	idp.discovery = idp.backChannelDocument(frontIssuer)
+	idp.hangUp = "/jwks"
+	clk := clocktest.New(testEpoch)
+	opts := backChannelOptions(idp, clk)
+	// The token store is never reached: the ID token does not verify.
+	opts.Tokens = authn.NewTokenStore(nil, clk, nil)
+	svc, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("creating OIDC service: %v", err)
+	}
+
+	rawToken := idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{
+		"iss": frontIssuer,
+		"aud": "wtctl",
+		"sub": "cli-back-channel",
+		"exp": clk.Now().Add(time.Hour).Unix(),
+	})
+	_, err = svc.ExchangeIDToken(context.Background(), rawToken)
+	if !errors.Is(err, authn.ErrInvalidToken) {
+		t.Fatalf("got %v, want ErrInvalidToken", err)
+	}
+	if backChannel := idp.server.Listener.Addr().String(); strings.Contains(err.Error(), backChannel) {
+		t.Errorf("the client learns the back channel %s: %v", backChannel, err)
+	}
+}
