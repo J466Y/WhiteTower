@@ -197,6 +197,7 @@ Follow-ups, each a row of the work queue:
 - In P1-03's code on `main` ([P1-03's progress notes](P1-03-human-identity-and-access.md#progress-notes) of 2026-11-02): token revocation without an owner check; sessions not rotated at sign-in (ST-14); the unprefixed session cookie accepted in production; a typed nil that makes the token exchange panic when OIDC is off; ST-03's canaries; a plain-HTTP issuer accepted outside development; a core that cannot start while the identity provider is down (KIL-08); the OIDC state key, made by each process (NFR-06); no audit event for people and sessions (AUD-01); and principals of SCIM and of sign-in that are never linked.
 - The Helm chart, which gets the discovery URL, the scopes, a CA file for the back channel, the shared state key and an egress rule to the identity provider, once the core has them.
 - The console's Node version: its tests fail on Node 22.12.0, which `web/package.json` still accepts.
+- In the stacks, Keycloak shares the core's host, 127.0.0.1. Chromium treats `http://127.0.0.1` as secure, so it sends even a `Secure` cookie of the core to Keycloak's HTTP port, as P1-03's fix of access control and sessions found. Only another host name for Keycloak, such as one under `.localhost`, would keep the core's cookies from it, which changes the stacks' issuer, realms and seed. It matters in development only.
 
 The threat model (version 0.1.7) adds to T-13's mitigations that a discovery URL is trusted as the issuer is.
 
