@@ -1,0 +1,18 @@
+# Read by OSV-Scanner, and by the OpenSSF Scorecard check built on it, for the
+# console's pnpm-lock.yaml. OSV-Scanner reads only the file in each lockfile's
+# own directory, so the root osv-scanner.toml does not apply here.
+#
+# OSV-Scanner cannot scope an ignore to one advisory and one version at once.
+# The entry below takes the version, so every other minimatch still fails the
+# scan, but it also hides any other advisory of 5.1.9 until it expires. Remove
+# it once GitHub's advisory database starts GHSA-g3hv-75wg-m249 at 7.0.0, or
+# once openapi-typescript moves to @redocly/openapi-core 2.x, which uses
+# picomatch instead.
+
+[[PackageOverrides]]
+name = "minimatch"
+version = "5.1.9"
+ecosystem = "npm"
+effectiveUntil = 2027-02-02
+vulnerability.ignore = true
+reason = "GHSA-g3hv-75wg-m249 matches every version before 11.0.1, but the code it describes (firstPhasePreProcess) first appears in minimatch 7.0.0, and 5.1.9 has neither it nor optimizationLevel. minimatch reaches the console only through openapi-typescript and @redocly/openapi-core, a build-time tool that generates src/api/schema.gen.ts."
