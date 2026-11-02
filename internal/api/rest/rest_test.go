@@ -1042,13 +1042,15 @@ func TestExchangeTokenEndpoint(t *testing.T) {
 		problemOf(t, res, problem.Unauthenticated)
 	})
 
-	t.Run("unconfigured exchanger returns internal problem", func(t *testing.T) {
+	t.Run("without an exchanger, the exchange is not found", func(t *testing.T) {
 		opts := options(io.Discard)
 		opts.Exchanger = nil
 		h := Handler(opts)
 
 		body := strings.NewReader(`{"idToken":"some-token"}`)
 		res := call(h, http.MethodPost, "/api/v1/tokens/exchange", "", nil, body)
-		problemOf(t, res, problem.Internal)
+		if p := problemOf(t, res, problem.NotFound); p.Detail != "token exchange is not configured" {
+			t.Errorf("detail %q, want the exchange not configured", p.Detail)
+		}
 	})
 }

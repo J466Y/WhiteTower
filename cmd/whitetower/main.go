@@ -252,9 +252,11 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		authHandler = authMux
 	}
 
-	var scimSvc *authn.SCIMService
+	// The console mounts SCIM only when it is on. A nil *authn.SCIMService
+	// would make a handler that is not nil, which the console would call.
+	var scimHandler http.Handler
 	if cfg.Auth.SCIM.Enabled {
-		scimSvc, err = authn.NewSCIMService(authn.SCIMOptions{
+		scimSvc, err := authn.NewSCIMService(authn.SCIMOptions{
 			Enabled:   cfg.Auth.SCIM.Enabled,
 			TokenFile: cfg.Auth.SCIM.TokenFile,
 			Logger:    logger,
@@ -262,6 +264,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("initializing SCIM service: %w", err)
 		}
+		scimHandler = scimSvc
 	}
 
 	registry := metrics.NewRegistry(v)
@@ -310,7 +313,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Metrics:       metrics.NewRPC(registry),
 	})
 	srv, err := server.New(cfg, server.Handlers{
-		Console:    observer.Wrap("console", server.ConsoleHandler(api, authHandler, scimSvc)),
+		Console:    observer.Wrap("console", server.ConsoleHandler(api, authHandler, scimHandler)),
 		Machine:    observer.Wrap("machine", server.MachineHandler(moduleAPI)),
 		Operations: server.OperationsHandler(drain, ready, metrics.Handler(registry)),
 	}, drain, logger)

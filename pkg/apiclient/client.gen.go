@@ -2478,7 +2478,9 @@ type ClientInterface interface {
 	// ExchangeTokenWithBody Exchange CLI ID token for an API token
 	//
 	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-	// API token (12 hours) bound to the same human principal.
+	// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+	// has no token exchange: the operation is then `not_found`, with the detail that token
+	// exchange is not configured.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2488,7 +2490,9 @@ type ClientInterface interface {
 	// ExchangeToken Exchange CLI ID token for an API token
 	//
 	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-	// API token (12 hours) bound to the same human principal.
+	// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+	// has no token exchange: the operation is then `not_found`, with the detail that token
+	// exchange is not configured.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3568,7 +3572,9 @@ func (c *Client) CreateToken(ctx context.Context, body CreateTokenJSONRequestBod
 // ExchangeTokenWithBody Exchange CLI ID token for an API token
 //
 // Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-// API token (12 hours) bound to the same human principal.
+// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+// has no token exchange: the operation is then `not_found`, with the detail that token
+// exchange is not configured.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3588,7 +3594,9 @@ func (c *Client) ExchangeTokenWithBody(ctx context.Context, contentType string, 
 // ExchangeToken Exchange CLI ID token for an API token
 //
 // Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-// API token (12 hours) bound to the same human principal.
+// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+// has no token exchange: the operation is then `not_found`, with the detail that token
+// exchange is not configured.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6839,7 +6847,9 @@ type ClientWithResponsesInterface interface {
 	// ExchangeTokenWithBodyWithResponse Exchange CLI ID token for an API token
 	//
 	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-	// API token (12 hours) bound to the same human principal.
+	// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+	// has no token exchange: the operation is then `not_found`, with the detail that token
+	// exchange is not configured.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -6849,7 +6859,9 @@ type ClientWithResponsesInterface interface {
 	// ExchangeTokenWithResponse Exchange CLI ID token for an API token
 	//
 	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-	// API token (12 hours) bound to the same human principal.
+	// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+	// has no token exchange: the operation is then `not_found`, with the detail that token
+	// exchange is not configured.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -9857,7 +9869,9 @@ func (c *ClientWithResponses) CreateTokenWithResponse(ctx context.Context, body 
 // ExchangeTokenWithBodyWithResponse Exchange CLI ID token for an API token
 //
 // Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-// API token (12 hours) bound to the same human principal.
+// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+// has no token exchange: the operation is then `not_found`, with the detail that token
+// exchange is not configured.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -9873,7 +9887,9 @@ func (c *ClientWithResponses) ExchangeTokenWithBodyWithResponse(ctx context.Cont
 // ExchangeTokenWithResponse Exchange CLI ID token for an API token
 //
 // Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-// API token (12 hours) bound to the same human principal.
+// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+// has no token exchange: the operation is then `not_found`, with the detail that token
+// exchange is not configured.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

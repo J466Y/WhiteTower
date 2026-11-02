@@ -111,7 +111,9 @@ export interface paths {
         /**
          * Exchange CLI ID token for an API token
          * @description Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-         *     API token (12 hours) bound to the same human principal.
+         *     API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+         *     has no token exchange: the operation is then `not_found`, with the detail that token
+         *     exchange is not configured.
          */
         post: operations["exchangeToken"];
         delete?: never;

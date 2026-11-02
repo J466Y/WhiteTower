@@ -310,21 +310,58 @@ func TestDefaultsMakeNoOutboundConnection(t *testing.T) {
 	}
 }
 
-// With OIDC off, the public token exchange gives its answer for a server
-// without an exchanger, and nothing panics: the server's wiring gives the API
-// no exchanger, rather than a nil service that the API would call.
+// With OIDC off, the server has no token exchange: the operation answers
+// not_found, and nothing panics. The server's wiring gives the API no
+// exchanger, rather than a nil service that the API would call.
 func TestWithoutOIDCTheTokenExchangeIsNotConfigured(t *testing.T) {
 	s := startServe(t)
-	_, body := call(t, http.StatusInternalServerError, http.MethodPost, s.console+"/api/v1/tokens/exchange",
+	_, body := call(t, http.StatusNotFound, http.MethodPost, s.console+"/api/v1/tokens/exchange",
 		`{"idToken":"an ID token"}`, http.Header{"Content-Type": {"application/json"}})
-	if !strings.Contains(body, `"detail":"token exchange is not configured"`) {
-		t.Errorf("answer %s, want the exchange not configured", body)
+	if !strings.Contains(body, `"code":"not_found"`) || !strings.Contains(body, `"detail":"token exchange is not configured"`) {
+		t.Errorf("answer %s, want the exchange not found, as not configured", body)
 	}
 	if err := s.stop(); err != nil {
 		t.Fatalf("serve returned %v", err)
 	}
-	if panics := s.logs.records(t, "panic serving a request"); len(panics) != 0 {
-		t.Errorf("the exchange panicked: %v", panics)
+	if strings.Contains(s.logs.String(), "panic") {
+		t.Errorf("the exchange panicked:\n%s", s.logs)
+	}
+}
+
+// With SCIM off, nothing serves /scim/v2/: its paths answer as any unknown
+// path does, and nothing panics. The server's wiring mounts no SCIM handler,
+// rather than a nil service that the console would call.
+func TestWithoutSCIMItsPathsAreUnknown(t *testing.T) {
+	s := startServe(t)
+	answer := func(path string, header http.Header) string {
+		t.Helper()
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, s.console+path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for k, v := range header {
+			req.Header[k] = v
+		}
+		resp, err := insecure.Do(req)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.Status + " " + resp.Header.Get("Content-Type") + "\n" + string(body)
+	}
+	scim := answer("/scim/v2/Users", http.Header{"Authorization": {"Bearer a SCIM token"}})
+	if unknown := answer("/nothing-here", nil); scim != unknown {
+		t.Errorf("/scim/v2/Users answers\n%s\nand an unknown path\n%s", scim, unknown)
+	}
+	if err := s.stop(); err != nil {
+		t.Fatalf("serve returned %v", err)
+	}
+	if strings.Contains(s.logs.String(), "panic") {
+		t.Errorf("a SCIM path panicked:\n%s", s.logs)
 	}
 }
 
