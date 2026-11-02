@@ -93,7 +93,7 @@ OpenID Connect authentication and backend-for-frontend settings (ADR-0009).
 
 | Key | Environment variable | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `auth.oidc.issuer` | `WT_AUTH_OIDC_ISSUER` | string | none | Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled. |
+| `auth.oidc.issuer` | `WT_AUTH_OIDC_ISSUER` | string | none | Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled. Browsers sign in at it, and without auth.oidc.discovery_url the server also takes the discovery document and the signing keys from it and sends it the client secret and the authorization code, so the URL is https: http only with dev.self_signed_tls, which the development stacks set. |
 | `auth.oidc.discovery_url` | `WT_AUTH_OIDC_DISCOVERY_URL` | string | none | Base URL that the server fetches the identity provider's discovery document from, under /.well-known/openid-configuration, when the server reaches the provider at another address than browsers do, such as http://keycloak:8080/realms/whitetower inside a container network. The document must still name auth.oidc.issuer as its issuer, and ID tokens are verified against auth.oidc.issuer. The server sends the client secret and the authorization code to the endpoints the document names and takes the signing keys from them, so the URL is https when the issuer is. Empty: the issuer. |
 | `auth.oidc.client_id` | `WT_AUTH_OIDC_CLIENT_ID` | string | none | Client ID of the confidential client in the IdP. |
 | `auth.oidc.cli_client_id` | `WT_AUTH_OIDC_CLI_CLIENT_ID` | string | `wtctl` | Client ID of the public client used by the CLI (wtctl): wtctl by default. |
@@ -211,4 +211,4 @@ Settings for development only.
 
 | Key | Environment variable | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `dev.self_signed_tls` | `WT_DEV_SELF_SIGNED_TLS` | boolean | `false` | Serve a self-signed certificate generated at startup on the HTTPS listeners, instead of the certificate files. For development only: the server logs a warning. |
+| `dev.self_signed_tls` | `WT_DEV_SELF_SIGNED_TLS` | boolean | `false` | Serve a self-signed certificate generated at startup on the HTTPS listeners, instead of the certificate files, and accept an http auth.oidc.issuer, as the development identity provider's. For development only: the server logs a warning. |

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -40,7 +41,59 @@ func setupAuthn(t *testing.T, clk *clocktest.Fake) (*authn.SessionStore, *authn.
 	return sessionStore, principalStore, tokenStore, database
 }
 
-// Security test ST-14: Session fixation is impossible; cookie flags are set; idle and absolute expiry apply; sessions are rotated at login and revoked at logout, on deactivation and on role changes
+// Security test ST-14: only the session cookie with the __Host- prefix signs a
+// request in, so that a session cookie that another host of the domain or a
+// plain HTTP page planted signs nobody in as whoever planted it (ADR-0009)
+func TestOnlyThePrefixedSessionCookieSignsIn(t *testing.T) {
+	ctx := context.Background()
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, tokenStore, _ := setupAuthn(t, clk)
+	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, nil)
+
+	victim, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-victim", "Vera Victim", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attacker, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-attacker", "Mallory Planter", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	planted, err := sessionStore.Create(ctx, attacker.ID, "oidc", []string{"user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	own, err := sessionStore.Create(ctx, victim.ID, "oidc", []string{"user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tt := range []struct {
+		name, cookies string
+		want          string // the principal signed in; empty: nobody
+	}{
+		{"the unprefixed cookie alone", "wt_session=" + planted.Token, ""},
+		{"the unprefixed cookie before the prefixed one", "wt_session=" + planted.Token + "; __Host-wt_session=" + own.Token, victim.ID.String()},
+		{"the prefixed cookie", "__Host-wt_session=" + own.Token, victim.ID.String()},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+			req.Header.Set("Cookie", tt.cookies)
+			p, err := authenticator.Authenticate(req)
+			if err != nil {
+				t.Fatalf("authenticating: %v", err)
+			}
+			got := ""
+			if p != nil {
+				got = p.ID
+			}
+			if got != tt.want {
+				t.Errorf("signed in as %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// Security test ST-14: cookie flags are set; idle and absolute expiry apply; sessions are revoked at logout and on deactivation
 func TestSessionLifecycleAndSecurity(t *testing.T) {
 	ctx := context.Background()
 	clk := clocktest.New(testEpoch)
@@ -58,9 +111,9 @@ func TestSessionLifecycleAndSecurity(t *testing.T) {
 			t.Fatalf("creating session: %v", err)
 		}
 
-		cookie := sessionStore.Cookie(session.Token, true)
-		if cookie.Name != authn.CookieNameSecure {
-			t.Errorf("expected cookie name %s, got %s", authn.CookieNameSecure, cookie.Name)
+		cookie := sessionStore.Cookie(session.Token)
+		if cookie.Name != "__Host-wt_session" {
+			t.Errorf("expected cookie name __Host-wt_session, got %s", cookie.Name)
 		}
 		if !cookie.HttpOnly {
 			t.Errorf("expected HttpOnly=true")
@@ -75,43 +128,9 @@ func TestSessionLifecycleAndSecurity(t *testing.T) {
 			t.Errorf("expected Path=/, got %s", cookie.Path)
 		}
 
-		clear := sessionStore.ClearCookie(true)
-		if clear.MaxAge != -1 {
-			t.Errorf("expected clear cookie MaxAge=-1, got %d", clear.MaxAge)
-		}
-	})
-
-	t.Run("session rotation prevents fixation", func(t *testing.T) {
-		s1, err := sessionStore.Create(ctx, principal.ID, "oidc", []string{"operator"})
-		if err != nil {
-			t.Fatalf("creating initial session: %v", err)
-		}
-
-		s2, err := sessionStore.Rotate(ctx, s1.Token)
-		if err != nil {
-			t.Fatalf("rotating session: %v", err)
-		}
-
-		if s2.Token == s1.Token {
-			t.Errorf("rotated session must have a new token")
-		}
-		if s2.CSRFToken == s1.CSRFToken {
-			t.Errorf("rotated session must have a new CSRF token")
-		}
-
-		// The old session is revoked immediately.
-		_, err = sessionStore.Get(ctx, s1.Token)
-		if !errors.Is(err, authn.ErrSessionRevoked) {
-			t.Errorf("old session must be revoked after rotation, got %v", err)
-		}
-
-		// The new session is active.
-		loaded, err := sessionStore.Get(ctx, s2.Token)
-		if err != nil {
-			t.Fatalf("loading rotated session: %v", err)
-		}
-		if loaded.PrincipalID != principal.ID {
-			t.Errorf("principal mismatch on rotated session")
+		clear := sessionStore.ClearCookie()
+		if clear.Name != "__Host-wt_session" || !clear.Secure || clear.MaxAge != -1 {
+			t.Errorf("expected a Secure __Host-wt_session clear cookie with MaxAge=-1, got %+v", clear)
 		}
 	})
 

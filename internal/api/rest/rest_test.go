@@ -807,6 +807,160 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 	})
 }
 
+// Security test ST-19: a token is revoked only by its principal, by the person
+// responsible for its service account, or by an administrator; any other
+// token is not found, as one that does not exist
+func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorRevokesAToken(t *testing.T) {
+	ctx := context.Background()
+	d := dbtest.New(t)
+	database := d.Open(t)
+	clk := clocktest.New(time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC))
+	cat, err := audit.LoadCatalog(events.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := audit.NewWriter(cat, clk)
+	sessionStore := authn.NewSessionStore(database, clk, authn.SessionOptions{})
+	tokenStore := authn.NewTokenStore(database, clk, writer)
+	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
+
+	human := func(subject, name string, roles ...string) auth.Principal {
+		t.Helper()
+		p, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", subject, name, nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return auth.Principal{ID: p.ID.String(), Kind: auth.Human, Name: name, Roles: roles}
+	}
+	uma := human("sub-uma", "Uma User", "user")
+	otto := human("sub-otto", "Otto Owner", "owner")
+	ada := human("sub-ada", "Ada Admin", "admin")
+	bot := func(responsible auth.Principal, name string) auth.Principal {
+		t.Helper()
+		sa, err := principalStore.CreateServiceAccount(ctx, name, nil, responsible.Roles, responsible)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return auth.Principal{ID: sa.ID.String(), Kind: auth.ServiceAccount, Name: name}
+	}
+	umasBot, ottosBot := bot(uma, "Uma's bot"), bot(otto, "Otto's bot")
+	// token creates a token of owner's, and revokes it first as its owner when
+	// revoked is set.
+	token := func(owner auth.Principal, revoked bool) *authn.CreatedToken {
+		t.Helper()
+		id := uuid.MustParse(owner.ID)
+		created, err := tokenStore.Create(ctx, id, "key", []string{string(authz.PermissionIdentityMeRead)}, 30, owner)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if revoked {
+			if err := tokenStore.Revoke(ctx, created.ID, owner, "rotated"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return created
+	}
+	// revocations returns the actor and the data of each revocation event of
+	// a token.
+	type revocation struct {
+		Actor string
+		Data  struct {
+			TokenID     string `json:"token_id"`
+			PrincipalID string `json:"principal_id"`
+			Actor       struct {
+				ID string `json:"id"`
+			} `json:"actor"`
+		} `json:"data"`
+	}
+	revocations := func(tokenID uuid.UUID) []revocation {
+		t.Helper()
+		rows, err := database.Query(ctx, "SELECT actor_id, canonical FROM whitetower.audit_events WHERE type = 'whitetower.token.revoked.v1'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var out []revocation
+		for rows.Next() {
+			var r revocation
+			var canonical []byte
+			if err := rows.Scan(&r.Actor, &canonical); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(canonical, &r); err != nil {
+				t.Fatal(err)
+			}
+			if r.Data.TokenID == tokenID.String() {
+				out = append(out, r)
+			}
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
+	opts := options(io.Discard)
+	opts.Tokens = tokenStore
+	opts.Principals = principalStore
+	opts.Authorizer = authz.NewAuthorizer()
+	revoke := func(caller auth.Principal, id uuid.UUID) result {
+		o := opts
+		o.Authenticator = fixedAuthenticator{caller}
+		return call(Handler(o), http.MethodDelete, "/api/v1/tokens/"+id.String(), "", nil, nil)
+	}
+
+	notFound := problemOf(t, revoke(uma, uuid.New()), problem.NotFound)
+	for _, tt := range []struct {
+		name    string
+		caller  auth.Principal
+		owner   auth.Principal
+		revoked bool // the token is revoked before the call, by its owner
+		allowed bool
+	}{
+		{"another person's token", uma, otto, false, false},
+		{"the token of another person's service account", uma, ottosBot, false, false},
+		{"another person's revoked token", uma, otto, true, false},
+		{"one's own token", uma, uma, false, true},
+		{"the token of one's service account", uma, umasBot, false, true},
+		{"another person's token, as an administrator", ada, otto, false, true},
+		{"the token of another person's service account, as an administrator", ada, ottosBot, false, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tok := token(tt.owner, tt.revoked)
+			before := len(revocations(tok.ID))
+			res := revoke(tt.caller, tok.ID)
+
+			_, _, used := tokenStore.GetByToken(ctx, tok.Token)
+			events := revocations(tok.ID)
+			if !tt.allowed {
+				if p := problemOf(t, res, problem.NotFound); p.Detail != notFound.Detail {
+					t.Errorf("refused as %q, while a token that does not exist is %q", p.Detail, notFound.Detail)
+				}
+				if !tt.revoked && used != nil {
+					t.Errorf("the token no longer works: %v", used)
+				}
+				if len(events) != before {
+					t.Errorf("%d revocation events, want %d", len(events), before)
+				}
+				return
+			}
+			if res.status != http.StatusNoContent {
+				t.Fatalf("status %d, body %s", res.status, res.body)
+			}
+			if !errors.Is(used, authn.ErrTokenRevoked) {
+				t.Errorf("the token: %v, want it revoked", used)
+			}
+			if len(events) != 1 {
+				t.Fatalf("%d revocation events, want 1", len(events))
+			}
+			if e := events[0]; e.Actor != tt.caller.ID || e.Data.Actor.ID != tt.caller.ID || e.Data.PrincipalID != tt.owner.ID {
+				t.Errorf("revocation event by %s (data: %s) of a token of %s, want by %s of a token of %s",
+					e.Actor, e.Data.Actor.ID, e.Data.PrincipalID, tt.caller.ID, tt.owner.ID)
+			}
+		})
+	}
+}
+
 type mockTokenExchanger struct {
 	token *authn.CreatedToken
 	err   error

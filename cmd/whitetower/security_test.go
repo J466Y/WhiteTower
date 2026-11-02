@@ -9,12 +9,15 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"io"
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,6 +26,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -199,6 +203,92 @@ func fetch(t *testing.T, method, url, body string, header http.Header) string {
 	return resp.Status + "\n" + b.String()
 }
 
+// refusingProvider is an OpenID Connect provider, on plain HTTP, whose token
+// endpoint refuses every client. It keeps the client secrets that it was
+// sent, so that a test sees that the server read its own.
+type refusingProvider struct {
+	*httptest.Server
+	mu      sync.Mutex
+	secrets []string
+}
+
+func newRefusingProvider(t *testing.T) *refusingProvider {
+	t.Helper()
+	p := &refusingProvider{}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                                p.URL,
+			"authorization_endpoint":                p.URL + "/auth",
+			"token_endpoint":                        p.URL + "/token",
+			"jwks_uri":                              p.URL + "/jwks",
+			"id_token_signing_alg_values_supported": []string{"RS256"},
+			"response_types_supported":              []string{"code"},
+			"subject_types_supported":               []string{"public"},
+		})
+	})
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		// The client authenticates in the header or in the form.
+		secret := r.PostFormValue("client_secret")
+		if _, password, ok := r.BasicAuth(); ok {
+			secret, _ = url.QueryUnescape(password)
+		}
+		p.mu.Lock()
+		p.secrets = append(p.secrets, secret)
+		p.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = io.WriteString(w, `{"error":"invalid_client","error_description":"the client is not known"}`)
+	})
+	p.Server = httptest.NewServer(mux)
+	t.Cleanup(p.Close)
+	return p
+}
+
+// received reports whether the provider was sent secret as a client secret.
+func (p *refusingProvider) received(secret string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Contains(p.secrets, secret)
+}
+
+// startSignIn starts a sign-in at the console, and returns all of the answer,
+// the state that the provider would send back, and the state cookie.
+func startSignIn(t *testing.T, console string) (answer, state, cookie string) {
+	t.Helper()
+	client := &http.Client{
+		Timeout:       insecure.Timeout,
+		Transport:     insecure.Transport,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, console+"/auth/login", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	location, err := resp.Location()
+	if resp.StatusCode != http.StatusFound || err != nil {
+		t.Fatalf("starting a sign-in: %s, location %v: OIDC is not on", resp.Status, err)
+	}
+	for _, c := range resp.Cookies() {
+		if c.Name == "__Host-wt_oidc" {
+			cookie = c.Name + "=" + c.Value
+		}
+	}
+	if cookie == "" {
+		t.Fatal("starting a sign-in set no state cookie")
+	}
+	var b bytes.Buffer
+	_ = resp.Header.Write(&b)
+	_, _ = io.Copy(&b, resp.Body)
+	return resp.Status + "\n" + b.String(), location.Query().Get("state"), cookie
+}
+
 // Security test ST-03: canary values in every secret file, and in the
 // credentials that callers send, never appear in the logs, the answers, the
 // metrics or the traces: not as the server works, nor when the database
@@ -208,11 +298,13 @@ func TestSecretsNeverLeak(t *testing.T) {
 	dir := t.TempDir()
 	canary := func(name string) string { return "canary-" + name + "-" + rand.Text() }
 	canaries := map[string]string{
-		"runtime password":   canary("runtime"),
-		"migration password": canary("migration"),
-		"refused password":   canary("refused"),
-		"bearer token":       canary("token"),
-		"session cookie":     canary("cookie"),
+		"runtime password":       canary("runtime"),
+		"migration password":     canary("migration"),
+		"refused password":       canary("refused"),
+		"bearer token":           canary("token"),
+		"session cookie":         canary("cookie"),
+		"break-glass credential": canary("breakglass"),
+		"authorization code":     canary("code"),
 	}
 
 	// The runtime role's password is a canary: a role of the test's own,
@@ -259,7 +351,9 @@ func TestSecretsNeverLeak(t *testing.T) {
 		"WT_AUDIT_EXPORT_PSEUDONYMIZE=true",
 		"WT_AUDIT_EXPORT_PSEUDONYM_KEY_FILE=" + pseudonymFile,
 		"WT_AUTH_OIDC_CLIENT_SECRET_FILE=" + oidcFile,
+		"WT_AUTH_BREAKGLASS_ENABLED=true",
 		"WT_AUTH_BREAKGLASS_CREDENTIAL_HASH_FILE=" + breakglassFile,
+		"WT_AUTH_SCIM_ENABLED=true",
 		"WT_AUTH_SCIM_TOKEN_FILE=" + scimFile,
 	}
 	s := startServeOn(t, d, env...)
@@ -293,7 +387,45 @@ func TestSecretsNeverLeak(t *testing.T) {
 		answers.WriteString(fetch(t, http.MethodPost, s.machine+"/whitetower.module.v1alpha1.MetaService/GetServerInfo", body, connect))
 	}
 	answers.WriteString(fetch(t, http.MethodPost, s.machine+"/whitetower.module.v1alpha1.NoService/Nothing", "{}", connect))
-	metrics := fetch(t, http.MethodGet, s.operations+"/metrics", "", nil)
+
+	// Break-glass and SCIM read their secret files, and refuse a credential
+	// that does not match: a canary, which must not reach the logs either.
+	// Their answers show that they are on: off, the console would serve
+	// these paths.
+	refusal := fetch(t, http.MethodPost, s.console+"/auth/breakglass", `{"credential":"`+canaries["break-glass credential"]+`"}`,
+		http.Header{"Content-Type": {"application/json"}, "Cookie": credentials["Cookie"]})
+	if !strings.HasPrefix(refusal, "401 ") || !strings.Contains(refusal, "invalid break-glass credential") {
+		t.Fatalf("break-glass with a wrong credential: %s", refusal)
+	}
+	answers.WriteString(refusal)
+	refusal = fetch(t, http.MethodGet, s.console+"/scim/v2/Users", "", credentials)
+	if !strings.HasPrefix(refusal, "401 ") || !strings.Contains(refusal, "application/scim+json") {
+		t.Fatalf("SCIM with a wrong token: %s", refusal)
+	}
+	answers.WriteString(refusal)
+
+	// OIDC: a sign-in whose code the provider refuses to exchange. The
+	// provider serves plain HTTP, which only development allows
+	// (auth.oidc.issuer), so this server serves the development certificate,
+	// and the first one the canary key.
+	idp := newRefusingProvider(t)
+	signIn := startServeOn(t, d, append(slices.Clone(env), "WT_DEV_SELF_SIGNED_TLS=true",
+		"WT_AUTH_OIDC_ISSUER="+idp.URL, "WT_AUTH_OIDC_CLIENT_ID=whitetower-console",
+		"WT_AUTH_OIDC_REDIRECT_URL=https://127.0.0.1:8443/auth/callback")...)
+	login, state, stateCookie := startSignIn(t, signIn.console)
+	answers.WriteString(login)
+	refusal = fetch(t, http.MethodGet, signIn.console+"/auth/callback?code="+canaries["authorization code"]+"&state="+state, "",
+		http.Header{"Cookie": {stateCookie + "; " + credentials["Cookie"][0]}})
+	if !strings.HasPrefix(refusal, "502 ") {
+		t.Fatalf("a sign-in whose code the provider refuses: %s", refusal)
+	}
+	answers.WriteString(refusal)
+	if !idp.received(canaries["oidc client secret"]) {
+		t.Fatal("the provider never received the client secret of the secret file")
+	}
+
+	metrics := fetch(t, http.MethodGet, s.operations+"/metrics", "", nil) +
+		fetch(t, http.MethodGet, signIn.operations+"/metrics", "", nil)
 
 	// A server whose password the database refuses logs why, but not the
 	// password.
@@ -315,8 +447,10 @@ func TestSecretsNeverLeak(t *testing.T) {
 		t.Fatal("migrate with a refused password succeeded")
 	}
 
-	if err := s.stop(); err != nil { // the last spans leave
-		t.Fatalf("serve returned %v", err)
+	for _, server := range []*serving{s, signIn} {
+		if err := server.stop(); err != nil { // the last spans leave
+			t.Fatalf("serve returned %v", err)
+		}
 	}
 	_, spans := c.got()
 	if len(spans) == 0 {
@@ -332,7 +466,7 @@ func TestSecretsNeverLeak(t *testing.T) {
 	}
 
 	for what, output := range map[string]string{
-		"logs": s.logs.String() + refused.logs.String(), "answers": answers.String(), "metrics": metrics,
+		"logs": s.logs.String() + refused.logs.String() + signIn.logs.String(), "answers": answers.String(), "metrics": metrics,
 		"traces": traces.String(), "config print": printed.String(), "migrate": migrated.String(),
 	} {
 		if output == "" {

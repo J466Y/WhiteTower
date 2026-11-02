@@ -75,7 +75,7 @@ To sign in through Vite, give the core the console's callback as its redirect UR
 WT_AUTH_OIDC_REDIRECT_URL=http://localhost:5173/auth/callback task run
 ```
 
-On Windows, set the variable first: `$env:WT_AUTH_OIDC_REDIRECT_URL = "http://localhost:5173/auth/callback"`. A session belongs to the host name where you signed in: a sign-in through Vite holds for <http://localhost:5173> only.
+On Windows, set the variable first: `$env:WT_AUTH_OIDC_REDIRECT_URL = "http://localhost:5173/auth/callback"`. A session belongs to the host name where you signed in: a sign-in through Vite holds for <http://localhost:5173> only. The session cookie is `Secure`, with the `__Host-` prefix, there too, which Chromium accepts, since it treats `http://localhost` as secure.
 
 ## Development services
 

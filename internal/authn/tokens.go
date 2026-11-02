@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -293,7 +294,13 @@ func (ts *TokenStore) GetByToken(ctx context.Context, rawToken string) (*APIToke
 	return token, fromDBModel(pRow), nil
 }
 
-// Revoke revokes a single token by its ID, recording an audited event.
+// Revoke revokes a single token by its ID, recording an audited event. The
+// actor revokes their own tokens, those of the service accounts they are
+// responsible for, and any token as an administrator: those whose tokens they
+// may list (HUM-03, ST-19). Any other token is ErrTokenNotFound, as one that
+// does not exist, so that an ID never shows whether a token exists. The rule
+// is checked here, in the transaction that revokes, so that no caller of the
+// store can skip it.
 func (ts *TokenStore) Revoke(ctx context.Context, tokenID uuid.UUID, actor auth.Principal, reason string) error {
 	if reason == "" {
 		reason = "manual revocation"
@@ -307,6 +314,13 @@ func (ts *TokenStore) Revoke(ctx context.Context, tokenID uuid.UUID, actor auth.
 				return ErrTokenNotFound
 			}
 			return fmt.Errorf("reading token: %w", err)
+		}
+		allowed, err := mayRevoke(ctx, q, token.PrincipalID, actor)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return ErrTokenNotFound
 		}
 		if token.RevokedAt != nil {
 			return nil
@@ -350,6 +364,20 @@ func (ts *TokenStore) Revoke(ctx context.Context, tokenID uuid.UUID, actor auth.
 
 		return nil
 	})
+}
+
+// mayRevoke reports whether actor may revoke a token of the principal owner:
+// their own, one of a service account they are responsible for, or any as an
+// administrator.
+func mayRevoke(ctx context.Context, q *authndb.Queries, owner uuid.UUID, actor auth.Principal) (bool, error) {
+	if slices.Contains(actor.Roles, string(authz.RoleAdmin)) || owner.String() == actor.ID {
+		return true, nil
+	}
+	p, err := q.GetPrincipalByID(ctx, owner)
+	if err != nil {
+		return false, fmt.Errorf("reading the token's principal: %w", err)
+	}
+	return p.ResponsiblePrincipalID != nil && p.ResponsiblePrincipalID.String() == actor.ID, nil
 }
 
 // RevokeAllForPrincipalTx revokes all tokens of principalID inside an existing transaction.

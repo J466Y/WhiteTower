@@ -194,7 +194,7 @@ func initiateLogin(t *testing.T, svc *authn.OIDCService, returnURL string) (*htt
 	cookies := loginRec.Result().Cookies()
 	var stateCookie *http.Cookie
 	for _, c := range cookies {
-		if c.Name == "__Host-wt_oidc" || c.Name == "wt_oidc" {
+		if c.Name == "__Host-wt_oidc" {
 			stateCookie = c
 			break
 		}
@@ -400,7 +400,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 
 		var sessionCookie *http.Cookie
 		for _, c := range callbackRec.Result().Cookies() {
-			if c.Name == authn.CookieNameSecure || c.Name == authn.CookieNameInsecure {
+			if c.Name == authn.CookieName {
 				sessionCookie = c
 				break
 			}
@@ -611,7 +611,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/auth/logout", nil)
-		req.AddCookie(sessionStore.Cookie(sess.Token, false))
+		req.AddCookie(sessionStore.Cookie(sess.Token))
 		rec := httptest.NewRecorder()
 
 		svc.ServeHTTP(rec, req)
@@ -624,6 +624,132 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		_, err = sessionStore.Get(context.Background(), sess.Token)
 		if !strings.Contains(fmt.Sprint(err), "revoked") {
 			t.Errorf("expected session to be revoked, got %v", err)
+		}
+	})
+}
+
+// Security test ST-14: a sign-in revokes the session that the browser held,
+// under the session cookie's name or the unprefixed one, whoever it belonged
+// to; a sign-in that fails revokes nothing
+func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
+	ctx := context.Background()
+	idp := newMockIDP(t)
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, _, database := setupAuthn(t, clk)
+
+	const clientID = "whitetower-console"
+	svc, err := authn.NewOIDCService(ctx, authn.OIDCOptions{
+		Issuer:       idp.server.URL,
+		ClientID:     clientID,
+		ClientSecret: "test-secret",
+		RedirectURL:  "https://127.0.0.1:8443/auth/callback",
+		Clock:        clk,
+		HTTPClient:   idp.server.Client(),
+	}, database, principalStore, sessionStore)
+	if err != nil {
+		t.Fatalf("creating OIDC service: %v", err)
+	}
+
+	// callback ends a sign-in whose ID token has the audience aud, with the
+	// browser's cookies, and returns the answer.
+	callback := func(t *testing.T, subject, aud string, cookies ...*http.Cookie) *httptest.ResponseRecorder {
+		t.Helper()
+		stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/")
+		idp.customToken = idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{
+			"iss":   idp.server.URL,
+			"aud":   aud,
+			"sub":   subject,
+			"exp":   clk.Now().Add(time.Hour).Unix(),
+			"nonce": nonceParam,
+		})
+		req := httptest.NewRequest(http.MethodGet, "/auth/callback?code=mock-code&state="+url.QueryEscape(stateParam), nil)
+		req.AddCookie(stateCookie)
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+		rec := httptest.NewRecorder()
+		svc.ServeHTTP(rec, req)
+		return rec
+	}
+	// signIn ends a sign-in that succeeds, and returns its session's token.
+	signIn := func(t *testing.T, subject string, cookies ...*http.Cookie) string {
+		t.Helper()
+		rec := callback(t, subject, clientID, cookies...)
+		if rec.Code != http.StatusFound {
+			t.Fatalf("sign-in as %s: got %d %q, want 302", subject, rec.Code, rec.Body.String())
+		}
+		for _, c := range rec.Result().Cookies() {
+			if c.Name == authn.CookieName && c.Value != "" {
+				return c.Value
+			}
+		}
+		t.Fatalf("sign-in as %s set no session cookie", subject)
+		return ""
+	}
+	checkRevoked := func(t *testing.T, token string) {
+		t.Helper()
+		if _, err := sessionStore.Get(ctx, token); !errors.Is(err, authn.ErrSessionRevoked) {
+			t.Errorf("the session the browser held: got %v, want it revoked", err)
+		}
+	}
+	checkValid := func(t *testing.T, token string) {
+		t.Helper()
+		if _, err := sessionStore.Get(ctx, token); err != nil {
+			t.Errorf("the session: got %v, want it valid", err)
+		}
+	}
+
+	t.Run("the previous person's session", func(t *testing.T) {
+		alice := signIn(t, "usr-alice")
+		bob := signIn(t, "usr-bob", &http.Cookie{Name: authn.CookieName, Value: alice})
+		checkRevoked(t, alice)
+		checkValid(t, bob)
+	})
+
+	t.Run("the same person's session", func(t *testing.T) {
+		first := signIn(t, "usr-carol")
+		second := signIn(t, "usr-carol", &http.Cookie{Name: authn.CookieName, Value: first})
+		checkRevoked(t, first)
+		checkValid(t, second)
+	})
+
+	t.Run("a session planted under the unprefixed name", func(t *testing.T) {
+		mallory, err := principalStore.UpsertHuman(ctx, idp.server.URL, "usr-mallory", "Mallory Planter", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		planted, err := sessionStore.Create(ctx, mallory.ID, "oidc", []string{"user"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		dave := signIn(t, "usr-dave", &http.Cookie{Name: "wt_session", Value: planted.Token})
+		checkRevoked(t, planted.Token)
+		checkValid(t, dave)
+	})
+
+	t.Run("a sign-in that fails", func(t *testing.T) {
+		held := signIn(t, "usr-erin")
+		if rec := callback(t, "usr-frank", "another-client", &http.Cookie{Name: authn.CookieName, Value: held}); rec.Code != http.StatusBadRequest {
+			t.Fatalf("a sign-in with an ID token for another client: got %d, want 400", rec.Code)
+		}
+		checkValid(t, held)
+	})
+
+	// The console is served over HTTPS only, development included, so the
+	// cookies of a sign-in are always Secure, with the __Host- prefix.
+	t.Run("the cookies of a sign-in are Secure", func(t *testing.T) {
+		login := httptest.NewRecorder()
+		svc.ServeHTTP(login, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
+		cookies := append(login.Result().Cookies(), callback(t, "usr-grace", clientID).Result().Cookies()...)
+		names := map[string]bool{}
+		for _, c := range cookies {
+			names[c.Name] = true
+			if !strings.HasPrefix(c.Name, "__Host-") || !c.Secure || !c.HttpOnly || c.Path != "/" || c.Domain != "" {
+				t.Errorf("cookie %s: Secure %v, HttpOnly %v, path %q, domain %q", c.Name, c.Secure, c.HttpOnly, c.Path, c.Domain)
+			}
+		}
+		if !names["__Host-wt_oidc"] || !names[authn.CookieName] {
+			t.Errorf("cookies %v, want the state cookie and the session cookie", names)
 		}
 	})
 }
@@ -845,7 +971,7 @@ func TestTheProviderIsDiscoveredThroughItsBackChannel(t *testing.T) {
 		}
 		var session *authn.Session
 		for _, c := range rec.Result().Cookies() {
-			if c.Name == authn.CookieNameInsecure && c.Value != "" {
+			if c.Name == authn.CookieName && c.Value != "" {
 				s, err := sessionStore.Get(context.Background(), c.Value)
 				if err != nil {
 					t.Fatalf("reading the session: %v", err)

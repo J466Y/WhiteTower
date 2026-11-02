@@ -310,6 +310,24 @@ func TestDefaultsMakeNoOutboundConnection(t *testing.T) {
 	}
 }
 
+// With OIDC off, the public token exchange gives its answer for a server
+// without an exchanger, and nothing panics: the server's wiring gives the API
+// no exchanger, rather than a nil service that the API would call.
+func TestWithoutOIDCTheTokenExchangeIsNotConfigured(t *testing.T) {
+	s := startServe(t)
+	_, body := call(t, http.StatusInternalServerError, http.MethodPost, s.console+"/api/v1/tokens/exchange",
+		`{"idToken":"an ID token"}`, http.Header{"Content-Type": {"application/json"}})
+	if !strings.Contains(body, `"detail":"token exchange is not configured"`) {
+		t.Errorf("answer %s, want the exchange not configured", body)
+	}
+	if err := s.stop(); err != nil {
+		t.Fatalf("serve returned %v", err)
+	}
+	if panics := s.logs.records(t, "panic serving a request"); len(panics) != 0 {
+		t.Errorf("the exchange panicked: %v", panics)
+	}
+}
+
 // The criterion of plan P1-01, step 3, through the server binary's own wiring:
 // the response, the access log and the exported span share their IDs.
 func TestARequestIsFollowedThroughLogsAndExportedTraces(t *testing.T) {

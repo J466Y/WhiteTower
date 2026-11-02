@@ -31,9 +31,10 @@ import (
 )
 
 const (
-	stateCookieNameSecure   = "__Host-wt_oidc"
-	stateCookieNameInsecure = "wt_oidc"
-	stateCookieLifetime     = 10 * time.Minute
+	// stateCookieName is the name of the cookie that holds a sign-in's state,
+	// Secure and with the __Host- prefix, as the session cookie is.
+	stateCookieName     = "__Host-wt_oidc"
+	stateCookieLifetime = 10 * time.Minute
 )
 
 // OIDCOptions holds options for configuring the OpenID Connect backend-for-frontend service.
@@ -48,7 +49,6 @@ type OIDCOptions struct {
 	GroupsClaim       string
 	RoleMapping       map[string]string
 	AllowedAlgorithms []string
-	SecureCookies     bool
 	Clock             clock.Clock
 	Logger            *slog.Logger
 	Limiter           *ratelimit.Limiter
@@ -281,17 +281,12 @@ func (s *OIDCService) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookieName := stateCookieNameSecure
-	if !s.opts.SecureCookies {
-		cookieName = stateCookieNameInsecure
-	}
-	//nolint:gosec // G124: secure flag is dynamic to support non-TLS development
 	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
+		Name:     stateCookieName,
 		Value:    cookieValue,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   s.opts.SecureCookies,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(stateCookieLifetime.Seconds()),
 	})
@@ -309,12 +304,7 @@ func (s *OIDCService) handleLogin(w http.ResponseWriter, r *http.Request) {
 // handleCallback validates the authorization code and ID token, provisions the principal,
 // resolves effective roles, and issues the session cookie (ST-16).
 func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
-	cookieName := stateCookieNameSecure
-	if !s.opts.SecureCookies {
-		cookieName = stateCookieNameInsecure
-	}
-
-	cookie, err := r.Cookie(cookieName)
+	cookie, err := r.Cookie(stateCookieName)
 	if err != nil {
 		http.Error(w, "missing OIDC state cookie", http.StatusBadRequest)
 		return
@@ -457,41 +447,37 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	effectiveRoles := ResolveEffectiveRoles(groups, s.opts.RoleMapping, localBindings)
 
-	session, err := s.sessions.Create(ctx, principal.ID, "oidc", effectiveRoles)
+	// Security test ST-14: the session that the browser held is revoked with
+	// the new one's creation.
+	session, err := s.sessions.Replace(ctx, heldSessions(r), principal.ID, "oidc", effectiveRoles)
 	if err != nil {
 		s.logger.Error("creating session", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	//nolint:gosec // G124: secure flag is dynamic to support non-TLS development
 	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
+		Name:     stateCookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   s.opts.SecureCookies,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
 
-	http.SetCookie(w, s.sessions.Cookie(session.Token, s.opts.SecureCookies))
+	http.SetCookie(w, s.sessions.Cookie(session.Token))
 	http.Redirect(w, r, state.ReturnURL, http.StatusFound)
 }
 
 // handleLogout clears the session in PostgreSQL and the browser cookie, then
 // redirects to the IdP's end session endpoint if available (plan P1-03, step 1).
 func (s *OIDCService) handleLogout(w http.ResponseWriter, r *http.Request) {
-	cookieName := CookieNameSecure
-	if !s.opts.SecureCookies {
-		cookieName = CookieNameInsecure
-	}
-
-	if cookie, err := r.Cookie(cookieName); err == nil && cookie.Value != "" {
+	if cookie, err := r.Cookie(CookieName); err == nil && cookie.Value != "" {
 		_ = s.sessions.Revoke(r.Context(), cookie.Value)
 	}
 
-	http.SetCookie(w, s.sessions.ClearCookie(s.opts.SecureCookies))
+	http.SetCookie(w, s.sessions.ClearCookie())
 
 	if s.endSessionURL != "" {
 		if u, err := url.Parse(s.endSessionURL); err == nil {

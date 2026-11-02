@@ -139,7 +139,7 @@ type Breakglass struct {
 
 // OIDC holds OpenID Connect authentication and BFF settings (plan P1-03, step 1; ADR-0009).
 type OIDC struct {
-	// Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled.
+	// Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled. Browsers sign in at it, and without auth.oidc.discovery_url the server also takes the discovery document and the signing keys from it and sends it the client secret and the authorization code, so the URL is https: http only with dev.self_signed_tls, which the development stacks set.
 	Issuer string `yaml:"issuer"`
 	// Base URL that the server fetches the identity provider's discovery document from, under /.well-known/openid-configuration, when the server reaches the provider at another address than browsers do, such as http://keycloak:8080/realms/whitetower inside a container network. The document must still name auth.oidc.issuer as its issuer, and ID tokens are verified against auth.oidc.issuer. The server sends the client secret and the authorization code to the endpoints the document names and takes the signing keys from them, so the URL is https when the issuer is. Empty: the issuer.
 	DiscoveryURL string `yaml:"discovery_url"`
@@ -266,7 +266,7 @@ const MaxCheckpointInterval = time.Minute
 
 // Dev holds settings for development only.
 type Dev struct {
-	// Serve a self-signed certificate generated at startup on the HTTPS listeners, instead of the certificate files. For development only: the server logs a warning.
+	// Serve a self-signed certificate generated at startup on the HTTPS listeners, instead of the certificate files, and accept an http auth.oidc.issuer, as the development identity provider's. For development only: the server logs a warning.
 	SelfSignedTLS bool `yaml:"self_signed_tls"`
 }
 
@@ -453,6 +453,11 @@ func (c Config) Validate() error {
 		add("auth.session.idle_timeout", "cannot be longer than auth.session.absolute_lifetime")
 	}
 	if c.Auth.OIDC.Issuer != "" {
+		// A release build refuses dev.self_signed_tls (threat model, T-61),
+		// so it refuses an http issuer too (T-13).
+		if u, err := url.Parse(c.Auth.OIDC.Issuer); err == nil && u.Scheme == "http" && !c.Dev.SelfSignedTLS {
+			add("auth.oidc.issuer", "want https, unless dev.self_signed_tls is set: browsers sign in at the issuer, and the server takes the signing keys from it (threat model, T-13)")
+		}
 		if c.Auth.OIDC.ClientID == "" {
 			add("auth.oidc.client_id", "required when auth.oidc.issuer is set")
 		}

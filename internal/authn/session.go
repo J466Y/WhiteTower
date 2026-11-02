@@ -21,11 +21,20 @@ import (
 )
 
 const (
-	// CookieNameSecure is the session cookie name with the __Host- prefix (ADR-0009).
-	CookieNameSecure = "__Host-wt_session"
+	// CookieName is the session cookie's name. Its __Host- prefix makes
+	// browsers keep the cookie only when it is Secure, for the core's host
+	// alone and the path /, so that neither another host of the domain nor a
+	// plain HTTP page can set it (ADR-0009). The console is served over HTTPS
+	// only, self-signed certificate included, and browsers treat
+	// http://localhost, where the Vite development server runs, as secure:
+	// the cookie is always Secure.
+	CookieName = "__Host-wt_session"
 
-	// CookieNameInsecure is the fallback cookie name when TLS is not enabled.
-	CookieNameInsecure = "wt_session"
+	// unprefixedCookieName is the session cookie's name without the prefix,
+	// which the core gave it when development settings turned Secure off.
+	// The core never authenticates with it, but a sign-in revokes the session
+	// it names, as one that an older version set or another host planted.
+	unprefixedCookieName = "wt_session"
 
 	csrfHMACKey = "whitetower-csrf-token-v1"
 )
@@ -281,19 +290,53 @@ func (s *SessionStore) Get(ctx context.Context, token string) (*Session, error) 
 	}, nil
 }
 
-// Rotate implements session fixation prevention by replacing oldToken with a fresh session
-// for the same principal, retaining roles and method.
-func (s *SessionStore) Rotate(ctx context.Context, oldToken string) (*Session, error) {
-	current, err := s.Get(ctx, oldToken)
-	if err != nil {
-		return nil, fmt.Errorf("validating existing session for rotation: %w", err)
-	}
+// Replace creates the session of a sign-in and, in the same transaction,
+// revokes the sessions that held names: those of the session cookies that
+// the browser sent with the sign-in, whoever they belong to. A sign-in thus
+// never leaves valid a session that the browser held before it, be it the
+// previous user's or one that someone planted (ST-14).
+func (s *SessionStore) Replace(ctx context.Context, held []string, principalID uuid.UUID, method string, roles []string) (*Session, error) {
+	var session *Session
+	err := s.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
+		var err error
+		session, err = s.ReplaceTx(ctx, tx, held, principalID, method, roles, s.opts.AbsoluteLifetime)
+		return err
+	})
+	return session, err
+}
 
-	if err := s.Revoke(ctx, oldToken); err != nil {
-		return nil, fmt.Errorf("revoking old session: %w", err)
+// ReplaceTx is Replace inside the given transaction, with an explicit maximum
+// lifetime.
+func (s *SessionStore) ReplaceTx(
+	ctx context.Context,
+	tx *db.Tx,
+	held []string,
+	principalID uuid.UUID,
+	method string,
+	roles []string,
+	lifetime time.Duration,
+) (*Session, error) {
+	now := s.clk.Now().UTC()
+	q := authndb.New(tx)
+	for _, token := range held {
+		if err := q.RevokeSession(ctx, authndb.RevokeSessionParams{IDHash: hashToken(token), RevokedAt: &now}); err != nil {
+			return nil, fmt.Errorf("revoking the session that the browser held: %w", err)
+		}
 	}
+	return s.CreateWithLifetimeTx(ctx, tx, principalID, method, roles, lifetime)
+}
 
-	return s.Create(ctx, current.PrincipalID, current.Method, current.Roles)
+// heldSessions returns the session tokens that r's cookies name, for Replace:
+// the first under the session cookie's name and the first under the
+// unprefixed one, so that a request with many cookies costs no more.
+func heldSessions(r *http.Request) []string {
+	var held []string
+	for _, name := range []string{CookieName, unprefixedCookieName} {
+		if c, err := r.Cookie(name); err == nil && c.Value != "" {
+			held = append(held, c.Value)
+		}
+	}
+	return held
 }
 
 // Revoke marks a single session as revoked.
@@ -366,29 +409,20 @@ func (s *SessionStore) ValidateRequestCSRF(r *http.Request) bool {
 }
 
 // Cookie constructs an http.Cookie for sessionToken.
-func (s *SessionStore) Cookie(sessionToken string, secure bool) *http.Cookie {
-	name := CookieNameSecure
-	if !secure {
-		name = CookieNameInsecure
-	}
-	//nolint:gosec // G124: secure flag is dynamic to support non-TLS in development
+func (s *SessionStore) Cookie(sessionToken string) *http.Cookie {
 	return &http.Cookie{
-		Name:     name,
+		Name:     CookieName,
 		Value:    sessionToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(s.opts.AbsoluteLifetime.Seconds()),
 	}
 }
 
 // CookieForSession constructs an http.Cookie scaled to the specific session's remaining lifetime.
-func (s *SessionStore) CookieForSession(session *Session, secure bool) *http.Cookie {
-	name := CookieNameSecure
-	if !secure {
-		name = CookieNameInsecure
-	}
+func (s *SessionStore) CookieForSession(session *Session) *http.Cookie {
 	maxAge := int(s.opts.AbsoluteLifetime.Seconds())
 	if session != nil && !session.AbsoluteExpiresAt.IsZero() {
 		rem := session.AbsoluteExpiresAt.Sub(s.clk.Now().UTC())
@@ -396,31 +430,25 @@ func (s *SessionStore) CookieForSession(session *Session, secure bool) *http.Coo
 			maxAge = int(rem.Seconds())
 		}
 	}
-	//nolint:gosec // G124: secure flag is dynamic to support non-TLS in development
 	return &http.Cookie{
-		Name:     name,
+		Name:     CookieName,
 		Value:    session.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   maxAge,
 	}
 }
 
 // ClearCookie returns a cookie configured to delete the session from the client.
-func (s *SessionStore) ClearCookie(secure bool) *http.Cookie {
-	name := CookieNameSecure
-	if !secure {
-		name = CookieNameInsecure
-	}
-	//nolint:gosec // G124: secure flag is dynamic to support non-TLS in development
+func (s *SessionStore) ClearCookie() *http.Cookie {
 	return &http.Cookie{
-		Name:     name,
+		Name:     CookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	}

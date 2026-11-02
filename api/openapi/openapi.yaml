@@ -131,7 +131,12 @@ paths:
     delete:
       operationId: revokeToken
       summary: Revoke an API token
-      description: Revokes an active API token by its ID.
+      description: |
+        Revokes an active API token by its ID. A caller revokes their own
+        tokens, those of the service accounts they are responsible for, and,
+        as an administrator, any token: the tokens they may list. Any other
+        token is `not_found`, as a token that does not exist is, so that a
+        token's ID never shows whether the token exists.
       tags: [tokens]
       parameters:
         - name: id
