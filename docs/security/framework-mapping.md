@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Version 0.2, with [threat model v0.1.6](threat-model.md) |
+| **Status** | Version 0.2, with [threat model v0.1.7](threat-model.md) |
 | **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models) and 2026-10-27 (ISO/IEC 42001, the GDPR, and the evidence of each article and control: the maintainer's decision) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 7; requirement NFR-22 |
 

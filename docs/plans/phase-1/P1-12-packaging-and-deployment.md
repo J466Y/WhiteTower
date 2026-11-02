@@ -171,6 +171,35 @@ The plan lands in five pull requests across its two parts (P1-12.1: packaging fo
 | 4. Air-gapped bundle and egress-denied CI test | 5, 6, ST-60, NFR-14 | Not started |
 | 5. Upgrades, backup/restore and operations documentation | 7, 8, 9, 10, ST-64, OPS-06, OPS-07 | Not started |
 
+### 2026-11-02: the review of signing in from a browser
+
+The maintainer merged the fix (#94) while the review ran, which covered the same commit. The review found no blocking problem. The check of the discovery document's issuer is exactly as strict as go-oidc's was, in every configuration, and each rule of the fix has a test that fails when the rule breaks. The reviewer accepts what the fix did beyond its brief: it refuses the discovery document's own URL as `auth.oidc.discovery_url`, a refusal of `/api/v1/tokens/exchange` names nothing of the back channel, and the fix changes about 1,220 lines, of which about 840 are tests.
+
+Corrections, for a P1-12 fix of the work queue:
+
+- **The post-logout target.** An identity provider must now register the console's root, on the origin of `auth.oidc.redirect_url`, as a post-logout redirect URI. The comment of `auth.oidc.redirect_url`, and so the configuration reference, and step 4 of the SAML broker guide do not say so.
+- **Tests.**
+  - A failed discovery is tested only with a broken connection, where go-oidc's own error already names the URL. An HTTP error status, which go-oidc does not name, shows whether the core does.
+  - Nothing tests that the errors of `auth.oidc.discovery_url` never repeat it, as its neighbours' canary tests do.
+  - The packaging test runs the seed through pgx, which fails on any error, so nothing sees whether the Compose command keeps `ON_ERROR_STOP`.
+  - The Taskfile check decodes every task, so a valid form of another task, such as a dynamic variable, breaks it. It needs only `tasks.run`.
+- **The seed's governance head.** The seed's last statement calls `next_governance_version()` for rows that `ON CONFLICT` then discards, so every start moves the head. It must skip agents that already have a governance state, and the test must check that a second run changes nothing, as its comment and the fix's note claim.
+- **Documents.**
+  - An evaluation stack started before the fix needs `task eval:down -- -v` and a rebuild, and a development Keycloak container started before it needs recreating to import the new realm. No document says so.
+  - `task eval` reads `deploy/compose/dev/.env`, while the direct Compose command reads a `.env` beside its own file.
+  - The sign-in spec passes only against the development realm, so `WT_E2E_URL` alone no longer tests another deployment.
+  - `/auth/logout` signs out of Keycloak once the person confirms, not at once.
+- **The SAML broker guide** asks for the `groups` scope, which Keycloak refuses, shows a `/me` answer that the API does not give, and names an event that the catalog lacks.
+- **The fix's note** below lists its differences from the brief without their reasons, which the handoff gave.
+
+Follow-ups, each a row of the work queue:
+
+- In P1-03's code on `main` ([P1-03's progress notes](P1-03-human-identity-and-access.md#progress-notes) of 2026-11-02): token revocation without an owner check; sessions not rotated at sign-in (ST-14); the unprefixed session cookie accepted in production; a typed nil that makes the token exchange panic when OIDC is off; ST-03's canaries; a plain-HTTP issuer accepted outside development; a core that cannot start while the identity provider is down (KIL-08); the OIDC state key, made by each process (NFR-06); no audit event for people and sessions (AUD-01); and principals of SCIM and of sign-in that are never linked.
+- The Helm chart, which gets the discovery URL, the scopes, a CA file for the back channel, the shared state key and an egress rule to the identity provider, once the core has them.
+- The console's Node version: its tests fail on Node 22.12.0, which `web/package.json` still accepts.
+
+The threat model (version 0.1.7) adds to T-13's mitigations that a discovery URL is trusted as the issuer is.
+
 ### 2026-10-30: signing in from a browser (fix)
 
 A fix outside the five pull requests, from the reviewer's finding of 2026-10-29 ([AGENTS.md](../../../AGENTS.md), work queue), with the decisions that the maintainer and the reviewer took on 2026-10-30. No stack let a person sign in from a browser, which milestone M1 asks for, so the guide of pull request 1 could not be followed (step 2, OPS-01).
