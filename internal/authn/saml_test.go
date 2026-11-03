@@ -18,7 +18,7 @@ import (
 func TestSAMLThroughBroker(t *testing.T) {
 	idp := newMockIDP(t)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, _, database := setupAuthn(t, clk)
+	sessionStore, principalStore, _, _ := setupAuthn(t, clk)
 
 	const clientID = "whitetower-console"
 
@@ -37,7 +37,7 @@ func TestSAMLThroughBroker(t *testing.T) {
 		RoleMapping:       roleMapping,
 		GroupsClaim:       "groups",
 		AllowedAlgorithms: []string{"RS256"},
-	}, database, principalStore, sessionStore)
+	}, principalStore, sessionStore)
 
 	// 1. User initiates login
 	loginReq := httptest.NewRequest(http.MethodGet, "/auth/login?return_url=/dashboard", nil)

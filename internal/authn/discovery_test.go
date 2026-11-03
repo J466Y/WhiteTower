@@ -102,7 +102,7 @@ func TestBeforeDiscoverySignInIsUnavailable(t *testing.T) {
 	// Nothing reaches the stores before discovery, and a logout without a
 	// session cookie revokes nothing.
 	opts.Tokens = authn.NewTokenStore(nil, clk, nil)
-	svc, err := authn.NewOIDCService(opts, nil, nil, authn.NewSessionStore(nil, clk, authn.SessionOptions{}))
+	svc, err := authn.NewOIDCService(opts, nil, authn.NewSessionStore(nil, clk, nil, authn.SessionOptions{}))
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestDiscoveryBacksOffUntilTheProviderAnswers(t *testing.T) {
 		Clock:        clk,
 		Logger:       slog.New(slog.NewJSONHandler(logs, nil)),
 		Metrics:      metrics.NewOIDC(reg),
-	}, nil, nil, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestDiscoveryStopsWithItsContext(t *testing.T) {
 	clk := clocktest.New(testEpoch)
 	opts := backChannelOptions(idp, clk)
 	opts.StateKey = newStateKey(t)
-	svc, err := authn.NewOIDCService(opts, nil, nil, nil)
+	svc, err := authn.NewOIDCService(opts, nil, nil)
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
@@ -319,7 +319,7 @@ func TestEachDiscoveryAttemptTimesOut(t *testing.T) {
 		Timeout:      100 * time.Millisecond,
 		Clock:        clk,
 		Logger:       slog.New(slog.DiscardHandler),
-	}, nil, nil, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
@@ -386,7 +386,7 @@ func TestTheCAFileTrustsTheProvidersBackChannel(t *testing.T) {
 	idp := newTLSMockIDP(t)
 	idp.discovery = idp.backChannelDocument(frontIssuer)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+	sessionStore, principalStore, tokenStore, _ := setupAuthn(t, clk)
 
 	untrusted := backChannelOptions(idp, clk)
 	if err := discover(t, untrusted); err == nil || !strings.Contains(err.Error(), "certificate") {
@@ -396,7 +396,7 @@ func TestTheCAFileTrustsTheProvidersBackChannel(t *testing.T) {
 	opts := backChannelOptions(idp, clk)
 	opts.CAFile = writeCA(t, idp.server)
 	opts.Tokens = tokenStore
-	svc := newService(t, opts, database, principalStore, sessionStore)
+	svc := newService(t, opts, principalStore, sessionStore)
 	if rec := signInThroughBackChannel(t, svc, idp, clk, frontIssuer); rec.Code != http.StatusFound {
 		t.Fatalf("a sign-in through the provider over HTTPS: got %d %q, want 302", rec.Code, rec.Body.String())
 	}
@@ -419,13 +419,13 @@ func TestASignInEndsOnAnyServiceWithTheSameStateKey(t *testing.T) {
 	idp := newMockIDP(t)
 	idp.discovery = idp.backChannelDocument(frontIssuer)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, _, database := setupAuthn(t, clk)
+	sessionStore, principalStore, _, _ := setupAuthn(t, clk)
 	opts := backChannelOptions(idp, clk)
 	opts.StateKey = newStateKey(t)
-	first := newService(t, opts, database, principalStore, sessionStore)
-	second := newService(t, opts, database, principalStore, sessionStore)
+	first := newService(t, opts, principalStore, sessionStore)
+	second := newService(t, opts, principalStore, sessionStore)
 	opts.StateKey = newStateKey(t)
-	other := newService(t, opts, database, principalStore, sessionStore)
+	other := newService(t, opts, principalStore, sessionStore)
 
 	// callback ends on svc a sign-in that started on first.
 	callback := func(svc *authn.OIDCService) *httptest.ResponseRecorder {

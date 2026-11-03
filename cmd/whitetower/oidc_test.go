@@ -208,8 +208,8 @@ func TestTheCoreStartsWhileTheIdentityProviderIsDown(t *testing.T) {
 	}
 	writer := audit.NewWriter(catalog, clock.System)
 	tokens := authn.NewTokenStore(pool, clock.System, writer)
-	principals := authn.NewPrincipalStore(pool, clock.System, writer, authn.NewSessionStore(pool, clock.System, authn.SessionOptions{}), tokens)
-	owner, err := principals.UpsertHuman(context.Background(), idp.URL, "usr-before-the-outage", "Olga Before", nil, []string{"wt-owners"})
+	principals := authn.NewPrincipalStore(pool, clock.System, writer, authn.NewSessionStore(pool, clock.System, writer, authn.SessionOptions{}), tokens)
+	owner, err := principals.SignIn(context.Background(), "oidc", authn.Identity{Issuer: idp.URL, Subject: "usr-before-the-outage", DisplayName: "Olga Before", Groups: []string{"wt-owners"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

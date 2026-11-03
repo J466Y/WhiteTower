@@ -1,18 +1,30 @@
 -- Queries of the human authentication and session domain (plan P1-03).
 
--- name: UpsertHumanPrincipal :one
+-- name: LockHumanPrincipalByIdentity :one
+-- Locks the principal, so that a sign-in reads the groups that it changes.
+SELECT * FROM whitetower.principals
+WHERE issuer = $1 AND subject = $2 AND kind = 'human'
+FOR UPDATE;
+
+-- name: InsertHumanPrincipal :one
+-- Returns no row when a principal with the issuer and subject exists, or
+-- another transaction created one meanwhile, once that transaction commits.
 INSERT INTO whitetower.principals (
     id, kind, issuer, subject, display_name, email, status, idp_groups, last_login_at, created_at, updated_at
 ) VALUES (
-    $1, 'human', $2, $3, $4, $5, 'active', $6, $7, $7, $7
+    $1, 'human', $2, $3, $4, $5, 'active', $6, $7, $8, $8
 )
-ON CONFLICT (issuer, subject) WHERE kind = 'human'
-DO UPDATE SET
-    display_name = EXCLUDED.display_name,
-    email = EXCLUDED.email,
-    idp_groups = EXCLUDED.idp_groups,
-    last_login_at = EXCLUDED.last_login_at,
-    updated_at = EXCLUDED.last_login_at
+ON CONFLICT (issuer, subject) WHERE kind = 'human' DO NOTHING
+RETURNING *;
+
+-- name: UpdateHumanPrincipalAtSignIn :one
+UPDATE whitetower.principals
+SET display_name = $2,
+    email = $3,
+    idp_groups = $4,
+    last_login_at = $5,
+    updated_at = $5
+WHERE id = $1
 RETURNING *;
 
 -- name: GetPrincipalByID :one
@@ -54,6 +66,15 @@ WHERE id_hash = $1 AND revoked_at IS NULL;
 UPDATE whitetower.sessions
 SET revoked_at = $2
 WHERE id_hash = $1 AND revoked_at IS NULL;
+
+-- name: RevokeActiveSession :one
+-- Revokes the session only while it is active, as SessionStore.Get judges it,
+-- and returns whose it was: no row when nothing was revoked.
+UPDATE whitetower.sessions
+SET revoked_at = $2
+WHERE id_hash = $1 AND revoked_at IS NULL
+  AND idle_expires_at >= $2 AND absolute_expires_at >= $2
+RETURNING principal_id, method;
 
 -- name: RevokeSessionsForPrincipal :exec
 UPDATE whitetower.sessions

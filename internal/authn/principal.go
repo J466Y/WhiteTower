@@ -22,6 +22,10 @@ import (
 // ErrPrincipalNotFound is returned when no principal matches the query.
 var ErrPrincipalNotFound = errors.New("principal not found")
 
+// ErrPrincipalExists is returned when SCIM would create a principal with the
+// issuer and subject of one that exists.
+var ErrPrincipalExists = errors.New("a principal with this issuer and subject exists")
+
 var (
 	// ErrResponsibleNotHuman is returned when a principal that is not a human
 	// would be responsible for a service account.
@@ -71,36 +75,199 @@ func NewPrincipalStore(database *db.DB, clk clock.Clock, writer *audit.Writer, s
 	}
 }
 
-// UpsertHuman creates or updates a human principal record from IdP authentication claims.
-func (ps *PrincipalStore) UpsertHuman(ctx context.Context, issuer, subject, displayName string, email *string, idpGroups []string) (*Principal, error) {
-	if issuer == "" || subject == "" || displayName == "" {
+// Identity is what an identity provider says of a person at a sign-in, or
+// what SCIM provisions: the issuer and subject that name them, their name and
+// email address, and the groups from which their roles come.
+type Identity struct {
+	Issuer      string
+	Subject     string
+	DisplayName string
+	Email       *string
+	Groups      []string
+}
+
+// SignIn creates the principal of the person whom id names, or updates the
+// one with its issuer and subject, at a sign-in through method: "oidc" from a
+// browser, or "token_exchange" from the CLI. In the same transaction it
+// records what changed (AUD-01): whitetower.principal.created.v1 for a new
+// principal, and whitetower.principal.groups_changed.v1 when the groups,
+// compared as sets, are not those the principal had. Then, still in that
+// transaction, it runs then, when not nil, for the rest of the sign-in: its
+// session or its token. An inactive principal is refused with
+// ErrPrincipalInactive, and nothing is written: neither its record nor an
+// event.
+func (ps *PrincipalStore) SignIn(ctx context.Context, method string, id Identity, then func(ctx context.Context, tx *db.Tx, p *Principal) error) (*Principal, error) {
+	if id.Issuer == "" || id.Subject == "" || id.DisplayName == "" {
 		return nil, errors.New("issuer, subject, and displayName are required")
 	}
-	if idpGroups == nil {
-		idpGroups = []string{}
-	}
-
 	newID, err := uuid.NewV7()
 	if err != nil {
 		return nil, fmt.Errorf("generating principal UUID: %w", err)
 	}
-
-	now := ps.clk.Now().UTC()
-	q := authndb.New(ps.database)
-	row, err := q.UpsertHumanPrincipal(ctx, authndb.UpsertHumanPrincipalParams{
-		ID:          newID,
-		Issuer:      &issuer,
-		Subject:     &subject,
-		DisplayName: displayName,
-		Email:       email,
-		IdpGroups:   idpGroups,
-		LastLoginAt: &now,
+	var signedIn *Principal
+	err = ps.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
+		p, err := signInHuman(ctx, tx, ps.writer, ps.clk.Now().UTC(), newID, method, id)
+		if err != nil {
+			return err
+		}
+		if p.Status != "active" {
+			return ErrPrincipalInactive
+		}
+		if then != nil {
+			if err := then(ctx, tx, p); err != nil {
+				return err
+			}
+		}
+		signedIn = p
+		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("upserting principal: %w", err)
+		return nil, err
 	}
+	return signedIn, nil
+}
 
+// signInHuman creates the principal of id in tx, with newID, or updates the
+// one with its issuer and subject, at a sign-in through method, and records
+// what changed. It locks the principal's row before it reads the groups, so
+// that two sign-ins of one person at once, on one replica or two, create one
+// principal and record one creation, and the second records its change from
+// the groups that the first wrote. Under READ COMMITTED, an insert that meets
+// a principal that another transaction created waits for that transaction,
+// and once it commits inserts nothing: the next lock, a new statement, finds
+// the principal.
+func signInHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.Time, newID uuid.UUID, method string, id Identity) (*Principal, error) {
+	q := authndb.New(tx)
+	groups := groupSet(id.Groups)
+	for attempt := 1; ; attempt++ {
+		held, err := q.LockHumanPrincipalByIdentity(ctx, authndb.LockHumanPrincipalByIdentityParams{Issuer: &id.Issuer, Subject: &id.Subject})
+		if err == nil {
+			row, err := q.UpdateHumanPrincipalAtSignIn(ctx, authndb.UpdateHumanPrincipalAtSignInParams{
+				ID:          held.ID,
+				DisplayName: id.DisplayName,
+				Email:       id.Email,
+				IdpGroups:   groups,
+				LastLoginAt: &now,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("updating principal: %w", err)
+			}
+			if before := groupSet(held.IdpGroups); !slices.Equal(before, groups) {
+				if err := writer.Record(ctx, tx, audit.Event{
+					Type:    "whitetower.principal.groups_changed.v1",
+					Subject: held.ID.String(),
+					Data: map[string]any{
+						"principal_id": held.ID.String(),
+						"actor":        actorOf(method, held.ID),
+						"method":       method,
+						"before":       before,
+						"after":        groups,
+					},
+				}); err != nil {
+					return nil, fmt.Errorf("recording the change of the principal's groups: %w", err)
+				}
+			}
+			return fromDBModel(row), nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("locking principal: %w", err)
+		}
+		if attempt > 1 {
+			return nil, errors.New("the principal that another sign-in created is gone")
+		}
+		created, err := createHuman(ctx, tx, writer, now, newID, method, id, &now)
+		if err == nil {
+			return created, nil
+		}
+		if !errors.Is(err, ErrPrincipalExists) {
+			return nil, err
+		}
+		// Another sign-in created the principal since the lock found none,
+		// and has committed.
+	}
+}
+
+// ProvisionHuman creates the principal of the person whom id names, as SCIM
+// provisions it, and records whitetower.principal.created.v1 in the same
+// transaction, with SCIM's service account as actor. A principal with the
+// issuer and subject exists already: ErrPrincipalExists, and nothing is
+// written. SCIM is never a sign-in, so the principal has no last login.
+func (ps *PrincipalStore) ProvisionHuman(ctx context.Context, id Identity) (*Principal, error) {
+	if id.Issuer == "" || id.Subject == "" || id.DisplayName == "" {
+		return nil, errors.New("issuer, subject, and displayName are required")
+	}
+	newID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("generating principal UUID: %w", err)
+	}
+	var created *Principal
+	err = ps.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) (err error) {
+		created, err = createHuman(ctx, tx, ps.writer, ps.clk.Now().UTC(), newID, "scim", id, nil)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+// createHuman inserts the principal of id in tx, with newID, and records its
+// creation through method. A principal with the issuer and subject exists, or
+// another transaction created one that committed: ErrPrincipalExists.
+func createHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.Time, newID uuid.UUID, method string, id Identity, lastLogin *time.Time) (*Principal, error) {
+	groups := groupSet(id.Groups)
+	row, err := authndb.New(tx).InsertHumanPrincipal(ctx, authndb.InsertHumanPrincipalParams{
+		ID:          newID,
+		Issuer:      &id.Issuer,
+		Subject:     &id.Subject,
+		DisplayName: id.DisplayName,
+		Email:       id.Email,
+		IdpGroups:   groups,
+		LastLoginAt: lastLogin,
+		CreatedAt:   now,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrPrincipalExists
+	}
+	if err != nil {
+		return nil, fmt.Errorf("creating principal: %w", err)
+	}
+	if err := writer.Record(ctx, tx, audit.Event{
+		Type:    "whitetower.principal.created.v1",
+		Subject: row.ID.String(),
+		Data: map[string]any{
+			"principal_id": row.ID.String(),
+			"actor":        actorOf(method, row.ID),
+			"method":       method,
+			"idp_groups":   groups,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("recording the principal's creation: %w", err)
+	}
 	return fromDBModel(row), nil
+}
+
+// groupSet returns groups sorted, each once, and never nil: the form in which
+// principals keep their groups and events record them, so that the same
+// groups in another order are the same groups.
+func groupSet(groups []string) []string {
+	set := append([]string{}, groups...)
+	slices.Sort(set)
+	return slices.Compact(set)
+}
+
+// actorOf returns the audit actor of a change to the principal id, or to its
+// session, made through method: SCIM's service account for a provisioning,
+// the break-glass custodian, or the person who signs in or out.
+func actorOf(method string, id uuid.UUID) map[string]any {
+	switch method {
+	case "scim":
+		return map[string]any{"type": "service_account", "id": SCIMPrincipalID.String()}
+	case "breakglass":
+		return map[string]any{"type": "breakglass", "id": id.String()}
+	default:
+		return map[string]any{"type": "human", "id": id.String()}
+	}
 }
 
 // GetByID returns the principal with the given UUID.

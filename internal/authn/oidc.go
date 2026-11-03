@@ -118,7 +118,6 @@ type OIDCService struct {
 	client        *http.Client
 	discoveryURL  string
 	documentURL   string
-	database      *db.DB
 	principals    *PrincipalStore
 	sessions      *SessionStore
 	tokens        *TokenStore
@@ -145,7 +144,7 @@ type discovered struct {
 // the token exchange answer that the provider is unavailable, so that a core
 // that starts while the provider is down still serves break-glass and the
 // machine listener (KIL-08, HUM-06).
-func NewOIDCService(opts OIDCOptions, database *db.DB, principals *PrincipalStore, sessions *SessionStore) (*OIDCService, error) {
+func NewOIDCService(opts OIDCOptions, principals *PrincipalStore, sessions *SessionStore) (*OIDCService, error) {
 	// Without an issuer, a discovery document without one would pass the
 	// issuer check of Discover.
 	if opts.Issuer == "" {
@@ -202,7 +201,6 @@ func NewOIDCService(opts OIDCOptions, database *db.DB, principals *PrincipalStor
 		client:        &http.Client{Transport: transport, Timeout: opts.Timeout},
 		discoveryURL:  discoveryURL,
 		documentURL:   strings.TrimSuffix(discoveryURL, "/") + "/.well-known/openid-configuration",
-		database:      database,
 		principals:    principals,
 		sessions:      sessions,
 		tokens:        opts.Tokens,
@@ -494,79 +492,31 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 		return
 	}
 
-	var claims idTokenClaims
-	if err := idToken.Claims(&claims); err != nil {
+	id, err := s.identityOf(idToken)
+	if err != nil {
 		http.Error(w, "reading id token claims failed", http.StatusBadRequest)
 		return
 	}
 
-	var rawClaims map[string]any
-	if err := idToken.Claims(&rawClaims); err != nil {
-		http.Error(w, "reading raw id token claims failed", http.StatusBadRequest)
-		return
-	}
-
-	var groups []string
-	if rawGroups, ok := rawClaims[s.opts.GroupsClaim]; ok {
-		switch g := rawGroups.(type) {
-		case []any:
-			for _, item := range g {
-				if str, ok := item.(string); ok {
-					groups = append(groups, str)
-				}
-			}
-		case []string:
-			groups = append(groups, g...)
+	// One transaction signs the person in: the principal, its events and the
+	// session. Security test ST-14: the session that the browser held is
+	// revoked with the new one's creation.
+	var session *Session
+	_, err = s.principals.SignIn(ctx, "oidc", id, func(ctx context.Context, tx *db.Tx, p *Principal) error {
+		localBindings, err := authndb.New(tx).ListActiveRoleBindings(ctx, p.ID)
+		if err != nil {
+			return fmt.Errorf("fetching local role bindings: %w", err)
 		}
-	}
-
-	displayName := claims.Name
-	if displayName == "" {
-		displayName = claims.PreferredUsername
-	}
-	if displayName == "" {
-		displayName = claims.Email
-	}
-	if displayName == "" {
-		displayName = claims.Subject
-	}
-
-	var emailPtr *string
-	if claims.Email != "" {
-		emailPtr = &claims.Email
-	}
-
-	principal, err := s.principals.UpsertHuman(ctx, s.opts.Issuer, claims.Subject, displayName, emailPtr, groups)
-	if err != nil {
-		s.logger.Error("upserting principal", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	if principal.Status != "active" {
+		effectiveRoles := ResolveEffectiveRoles(id.Groups, s.opts.RoleMapping, localBindings)
+		session, err = s.sessions.ReplaceTx(ctx, tx, heldSessions(r), p.ID, "oidc", effectiveRoles, 0)
+		return err
+	})
+	switch {
+	case errors.Is(err, ErrPrincipalInactive):
 		http.Error(w, "account is deactivated", http.StatusForbidden)
 		return
-	}
-
-	var localBindings []string
-	if s.database != nil {
-		q := authndb.New(s.database)
-		var err error
-		localBindings, err = q.ListActiveRoleBindings(ctx, principal.ID)
-		if err != nil {
-			s.logger.Error("fetching local role bindings", "error", err)
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
-	}
-
-	effectiveRoles := ResolveEffectiveRoles(groups, s.opts.RoleMapping, localBindings)
-
-	// Security test ST-14: the session that the browser held is revoked with
-	// the new one's creation.
-	session, err := s.sessions.Replace(ctx, heldSessions(r), principal.ID, "oidc", effectiveRoles)
-	if err != nil {
-		s.logger.Error("creating session", "error", err)
+	case err != nil:
+		s.logger.Error("signing in", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -588,10 +538,13 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 // handleLogout clears the session in PostgreSQL and the browser cookie, then
 // redirects to the IdP's end session endpoint if available (plan P1-03, step 1).
 // Before discovery, the provider and its endpoint are unknown: the logout is
-// then local only, so that a person can always sign out of the core.
+// then local only, so that a person can always sign out of the core. A
+// revocation that fails still clears the cookie, and is logged.
 func (s *OIDCService) handleLogout(w http.ResponseWriter, r *http.Request, provider *discovered) {
 	if cookie, err := r.Cookie(CookieName); err == nil && cookie.Value != "" {
-		_ = s.sessions.Revoke(r.Context(), cookie.Value)
+		if err := s.sessions.SignOut(r.Context(), cookie.Value); err != nil {
+			s.logger.Error("signing out: revoking the session failed", "error", err)
+		}
 	}
 
 	http.SetCookie(w, s.sessions.ClearCookie())
@@ -720,14 +673,47 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 		return nil, fmt.Errorf("%w: the ID token does not verify", ErrInvalidToken)
 	}
 
-	var claims idTokenClaims
-	if err := idToken.Claims(&claims); err != nil {
+	id, err := s.identityOf(idToken)
+	if err != nil {
 		return nil, fmt.Errorf("reading id token claims: %w", err)
 	}
 
+	// One transaction signs the person in: the principal, its events and the
+	// token, whose whitetower.token.created.v1 records the sign-in.
+	var created *CreatedToken
+	_, err = s.principals.SignIn(ctx, "token_exchange", id, func(ctx context.Context, tx *db.Tx, p *Principal) error {
+		localBindings, err := authndb.New(tx).ListActiveRoleBindings(ctx, p.ID)
+		if err != nil {
+			return fmt.Errorf("fetching role bindings: %w", err)
+		}
+		effectiveRoles := ResolveEffectiveRoles(id.Groups, s.opts.RoleMapping, localBindings)
+		actor := auth.Principal{
+			ID:    p.ID.String(),
+			Kind:  auth.Human,
+			Name:  p.DisplayName,
+			Roles: effectiveRoles,
+		}
+		created, err = s.tokens.createWithLifetimeTx(ctx, tx, p.ID, "wtctl", authz.PermissionsList(effectiveRoles), 12*time.Hour, actor)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+// identityOf returns what a verified ID token says of the person: the
+// configured issuer, the subject, a name, the email address and the groups of
+// the groups claim. The name falls back to the preferred username, the email
+// address and the subject, in that order.
+func (s *OIDCService) identityOf(idToken *oidc.IDToken) (Identity, error) {
+	var claims idTokenClaims
+	if err := idToken.Claims(&claims); err != nil {
+		return Identity{}, err
+	}
 	var rawClaims map[string]any
 	if err := idToken.Claims(&rawClaims); err != nil {
-		return nil, fmt.Errorf("reading raw id token claims: %w", err)
+		return Identity{}, err
 	}
 
 	var groups []string
@@ -755,38 +741,15 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 		displayName = claims.Subject
 	}
 
-	var emailPtr *string
+	var email *string
 	if claims.Email != "" {
-		emailPtr = &claims.Email
+		email = &claims.Email
 	}
-
-	principal, err := s.principals.UpsertHuman(ctx, s.opts.Issuer, claims.Subject, displayName, emailPtr, groups)
-	if err != nil {
-		return nil, fmt.Errorf("upserting principal: %w", err)
-	}
-
-	if principal.Status != "active" {
-		return nil, ErrPrincipalInactive
-	}
-
-	var localBindings []string
-	if s.database != nil {
-		q := authndb.New(s.database)
-		localBindings, err = q.ListActiveRoleBindings(ctx, principal.ID)
-		if err != nil {
-			return nil, fmt.Errorf("fetching role bindings: %w", err)
-		}
-	}
-
-	effectiveRoles := ResolveEffectiveRoles(groups, s.opts.RoleMapping, localBindings)
-	permissions := authz.PermissionsList(effectiveRoles)
-
-	actor := auth.Principal{
-		ID:    principal.ID.String(),
-		Kind:  auth.Human,
-		Name:  principal.DisplayName,
-		Roles: effectiveRoles,
-	}
-
-	return s.tokens.CreateWithLifetime(ctx, principal.ID, "wtctl", permissions, 12*time.Hour, actor)
+	return Identity{
+		Issuer:      s.opts.Issuer,
+		Subject:     claims.Subject,
+		DisplayName: displayName,
+		Email:       email,
+		Groups:      groups,
+	}, nil
 }

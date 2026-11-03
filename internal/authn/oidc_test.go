@@ -26,7 +26,6 @@ import (
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
-	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 )
 
@@ -211,12 +210,12 @@ func newStateKey(t *testing.T) []byte {
 
 // newService returns a service of opts that has discovered its provider, with
 // a state key of its own unless opts holds one.
-func newService(t *testing.T, opts authn.OIDCOptions, database *db.DB, principals *authn.PrincipalStore, sessions *authn.SessionStore) *authn.OIDCService {
+func newService(t *testing.T, opts authn.OIDCOptions, principals *authn.PrincipalStore, sessions *authn.SessionStore) *authn.OIDCService {
 	t.Helper()
 	if opts.StateKey == nil {
 		opts.StateKey = newStateKey(t)
 	}
-	svc, err := authn.NewOIDCService(opts, database, principals, sessions)
+	svc, err := authn.NewOIDCService(opts, principals, sessions)
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
@@ -333,7 +332,7 @@ func TestReturnURLValidation(t *testing.T) {
 func TestLoginRateLimiting(t *testing.T) {
 	idp := newMockIDP(t)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, _, database := setupAuthn(t, clk)
+	sessionStore, principalStore, _, _ := setupAuthn(t, clk)
 
 	// Rate limiter with capacity for 2 requests
 	limiter := ratelimit.New(1, 2)
@@ -345,7 +344,7 @@ func TestLoginRateLimiting(t *testing.T) {
 		RedirectURL:  "https://127.0.0.1:8443/auth/callback",
 		Clock:        clk,
 		Limiter:      limiter,
-	}, database, principalStore, sessionStore)
+	}, principalStore, sessionStore)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/login", nil)
 	req.RemoteAddr = "192.0.2.1:12345"
@@ -388,7 +387,7 @@ func TestLoginRateLimiting(t *testing.T) {
 func TestIDTokenValidationAndSecurity(t *testing.T) {
 	idp := newMockIDP(t)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, _, database := setupAuthn(t, clk)
+	sessionStore, principalStore, _, _ := setupAuthn(t, clk)
 
 	const clientID = "whitetower-console"
 
@@ -405,7 +404,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		Clock:             clk,
 		RoleMapping:       roleMapping,
 		AllowedAlgorithms: []string{"RS256"},
-	}, database, principalStore, sessionStore)
+	}, principalStore, sessionStore)
 
 	t.Run("successful login provisions principal and session", func(t *testing.T) {
 		stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/dashboard")
@@ -594,7 +593,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 	t.Run("inactive principal cannot log in", func(t *testing.T) {
 		// First deactivate principal
 		deactEmail := "inactive@example.com"
-		p, err := principalStore.UpsertHuman(context.Background(), idp.server.URL, "sub-inactive-123", "Inactive User", &deactEmail, []string{})
+		p, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "sub-inactive-123", DisplayName: "Inactive User", Email: &deactEmail}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -644,7 +643,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 
 	t.Run("logout revokes session and redirects", func(t *testing.T) {
 		// Create a session to log out from
-		p, err := principalStore.UpsertHuman(context.Background(), idp.server.URL, "sub-logout-user", "Logout User", nil, []string{})
+		p, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "sub-logout-user", DisplayName: "Logout User"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -678,7 +677,7 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 	ctx := context.Background()
 	idp := newMockIDP(t)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, _, database := setupAuthn(t, clk)
+	sessionStore, principalStore, _, _ := setupAuthn(t, clk)
 
 	const clientID = "whitetower-console"
 	svc := newService(t, authn.OIDCOptions{
@@ -687,7 +686,7 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 		ClientSecret: "test-secret",
 		RedirectURL:  "https://127.0.0.1:8443/auth/callback",
 		Clock:        clk,
-	}, database, principalStore, sessionStore)
+	}, principalStore, sessionStore)
 
 	// callback ends a sign-in whose ID token has the audience aud, with the
 	// browser's cookies, and returns the answer.
@@ -753,7 +752,7 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 	})
 
 	t.Run("a session planted under the unprefixed name", func(t *testing.T) {
-		mallory, err := principalStore.UpsertHuman(ctx, idp.server.URL, "usr-mallory", "Mallory Planter", nil, nil)
+		mallory, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-mallory", DisplayName: "Mallory Planter"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -796,7 +795,7 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 func TestExchangeIDToken(t *testing.T) {
 	idp := newMockIDP(t)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+	sessionStore, principalStore, tokenStore, _ := setupAuthn(t, clk)
 
 	const clientID = "whitetower-console"
 	const cliClientID = "wtctl"
@@ -816,7 +815,7 @@ func TestExchangeIDToken(t *testing.T) {
 		RoleMapping:       roleMapping,
 		AllowedAlgorithms: []string{"RS256"},
 		Tokens:            tokenStore,
-	}, database, principalStore, sessionStore)
+	}, principalStore, sessionStore)
 
 	t.Run("successful exchange for wtctl audience returns 12-hour API token", func(t *testing.T) {
 		now := clk.Now()
@@ -983,11 +982,11 @@ func TestTheProviderIsDiscoveredThroughItsBackChannel(t *testing.T) {
 	idp := newMockIDP(t)
 	idp.discovery = idp.backChannelDocument(frontIssuer)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+	sessionStore, principalStore, tokenStore, _ := setupAuthn(t, clk)
 
 	opts := backChannelOptions(idp, clk)
 	opts.Tokens = tokenStore
-	svc := newService(t, opts, database, principalStore, sessionStore)
+	svc := newService(t, opts, principalStore, sessionStore)
 
 	t.Run("sign-in sends the browser to the issuer, and the principal keeps it", func(t *testing.T) {
 		loginRec := httptest.NewRecorder()
@@ -1102,7 +1101,7 @@ func TestTheBrowsersEndpointsMayLeaveTheIssuersOrigin(t *testing.T) {
 	opts := backChannelOptions(idp, clk)
 	// A logout without a session cookie revokes nothing, so the session
 	// store needs no database.
-	svc := newService(t, opts, nil, nil, authn.NewSessionStore(nil, clk, authn.SessionOptions{}))
+	svc := newService(t, opts, nil, authn.NewSessionStore(nil, clk, nil, authn.SessionOptions{}))
 
 	login := httptest.NewRecorder()
 	svc.ServeHTTP(login, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
@@ -1118,7 +1117,7 @@ func TestTheBrowsersEndpointsMayLeaveTheIssuersOrigin(t *testing.T) {
 func discover(t *testing.T, opts authn.OIDCOptions) error {
 	t.Helper()
 	opts.StateKey = newStateKey(t)
-	svc, err := authn.NewOIDCService(opts, nil, nil, nil)
+	svc, err := authn.NewOIDCService(opts, nil, nil)
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
@@ -1171,7 +1170,7 @@ func TestTheServiceRefusesOptionsItCannotWorkWith(t *testing.T) {
 			opts := backChannelOptions(newMockIDP(t), clocktest.New(testEpoch))
 			opts.StateKey = newStateKey(t)
 			tt.change(&opts)
-			if _, err := authn.NewOIDCService(opts, nil, nil, nil); err == nil || !strings.Contains(err.Error(), tt.want) {
+			if _, err := authn.NewOIDCService(opts, nil, nil); err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("got %v, want a refusal that says %q", err, tt.want)
 			}
 		})
@@ -1193,7 +1192,7 @@ func TestAFailureOnTheBackChannelNamesNothingOfItToTheBrowser(t *testing.T) {
 			idp.discovery = idp.backChannelDocument(frontIssuer)
 			idp.hangUp = tt.path
 			clk := clocktest.New(testEpoch)
-			svc := newService(t, backChannelOptions(idp, clk), nil, nil, nil)
+			svc := newService(t, backChannelOptions(idp, clk), nil, nil)
 
 			rec := signInThroughBackChannel(t, svc, idp, clk, frontIssuer)
 			if rec.Code != tt.want {
@@ -1217,7 +1216,7 @@ func TestARefusedExchangeNamesNothingOfTheBackChannel(t *testing.T) {
 	opts := backChannelOptions(idp, clk)
 	// The token store is never reached: the ID token does not verify.
 	opts.Tokens = authn.NewTokenStore(nil, clk, nil)
-	svc := newService(t, opts, nil, nil, nil)
+	svc := newService(t, opts, nil, nil)
 
 	rawToken := idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{
 		"iss": frontIssuer,

@@ -132,12 +132,26 @@
     "outcome": "",
     "reason": ""
   },
+  "whitetower.principal.created.v1": {
+    "action": "principal.created",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+    "actor_type": "human",
+    "outcome": "success",
+    "reason": ""
+  },
   "whitetower.principal.deactivated.v1": {
     "action": "principal.deactivated",
     "actor_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
     "actor_type": "human",
     "outcome": "success",
     "reason": "Employee left organization"
+  },
+  "whitetower.principal.groups_changed.v1": {
+    "action": "principal.groups_changed",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+    "actor_type": "human",
+    "outcome": "success",
+    "reason": ""
   },
   "whitetower.principal.reactivated.v1": {
     "action": "principal.reactivated",
@@ -159,6 +173,20 @@
     "actor_type": "module",
     "outcome": "success",
     "reason": ""
+  },
+  "whitetower.session.created.v1": {
+    "action": "session.created",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+    "actor_type": "human",
+    "outcome": "success",
+    "reason": ""
+  },
+  "whitetower.session.revoked.v1": {
+    "action": "session.revoked",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+    "actor_type": "human",
+    "outcome": "success",
+    "reason": "signed_out"
   },
   "whitetower.token.created.v1": {
     "action": "token.created",

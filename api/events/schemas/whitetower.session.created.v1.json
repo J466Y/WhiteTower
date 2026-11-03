@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Session created",
+  "description": "A person signed in to the console from a browser, through the identity provider, and got a session (HUM-01, AUD-01). A break-glass sign-in is recorded as whitetower.breakglass.used.v1, and the CLI's as whitetower.token.created.v1. It carries no token, nor any hash of one.",
+  "type": "object",
+  "required": [
+    "principal_id",
+    "actor",
+    "method",
+    "roles",
+    "expires_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "principal_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "actor": {
+      "description": "The person who signed in.",
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "method": {
+      "enum": [
+        "oidc"
+      ]
+    },
+    "roles": {
+      "description": "The effective roles of the session, which its groups and its local bindings give it at the sign-in (HUM-02): sorted, each once.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "steering",
+          "advisory",
+          "owner",
+          "user",
+          "operator",
+          "auditor",
+          "admin"
+        ]
+      }
+    },
+    "expires_at": {
+      "description": "When the session ends at the latest: its absolute lifetime.",
+      "$ref": "common.schema.json#/$defs/timestamp"
+    }
+  }
+}

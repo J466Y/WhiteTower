@@ -119,6 +119,28 @@ func (ts *TokenStore) CreateWithLifetime(
 	lifetime time.Duration,
 	actor auth.Principal,
 ) (*CreatedToken, error) {
+	var created *CreatedToken
+	err := ts.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) (err error) {
+		created, err = ts.createWithLifetimeTx(ctx, tx, principalID, name, scopes, lifetime, actor)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+// createWithLifetimeTx is CreateWithLifetime in tx, for a sign-in that creates
+// a token in its own transaction.
+func (ts *TokenStore) createWithLifetimeTx(
+	ctx context.Context,
+	tx *db.Tx,
+	principalID uuid.UUID,
+	name string,
+	scopes []string,
+	lifetime time.Duration,
+	actor auth.Principal,
+) (*CreatedToken, error) {
 	name = strings.TrimSpace(name)
 	if len(name) < 1 || len(name) > 100 {
 		return nil, errors.New("token name must be between 1 and 100 characters")
@@ -157,22 +179,60 @@ func (ts *TokenStore) CreateWithLifetime(
 		}
 	}
 
-	var created *CreatedToken
-	err = ts.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
-		q := authndb.New(tx)
-		// Ensure principal exists and is active
-		p, err := q.GetPrincipalByID(ctx, principalID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrPrincipalNotFound
-			}
-			return fmt.Errorf("verifying principal: %w", err)
+	q := authndb.New(tx)
+	// Ensure principal exists and is active
+	p, err := q.GetPrincipalByID(ctx, principalID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPrincipalNotFound
 		}
-		if p.Status != "active" {
-			return ErrPrincipalInactive
-		}
+		return nil, fmt.Errorf("verifying principal: %w", err)
+	}
+	if p.Status != "active" {
+		return nil, ErrPrincipalInactive
+	}
 
-		if err := q.CreateAPIToken(ctx, authndb.CreateAPITokenParams{
+	if err := q.CreateAPIToken(ctx, authndb.CreateAPITokenParams{
+		ID:          tokenID,
+		PrincipalID: principalID,
+		Name:        name,
+		TokenPrefix: prefix,
+		TokenHash:   hash,
+		Scopes:      scopes,
+		CreatedBy:   creatorID,
+		CreatedAt:   now,
+		ExpiresAt:   expiresAt,
+	}); err != nil {
+		return nil, fmt.Errorf("inserting api token: %w", err)
+	}
+
+	actorPayload := map[string]any{
+		"type": "human",
+		"id":   actor.ID,
+	}
+	if actor.Kind == auth.ServiceAccount {
+		actorPayload["type"] = "service_account"
+	} else if actor.ID == "" {
+		actorPayload["type"] = "system"
+		delete(actorPayload, "id")
+	}
+
+	if err := ts.writer.Record(ctx, tx, audit.Event{
+		Type:    "whitetower.token.created.v1",
+		Subject: principalID.String(),
+		Data: map[string]any{
+			"token_id":     tokenID.String(),
+			"principal_id": principalID.String(),
+			"token_prefix": prefix,
+			"scopes":       scopes,
+			"actor":        actorPayload,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("recording token creation audit event: %w", err)
+	}
+
+	return &CreatedToken{
+		APIToken: APIToken{
 			ID:          tokenID,
 			PrincipalID: principalID,
 			Name:        name,
@@ -182,56 +242,9 @@ func (ts *TokenStore) CreateWithLifetime(
 			CreatedBy:   creatorID,
 			CreatedAt:   now,
 			ExpiresAt:   expiresAt,
-		}); err != nil {
-			return fmt.Errorf("inserting api token: %w", err)
-		}
-
-		actorPayload := map[string]any{
-			"type": "human",
-			"id":   actor.ID,
-		}
-		if actor.Kind == auth.ServiceAccount {
-			actorPayload["type"] = "service_account"
-		} else if actor.ID == "" {
-			actorPayload["type"] = "system"
-			delete(actorPayload, "id")
-		}
-
-		if err := ts.writer.Record(ctx, tx, audit.Event{
-			Type:    "whitetower.token.created.v1",
-			Subject: principalID.String(),
-			Data: map[string]any{
-				"token_id":     tokenID.String(),
-				"principal_id": principalID.String(),
-				"token_prefix": prefix,
-				"scopes":       scopes,
-				"actor":        actorPayload,
-			},
-		}); err != nil {
-			return fmt.Errorf("recording token creation audit event: %w", err)
-		}
-
-		created = &CreatedToken{
-			APIToken: APIToken{
-				ID:          tokenID,
-				PrincipalID: principalID,
-				Name:        name,
-				TokenPrefix: prefix,
-				TokenHash:   hash,
-				Scopes:      scopes,
-				CreatedBy:   creatorID,
-				CreatedAt:   now,
-				ExpiresAt:   expiresAt,
-			},
-			Token: rawToken,
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return created, nil
+		},
+		Token: rawToken,
+	}, nil
 }
 
 // GetByToken authenticates rawToken, checks revocation, expiration, and principal status.

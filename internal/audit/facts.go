@@ -63,6 +63,11 @@ var rules = map[string]rule{
 	"whitetower.token.revoked.v1":           {actor: "actor", fixed: "success", reason: "reason"},
 	"whitetower.breakglass.used.v1":         {actor: "actor", fixed: "success"},
 	"whitetower.audit.read.v1":              {actor: "actor", fixed: "success"},
+	// People's principals and their sessions (plan P1-03).
+	"whitetower.principal.created.v1":        {actor: "actor", fixed: "success"},
+	"whitetower.principal.groups_changed.v1": {actor: "actor", fixed: "success"},
+	"whitetower.session.created.v1":          {actor: "actor", fixed: "success"},
+	"whitetower.session.revoked.v1":          {actor: "actor", fixed: "success", reason: "reason"},
 }
 
 // outcomes maps the outcomes that events tell to those the audit log

@@ -338,9 +338,7 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Check for collision
 	if existing, err := s.principals.GetBySubjectOrEmail(ctx, req.UserName); err == nil && existing != nil {
-		safeUserName := strings.ReplaceAll(req.UserName, "\n", "")
-		safeUserName = strings.ReplaceAll(safeUserName, "\r", "")
-		s.writeError(w, http.StatusConflict, "uniqueness", fmt.Sprintf("User with userName %q already exists", logging.Sanitize(safeUserName)))
+		s.writeUserExists(w, req.UserName)
 		return
 	}
 
@@ -366,7 +364,18 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		email = &req.UserName
 	}
 
-	created, err := s.principals.UpsertHuman(ctx, "scim", req.UserName, displayName, email, []string{})
+	// A create that another one of the same userName overtook is a
+	// collision too.
+	created, err := s.principals.ProvisionHuman(ctx, Identity{
+		Issuer:      "scim",
+		Subject:     req.UserName,
+		DisplayName: displayName,
+		Email:       email,
+	})
+	if errors.Is(err, ErrPrincipalExists) {
+		s.writeUserExists(w, req.UserName)
+		return
+	}
 	if err != nil {
 		safeUserName := strings.ReplaceAll(req.UserName, "\n", "")
 		safeUserName = strings.ReplaceAll(safeUserName, "\r", "")
@@ -389,6 +398,14 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Location", "/scim/v2/Users/"+created.ID.String())
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(principalToSCIM(created))
+}
+
+// writeUserExists answers that a user with userName exists (RFC 7644,
+// section 3.3).
+func (s *SCIMService) writeUserExists(w http.ResponseWriter, userName string) {
+	safeUserName := strings.ReplaceAll(userName, "\n", "")
+	safeUserName = strings.ReplaceAll(safeUserName, "\r", "")
+	s.writeError(w, http.StatusConflict, "uniqueness", fmt.Sprintf("User with userName %q already exists", logging.Sanitize(safeUserName)))
 }
 
 func (s *SCIMService) handleGetUser(w http.ResponseWriter, r *http.Request, idStr string) {
