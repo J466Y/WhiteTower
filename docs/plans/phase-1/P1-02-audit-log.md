@@ -372,3 +372,23 @@ Designing the bundles showed that pseudonymization on export (step 8) rewrites t
 | Keys from the verifier's caller | Keys taken from the bundle would let a forged bundle vouch for itself, as the note of 2026-10-14 says of the log |
 | No claim of completeness | An inclusion proof shows that an event is in the log, not that a filtered selection holds every match; the verification of the whole log shows that |
 | At most 10,000 events | About 20 MB, which one request carries; an auditor samples, or narrows the period |
+
+### 2026-11-02: the audit tests' dates (fix)
+
+A fix outside the eight pull requests. From 2026-11-01, `TestIngestBatchProcessing` and `TestST10IngestionSecurityAndIsolation` failed on `main` and on every branch: `no partition of relation "audit_event_ids" found for row`.
+
+- **The cause.** The migration creates the partitions of the database's month and of the next three. The ingester de-duplicates in the month of its own clock, which these tests fix in October 2026, so the partition they need existed only while October lasted. It is [AGENTS.md](../../../AGENTS.md)'s first pitfall, two clocks. In production both clocks are real, so the production code does not change.
+- **The fix.** `dbtest`'s `EnsureAuditPartitions` creates the partitions of the month of a given time, named, bounded and owned as `whitetower.ensure_audit_partitions` makes them. A test whose clock decides a partition key calls it with its clock's time. The tests keep their fixed epochs, in the past of the database's clock as the sealer's tests want, and their month boundaries. Epochs derived from the current month were the alternative: the tests would depend on the day they run, and on some days the fake clock would be ahead of the database's, which the ingester's backpressure refuses (below).
+- **The tests reviewed.** Every test that fixes its clock was read for a time that decides a partition key, `audit_events.ingested_at` or `audit_event_ids.ingest_month`, or a window over partitions:
+
+  | Tests | What their clock decides | Change |
+  | --- | --- | --- |
+  | Ingestion, `ingest_test.go` | The month of de-duplication | They create their clock's month |
+  | `TestRetentionDropsExpiredPartitionAndRecordsRange` | The retention window, over months the test creates | The shared helper replaces the retention tests' own |
+  | `TestRetentionRetainsActivePartitions` | The retention window | Its events went through the writer, so since November they were stored in the database's month, not in the October partition the test checks. It now stores them in its clock's month |
+  | `TestThePartitionsJobKeepsThreeMonthsAhead` | Nothing: it read the machine's clock, while the job follows the database's | It reads the database's month |
+  | `TestThroughputSustainedAndBurst`, `BenchmarkSealerRound` | The month of de-duplication, on the system clock | The shared helper replaces the retention tests' helper, and the benchmark's copy of it |
+  | The other audit tests, `test/tamper`, `internal/api/rest` and the packages that record events | The times of events and checkpoints only: the database stamps `ingested_at` | None |
+
+- Tests: the audit, tamper and REST packages pass on the real date, with their epochs moved to February 2024 (the dropped month to March 2023), and with the ingestion and sealer epochs at 2025-12-31 23:59:59.
+- **Follow-up, for the ingestion fix of 2026-10-23.** The ingester's backpressure compares its own clock with `ingested_at`, which the database stamps. With the tests' epoch moved to June 2027, every batch after the first is refused for sealing lag. A server clock ahead of the database's by more than the threshold (5 seconds by default) would refuse every batch, and one behind would hide the lag. The sealer already takes its sealing time from the database's clock. That fix can measure the lag on the database's clock too, and its test across a month boundary can create its months with `EnsureAuditPartitions`.

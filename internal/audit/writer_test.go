@@ -215,8 +215,12 @@ func TestThePartitionsJobKeepsThreeMonthsAhead(t *testing.T) {
 	d, pool, _ := setup(t)
 	ctx := context.Background()
 	superuser := d.Superuser(t)
-	month := time.Now().UTC()
-	month = time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, time.UTC)
+	// The partitions follow the database's clock, which at the turn of a
+	// month may be in another month than this machine's.
+	var month time.Time
+	if err := superuser.QueryRow(ctx, "SELECT date_trunc('month', now() AT TIME ZONE 'UTC')").Scan(&month); err != nil {
+		t.Fatal(err)
+	}
 	last := month.AddDate(0, audit.MonthsAhead, 0).Format("2006_01")
 	for _, table := range []string{"audit_events_" + last, "audit_event_ids_" + last} {
 		if _, err := superuser.Exec(ctx, "DROP TABLE whitetower."+table); err != nil {
