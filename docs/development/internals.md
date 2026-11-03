@@ -76,7 +76,7 @@ The test harness (plan P1-01, step 10):
 
 | Helper | What it gives |
 | --- | --- |
-| `internal/platform/db/dbtest` | PostgreSQL in Docker: one container per test binary, and for each test a migrated database with the roles of a deployment. `OpenReplica` opens a pool as another replica would, `Terminate` ends sessions as a failure would, `Superuser` checks what the roles cannot see. Without Docker the tests skip, except in CI, where they fail |
+| `internal/platform/db/dbtest` | PostgreSQL in Docker: one container per test binary, and for each test a migrated database with the roles of a deployment. `OpenReplica` opens a pool as another replica would, `Terminate` ends sessions as a failure would, `Superuser` checks what the roles cannot see, `EnsureAuditPartitions` creates the audit partitions of the month that a fake clock needs. Without Docker the tests skip, except in CI, where they fail |
 | `internal/api/rest/resttest` | The public API, served for the test, and its generated client; `As` makes a call as a principal |
 | `internal/platform/clock/clocktest` | A clock whose time moves only when the test moves it |
 | `internal/platform/golden` | Comparison with files in `testdata`, which `-update` rewrites |
