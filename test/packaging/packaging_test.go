@@ -164,6 +164,51 @@ func TestComposeProfilesComplyWithHardeningStandards(t *testing.T) {
 	}
 }
 
+// The seed stops at its first failed statement, so that the core does not
+// start on a database that is seeded in part: psql would otherwise run the
+// next statements and exit 0. The tests run the seed through pgx, which stops
+// at any error, so only the Compose command shows it.
+func TestTheEvaluationSeedStopsAtItsFirstError(t *testing.T) {
+	data, err := os.ReadFile(root + "/deploy/compose/eval/compose.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		Services struct {
+			Seed struct {
+				Command []string `yaml:"command"`
+				Volumes []string `yaml:"volumes"`
+			} `yaml:"seed"`
+		} `yaml:"services"`
+	}
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("parsing the evaluation stack: %v", err)
+	}
+	seed := cfg.Services.Seed
+
+	mounted := ""
+	for _, v := range seed.Volumes {
+		if source, target, ok := strings.Cut(v, ":"); ok && source == "./seed/seed.sql" {
+			mounted, _, _ = strings.Cut(target, ":")
+		}
+	}
+	if mounted == "" {
+		t.Fatalf("the seed service does not mount seed/seed.sql: %v", seed.Volumes)
+	}
+	// option reports whether the command gives value to the option name.
+	option := func(name, value string) bool {
+		for i := 0; i+1 < len(seed.Command); i++ {
+			if seed.Command[i] == name && seed.Command[i+1] == value {
+				return true
+			}
+		}
+		return false
+	}
+	if len(seed.Command) == 0 || seed.Command[0] != "psql" || !option("-v", "ON_ERROR_STOP=1") || !option("-f", mounted) {
+		t.Errorf("the seed's command is %q, want psql with -v ON_ERROR_STOP=1 and -f %s", seed.Command, mounted)
+	}
+}
+
 func TestEvaluationSeedScriptExecutesCleanly(t *testing.T) {
 	d := dbtest.New(t)
 	pool := d.Open(t)

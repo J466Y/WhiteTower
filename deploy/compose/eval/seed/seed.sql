@@ -53,7 +53,9 @@ ON CONFLICT (id) DO NOTHING;
 
 -- What enforcement points know of each agent, as T1 writes it when an agent
 -- is proposed: its lease by risk tier, its halt mode and the attributes that
--- policies see, at a version from the version counter.
+-- policies see, at a version from the version counter. Taking a version moves
+-- the head, even for a row that ON CONFLICT then discards, so the statement
+-- skips the agents that already have a governance state.
 INSERT INTO whitetower.governance_state (agent_id, lifecycle_state, lease_ttl_seconds, halt_mode, attributes, state_version)
 SELECT a.id, a.lifecycle_state, (s.value ->> a.risk_tier)::integer, a.halt_mode,
   jsonb_build_object('slug', a.slug, 'kind', a.kind, 'risk_tier', a.risk_tier,
@@ -63,4 +65,5 @@ FROM whitetower.agents a
 JOIN whitetower.agent_owners o ON o.agent_id = a.id AND o.role = 'primary' AND o.ended_at IS NULL
 JOIN whitetower.settings s ON s.key = 'killswitch.lease_ttl_seconds'
 WHERE a.id IN ('00000000-0000-7000-8000-000000000101', '00000000-0000-7000-8000-000000000102', '00000000-0000-7000-8000-000000000103')
+  AND NOT EXISTS (SELECT 1 FROM whitetower.governance_state g WHERE g.agent_id = a.id)
 ON CONFLICT (agent_id) DO NOTHING;
