@@ -27,9 +27,16 @@ Once running:
 
 To follow the guided walkthrough, see [Fifteen-minute demo](../../../docs/guides/fifteen-minute-demo.md).
 
+A stack started before 30 October 2026, when signing in from a browser was fixed, keeps its old image of the core, which `task eval` does not rebuild, and principals that signing in no longer finds. Delete its data and rebuild it once:
+
+```sh
+task eval:down -- -v
+docker compose -f deploy/compose/eval/compose.yaml up -d --build --wait
+```
+
 ## Signing in
 
-Open <https://127.0.0.1:8443/auth/login> and sign in at Keycloak as one of the test users below; <https://127.0.0.1:8443/auth/logout> signs out of the core and of Keycloak. Use `127.0.0.1`, never `localhost`: the cookies of a sign-in belong to one host name.
+Open <https://127.0.0.1:8443/auth/login> and sign in at Keycloak as one of the test users below. <https://127.0.0.1:8443/auth/logout> signs out of the core, then Keycloak asks you to confirm that you sign out of it too: choose **Logout**, or Keycloak keeps its session and the next sign-in asks for no password. Use `127.0.0.1`, never `localhost`: the cookies of a sign-in belong to one host name.
 
 Browsers reach Keycloak at `http://127.0.0.1:8180`, the issuer of its tokens (`KC_HOSTNAME`), while the core reaches it inside Docker's network at `http://keycloak:8080`, its discovery URL (`WT_AUTH_OIDC_DISCOVERY_URL`). The core asks for the scopes `openid`, `profile` and `email` only: Keycloak defines no `groups` scope and refuses a request for one, while the client's own mapper already puts the groups in the ID token.
 
@@ -53,7 +60,9 @@ Each user has a fixed ID in the realm, which Keycloak puts in the `sub` of its t
 
 ## Ports
 
-The stack takes the host port variables of the [development services](../dev/README.md#ports-already-in-use), such as `WT_POSTGRES_PORT`, but sign-in depends on two of them:
+The stack takes the host port variables of the [development services](../dev/README.md#ports-already-in-use), such as `WT_POSTGRES_PORT`. `task eval` reads them from `deploy/compose/dev/.env`, as `task dev` does. The direct Compose command reads a `.env` file next to `deploy/compose/eval/compose.yaml` instead, and ignores the one of the development services.
+
+Sign-in depends on two of them:
 
 - **`WT_CONSOLE_PORT`** must stay at 8443: the realm registers the core's callback on that port only, and Keycloak refuses another.
 - **`WT_KEYCLOAK_PORT`** may change, and the issuer follows it, but the seed's principals keep the issuer of port 8180: the people who sign in then become new principals, without the seeded agents and role bindings.

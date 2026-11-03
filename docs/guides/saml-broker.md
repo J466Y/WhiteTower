@@ -113,12 +113,15 @@ Repeat for each required governance group.
 
 ---
 
-## Step 4: Verify White Tower OIDC Client Mappers
+## Step 4: Verify the White Tower OIDC Client
 
-Keycloak must expose the mapped groups in the OIDC ID token claim that White Tower consumes.
+Keycloak must send the browser back to White Tower, and expose the mapped groups in the OIDC ID token claim that White Tower consumes.
 
-1. In Keycloak, navigate to **Clients** > **whitetower-console** > **Client scopes**.
-2. Verify that the dedicated client scope contains a `groups` mapper:
+1. In Keycloak, navigate to **Clients** > **whitetower-console** > **Settings**, and check the client's exact URIs, without wildcards:
+   - **Valid redirect URIs**: `https://<whitetower-host>/auth/callback`, the server's `auth.oidc.redirect_url`.
+   - **Valid post logout redirect URIs**: `https://<whitetower-host>/`, the console's root on the origin of `auth.oidc.redirect_url`. After a logout, White Tower sends the browser to Keycloak with this URI and the client's ID, and Keycloak refuses a URI that it does not list.
+2. Navigate to **Clients** > **whitetower-console** > **Client scopes**.
+3. Verify that the dedicated client scope contains a `groups` mapper:
    - **Mapper Type**: `Group Membership`
    - **Token Claim Name**: `groups`
    - **Full group path**: `false` (outputs `["wt-owners"]` instead of `["/wt-owners"]`, or keep `true` since White Tower normalizes leading slashes)
@@ -142,7 +145,6 @@ auth:
       - "openid"
       - "profile"
       - "email"
-      - "groups"
     groups_claim: "groups"
     role_mapping:
       wt-steering: steering
@@ -157,6 +159,8 @@ auth:
       - "ES256"
 ```
 
+The scopes leave out `groups`, which the server asks for by default. Keycloak defines no `groups` client scope and answers `invalid_scope` to a request for one, while the mapper of step 4 already puts the groups in the ID token. To ask for `groups`, first create a client scope named `groups` in Keycloak and add it to the client's default client scopes.
+
 ---
 
 ## Step 6: End-to-End Verification
@@ -167,16 +171,18 @@ auth:
 4. Complete authentication at the SAML IdP.
 5. Upon return, verify that:
    - The user is redirected to the White Tower console.
-   - `GET /api/v1/me` returns the authenticated principal:
+   - `GET /api/v1/me`, opened in the same browser, returns the authenticated principal, with the roles that its groups map to, the permissions of those roles and the session's CSRF token. For a member of `wt-admins`:
      ```json
      {
-       "id": "0192f2c4-8d1e-7c3a-9b2f-5e1d2c3b4a59",
+       "csrfToken": "SPewXN0PyWqBMhFQ3FPoJwuEntUsZ4bRp7p_-02k-y8",
        "displayName": "Alice Admin",
-       "roles": ["admin"],
-       "permissions": ["*"]
+       "id": "0192f2c4-8d1e-7c3a-9b2f-5e1d2c3b4a59",
+       "kind": "human",
+       "permissions": ["identity.me.read", "inventory.view", "settings.manage"],
+       "roles": ["admin"]
      }
      ```
-   - An audit event `whitetower.principal.provisioned.v1` or login audit trail is recorded.
+   - The audit log records nothing of the sign-in yet: the first sign-in creates the principal, and each sign-in updates its groups and its last sign-in time, without an audit event. The events of people and sessions are planned (requirement AUD-01). A sign-in that fails leaves its cause in the server's log.
 
 ---
 

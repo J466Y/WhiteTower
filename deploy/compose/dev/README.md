@@ -74,11 +74,16 @@ Tokens carry the groups in a `groups` claim, which plan P1-03 maps to roles. Eac
 
 ## Signing in
 
-The core of the `core` profile, and the one of `task run`, sign in through this Keycloak. Open `https://127.0.0.1:8443/auth/login`, and sign in as a test user; `https://127.0.0.1:8443/auth/logout` signs out of the core and of Keycloak. Use `127.0.0.1`, never `localhost`: the cookies of a sign-in belong to one host name.
+The core of the `core` profile, and the one of `task run`, sign in through this Keycloak. Open `https://127.0.0.1:8443/auth/login`, and sign in as a test user. `https://127.0.0.1:8443/auth/logout` signs out of the core, then Keycloak asks you to confirm that you sign out of it too: choose **Logout**, or Keycloak keeps its session and the next sign-in asks for no password. Use `127.0.0.1`, never `localhost`: the cookies of a sign-in belong to one host name.
 
 - **Two addresses.** Browsers reach Keycloak at `http://127.0.0.1:8180`, the issuer of its tokens (`KC_HOSTNAME`). The core in Docker reaches it at `http://keycloak:8080`, its discovery URL (`WT_AUTH_OIDC_DISCOVERY_URL`): Keycloak's back channel follows the address of each request (`KC_HOSTNAME_BACKCHANNEL_DYNAMIC`). `task run` reaches it at the issuer, as browsers do.
 - **Scopes.** The core asks for `openid`, `profile` and `email` only (`WT_AUTH_OIDC_SCOPES`). Keycloak defines no `groups` scope and refuses a request for one, while the client's own mapper already puts the groups in the ID token.
 - **Start order.** The core discovers Keycloak once, at start, and stops if it cannot: the `core` profile waits for a healthy Keycloak, and `task run` needs `task dev` first.
+- **A Keycloak from before 30 October 2026.** Keycloak imports the realm when its container is created, and keeps it in the container. A container created before signing in from a browser was fixed holds the old realm, which registers other callbacks, so Keycloak answers `Invalid parameter: redirect_uri`. Recreate it once, which imports the realm of the repository and drops what you changed in Keycloak's administration console:
+
+  ```sh
+  docker compose -f deploy/compose/dev/compose.yaml up -d --force-recreate --wait keycloak
+  ```
 
 ## OIDC clients
 
