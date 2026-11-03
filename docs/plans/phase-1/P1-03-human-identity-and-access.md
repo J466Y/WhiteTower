@@ -343,3 +343,28 @@ Mapping the GDPR in the [framework mapping](../../security/framework-mapping.md)
 The step erases the IdP subject as well as the name and the email, which the domain model's design left out: a subject kept would let the next login match the erased principal and write the person's name back. It erases only inactive people, and it is final.
 
 The threat model gains T-85: an administrator erases a principal to make what that person did unattributable. The mitigations are an erasure only after a deactivation, which is itself audited, a reference to the request, and an audit event that names the actor. The security test catalog gains ST-88. Until pull request 7 lands, the plans index shows P1-03 in progress, and `test/security` asks for the markers of its security tests, ST-88's included, once it is done again.
+
+### 2026-11-02: findings and decisions from the review of the sign-in fix
+
+The review of P1-12's sign-in fix ([P1-12's progress notes](P1-12-packaging-and-deployment.md#progress-notes) of 2026-11-02) read P1-03's code on the way, and confirmed each of these on `main` by reproduction:
+
+| Finding | Requirement | Work queue |
+| --- | --- | --- |
+| `DELETE /api/v1/tokens/{id}` needs only `identity.me.read` and checks no owner, so any signed-in principal revokes any principal's token | HUM-03, ST-19 | P1-03 fix: access control and sessions |
+| A sign-in creates a session without revoking the one the browser holds. `SessionStore.Rotate` has no caller outside tests, and the test marked ST-14 calls it directly | ST-14 | The same |
+| The authenticator falls back to the unprefixed `wt_session` whatever the cookie mode, which undoes the `__Host-` prefix | ADR-0009, ST-14 | The same |
+| `dev.self_signed_tls` drops `Secure` and the prefix although the stacks' console serves HTTPS, so the session cookie also goes to Keycloak's HTTP port on 127.0.0.1 | ST-14 | The same |
+| With OIDC off, `main` passes a typed nil as the REST API's exchanger, so the public `POST /api/v1/tokens/exchange` panics into a 500 | | The same |
+| ST-03 never turns on OIDC, break-glass or SCIM, so the canaries in their secret files are never read | ST-03 | The same |
+| A plain-HTTP `auth.oidc.issuer` is accepted outside development, though discovery, the token endpoint and the keys go through it | T-13 | The same |
+| Discovery at start is fatal and comes before break-glass, so a core that starts while the identity provider is down serves nothing | KIL-08, HUM-06 | P1-03 fix: the identity provider's availability, and several replicas |
+| The OIDC state is signed with a key that each process makes at random, so a sign-in that ends on another replica, or after a restart, fails | NFR-06 | The same |
+| A sign-in creates a principal and rewrites its groups, from which its roles come, without an audit event | AUD-01 | P1-03 fix: audit events for people and their sessions |
+| SCIM creates a principal under the issuer `scim` and the userName, and a sign-in another under the provider's issuer and `sub`. Nothing links them, so a SCIM deactivation leaves the person who signs in active | ST-21 | P1-03 fix: SCIM and sign-in share one principal |
+
+The maintainer's decisions of 2026-11-02:
+
+1. **The identity provider's availability.** The core starts while the identity provider is down, and discovers it in the background, with backoff and a timeout on each attempt. Meanwhile the sign-in routes and the token exchange answer 503, and break-glass and the machine listener work. Only configuration errors stop the start. The alternative, discovery kept fatal and documented, breaks KIL-08 and HUM-06 on a restart during an outage.
+2. **Several replicas.** The OIDC state is signed with a shared key read from a file, `auth.oidc.state_key_file`, as the other secrets are. The alternative, the state kept in PostgreSQL, single use and expiring, needs no secret, but more code and a table to clean.
+3. **SCIM and sign-in.** SCIM stores the `externalId` that the identity provider sends, and a sign-in matches the principal whose `externalId` equals a configurable claim of the ID token: `sub` by default, `oid` for Entra ID. The alternatives: adopting a principal by verified email, simpler to configure but tied to an address that changes and to a meaning of "verified" that varies between providers; or deferring, which leaves SCIM deprovisioning without effect on people who sign in.
+4. **Audit.** The creation of a principal, a change of its groups (before and after), and each sign-in and sign-out of a person write audit events. The alternative, creations and group changes only, leaves the log silent on who signed in, and when.
