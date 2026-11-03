@@ -100,7 +100,6 @@ func VerifyCredential(hashString string, candidate string) bool {
 type BreakglassOptions struct {
 	Enabled            bool
 	CredentialHashFile string
-	SecureCookies      bool
 	Clock              clock.Clock
 	Logger             *slog.Logger
 	Limiter            *ratelimit.Limiter
@@ -222,8 +221,10 @@ func (s *BreakglassService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return fmt.Errorf("upserting break-glass principal: %w", err)
 		}
 
-		// Issue a 1-hour session with RoleOperator permissions restricted by BreakglassScopes.
-		session, err = s.sessions.CreateWithLifetimeTx(ctx, tx, BreakglassPrincipalID, "breakglass", []string{string(authz.RoleOperator)}, BreakglassLifetime)
+		// Issue a 1-hour session with RoleOperator permissions restricted by
+		// BreakglassScopes. Security test ST-14: the session that the browser
+		// held is revoked in the same transaction.
+		session, err = s.sessions.ReplaceTx(ctx, tx, heldSessions(r), BreakglassPrincipalID, "breakglass", []string{string(authz.RoleOperator)}, BreakglassLifetime)
 		if err != nil {
 			return fmt.Errorf("creating break-glass session: %w", err)
 		}
@@ -258,8 +259,7 @@ func (s *BreakglassService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"expires_at", session.AbsoluteExpiresAt,
 	)
 
-	cookie := s.sessions.CookieForSession(session, s.opts.SecureCookies)
-	http.SetCookie(w, cookie)
+	http.SetCookie(w, s.sessions.CookieForSession(session))
 
 	if strings.Contains(r.Header.Get("Accept"), "application/json") || strings.HasPrefix(contentType, "application/json") {
 		w.Header().Set("Content-Type", "application/json")

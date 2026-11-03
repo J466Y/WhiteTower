@@ -198,6 +198,10 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, cfg.Auth.OIDC.RoleMapping)
 
 	var oidcSvc *authn.OIDCService
+	// The public API exchanges ID tokens only when OIDC is on. A nil
+	// *authn.OIDCService would make a TokenExchanger that is not nil, which
+	// the API would call.
+	var exchanger rest.TokenExchanger
 	if cfg.Auth.OIDC.Issuer != "" {
 		clientSecret, err := os.ReadFile(cfg.Auth.OIDC.ClientSecretFile)
 		if err != nil {
@@ -214,7 +218,6 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			GroupsClaim:       cfg.Auth.OIDC.GroupsClaim,
 			RoleMapping:       cfg.Auth.OIDC.RoleMapping,
 			AllowedAlgorithms: cfg.Auth.OIDC.AllowedAlgorithms,
-			SecureCookies:     !cfg.Dev.SelfSignedTLS,
 			Logger:            logger,
 			Limiter:           ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
 			Tokens:            tokenStore,
@@ -222,6 +225,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("oidc service: %w", err)
 		}
+		exchanger = oidcSvc
 	}
 
 	var breakglassSvc *authn.BreakglassService
@@ -229,7 +233,6 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		breakglassSvc = authn.NewBreakglassService(authn.BreakglassOptions{
 			Enabled:            cfg.Auth.Breakglass.Enabled,
 			CredentialHashFile: cfg.Auth.Breakglass.CredentialHashFile,
-			SecureCookies:      !cfg.Dev.SelfSignedTLS,
 			Clock:              clock.System,
 			Logger:             logger,
 		}, database, sessionStore, writer)
@@ -249,9 +252,11 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		authHandler = authMux
 	}
 
-	var scimSvc *authn.SCIMService
+	// The console mounts SCIM only when it is on. A nil *authn.SCIMService
+	// would make a handler that is not nil, which the console would call.
+	var scimHandler http.Handler
 	if cfg.Auth.SCIM.Enabled {
-		scimSvc, err = authn.NewSCIMService(authn.SCIMOptions{
+		scimSvc, err := authn.NewSCIMService(authn.SCIMOptions{
 			Enabled:   cfg.Auth.SCIM.Enabled,
 			TokenFile: cfg.Auth.SCIM.TokenFile,
 			Logger:    logger,
@@ -259,6 +264,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("initializing SCIM service: %w", err)
 		}
+		scimHandler = scimSvc
 	}
 
 	registry := metrics.NewRegistry(v)
@@ -284,7 +290,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		RateLimited:   httpMetrics.RateLimited("console").Inc,
 		Tokens:        tokenStore,
 		Principals:    principalStore,
-		Exchanger:     oidcSvc,
+		Exchanger:     exchanger,
 		AuditLog:      auditLog,
 		Inventory: inventory.New(inventory.Options{
 			DB:          database,
@@ -307,7 +313,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Metrics:       metrics.NewRPC(registry),
 	})
 	srv, err := server.New(cfg, server.Handlers{
-		Console:    observer.Wrap("console", server.ConsoleHandler(api, authHandler, scimSvc)),
+		Console:    observer.Wrap("console", server.ConsoleHandler(api, authHandler, scimHandler)),
 		Machine:    observer.Wrap("machine", server.MachineHandler(moduleAPI)),
 		Operations: server.OperationsHandler(drain, ready, metrics.Handler(registry)),
 	}, drain, logger)

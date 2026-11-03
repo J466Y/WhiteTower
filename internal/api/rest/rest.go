@@ -380,8 +380,11 @@ func (s Server) ListServiceAccounts(ctx context.Context, _ gen.ListServiceAccoun
 
 // ExchangeToken exchanges an IdP ID token from the CLI's login for a short-lived API token.
 func (s Server) ExchangeToken(ctx context.Context, request gen.ExchangeTokenRequestObject) (gen.ExchangeTokenResponseObject, error) {
+	// A server without OIDC sign-in has no token exchange: the server did not
+	// fail, so the answer is not internal. An identity provider that is
+	// configured but does not answer is another case, with another answer.
 	if s.exchanger == nil {
-		return nil, problem.New(problem.Internal, "token exchange is not configured")
+		return nil, problem.New(problem.NotFound, "token exchange is not configured")
 	}
 	if request.Body == nil || strings.TrimSpace(request.Body.IdToken) == "" {
 		return nil, problem.New(problem.BadRequest, "idToken is required")

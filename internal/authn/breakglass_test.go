@@ -3,6 +3,7 @@ package authn_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -66,7 +67,6 @@ func TestBreakglassEmergencyAccess(t *testing.T) {
 	svc := authn.NewBreakglassService(authn.BreakglassOptions{
 		Enabled:            true,
 		CredentialHashFile: hashFile,
-		SecureCookies:      false,
 		Clock:              clk,
 		Logger:             logger,
 		Limiter:            limiter,
@@ -113,7 +113,7 @@ func TestBreakglassEmergencyAccess(t *testing.T) {
 	cookies := loginRec.Result().Cookies()
 	var sessionCookie *http.Cookie
 	for _, c := range cookies {
-		if c.Name == authn.CookieNameInsecure {
+		if c.Name == authn.CookieName {
 			sessionCookie = c
 			break
 		}
@@ -209,5 +209,85 @@ func TestBreakglassEmergencyAccess(t *testing.T) {
 	_, err = authenticator.Authenticate(expiredReq)
 	if err == nil {
 		t.Error("expected authentication to fail for expired break-glass session after 1 hour")
+	}
+}
+
+// Security test ST-14: a break-glass sign-in revokes the session that the
+// browser held, under the session cookie's name or the unprefixed one; a
+// refused credential revokes nothing
+func TestABreakglassSignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
+	ctx := context.Background()
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, _, database := setupAuthn(t, clk)
+	cat, err := audit.LoadCatalog(events.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawCred, hashStr, err := authn.GenerateBreakglassCredential()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashFile := filepath.Join(t.TempDir(), "breakglass.hash")
+	if err := os.WriteFile(hashFile, []byte(hashStr+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc := authn.NewBreakglassService(authn.BreakglassOptions{
+		Enabled:            true,
+		CredentialHashFile: hashFile,
+		Clock:              clk,
+		Logger:             slog.New(slog.DiscardHandler),
+	}, database, sessionStore, audit.NewWriter(cat, clk))
+
+	alice, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-alice", "Alice Operator", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := sessionStore.Create(ctx, alice.ID, "oidc", []string{"operator"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	planted, err := sessionStore.Create(ctx, alice.ID, "oidc", []string{"operator"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	signIn := func(credential string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/auth/breakglass", strings.NewReader(`{"credential":"`+credential+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: authn.CookieName, Value: held.Token})
+		req.AddCookie(&http.Cookie{Name: "wt_session", Value: planted.Token})
+		rec := httptest.NewRecorder()
+		svc.ServeHTTP(rec, req)
+		return rec
+	}
+
+	if rec := signIn("wt_bg_wrong"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("a wrong credential: got %d, want 401", rec.Code)
+	}
+	for _, token := range []string{held.Token, planted.Token} {
+		if _, err := sessionStore.Get(ctx, token); err != nil {
+			t.Fatalf("after a refused credential, the session the browser held: %v, want it valid", err)
+		}
+	}
+
+	rec := signIn(rawCred)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("the credential: got %d %q, want 200", rec.Code, rec.Body.String())
+	}
+	for _, token := range []string{held.Token, planted.Token} {
+		if _, err := sessionStore.Get(ctx, token); !errors.Is(err, authn.ErrSessionRevoked) {
+			t.Errorf("the session the browser held: got %v, want it revoked", err)
+		}
+	}
+	var issued string
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == authn.CookieName {
+			issued = c.Value
+			if !c.Secure || !c.HttpOnly {
+				t.Errorf("the session cookie: Secure %v, HttpOnly %v", c.Secure, c.HttpOnly)
+			}
+		}
+	}
+	if s, err := sessionStore.Get(ctx, issued); err != nil || s.Method != "breakglass" {
+		t.Errorf("the break-glass session: %+v, %v", s, err)
 	}
 }

@@ -87,7 +87,11 @@ export interface paths {
         post?: never;
         /**
          * Revoke an API token
-         * @description Revokes an active API token by its ID.
+         * @description Revokes an active API token by its ID. A caller revokes their own
+         *     tokens, those of the service accounts they are responsible for, and,
+         *     as an administrator, any token: the tokens they may list. Any other
+         *     token is `not_found`, as a token that does not exist is, so that a
+         *     token's ID never shows whether the token exists.
          */
         delete: operations["revokeToken"];
         options?: never;
@@ -107,7 +111,9 @@ export interface paths {
         /**
          * Exchange CLI ID token for an API token
          * @description Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
-         *     API token (12 hours) bound to the same human principal.
+         *     API token (12 hours) bound to the same human principal. A server without OIDC sign-in
+         *     has no token exchange: the operation is then `not_found`, with the detail that token
+         *     exchange is not configured.
          */
         post: operations["exchangeToken"];
         delete?: never;

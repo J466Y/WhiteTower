@@ -177,7 +177,7 @@ func TestSCIMDeprovisioningAndSecurity(t *testing.T) {
 
 		// Verify session and token are active before deprovisioning
 		authReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
-		authReq.AddCookie(sessionStore.CookieForSession(session, false))
+		authReq.AddCookie(sessionStore.CookieForSession(session))
 		authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, nil)
 		p, err := authenticator.Authenticate(authReq)
 		if err != nil || p == nil {
@@ -289,7 +289,7 @@ func TestSCIMDeprovisioningAndSecurity(t *testing.T) {
 
 		// Verify Bob's session was revoked
 		bobAuthReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
-		bobAuthReq.AddCookie(sessionStore.CookieForSession(bobSession, false))
+		bobAuthReq.AddCookie(sessionStore.CookieForSession(bobSession))
 		authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, nil)
 		if p, err := authenticator.Authenticate(bobAuthReq); err == nil && p != nil {
 			t.Fatalf("expected bob's session to be revoked, got %v", p)

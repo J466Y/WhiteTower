@@ -196,6 +196,40 @@ func TestTheDiscoveryURLIsABackChannelOfTheIssuer(t *testing.T) {
 	}
 }
 
+// Browsers sign in at the issuer, and the server takes its signing keys from
+// it: over plain HTTP, only in development, which a release build refuses.
+func TestAPlainHTTPIssuerNeedsTheDevelopmentSetting(t *testing.T) {
+	oidc := func(issuer string) []string {
+		return []string{
+			"WT_AUTH_OIDC_ISSUER=" + issuer,
+			"WT_AUTH_OIDC_CLIENT_ID=whitetower-console",
+			"WT_AUTH_OIDC_REDIRECT_URL=https://127.0.0.1:8443/auth/callback",
+		}
+	}
+	for _, tt := range []struct {
+		name    string
+		environ []string
+		refused bool
+	}{
+		{"http", oidc("http://idp.internal/realms/whitetower"), true},
+		{"http in capitals", oidc("HTTP://idp.internal/realms/whitetower"), true},
+		{"http with an https discovery URL", append(oidc("http://idp.internal/realms/whitetower"),
+			"WT_AUTH_OIDC_DISCOVERY_URL=https://keycloak.internal:8443/realms/whitetower"), true},
+		{"http in development", append(oidc("http://127.0.0.1:8180/realms/whitetower"), "WT_DEV_SELF_SIGNED_TLS=true"), false},
+		{"https", oidc("https://idp.example.test/realms/whitetower"), false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Load("", tt.environ)
+			switch {
+			case tt.refused && (err == nil || !strings.Contains(err.Error(), "auth.oidc.issuer: want https, unless dev.self_signed_tls is set")):
+				t.Fatalf("error %v, want auth.oidc.issuer refused", err)
+			case !tt.refused && err != nil:
+				t.Fatalf("refused: %v", err)
+			}
+		})
+	}
+}
+
 func TestRetentionAllowShort(t *testing.T) {
 	cfg, err := Load("", []string{
 		"WT_DEV_SELF_SIGNED_TLS=true",

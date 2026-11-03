@@ -77,11 +77,11 @@ func (a *Authenticator) Authenticate(r *http.Request) (*auth.Principal, error) {
 		}, nil
 	}
 
-	// 2. Fall back to cookie session
-	cookie, err := r.Cookie(CookieNameSecure)
-	if errors.Is(err, http.ErrNoCookie) {
-		cookie, err = r.Cookie(CookieNameInsecure)
-	}
+	// 2. Fall back to cookie session. Only the prefixed name counts: a cookie
+	// without the prefix could come from another host of the domain or from
+	// plain HTTP, and would sign the browser in as whoever planted it
+	// (ADR-0009, ST-14).
+	cookie, err := r.Cookie(CookieName)
 	if errors.Is(err, http.ErrNoCookie) {
 		return nil, nil
 	}
