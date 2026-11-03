@@ -35,7 +35,7 @@ go run ./cmd/wtctl version --insecure-skip-tls-verify --server https://127.0.0.1
 
 `task run` serves a placeholder page; [Working on the console](#working-on-the-console) shows how to run the real console. `task build` builds both into `bin/whitetower`, with the CLI next to it.
 
-`task run` signs in through the Keycloak of `task dev`, which it needs running: open <https://127.0.0.1:8443/auth/login> and sign in as one of the [test users](../deploy/compose/dev/README.md#test-users). <https://127.0.0.1:8443/api/v1/me> then shows who you are, and <https://127.0.0.1:8443/auth/logout> signs you out. Use `127.0.0.1`, never `localhost`: the cookies of a sign-in belong to one host name.
+`task run` signs in through the Keycloak of `task dev`, which it needs running: open <https://127.0.0.1:8443/auth/login> and sign in as one of the [test users](../deploy/compose/dev/README.md#test-users). <https://127.0.0.1:8443/api/v1/me> then shows who you are, and <https://127.0.0.1:8443/auth/logout> signs you out of the core, then of Keycloak once you confirm on its page. Use `127.0.0.1`, never `localhost`: the cookies of a sign-in belong to one host name.
 
 The core has three listeners: the console and public API on `127.0.0.1:8443`, the module API on `127.0.0.1:9443`, and operations on `http://127.0.0.1:9090`, with `/healthz`, `/readyz` and `/metrics`. Its settings are in the [configuration reference](reference/configuration.md); `whitetower config print` shows the effective values.
 
@@ -75,11 +75,11 @@ To sign in through Vite, give the core the console's callback as its redirect UR
 WT_AUTH_OIDC_REDIRECT_URL=http://localhost:5173/auth/callback task run
 ```
 
-On Windows, set the variable first: `$env:WT_AUTH_OIDC_REDIRECT_URL = "http://localhost:5173/auth/callback"`. A session belongs to the host name where you signed in: a sign-in through Vite holds for <http://localhost:5173> only. The session cookie is `Secure`, with the `__Host-` prefix, there too, which Chromium accepts, since it treats `http://localhost` as secure.
+On Windows, set the variable first: `$env:WT_AUTH_OIDC_REDIRECT_URL = "http://localhost:5173/auth/callback"`, and remove it afterwards with `Remove-Item Env:WT_AUTH_OIDC_REDIRECT_URL`: until then, every `task run` in that window keeps the callback of Vite. A session belongs to the host name where you signed in: a sign-in through Vite holds for <http://localhost:5173> only. The session cookie is `Secure`, with the `__Host-` prefix, there too, which Chromium accepts, since it treats `http://localhost` as secure.
 
 ## Development services
 
-`task dev` starts PostgreSQL and Keycloak. Keycloak comes with one test user per role, which `task run` and the core in Docker sign in with. Addresses, users and credentials, all for local use only, and how the core reaches Keycloak, are in [deploy/compose/dev/README.md](../deploy/compose/dev/README.md).
+`task dev` starts PostgreSQL and Keycloak. Keycloak comes with one test user per role, a user with two roles and a disabled user: you sign in as them to `task run` or to the core in Docker. Addresses, users and credentials, all for local use only, and how the core reaches Keycloak, are in [deploy/compose/dev/README.md](../deploy/compose/dev/README.md).
 
 PostgreSQL has the roles of a deployment. `whitetower_migrator` owns the schema, and only `whitetower migrate` uses it. The core connects as `whitetower_app`, which may read and write data but never change the schema ([threat model](security/threat-model.md), DC-3). The roles are created when the database starts on an empty volume. A volume from before October 2026 lacks them: recreate it with `docker compose -f deploy/compose/dev/compose.yaml down --volumes`, which deletes the development data.
 
@@ -122,7 +122,12 @@ The test helpers, and how a package writes its tests, are in [internals](develop
 
 - **Unit tests:** `task test`.
 - **Database tests:** they start PostgreSQL in Docker with testcontainers, through `internal/platform/db/dbtest`, which gives each test a fresh database with the roles of a deployment. Without Docker they are skipped, except in CI, where they fail. `WT_TEST_POSTGRES_IMAGE` picks another PostgreSQL version, for example `postgres:16-alpine`.
-- **End-to-end tests:** start a core that serves the built console and signs in through the development Keycloak, as CI does with the Compose `core` profile (`docker compose -f deploy/compose/dev/compose.yaml --profile core up -d --build --wait whitetower`), then run `task e2e`. The browser tests need Chromium, installed once with `pnpm --dir web exec playwright install chromium`; the sign-in test signs in as each test user of the realm. Set `WT_E2E_URL`, `WT_E2E_MACHINE_URL` and `WT_E2E_OPERATIONS_URL` to test another deployment.
+- **End-to-end tests:** start a core that serves the built console and signs in through the development Keycloak, as CI does with the Compose `core` profile (`docker compose -f deploy/compose/dev/compose.yaml --profile core up -d --build --wait whitetower`), then run `task e2e`. The browser tests need Chromium, installed once with `pnpm --dir web exec playwright install chromium`. The sign-in test signs in as each enabled test user of the development realm, and checks that Keycloak refuses `inactive`, so it passes only against a core that signs in through that realm. To test another deployment, set `WT_E2E_URL`, `WT_E2E_MACHINE_URL` and `WT_E2E_OPERATIONS_URL`, then run the API tests and the browser's smoke test only:
+
+  ```sh
+  go test -tags e2e -count=1 ./test/e2e/...
+  pnpm --dir web exec playwright test smoke.spec.ts
+  ```
 - **Race detector:** `go test -race ./...` needs cgo (a C compiler). CI runs it on Linux.
 
 ## Repository layout
@@ -156,4 +161,5 @@ The reasoning behind the layout is in [ADR-0007](adr/0007-monorepo-layout.md). T
 | `corepack` fails with a signature or key error | The corepack bundled with Node.js 22.12 has outdated signing keys. Install pnpm with npm instead. |
 | `The console is not built` when running `task build:go` | Run `task build`, which builds the console first. |
 | `task run` stops with `oidc service: discovering OIDC provider at http://127.0.0.1:8180/...` | Keycloak is not running, or not ready yet: start it with `task dev`, which waits until it is healthy. |
+| Keycloak answers `Invalid parameter: redirect_uri` when you sign in | The Keycloak container predates the realm in the repository, which it imported when it was created: recreate it, as [deploy/compose/dev/README.md](../deploy/compose/dev/README.md#signing-in) shows. Or the core's redirect URL is one that the realm does not register, such as another port than 8443. |
 | `bind: An attempt was made to access a socket in a way forbidden by its access permissions` | Windows reserves port ranges for Hyper-V, and they can change after a restart: `netsh interface ipv4 show excludedportrange protocol=tcp` lists them. Choose a port outside them: `WT_CONSOLE_PORT` and the like in `deploy/compose/dev/.env` for Compose, or `WT_LISTENERS_CONSOLE_ADDRESS` for the binary. Signing in needs the console on port 8443, which the realm registers ([deploy/compose/dev/README.md](../deploy/compose/dev/README.md#ports-already-in-use)). |

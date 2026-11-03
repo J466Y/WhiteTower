@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"go.yaml.in/yaml/v3"
 
+	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 )
 
@@ -28,12 +29,15 @@ type realm struct {
 	ClientScopes []struct {
 		Name string `json:"name"`
 	} `json:"clientScopes"`
-	Users []struct {
-		ID       string   `json:"id"`
-		Username string   `json:"username"`
-		Email    string   `json:"email"`
-		Groups   []string `json:"groups"`
-	} `json:"users"`
+	Users []realmUser `json:"users"`
+}
+
+type realmUser struct {
+	ID       string   `json:"id"`
+	Username string   `json:"username"`
+	Email    string   `json:"email"`
+	Enabled  bool     `json:"enabled"`
+	Groups   []string `json:"groups"`
 }
 
 type realmClient struct {
@@ -78,8 +82,16 @@ func (r realm) checkClient(t *testing.T, env map[string]string, secret string) {
 		t.Fatalf("parsing the redirect URL: %v", err)
 	}
 	postLogout := u.Scheme + "://" + u.Host + "/"
-	if uris := strings.Split(client.Attributes["post.logout.redirect.uris"], "##"); !slices.Contains(uris, postLogout) {
-		t.Errorf("the console's root %s is not among the realm's post-logout redirect URIs %v", postLogout, uris)
+	postLogoutURIs := strings.Split(client.Attributes["post.logout.redirect.uris"], "##")
+	if !slices.Contains(postLogoutURIs, postLogout) {
+		t.Errorf("the console's root %s is not among the realm's post-logout redirect URIs %v", postLogout, postLogoutURIs)
+	}
+	// Exact URIs only: with a wildcard, Keycloak would send a code, or a
+	// browser after a logout, to any path that matches it.
+	for _, uri := range append(slices.Clone(client.RedirectURIs), postLogoutURIs...) {
+		if strings.Contains(uri, "*") {
+			t.Errorf("the realm registers the wildcard URI %s, where exact URIs belong", uri)
+		}
 	}
 	if strings.TrimSpace(secret) != client.Secret {
 		t.Error("the core's client secret is not the realm's")
@@ -90,7 +102,11 @@ func (r realm) checkClient(t *testing.T, env map[string]string, secret string) {
 	for _, s := range r.ClientScopes {
 		defined = append(defined, s.Name)
 	}
-	for _, scope := range strings.Split(env["WT_AUTH_OIDC_SCOPES"], ",") {
+	scopes := config.Defaults().Auth.OIDC.Scopes
+	if s := env["WT_AUTH_OIDC_SCOPES"]; s != "" {
+		scopes = strings.Split(s, ",")
+	}
+	for _, scope := range scopes {
 		if !slices.Contains(defined, strings.TrimSpace(scope)) {
 			t.Errorf("the core asks for the scope %q, which the realm does not define", scope)
 		}
@@ -138,6 +154,20 @@ func TestEachStackSignsInThroughItsKeycloak(t *testing.T) {
 				t.Errorf("the core's discovery URL is %q, want Keycloak's address in the stack's network, %q", got, want)
 			}
 
+			// The redirect URL is the address that the console is published
+			// at: on another port, Keycloak refuses a redirect that the realm
+			// does not register, rather than send the code to whatever
+			// listens on 8443.
+			console := ""
+			for _, p := range core.Ports {
+				if strings.HasSuffix(p, ":8443") {
+					console = strings.TrimSuffix(p, ":8443")
+				}
+			}
+			if got, want := env["WT_AUTH_OIDC_REDIRECT_URL"], "https://"+console+"/auth/callback"; console == "" || got != want {
+				t.Errorf("the core's redirect URL is %q, want the console's published address, %q", got, want)
+			}
+
 			// The core reads the client's secret from a file, and discovers
 			// the provider at start, once Keycloak is ready.
 			if env["WT_AUTH_OIDC_CLIENT_SECRET_FILE"] != "/run/secrets/oidc-client-secret" || !slices.Contains(core.Secrets, "oidc-client-secret") {
@@ -162,15 +192,25 @@ func TestTaskRunSignsInThroughTheDevelopmentKeycloak(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Only the run task is decoded: the others may take any form that Task
+	// accepts, such as a variable that a command computes.
 	var taskfile struct {
-		Tasks map[string]struct {
-			Env map[string]string `yaml:"env"`
-		} `yaml:"tasks"`
+		Tasks map[string]yaml.Node `yaml:"tasks"`
 	}
 	if err := yaml.Unmarshal(data, &taskfile); err != nil {
 		t.Fatalf("parsing Taskfile.yml: %v", err)
 	}
-	env := taskfile.Tasks["run"].Env
+	var run struct {
+		Env map[string]string `yaml:"env"`
+	}
+	node, ok := taskfile.Tasks["run"]
+	if !ok {
+		t.Fatal("Taskfile.yml has no run task")
+	}
+	if err := node.Decode(&run); err != nil {
+		t.Fatalf("parsing the run task: %v", err)
+	}
+	env := run.Env
 	dev := loadCompose(t, root+"/deploy/compose/dev/compose.yaml").Services["whitetower"].Environment
 
 	if got, want := withDefaults(env["WT_AUTH_OIDC_ISSUER"]), withDefaults(dev["WT_AUTH_OIDC_ISSUER"]); got != want {
@@ -186,28 +226,36 @@ func TestTaskRunSignsInThroughTheDevelopmentKeycloak(t *testing.T) {
 	loadRealm(t, "dev").checkClient(t, env, string(secret))
 }
 
-// Both realms give each user the same fixed ID, which Keycloak puts in the
-// sub of the user's tokens: it survives a new import of the realm.
-func TestBothRealmsGiveEachUserTheSameID(t *testing.T) {
+// Both realms have the same users. Each has a fixed ID, which Keycloak puts in
+// the sub of the user's tokens: it survives a new import of the realm. CI
+// signs in through the development realm only, so its users' groups, and the
+// disabled account, must be the evaluation realm's too.
+func TestBothRealmsHaveTheSameUsers(t *testing.T) {
 	dev, eval := loadRealm(t, "dev"), loadRealm(t, "eval")
-	ids := map[string]string{}
+	users := map[string]realmUser{}
 	for _, u := range dev.Users {
 		if _, err := uuid.Parse(u.ID); err != nil {
 			t.Errorf("user %s: ID %q is not a UUID", u.Username, u.ID)
 		}
-		for name, id := range ids {
-			if id == u.ID {
-				t.Errorf("users %s and %s share the ID %s", name, u.Username, id)
+		for name, other := range users {
+			if other.ID == u.ID {
+				t.Errorf("users %s and %s share the ID %s", name, u.Username, u.ID)
 			}
 		}
-		ids[u.Username] = u.ID
+		users[u.Username] = u
 	}
 	if len(eval.Users) != len(dev.Users) {
 		t.Errorf("the realms have %d and %d users", len(dev.Users), len(eval.Users))
 	}
 	for _, u := range eval.Users {
-		if ids[u.Username] != u.ID {
-			t.Errorf("user %s: ID %q in the evaluation realm, %q in the development realm", u.Username, u.ID, ids[u.Username])
+		d := users[u.Username]
+		switch {
+		case d.ID != u.ID:
+			t.Errorf("user %s: ID %q in the evaluation realm, %q in the development realm", u.Username, u.ID, d.ID)
+		case d.Enabled != u.Enabled:
+			t.Errorf("user %s: enabled %t in the evaluation realm, %t in the development realm", u.Username, u.Enabled, d.Enabled)
+		case !slices.Equal(d.Groups, u.Groups):
+			t.Errorf("user %s: groups %v in the evaluation realm, %v in the development realm", u.Username, u.Groups, d.Groups)
 		}
 	}
 }
@@ -215,7 +263,8 @@ func TestBothRealmsGiveEachUserTheSameID(t *testing.T) {
 // Signing in as a user of the evaluation realm finds the principal that the
 // seed wrote for it: the seed's principals have the core's issuer, and the
 // IDs of the realm's users as subjects. The seed runs on every start of the
-// stack, so a second run changes nothing.
+// stack, so a second run changes nothing, not even the head of the
+// governance versions.
 func TestTheEvaluationSeedMatchesTheRealmsUsers(t *testing.T) {
 	d := dbtest.New(t)
 	pool := d.Open(t)
@@ -276,15 +325,32 @@ func TestTheEvaluationSeedMatchesTheRealmsUsers(t *testing.T) {
 		}
 		return n
 	}
-	seeded := readPrincipals()
-	if seeded < 7 {
+	if seeded := readPrincipals(); seeded < 7 {
 		t.Fatalf("the seed wrote %d principals, want at least 7", seeded)
 	}
 
+	// snapshot returns the number and a digest of the rows of each table
+	// that the seed writes, and of the head that its governance states take
+	// their version from.
+	snapshot := func() map[string]string {
+		t.Helper()
+		rows := map[string]string{}
+		for _, table := range []string{"principals", "role_bindings", "use_cases", "agents", "agent_owners", "governance_state", "governance_head"} {
+			var digest string
+			if err := su.QueryRow(ctx, "SELECT count(*) || ' rows, ' || coalesce(md5(string_agg(t::text, ',' ORDER BY t::text)), '') FROM whitetower."+table+" t").Scan(&digest); err != nil {
+				t.Fatal(err)
+			}
+			rows[table] = digest
+		}
+		return rows
+	}
+	before := snapshot()
 	if _, err := su.Exec(ctx, string(seed)); err != nil {
 		t.Fatalf("executing seed.sql a second time: %v", err)
 	}
-	if again := readPrincipals(); again != seeded {
-		t.Errorf("a second run of the seed left %d principals, want %d", again, seeded)
+	for table, after := range snapshot() {
+		if after != before[table] {
+			t.Errorf("a second run of the seed changed whitetower.%s: %s, then %s", table, before[table], after)
+		}
 	}
 }

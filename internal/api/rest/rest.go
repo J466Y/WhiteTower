@@ -395,7 +395,9 @@ func (s Server) ExchangeToken(ctx context.Context, request gen.ExchangeTokenRequ
 			return nil, problem.New(problem.Forbidden, "account is deactivated")
 		}
 		if errors.Is(err, authn.ErrInvalidToken) {
-			return nil, problem.New(problem.Unauthenticated, "invalid ID token: "+err.Error())
+			// A fixed detail: the exchanger's error names an API token, and
+			// its cause stays in the log.
+			return nil, problem.New(problem.Unauthenticated, "the ID token does not verify")
 		}
 		return nil, fmt.Errorf("exchanging id token: %w", err)
 	}

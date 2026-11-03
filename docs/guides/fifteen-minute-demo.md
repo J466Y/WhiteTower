@@ -37,6 +37,13 @@ Or using Docker Compose directly:
 docker compose -f deploy/compose/eval/compose.yaml up -d --wait
 ```
 
+A stack started before 30 October 2026, when signing in from a browser was fixed, keeps its old image of the core and principals that signing in no longer finds. Delete its data and rebuild it once:
+
+```sh
+task eval:down -- -v
+docker compose -f deploy/compose/eval/compose.yaml up -d --build --wait
+```
+
 Docker Compose spins up:
 1. **PostgreSQL 17** (`127.0.0.1:5432`): database with migrated schema.
 2. **Keycloak 26** (`http://127.0.0.1:8180`): OpenID Connect IdP pre-configured with realm `whitetower` and governance users.
@@ -47,11 +54,11 @@ Docker Compose spins up:
 Verify the core is ready:
 
 ```sh
-curl -s http://127.0.0.1:9090/healthz
+curl -s http://127.0.0.1:9090/readyz
 # Output: ok
 ```
 
-Use `127.0.0.1` in every address of this guide, never `localhost`: the cookies of a sign-in belong to one host name, and Keycloak names itself `http://127.0.0.1:8180`. Signing in also needs the stack's default ports, which the realm and the seed name ([the stack's README](../../deploy/compose/eval/README.md#ports)).
+Use `127.0.0.1` in every address of this guide, never `localhost`: the cookies of a sign-in belong to one host name, and Keycloak names itself `http://127.0.0.1:8180`. The guide also needs the console on port 8443 and Keycloak on port 8180: on another console port, signing in fails, and on another Keycloak port, you sign in without the seeded principals ([the stack's README](../../deploy/compose/eval/README.md#ports)).
 
 ---
 

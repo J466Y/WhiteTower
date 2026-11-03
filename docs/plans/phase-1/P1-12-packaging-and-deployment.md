@@ -171,6 +171,40 @@ The plan lands in five pull requests across its two parts (P1-12.1: packaging fo
 | 4. Air-gapped bundle and egress-denied CI test | 5, 6, ST-60, NFR-14 | Not started |
 | 5. Upgrades, backup/restore and operations documentation | 7, 8, 9, 10, ST-64, OPS-06, OPS-07 | Not started |
 
+### 2026-11-03: corrections from the review of signing in from a browser (fix)
+
+A fix outside the five pull requests, with the corrections that the review of 2026-11-02, below, lists, and the review's smaller findings that still held on `main`.
+
+- **The post-logout target.** The comment of `auth.oidc.redirect_url`, and so the configuration reference, says that the URL is absolute and that the identity provider must register the console's root on its origin as a post-logout redirect URI. Step 4 of the SAML broker guide says the same, beside the redirect URI. `config.Validate` now refuses a relative redirect URL under its key, as the constructor already did, so `whitetower config print` refuses what `serve` refuses.
+- **Tests.**
+  - A failed discovery names the document's URL when the provider hangs up, and when it answers 404 or 503, where go-oidc's own error names no URL. With the error naming the issuer instead, both HTTP cases fail, and the hang-up still passes, as the review found.
+  - The errors of `auth.oidc.discovery_url` never repeat it, with user info, a query or a malformed escape, nor the issuer that two of its refusals compare it with.
+  - A static check keeps `-v ON_ERROR_STOP=1` in the seed's Compose command, with `-f` and the seed file that the service mounts.
+  - The Taskfile check decodes only `tasks.run`, so a task with a computed variable no longer breaks it.
+- **The seed's governance head.** The seed's last statement skips the agents that already have a governance state, so a second start takes no version. The seed test compares every table that the seed writes, and the head, before and after a second run. The note of 2026-10-30 and the test said that a second run changes nothing: it was false until this fix, and it holds now.
+- **Documents.**
+  - Both stacks' READMEs and section 2 of the fifteen-minute demo say what a stack from before the sign-in fix needs: for the evaluation stack, `task eval:down -- -v` and a rebuild, since `task eval` keeps an existing image; for the development Keycloak, a new container, which imports the realm again. `docs/development.md` adds the symptom, `Invalid parameter: redirect_uri`, to its troubleshooting.
+  - The evaluation README's Ports section says that `task eval` reads `deploy/compose/dev/.env`, and the direct Compose command a `.env` next to its own file, as Docker Compose 5.5.0 does.
+  - The sign-in spec is documented, not split into its own Playwright project. `docs/development.md` and the `e2e` task's description say that it needs the development realm, and give the tests for another deployment: the Go API tests and `smoke.spec.ts` alone. A project of its own would have one user today, CI's End-to-end job, which runs every spec against the development stack either way. Steps 3 and 6, whose tests run on kind, either provide Keycloak with this realm or split the configuration then.
+  - Both READMEs and `docs/development.md` say that `/auth/logout` signs out of Keycloak once the person confirms on Keycloak's page.
+- **The SAML broker guide** asks for `openid`, `profile` and `email`, and says how to add a `groups` client scope instead. Its `/me` example is the API's answer for an administrator, from `GetMe` and the permission matrix: with `kind`, the permissions of the role and the session's CSRF token. It says that the audit log records nothing of a sign-in yet (AUD-01), where it named an event that the catalog lacks.
+- **The note of 2026-10-30** gains its differences from the brief, with their reasons, and cites the finding by its date and content rather than by the work queue.
+- **The review's smaller findings, fixed:**
+  - `checkEndpoint` refuses an empty query or fragment, a `?` or `#` alone, which parsed to nothing but moved the path that a client appends. This covers the OTLP endpoints too.
+  - A refused exchange of an ID token answers `the ID token does not verify`, where it answered `invalid ID token: invalid API token: the ID token does not verify`.
+  - The two tests of back channel errors lose the ST-16 marker: ST-16 is about refusing ID tokens.
+  - The constructor's refusals are checked by their text, and a test shows that the endpoints that browsers use may leave the issuer's origin.
+  - The static checks fail on a wildcard redirect or post-logout URI; take a core without `WT_AUTH_OIDC_SCOPES` as asking for the core's default scopes; check that each Compose core's redirect URL follows the port that its console is published at; and compare the groups and the enabled flag of both realms' users, not only their IDs.
+  - The demo checks `/readyz`, and names the two ports that it needs. `docs/development.md` tells PowerShell users to remove the Vite redirect URL afterwards, and describes the test users and the sign-in test exactly.
+  - P1-03 step 11's criterion, end-to-end tests that sign in as each role, holds since the sign-in fix: the sign-in spec signs in as every enabled user of the development realm.
+- **The smaller findings left:**
+  - The browser test still waits for a URL, and clicks Keycloak's logout, with the test's timeout only. Shorter waits change CI's End-to-end job, which this fix did not run.
+  - The browser test's users are still written by hand, not read from the realm.
+  - The seed test still starts its own database beside the seed's other test, and keeps its minimum of seven principals.
+  - The scope check still counts the realm's client scopes, not the client's, and `task run`'s issuer is still compared once its default is expanded.
+  - The note of 2026-10-30 labels decisions 1 to 4 with who took them, and not decisions 5 to 8: the brief that numbered them is not in the repository.
+- Follow-up: the operations guide (step 9) tells an operator of Keycloak to register the post-logout redirect URI, beside the scopes.
+
 ### 2026-11-02: the review of signing in from a browser
 
 The maintainer merged the fix (#94) while the review ran, which covered the same commit. The review found no blocking problem. The check of the discovery document's issuer is exactly as strict as go-oidc's was, in every configuration, and each rule of the fix has a test that fails when the rule breaks. The reviewer accepts what the fix did beyond its brief: it refuses the discovery document's own URL as `auth.oidc.discovery_url`, a refusal of `/api/v1/tokens/exchange` names nothing of the back channel, and the fix changes about 1,220 lines, of which about 840 are tests.
@@ -203,7 +237,7 @@ The threat model (version 0.1.7) adds to T-13's mitigations that a discovery URL
 
 ### 2026-10-30: signing in from a browser (fix)
 
-A fix outside the five pull requests, from the reviewer's finding of 2026-10-29 ([AGENTS.md](../../../AGENTS.md), work queue), with the decisions that the maintainer and the reviewer took on 2026-10-30. No stack let a person sign in from a browser, which milestone M1 asks for, so the guide of pull request 1 could not be followed (step 2, OPS-01).
+A fix outside the five pull requests, from the reviewer's finding of 2026-10-29 that no stack let a person sign in from a browser, with the decisions that the maintainer and the reviewer took on 2026-10-30. Milestone M1 asks for that sign-in, and without it the guide of pull request 1 could not be followed (step 2, OPS-01).
 
 - **Keycloak's two addresses.** Browsers reach Keycloak at `http://127.0.0.1:8180`, and a core in a container at `http://keycloak:8080`. Keycloak named its issuer after the host of each request, and the evaluation core's issuer was `http://keycloak:8080/realms/whitetower`, which browsers cannot resolve. In both stacks, Keycloak now names itself after the browsers' URL (`KC_HOSTNAME`, `http://127.0.0.1:${WT_KEYCLOAK_PORT:-8180}`) and keeps a dynamic back channel (`KC_HOSTNAME_BACKCHANNEL_DYNAMIC`). Tokens carry the browsers' issuer, the endpoints that browsers use are on it, and the token, key and user info endpoints follow the address of each request. A realm's `frontendUrl` alone would move those to `127.0.0.1` too, which a container cannot reach, as a spike of the review measured.
 - **A discovery URL.** The setting `auth.oidc.discovery_url` (`WT_AUTH_OIDC_DISCOVERY_URL`) is the base URL that the core fetches `/.well-known/openid-configuration` from when it reaches the provider at another address than browsers do. go-oidc compares the document's issuer with the URL it fetched the document from; the core turns that comparison off in every case, with go-oidc's issuer URL context, and compares the document's issuer with `auth.oidc.issuer` itself, so that one tested path decides. ID tokens are verified against `auth.oidc.issuer`, and principals keep it as their issuer. Validation refuses the setting without an issuer, outside http and https, with user info, a query or a fragment, over http when the issuer is https, equal to the issuer, or as the document's own URL. A failed discovery stops the core and names the document's URL. The callback no longer shows the browser the errors of the token exchange and of the key fetch, which can name the back channel, and the exchange of an ID token for the CLI (`/api/v1/tokens/exchange`) no longer repeats the verifier's error to its client: the log keeps both.
@@ -220,6 +254,14 @@ A fix outside the five pull requests, from the reviewer's finding of 2026-10-29 
   - `internal/platform/config`: each refusal of `auth.oidc.discovery_url`, and the values that the stacks use.
   - `web/e2e/sign-in.spec.ts`, in CI's End-to-end job: every enabled user of the realm signs in through Keycloak's form and holds the roles of their groups; `inactive` is refused before the core's callback; signing out goes through Keycloak's confirmation, and the next sign-in asks for the password. A browser test rather than a Go one, because the fault and its fix are in what a browser does: Keycloak's form, its cookies on `http://127.0.0.1`, the redirects between the two origins and Keycloak's logout page.
   - `test/packaging`, since CI never starts the evaluation stack: both stacks and `task run` against their realm (Keycloak's hostname, the issuer, the discovery URL, the redirect and post-logout URIs, the secret, the scopes and the wait for Keycloak); both realms give each user the same fixed ID; the evaluation seed's principals have the core's issuer and the users' IDs, and a second run changes nothing.
+- Differences from the brief, with the reasons that the fix's handoff gave:
+  - The setting also refuses the discovery document's own URL: go-oidc appends `/.well-known/openid-configuration` to the URL it is given, so it would fetch that path twice and stop with a 404.
+  - `/api/v1/tokens/exchange` repeats nothing of the verifier's error. The decision named only browsers, but no error that reaches a client may name anything internal, whoever the client is ([AGENTS.md](../../../AGENTS.md), code conventions).
+  - The constructor refuses an empty issuer, which a discovery document without an issuer would match, and a relative redirect URL, which has no origin to send the browser back to after a logout.
+  - The realms register exact post-logout URIs instead of wildcards: the core sends only the console's root, and a wildcard would accept any path that matches it.
+  - The Compose redirect URL follows `WT_CONSOLE_PORT`. On another port, Keycloak refuses the redirect, which the realm does not register, rather than send the authorization code to whatever listens on 8443.
+  - The seed keeps `ON CONFLICT (id) DO NOTHING` rather than rewriting each principal's identity at every start, so that it never overwrites a later change, such as the erasure of a subject (P1-03 step 13). A volume from before the fix therefore keeps principals that no sign-in matches.
+  - The size: about 1,220 changed lines, against the 800 that AGENTS.md sets, of which about 840 are tests. Go, the stacks and the documents are about 100, 100 and 180 lines.
 - Follow-ups: the Helm chart, which has the same fault and no discovery URL; a timeout on the core's calls to the identity provider; a successful sign-in does not revoke a session that the browser already holds, which ST-14 asks (sessions rotated at login); and the operations guide (step 9), which tells an operator of Keycloak to set the scopes too, or to add a `groups` client scope.
 
 ### 2026-10-16: production Helm chart (PR 2)
