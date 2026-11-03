@@ -467,6 +467,5 @@ The maintainer's decision 4 of 2026-11-02, above. A sign-in created a principal 
 - **Follow-ups:**
   - The creation of a service account, and its role bindings, record no event. Role bindings are outside this fix.
   - The events name no session, since sessions are known by the hash of their token. Pairing a sign-out with its sign-in needs an identifier of the session that is not secret, which takes a new migration.
-  - The events about people take the principal's ID as subject, as `principal.deactivated`, `token.created` and `breakglass.used` did before them, while the contracts' section 8.2 reserves the subject for an agent's ID.
   - `task verify:gen` does not compare `internal/authn/authndb`, so a stale generation of the authentication queries would pass CI.
   - From the brief, outside this fix: a logout route when only break-glass is on, and logout as a GET.
