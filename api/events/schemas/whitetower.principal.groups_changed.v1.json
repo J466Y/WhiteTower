@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Principal's groups changed",
+  "description": "A sign-in brought a person's principal other groups from the identity provider than it had, compared as sets; roles come from groups (HUM-02, AUD-01). The identity provider decides the groups: the person who signed in only carried them. The first sign-in records its groups in whitetower.principal.created.v1 instead.",
+  "type": "object",
+  "required": [
+    "principal_id",
+    "actor",
+    "method",
+    "before",
+    "after"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "principal_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "actor": {
+      "description": "The person whose sign-in carried the groups, or the break-glass custodian.",
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "method": {
+      "description": "The sign-in that carried the groups: from a browser through the identity provider, or the CLI's exchange of an ID token. A break-glass sign-in gives its principal no groups, and records a change only if its principal had some.",
+      "enum": [
+        "oidc",
+        "token_exchange",
+        "breakglass"
+      ]
+    },
+    "before": {
+      "description": "The groups the principal had: sorted, each once.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "after": {
+      "description": "The groups the principal has now: sorted, each once.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

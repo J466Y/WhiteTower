@@ -189,7 +189,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	}
 	writer := audit.NewWriter(catalog, clock.System)
 
-	sessionStore := authn.NewSessionStore(database, clock.System, authn.SessionOptions{
+	sessionStore := authn.NewSessionStore(database, clock.System, writer, authn.SessionOptions{
 		IdleTimeout:      cfg.Auth.Session.IdleTimeout,
 		AbsoluteLifetime: cfg.Auth.Session.AbsoluteLifetime,
 	})
@@ -233,7 +233,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			Limiter:           ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
 			Metrics:           metrics.NewOIDC(registry),
 			Tokens:            tokenStore,
-		}, database, principalStore, sessionStore)
+		}, principalStore, sessionStore)
 		if err != nil {
 			return fmt.Errorf("oidc service: %w", err)
 		}

@@ -32,7 +32,7 @@ func TestAPITokenSecurity(t *testing.T) {
 	})
 
 	email := "alice@example.com"
-	principal, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-alice", "Alice Admin", &email, []string{"admins"})
+	principal, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-alice", DisplayName: "Alice Admin", Email: &email, Groups: []string{"admins"}}, nil)
 	if err != nil {
 		t.Fatalf("upserting principal: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestAPITokenSecurity(t *testing.T) {
 	t.Run("scopes enforced", func(t *testing.T) {
 		// Create an operator who has PermissionAuditEventsRead and PermissionHaltFleetIssue.
 		opEmail := "operator@example.com"
-		op, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-operator", "Op Operator", &opEmail, []string{"operators"})
+		op, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-operator", DisplayName: "Op Operator", Email: &opEmail, Groups: []string{"operators"}}, nil)
 		if err != nil {
 			t.Fatalf("upserting operator: %v", err)
 		}
@@ -164,7 +164,7 @@ func TestAPITokenSecurity(t *testing.T) {
 	t.Run("revocation with the principal", func(t *testing.T) {
 		// Create a separate user with tokens
 		bobEmail := "bob@example.com"
-		bob, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-bob", "Bob Operator", &bobEmail, []string{"operators"})
+		bob, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-bob", DisplayName: "Bob Operator", Email: &bobEmail, Groups: []string{"operators"}}, nil)
 		if err != nil {
 			t.Fatalf("upserting bob: %v", err)
 		}
@@ -231,7 +231,7 @@ func TestAPITokenSecurity(t *testing.T) {
 	t.Run("service account lifecycle and tokens", func(t *testing.T) {
 		// 1. Create service account tied to Audrey, an auditor
 		audreyEmail := "audrey@example.com"
-		audrey, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-audrey", "Audrey Auditor", &audreyEmail, []string{"auditors"})
+		audrey, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-audrey", DisplayName: "Audrey Auditor", Email: &audreyEmail, Groups: []string{"auditors"}}, nil)
 		if err != nil {
 			t.Fatalf("upserting audrey: %v", err)
 		}
@@ -289,7 +289,7 @@ func TestAPITokenSecurity(t *testing.T) {
 
 		// 6. Service account cannot be created with inactive responsible principal
 		deactivatedEmail := "inactive-user@example.com"
-		inactiveUser, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-inactive", "Inactive User", &deactivatedEmail, []string{"operators"})
+		inactiveUser, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-inactive", DisplayName: "Inactive User", Email: &deactivatedEmail, Groups: []string{"operators"}}, nil)
 		if err != nil {
 			t.Fatalf("upserting inactive user: %v", err)
 		}
@@ -306,7 +306,7 @@ func TestAPITokenSecurity(t *testing.T) {
 	t.Run("a service account acts with no more than its responsible principal holds", func(t *testing.T) {
 		// Owen holds the operator and auditor roles through his IdP groups.
 		owenEmail := "owen@example.com"
-		owen, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-owen", "Owen Operator", &owenEmail, []string{"operators", "auditors"})
+		owen, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-owen", DisplayName: "Owen Operator", Email: &owenEmail, Groups: []string{"operators", "auditors"}}, nil)
 		if err != nil {
 			t.Fatalf("upserting owen: %v", err)
 		}
@@ -337,7 +337,7 @@ func TestAPITokenSecurity(t *testing.T) {
 
 		// Owen leaves the operators' group: his service account loses the role
 		// too, although it is still bound to it.
-		if _, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-owen", "Owen Operator", &owenEmail, []string{"auditors"}); err != nil {
+		if _, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-owen", DisplayName: "Owen Operator", Email: &owenEmail, Groups: []string{"auditors"}}, nil); err != nil {
 			t.Fatalf("updating owen's groups: %v", err)
 		}
 		if roles, err := rolesOf(); err != nil || strings.Join(roles, ",") != "auditor" {
@@ -356,7 +356,7 @@ func TestAPITokenSecurity(t *testing.T) {
 	// Security test ST-18: Nobody gets a role through a service account that they do not hold
 	t.Run("a service account gets only roles that its responsible principal holds", func(t *testing.T) {
 		uliEmail := "uli@example.com"
-		uli, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-uli", "Uli User", &uliEmail, nil)
+		uli, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-uli", DisplayName: "Uli User", Email: &uliEmail}, nil)
 		if err != nil {
 			t.Fatalf("upserting uli: %v", err)
 		}

@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn/authndb"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
@@ -82,11 +83,13 @@ type SessionOptions struct {
 type SessionStore struct {
 	database *db.DB
 	clk      clock.Clock
+	writer   *audit.Writer
 	opts     SessionOptions
 }
 
-// NewSessionStore creates a new SessionStore.
-func NewSessionStore(database *db.DB, clk clock.Clock, opts SessionOptions) *SessionStore {
+// NewSessionStore creates a new SessionStore, which records sign-ins and
+// sign-outs with writer.
+func NewSessionStore(database *db.DB, clk clock.Clock, writer *audit.Writer, opts SessionOptions) *SessionStore {
 	if opts.IdleTimeout <= 0 {
 		opts.IdleTimeout = 30 * time.Minute
 	}
@@ -96,6 +99,7 @@ func NewSessionStore(database *db.DB, clk clock.Clock, opts SessionOptions) *Ses
 	return &SessionStore{
 		database: database,
 		clk:      clk,
+		writer:   writer,
 		opts:     opts,
 	}
 }
@@ -290,23 +294,17 @@ func (s *SessionStore) Get(ctx context.Context, token string) (*Session, error) 
 	}, nil
 }
 
-// Replace creates the session of a sign-in and, in the same transaction,
-// revokes the sessions that held names: those of the session cookies that
-// the browser sent with the sign-in, whoever they belong to. A sign-in thus
-// never leaves valid a session that the browser held before it, be it the
-// previous user's or one that someone planted (ST-14).
-func (s *SessionStore) Replace(ctx context.Context, held []string, principalID uuid.UUID, method string, roles []string) (*Session, error) {
-	var session *Session
-	err := s.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
-		var err error
-		session, err = s.ReplaceTx(ctx, tx, held, principalID, method, roles, s.opts.AbsoluteLifetime)
-		return err
-	})
-	return session, err
-}
-
-// ReplaceTx is Replace inside the given transaction, with an explicit maximum
-// lifetime.
+// ReplaceTx creates the session of a sign-in in tx and revokes the sessions
+// that held names: those of the session cookies that the browser sent with
+// the sign-in, whoever they belong to. A sign-in thus never leaves valid a
+// session that the browser held before it, be it the previous user's or one
+// that someone planted (ST-14). lifetime bounds the session; zero is the
+// store's absolute lifetime.
+//
+// It records, in tx, each held session that it revoked while active, as
+// replaced by the principal who signs in, and the sign-in, unless it is
+// break-glass's: that sign-in's record is whitetower.breakglass.used.v1, which
+// its service writes.
 func (s *SessionStore) ReplaceTx(
 	ctx context.Context,
 	tx *db.Tx,
@@ -316,17 +314,70 @@ func (s *SessionStore) ReplaceTx(
 	roles []string,
 	lifetime time.Duration,
 ) (*Session, error) {
-	now := s.clk.Now().UTC()
-	q := authndb.New(tx)
 	for _, token := range held {
-		if err := q.RevokeSession(ctx, authndb.RevokeSessionParams{IDHash: hashToken(token), RevokedAt: &now}); err != nil {
+		if err := s.revokeTx(ctx, tx, token, "replaced", actorOf(method, principalID)); err != nil {
 			return nil, fmt.Errorf("revoking the session that the browser held: %w", err)
 		}
 	}
-	return s.CreateWithLifetimeTx(ctx, tx, principalID, method, roles, lifetime)
+	session, err := s.CreateWithLifetimeTx(ctx, tx, principalID, method, roles, lifetime)
+	if err != nil || method == "breakglass" {
+		return session, err
+	}
+	if err := s.writer.Record(ctx, tx, audit.Event{
+		Type:    "whitetower.session.created.v1",
+		Subject: principalID.String(),
+		Data: map[string]any{
+			"principal_id": principalID.String(),
+			"actor":        actorOf(method, principalID),
+			"method":       method,
+			"roles":        append([]string{}, roles...), // an array, never null
+			"expires_at":   session.AbsoluteExpiresAt.UTC().Format("2006-01-02T15:04:05.000Z"),
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("recording the sign-in: %w", err)
+	}
+	return session, nil
 }
 
-// heldSessions returns the session tokens that r's cookies name, for Replace:
+// SignOut revokes the session of token, when it is active, and records in the
+// same transaction that its principal signed out. A token of no active
+// session, unknown, revoked or expired, changes and records nothing: signing
+// out needs no authentication, and must not let a request with a random or
+// stale cookie write to the audit log.
+func (s *SessionStore) SignOut(ctx context.Context, token string) error {
+	return s.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
+		return s.revokeTx(ctx, tx, token, "signed_out", nil)
+	})
+}
+
+// revokeTx revokes the session of token in tx when it is active, and records
+// its revocation for reason, by actor, or by the session's principal when
+// actor is nil. A token of no active session changes and records nothing.
+func (s *SessionStore) revokeTx(ctx context.Context, tx *db.Tx, token, reason string, actor map[string]any) error {
+	now := s.clk.Now().UTC()
+	revoked, err := authndb.New(tx).RevokeActiveSession(ctx, authndb.RevokeActiveSessionParams{IDHash: hashToken(token), RevokedAt: &now})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if actor == nil {
+		actor = actorOf(revoked.Method, revoked.PrincipalID)
+	}
+	return s.writer.Record(ctx, tx, audit.Event{
+		Type:    "whitetower.session.revoked.v1",
+		Subject: revoked.PrincipalID.String(),
+		Data: map[string]any{
+			"principal_id": revoked.PrincipalID.String(),
+			"actor":        actor,
+			"method":       revoked.Method,
+			"reason":       reason,
+		},
+	})
+}
+
+// heldSessions returns the session tokens that r's cookies name, for ReplaceTx:
 // the first under the session cookie's name and the first under the
 // unprefixed one, so that a request with many cookies costs no more.
 func heldSessions(r *http.Request) []string {

@@ -21,7 +21,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/J466Y/WhiteTower/internal/audit"
-	"github.com/J466Y/WhiteTower/internal/authn/authndb"
 	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
@@ -204,18 +203,12 @@ func (s *BreakglassService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var session *Session
 
 	err = s.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
-		q := authndb.New(tx)
-		issuer := "whitetower:breakglass"
-		subject := "custodian"
-		// Provision the break-glass principal record if it does not exist.
-		_, err := q.UpsertHumanPrincipal(ctx, authndb.UpsertHumanPrincipalParams{
-			ID:          BreakglassPrincipalID,
-			Issuer:      &issuer,
-			Subject:     &subject,
+		// Provision the break-glass principal record if it does not exist:
+		// its first use records the principal's creation.
+		_, err := signInHuman(ctx, tx, s.writer, now, BreakglassPrincipalID, "breakglass", Identity{
+			Issuer:      "whitetower:breakglass",
+			Subject:     "custodian",
 			DisplayName: "Break-Glass Custodian",
-			Email:       nil,
-			IdpGroups:   []string{},
-			LastLoginAt: &now,
 		})
 		if err != nil {
 			return fmt.Errorf("upserting break-glass principal: %w", err)
@@ -223,7 +216,8 @@ func (s *BreakglassService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// Issue a 1-hour session with RoleOperator permissions restricted by
 		// BreakglassScopes. Security test ST-14: the session that the browser
-		// held is revoked in the same transaction.
+		// held is revoked in the same transaction, and recorded; the event
+		// below records the sign-in.
 		session, err = s.sessions.ReplaceTx(ctx, tx, heldSessions(r), BreakglassPrincipalID, "breakglass", []string{string(authz.RoleOperator)}, BreakglassLifetime)
 		if err != nil {
 			return fmt.Errorf("creating break-glass session: %w", err)

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Session revoked",
+  "description": "A request ended a session that was active: the person signed out, or a sign-in in the browser that held the session replaced it (ST-14, AUD-01). A session that expires, or that the deactivation of its principal revokes, records no such event: whitetower.principal.deactivated.v1 records the deactivation. It carries no token, nor any hash of one.",
+  "type": "object",
+  "required": [
+    "principal_id",
+    "actor",
+    "method",
+    "reason"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "principal_id": {
+      "description": "The principal whose session ended.",
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "actor": {
+      "description": "Who ended it: the session's principal, who signed out, or whoever signed in in its place, who can be another person on a shared browser.",
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "method": {
+      "description": "How the session that ended was signed in.",
+      "enum": [
+        "oidc",
+        "breakglass"
+      ]
+    },
+    "reason": {
+      "description": "signed_out: its principal signed out. replaced: a sign-in in the browser that held it revoked it.",
+      "enum": [
+        "signed_out",
+        "replaced"
+      ]
+    }
+  }
+}

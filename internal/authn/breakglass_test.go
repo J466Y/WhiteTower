@@ -238,7 +238,7 @@ func TestABreakglassSignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 		Logger:             slog.New(slog.DiscardHandler),
 	}, database, sessionStore, audit.NewWriter(cat, clk))
 
-	alice, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-alice", "Alice Operator", nil, nil)
+	alice, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-alice", DisplayName: "Alice Operator"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

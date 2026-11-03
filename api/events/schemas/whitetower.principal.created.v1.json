@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Principal created",
+  "description": "A person's principal was created: at their first sign-in, or by SCIM provisioning (HUM-02, HUM-05, AUD-01). It names the person by the principal's pseudonymous ID only, never by name, email address or IdP subject (NFR-20).",
+  "type": "object",
+  "required": [
+    "principal_id",
+    "actor",
+    "method",
+    "idp_groups"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "principal_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "actor": {
+      "description": "The person who signed in, the break-glass custodian, or SCIM's service account.",
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "method": {
+      "description": "How the principal was created: a sign-in from a browser through the identity provider, the CLI's exchange of an ID token, the first use of break-glass, or SCIM provisioning.",
+      "enum": [
+        "oidc",
+        "token_exchange",
+        "breakglass",
+        "scim"
+      ]
+    },
+    "idp_groups": {
+      "description": "The groups that the identity provider gave the principal, from which its roles come (HUM-02): sorted, each once.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

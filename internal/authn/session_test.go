@@ -32,7 +32,7 @@ func setupAuthn(t *testing.T, clk *clocktest.Fake) (*authn.SessionStore, *authn.
 	}
 	writer := audit.NewWriter(cat, clk)
 
-	sessionStore := authn.NewSessionStore(database, clk, authn.SessionOptions{
+	sessionStore := authn.NewSessionStore(database, clk, writer, authn.SessionOptions{
 		IdleTimeout:      30 * time.Minute,
 		AbsoluteLifetime: 12 * time.Hour,
 	})
@@ -50,11 +50,11 @@ func TestOnlyThePrefixedSessionCookieSignsIn(t *testing.T) {
 	sessionStore, principalStore, tokenStore, _ := setupAuthn(t, clk)
 	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, nil)
 
-	victim, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-victim", "Vera Victim", nil, nil)
+	victim, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-victim", DisplayName: "Vera Victim"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	attacker, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-attacker", "Mallory Planter", nil, nil)
+	attacker, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-attacker", DisplayName: "Mallory Planter"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestSessionLifecycleAndSecurity(t *testing.T) {
 	sessionStore, principalStore, _, _ := setupAuthn(t, clk)
 
 	email := "alice@example.com"
-	principal, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", "sub-12345", "Alice Operator", &email, []string{"operators"})
+	principal, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-12345", DisplayName: "Alice Operator", Email: &email, Groups: []string{"operators"}}, nil)
 	if err != nil {
 		t.Fatalf("upserting principal: %v", err)
 	}

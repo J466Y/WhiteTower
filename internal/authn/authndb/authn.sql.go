@@ -377,6 +377,61 @@ func (q *Queries) GetSessionByHash(ctx context.Context, idHash []byte) (Whitetow
 	return i, err
 }
 
+const insertHumanPrincipal = `-- name: InsertHumanPrincipal :one
+INSERT INTO whitetower.principals (
+    id, kind, issuer, subject, display_name, email, status, idp_groups, last_login_at, created_at, updated_at
+) VALUES (
+    $1, 'human', $2, $3, $4, $5, 'active', $6, $7, $8, $8
+)
+ON CONFLICT (issuer, subject) WHERE kind = 'human' DO NOTHING
+RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version
+`
+
+type InsertHumanPrincipalParams struct {
+	ID          uuid.UUID
+	Issuer      *string
+	Subject     *string
+	DisplayName string
+	Email       *string
+	IdpGroups   []string
+	LastLoginAt *time.Time
+	CreatedAt   time.Time
+}
+
+// Returns no row when a principal with the issuer and subject exists, or
+// another transaction created one meanwhile, once that transaction commits.
+func (q *Queries) InsertHumanPrincipal(ctx context.Context, arg InsertHumanPrincipalParams) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, insertHumanPrincipal,
+		arg.ID,
+		arg.Issuer,
+		arg.Subject,
+		arg.DisplayName,
+		arg.Email,
+		arg.IdpGroups,
+		arg.LastLoginAt,
+		arg.CreatedAt,
+	)
+	var i WhitetowerPrincipal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.Email,
+		&i.Status,
+		&i.StatusChangedAt,
+		&i.StatusReason,
+		&i.IdpGroups,
+		&i.LastLoginAt,
+		&i.ResponsiblePrincipalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const listAPITokensByPrincipal = `-- name: ListAPITokensByPrincipal :many
 SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at FROM whitetower.api_tokens
 WHERE principal_id = $1
@@ -572,6 +627,43 @@ func (q *Queries) ListServiceAccountsByResponsiblePrincipal(ctx context.Context,
 	return items, nil
 }
 
+const lockHumanPrincipalByIdentity = `-- name: LockHumanPrincipalByIdentity :one
+
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+WHERE issuer = $1 AND subject = $2 AND kind = 'human'
+FOR UPDATE
+`
+
+type LockHumanPrincipalByIdentityParams struct {
+	Issuer  *string
+	Subject *string
+}
+
+// Queries of the human authentication and session domain (plan P1-03).
+// Locks the principal, so that a sign-in reads the groups that it changes.
+func (q *Queries) LockHumanPrincipalByIdentity(ctx context.Context, arg LockHumanPrincipalByIdentityParams) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, lockHumanPrincipalByIdentity, arg.Issuer, arg.Subject)
+	var i WhitetowerPrincipal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.Email,
+		&i.Status,
+		&i.StatusChangedAt,
+		&i.StatusReason,
+		&i.IdpGroups,
+		&i.LastLoginAt,
+		&i.ResponsiblePrincipalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const revokeAPIToken = `-- name: RevokeAPIToken :execrows
 UPDATE whitetower.api_tokens
 SET revoked_at = $2
@@ -608,6 +700,33 @@ func (q *Queries) RevokeAPITokensForPrincipal(ctx context.Context, arg RevokeAPI
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const revokeActiveSession = `-- name: RevokeActiveSession :one
+UPDATE whitetower.sessions
+SET revoked_at = $2
+WHERE id_hash = $1 AND revoked_at IS NULL
+  AND idle_expires_at >= $2 AND absolute_expires_at >= $2
+RETURNING principal_id, method
+`
+
+type RevokeActiveSessionParams struct {
+	IDHash    []byte
+	RevokedAt *time.Time
+}
+
+type RevokeActiveSessionRow struct {
+	PrincipalID uuid.UUID
+	Method      string
+}
+
+// Revokes the session only while it is active, as SessionStore.Get judges it,
+// and returns whose it was: no row when nothing was revoked.
+func (q *Queries) RevokeActiveSession(ctx context.Context, arg RevokeActiveSessionParams) (RevokeActiveSessionRow, error) {
+	row := q.db.QueryRow(ctx, revokeActiveSession, arg.IDHash, arg.RevokedAt)
+	var i RevokeActiveSessionRow
+	err := row.Scan(&i.PrincipalID, &i.Method)
+	return i, err
 }
 
 const revokeSession = `-- name: RevokeSession :exec
@@ -676,6 +795,54 @@ func (q *Queries) TouchSession(ctx context.Context, arg TouchSessionParams) erro
 	return err
 }
 
+const updateHumanPrincipalAtSignIn = `-- name: UpdateHumanPrincipalAtSignIn :one
+UPDATE whitetower.principals
+SET display_name = $2,
+    email = $3,
+    idp_groups = $4,
+    last_login_at = $5,
+    updated_at = $5
+WHERE id = $1
+RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version
+`
+
+type UpdateHumanPrincipalAtSignInParams struct {
+	ID          uuid.UUID
+	DisplayName string
+	Email       *string
+	IdpGroups   []string
+	LastLoginAt *time.Time
+}
+
+func (q *Queries) UpdateHumanPrincipalAtSignIn(ctx context.Context, arg UpdateHumanPrincipalAtSignInParams) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, updateHumanPrincipalAtSignIn,
+		arg.ID,
+		arg.DisplayName,
+		arg.Email,
+		arg.IdpGroups,
+		arg.LastLoginAt,
+	)
+	var i WhitetowerPrincipal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.Email,
+		&i.Status,
+		&i.StatusChangedAt,
+		&i.StatusReason,
+		&i.IdpGroups,
+		&i.LastLoginAt,
+		&i.ResponsiblePrincipalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const updatePrincipalStatus = `-- name: UpdatePrincipalStatus :exec
 UPDATE whitetower.principals
 SET status = $2,
@@ -701,63 +868,4 @@ func (q *Queries) UpdatePrincipalStatus(ctx context.Context, arg UpdatePrincipal
 		arg.StatusReason,
 	)
 	return err
-}
-
-const upsertHumanPrincipal = `-- name: UpsertHumanPrincipal :one
-
-INSERT INTO whitetower.principals (
-    id, kind, issuer, subject, display_name, email, status, idp_groups, last_login_at, created_at, updated_at
-) VALUES (
-    $1, 'human', $2, $3, $4, $5, 'active', $6, $7, $7, $7
-)
-ON CONFLICT (issuer, subject) WHERE kind = 'human'
-DO UPDATE SET
-    display_name = EXCLUDED.display_name,
-    email = EXCLUDED.email,
-    idp_groups = EXCLUDED.idp_groups,
-    last_login_at = EXCLUDED.last_login_at,
-    updated_at = EXCLUDED.last_login_at
-RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version
-`
-
-type UpsertHumanPrincipalParams struct {
-	ID          uuid.UUID
-	Issuer      *string
-	Subject     *string
-	DisplayName string
-	Email       *string
-	IdpGroups   []string
-	LastLoginAt *time.Time
-}
-
-// Queries of the human authentication and session domain (plan P1-03).
-func (q *Queries) UpsertHumanPrincipal(ctx context.Context, arg UpsertHumanPrincipalParams) (WhitetowerPrincipal, error) {
-	row := q.db.QueryRow(ctx, upsertHumanPrincipal,
-		arg.ID,
-		arg.Issuer,
-		arg.Subject,
-		arg.DisplayName,
-		arg.Email,
-		arg.IdpGroups,
-		arg.LastLoginAt,
-	)
-	var i WhitetowerPrincipal
-	err := row.Scan(
-		&i.ID,
-		&i.Kind,
-		&i.Issuer,
-		&i.Subject,
-		&i.DisplayName,
-		&i.Email,
-		&i.Status,
-		&i.StatusChangedAt,
-		&i.StatusReason,
-		&i.IdpGroups,
-		&i.LastLoginAt,
-		&i.ResponsiblePrincipalID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.Version,
-	)
-	return i, err
 }

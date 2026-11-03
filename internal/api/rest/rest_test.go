@@ -647,12 +647,12 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 		t.Fatal(err)
 	}
 	writer := audit.NewWriter(cat, clk)
-	sessionStore := authn.NewSessionStore(database, clk, authn.SessionOptions{})
+	sessionStore := authn.NewSessionStore(database, clk, writer, authn.SessionOptions{})
 	tokenStore := authn.NewTokenStore(database, clk, writer)
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
 
 	email := "operator@example.com"
-	user, err := principalStore.UpsertHuman(context.Background(), "https://idp.example.com", "sub-op", "Test Operator", &email, []string{"operators"})
+	user, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-op", DisplayName: "Test Operator", Email: &email, Groups: []string{"operators"}}, nil)
 	if err != nil {
 		t.Fatalf("upserting test user: %v", err)
 	}
@@ -751,7 +751,7 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 		}
 
 		adaEmail := "ada@example.com"
-		ada, err := principalStore.UpsertHuman(context.Background(), "https://idp.example.com", "sub-ada", "Ada Admin", &adaEmail, nil)
+		ada, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-ada", DisplayName: "Ada Admin", Email: &adaEmail}, nil)
 		if err != nil {
 			t.Fatalf("upserting the administrator: %v", err)
 		}
@@ -820,13 +820,13 @@ func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorRevokesAToken(t *tes
 		t.Fatal(err)
 	}
 	writer := audit.NewWriter(cat, clk)
-	sessionStore := authn.NewSessionStore(database, clk, authn.SessionOptions{})
+	sessionStore := authn.NewSessionStore(database, clk, writer, authn.SessionOptions{})
 	tokenStore := authn.NewTokenStore(database, clk, writer)
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
 
 	human := func(subject, name string, roles ...string) auth.Principal {
 		t.Helper()
-		p, err := principalStore.UpsertHuman(ctx, "https://idp.example.com", subject, name, nil, nil)
+		p, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: subject, DisplayName: name}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

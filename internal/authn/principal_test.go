@@ -27,7 +27,7 @@ func TestPrincipalLifecycleAndAuditing(t *testing.T) {
 	groups := []string{"developers", "engineers"}
 
 	// 1. Initial upsert
-	p1, err := principalStore.UpsertHuman(ctx, issuer, subject, initialName, &email, groups)
+	p1, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: issuer, Subject: subject, DisplayName: initialName, Email: &email, Groups: groups}, nil)
 	if err != nil {
 		t.Fatalf("upserting principal: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestPrincipalLifecycleAndAuditing(t *testing.T) {
 	updatedName := "Bob The Builder"
 	updatedGroups := []string{"developers", "architects"}
 	clk.Advance(time.Hour)
-	p2, err := principalStore.UpsertHuman(ctx, issuer, subject, updatedName, &email, updatedGroups)
+	p2, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: issuer, Subject: subject, DisplayName: updatedName, Email: &email, Groups: updatedGroups}, nil)
 	if err != nil {
 		t.Fatalf("updating principal: %v", err)
 	}
