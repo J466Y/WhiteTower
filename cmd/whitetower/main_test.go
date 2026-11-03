@@ -93,7 +93,9 @@ func TestHealthcheck(t *testing.T) {
 	}
 }
 
-// unusedAddr returns an address where nothing listens.
+// unusedAddr returns an address where nothing listens. Any process may bind
+// its port again once it is returned, so never give it to a listener: give
+// the listener port 0 instead (startServeOn).
 func unusedAddr(t *testing.T) string {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")

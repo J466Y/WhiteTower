@@ -150,15 +150,18 @@ func migrationEnv(d *dbtest.Database) []string {
 	}
 }
 
-// startServeOn starts the server on the database d.
+// startServeOn starts the server on the database d. Its listeners take port 0,
+// so that each gets a free port in the same bind that takes it, and the
+// server's logs say which. A port chosen before serve binds it could be taken
+// in between: go test runs packages in parallel, and their test servers and
+// containers bind ports too.
 func startServeOn(t *testing.T, d *dbtest.Database, environ ...string) *serving {
 	t.Helper()
-	console, machine, operations := unusedAddr(t), unusedAddr(t), unusedAddr(t)
 	cfg, err := config.Load("", slices.Concat([]string{
 		"WT_DEV_SELF_SIGNED_TLS=true",
-		"WT_LISTENERS_CONSOLE_ADDRESS=" + console,
-		"WT_LISTENERS_MACHINE_ADDRESS=" + machine,
-		"WT_LISTENERS_OPERATIONS_ADDRESS=" + operations,
+		"WT_LISTENERS_CONSOLE_ADDRESS=127.0.0.1:0",
+		"WT_LISTENERS_MACHINE_ADDRESS=127.0.0.1:0",
+		"WT_LISTENERS_OPERATIONS_ADDRESS=127.0.0.1:0",
 		"WT_SHUTDOWN_TIMEOUT=2s",
 	}, databaseEnv(d), auditEnv(t), environ))
 	if err != nil {
@@ -167,12 +170,7 @@ func startServeOn(t *testing.T, d *dbtest.Database, environ ...string) *serving 
 	if err := cfg.CheckServe(); err != nil {
 		t.Fatal(err)
 	}
-	s := &serving{
-		console:    "https://" + console,
-		machine:    "https://" + machine,
-		operations: "http://" + operations,
-		logs:       &syncBuffer{},
-	}
+	s := &serving{logs: &syncBuffer{}}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- serve(ctx, cfg, s.logs) }()
@@ -194,10 +192,12 @@ func startServeOn(t *testing.T, d *dbtest.Database, environ ...string) *serving 
 			t.Fatalf("serve returned %v; it logged:\n%s", err, s.logs)
 		default:
 		}
-		if resp, err := http.Get(s.operations + "/healthz"); err == nil {
-			_ = resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				return s
+		if s.addresses(t) {
+			if resp, err := http.Get(s.operations + "/healthz"); err == nil {
+				_ = resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					return s
+				}
 			}
 		}
 		if time.Now().After(deadline) {
@@ -205,6 +205,25 @@ func startServeOn(t *testing.T, d *dbtest.Database, environ ...string) *serving 
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
+}
+
+// addresses fills in the listeners' URLs once the server has logged where
+// each of them listens, and reports whether they are known.
+func (s *serving) addresses(t *testing.T) bool {
+	t.Helper()
+	if s.operations != "" {
+		return true
+	}
+	addrs := map[string]string{}
+	for _, r := range s.logs.records(t, "listening") {
+		listener, _ := r["listener"].(string)
+		addrs[listener], _ = r["addr"].(string)
+	}
+	if addrs["console"] == "" || addrs["machine"] == "" || addrs["operations"] == "" {
+		return false
+	}
+	s.console, s.machine, s.operations = "https://"+addrs["console"], "https://"+addrs["machine"], "http://"+addrs["operations"]
+	return true
 }
 
 // readiness returns the operations listener's answer to /readyz.
