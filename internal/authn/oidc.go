@@ -597,9 +597,8 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 		}
 	}
 	if err != nil {
-		// The API repeats this error to the client, and fetching the signing
-		// keys can fail on the provider's back channel: only the log holds
-		// the cause.
+		// Fetching the signing keys can fail on the provider's back channel,
+		// whose address no client may learn: only the log holds the cause.
 		s.logger.Warn("verifying exchange id_token failed", "error", err)
 		return nil, fmt.Errorf("%w: the ID token does not verify", ErrInvalidToken)
 	}

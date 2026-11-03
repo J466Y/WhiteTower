@@ -149,7 +149,7 @@ type OIDC struct {
 	CLIClientID string `yaml:"cli_client_id"`
 	// File with the confidential client secret: the secret never belongs in the configuration file or the environment.
 	ClientSecretFile string `yaml:"client_secret_file"`
-	// Redirect URL registered with the IdP for this server, such as https://127.0.0.1:8443/auth/callback.
+	// Absolute redirect URL registered with the IdP for this server, such as https://127.0.0.1:8443/auth/callback. After a logout, the IdP sends the browser to the console's root on the origin of this URL, such as https://127.0.0.1:8443/, which the IdP must also register among the client's post-logout redirect URIs: Keycloak refuses a logout to a URI it does not list.
 	RedirectURL string `yaml:"redirect_url"`
 	// Scopes requested during OIDC authorization: openid, profile, email, groups by default.
 	Scopes []string `yaml:"scopes"`
@@ -461,8 +461,11 @@ func (c Config) Validate() error {
 		if c.Auth.OIDC.ClientID == "" {
 			add("auth.oidc.client_id", "required when auth.oidc.issuer is set")
 		}
-		if c.Auth.OIDC.RedirectURL == "" {
+		if r := c.Auth.OIDC.RedirectURL; r == "" {
 			add("auth.oidc.redirect_url", "required when auth.oidc.issuer is set")
+		} else if u, err := url.Parse(r); err != nil || u.Scheme == "" || u.Host == "" {
+			// The server takes the origin of a logout's return from it.
+			add("auth.oidc.redirect_url", "want an absolute URL, such as https://127.0.0.1:8443/auth/callback")
 		}
 		for group, role := range c.Auth.OIDC.RoleMapping {
 			switch role {
@@ -577,7 +580,9 @@ func checkEndpoint(s string) error {
 		return errors.New("want an http or https URL")
 	case u.Host == "":
 		return errors.New("the URL has no host")
-	case u.RawQuery != "" || u.Fragment != "":
+	// An empty query or fragment parses to nothing, but a client that appends
+	// a path to the URL appends it after them.
+	case strings.ContainsAny(s, "?#"):
 		return errors.New("want a base URL, without a query or a fragment")
 	}
 	return nil
