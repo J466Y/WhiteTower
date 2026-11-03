@@ -324,6 +324,19 @@ func TestEachDiscoveryAttemptTimesOut(t *testing.T) {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
 
+	// reached waits until the provider has taken n connections, one for each
+	// attempt. The provider counts a connection once Accept returns, which
+	// can come after the attempt has timed out: the kernel completes the
+	// handshake before the provider's goroutine runs.
+	reached := func(n int32) {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); accepted.Load() < n; time.Sleep(5 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatalf("the provider took %d connections, want %d: each attempt must reach it", accepted.Load(), n)
+			}
+		}
+	}
+
 	attempt := make(chan error, 1)
 	go func() { attempt <- svc.Discover(context.Background()) }()
 	select {
@@ -335,7 +348,10 @@ func TestEachDiscoveryAttemptTimesOut(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("a discovery attempt against a provider that hangs did not time out")
 	}
+	reached(1)
 
+	// Run's first attempt ends, and Run waits for its delay; once it has
+	// passed, the next attempt reaches the provider, and ends too.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan struct{})
@@ -344,12 +360,10 @@ func TestEachDiscoveryAttemptTimesOut(t *testing.T) {
 		svc.Run(ctx)
 	}()
 	clk.WaitTimers(t, 1)
+	reached(2)
 	clk.Advance(time.Second)
 	clk.WaitTimers(t, 1)
-	// One connection for the attempt above, and one for each attempt of Run.
-	if got := accepted.Load(); got < 3 {
-		t.Errorf("the provider took %d connections, want 3: each attempt must end", got)
-	}
+	reached(3)
 	cancel()
 	<-done
 }
