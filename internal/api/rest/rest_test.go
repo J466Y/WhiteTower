@@ -1034,12 +1034,14 @@ func TestExchangeTokenEndpoint(t *testing.T) {
 
 	t.Run("invalid ID token is refused with unauthenticated", func(t *testing.T) {
 		opts := options(io.Discard)
-		opts.Exchanger = mockTokenExchanger{err: authn.ErrInvalidToken}
+		opts.Exchanger = mockTokenExchanger{err: fmt.Errorf("%w: the signing keys of http://keycloak:8080 are unreachable", authn.ErrInvalidToken)}
 		h := Handler(opts)
 
 		body := strings.NewReader(`{"idToken":"invalid-token"}`)
 		res := call(h, http.MethodPost, "/api/v1/tokens/exchange", "", nil, body)
-		problemOf(t, res, problem.Unauthenticated)
+		if p := problemOf(t, res, problem.Unauthenticated); p.Detail != "the ID token does not verify" {
+			t.Errorf("detail %q, want only that the ID token does not verify", p.Detail)
+		}
 	})
 
 	t.Run("without an exchanger, the exchange is not found", func(t *testing.T) {

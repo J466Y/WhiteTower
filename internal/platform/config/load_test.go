@@ -134,6 +134,8 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 		{"OTLP over gRPC", []string{"WT_TRACING_OTLP_ENDPOINT=grpc://collector:4317"}, "tracing.otlp.endpoint"},
 		{"OTLP without host", []string{"WT_TRACING_OTLP_ENDPOINT=https:///v1"}, "tracing.otlp.endpoint"},
 		{"OTLP with a query", []string{"WT_TRACING_OTLP_ENDPOINT=https://collector:4318/?tenant=a"}, "tracing.otlp.endpoint"},
+		{"OTLP with an empty query", []string{"WT_TRACING_OTLP_ENDPOINT=https://collector:4318/?"}, "tracing.otlp.endpoint"},
+		{"OTLP with an empty fragment", []string{"WT_AUDIT_EXPORT_OTLP_ENDPOINT=https://collector:4318/#"}, "audit.export.otlp.endpoint"},
 		{"CA file without https", []string{"WT_TRACING_OTLP_ENDPOINT=http://collector:4318", "WT_TRACING_OTLP_CA_FILE=/ca.pem"}, "tracing.otlp.ca_file"},
 		{"database scheme", []string{"WT_DATABASE_URL=mysql://app@db/whitetower"}, "database.url"},
 		{"database key-value string", []string{"WT_DATABASE_URL=host=db user=app"}, "database.url"},
@@ -153,9 +155,12 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 		{"discovery URL with a user", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://admin@keycloak:8080/realms/whitetower"), "auth.oidc.discovery_url"},
 		{"discovery URL with a query", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower?tenant=a"), "auth.oidc.discovery_url"},
 		{"discovery URL with a fragment", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower#a"), "auth.oidc.discovery_url"},
+		{"discovery URL with an empty query", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower?"), "auth.oidc.discovery_url"},
+		{"discovery URL with an empty fragment", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower#"), "auth.oidc.discovery_url"},
 		{"plain discovery URL for an https issuer", oidcWithDiscovery("https://idp.example.test/realms/whitetower", "http://keycloak:8080/realms/whitetower"), "auth.oidc.discovery_url"},
 		{"discovery URL that is the issuer", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://127.0.0.1:8180/realms/whitetower/"), "auth.oidc.discovery_url"},
 		{"discovery document instead of its base URL", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower/.well-known/openid-configuration"), "auth.oidc.discovery_url"},
+		{"relative redirect URL", []string{"WT_AUTH_OIDC_ISSUER=http://127.0.0.1:8180/realms/whitetower", "WT_AUTH_OIDC_CLIENT_ID=whitetower-console", "WT_AUTH_OIDC_REDIRECT_URL=/auth/callback"}, "auth.oidc.redirect_url: want an absolute URL"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -258,6 +263,26 @@ func TestEndpointErrorsDoNotRepeatTheURL(t *testing.T) {
 		}
 		if strings.Contains(err.Error(), "canary-5e3f") {
 			t.Fatalf("the error repeats the endpoint: %v", err)
+		}
+	}
+}
+
+// The same holds for the discovery URL, the back channel to the identity
+// provider, and for the issuer that its errors compare it with.
+func TestDiscoveryURLErrorsDoNotRepeatTheURL(t *testing.T) {
+	for _, tt := range []struct{ issuer, discovery string }{
+		{"http://127.0.0.1:8180/realms/whitetower", "http://user:canary-5e3f@keycloak:8080/realms/whitetower"},
+		{"http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower?k=canary-5e3f"},
+		{"http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/%zzcanary-5e3f"},
+		{"https://idp.example.test/realms/canary-5e3f", "http://keycloak:8080/realms/canary-5e3f"},
+		{"http://127.0.0.1:8180/realms/canary-5e3f", "http://127.0.0.1:8180/realms/canary-5e3f/"},
+	} {
+		_, err := Load("", append([]string{"WT_DEV_SELF_SIGNED_TLS=true"}, oidcWithDiscovery(tt.issuer, tt.discovery)...))
+		if err == nil || !strings.Contains(err.Error(), "auth.oidc.discovery_url") {
+			t.Fatalf("%s: error %v, want it to name auth.oidc.discovery_url", tt.discovery, err)
+		}
+		if strings.Contains(err.Error(), "canary-5e3f") {
+			t.Fatalf("the error repeats a URL: %v", err)
 		}
 	}
 }

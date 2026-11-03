@@ -40,6 +40,10 @@ type mockIDP struct {
 	// answer, as a provider that went away does; set it before the first
 	// request.
 	hangUp string
+	// discoveryStatus, when set, is the HTTP status that the mock answers
+	// for its discovery document, without the document; set it before the
+	// first request.
+	discoveryStatus int
 }
 
 func newMockIDP(t *testing.T) *mockIDP {
@@ -57,6 +61,10 @@ func newMockIDP(t *testing.T) *mockIDP {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		if m.discoveryStatus != 0 {
+			http.Error(w, http.StatusText(m.discoveryStatus), m.discoveryStatus)
+			return
+		}
 		document := m.discovery
 		if document == nil {
 			document = map[string]any{
@@ -1059,40 +1067,80 @@ func TestADiscoveryDocumentThatNamesAnotherIssuerIsRefused(t *testing.T) {
 	}
 }
 
-// A discovery that fails stops the service with an error that names the URL
-// it fetched, for the operator who reads the server's log.
-func TestAFailedDiscoveryNamesTheDocumentItFetched(t *testing.T) {
+// The endpoints that browsers use may leave the issuer's origin, as a
+// provider whose sign-in pages have their own host does: the server checks
+// the document's issuer, not where the document sends browsers.
+func TestTheBrowsersEndpointsMayLeaveTheIssuersOrigin(t *testing.T) {
 	idp := newMockIDP(t)
-	idp.hangUp = "/.well-known/openid-configuration"
-	_, err := authn.NewOIDCService(context.Background(), backChannelOptions(idp, clocktest.New(testEpoch)), nil, nil, nil)
-	if document := idp.server.URL + "/.well-known/openid-configuration"; err == nil || !strings.Contains(err.Error(), document) {
-		t.Fatalf("got %v, want an error that names %s", err, document)
+	idp.discovery = idp.backChannelDocument(frontIssuer)
+	idp.discovery["authorization_endpoint"] = "https://login.example.test/authorize"
+	idp.discovery["end_session_endpoint"] = "https://login.example.test/logout"
+	clk := clocktest.New(testEpoch)
+	opts := backChannelOptions(idp, clk)
+	// A logout without a session cookie revokes nothing, so the session
+	// store needs no database.
+	svc, err := authn.NewOIDCService(context.Background(), opts, nil, nil, authn.NewSessionStore(nil, clk, authn.SessionOptions{}))
+	if err != nil {
+		t.Fatalf("creating OIDC service: %v", err)
+	}
+
+	login := httptest.NewRecorder()
+	svc.ServeHTTP(login, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
+	if loc := login.Header().Get("Location"); !strings.HasPrefix(loc, "https://login.example.test/authorize?") {
+		t.Errorf("login redirects to %q, want the document's authorization endpoint", loc)
+	}
+	logout := httptest.NewRecorder()
+	svc.ServeHTTP(logout, httptest.NewRequest(http.MethodGet, "/auth/logout", nil))
+	checkEndSessionRedirect(t, logout.Header().Get("Location"), "https://login.example.test/logout", opts.ClientID)
+}
+
+// A discovery that fails stops the service with an error that names the URL
+// it fetched, for the operator who reads the server's log. go-oidc names it
+// when the connection fails, but not when the provider answers an HTTP error.
+func TestAFailedDiscoveryNamesTheDocumentItFetched(t *testing.T) {
+	for name, fail := range map[string]func(*mockIDP){
+		"the provider hangs up":   func(idp *mockIDP) { idp.hangUp = "/.well-known/openid-configuration" },
+		"the document is missing": func(idp *mockIDP) { idp.discoveryStatus = http.StatusNotFound },
+		"the provider is down":    func(idp *mockIDP) { idp.discoveryStatus = http.StatusServiceUnavailable },
+	} {
+		t.Run(name, func(t *testing.T) {
+			idp := newMockIDP(t)
+			fail(idp)
+			_, err := authn.NewOIDCService(context.Background(), backChannelOptions(idp, clocktest.New(testEpoch)), nil, nil, nil)
+			if document := idp.server.URL + "/.well-known/openid-configuration"; err == nil || !strings.Contains(err.Error(), document) {
+				t.Fatalf("got %v, want an error that names %s", err, document)
+			}
+		})
 	}
 }
 
 // The service refuses options that leave it no issuer to check documents and
 // ID tokens against, or no origin to come back to after a logout.
 func TestTheServiceNeedsAnIssuerAndAnAbsoluteRedirectURL(t *testing.T) {
-	for name, change := range map[string]func(*authn.OIDCOptions){
-		"no issuer":               func(o *authn.OIDCOptions) { o.Issuer = "" },
-		"a relative redirect URL": func(o *authn.OIDCOptions) { o.RedirectURL = "/auth/callback" },
+	for _, tt := range []struct {
+		name   string
+		change func(*authn.OIDCOptions)
+		want   string
+	}{
+		{"no issuer", func(o *authn.OIDCOptions) { o.Issuer = "" }, "an OIDC issuer is required"},
+		{"a relative redirect URL", func(o *authn.OIDCOptions) { o.RedirectURL = "/auth/callback" }, "must be an absolute URL"},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			idp := newMockIDP(t)
 			opts := backChannelOptions(idp, clocktest.New(testEpoch))
-			change(&opts)
+			tt.change(&opts)
 			// The document names the configured issuer, even an empty one, so
 			// that only the refusal under test can stop the service.
 			idp.discovery = idp.backChannelDocument(opts.Issuer)
-			if _, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil); err == nil {
-				t.Fatal("the service was created")
+			if _, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil); err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("got %v, want a refusal that says %q", err, tt.want)
 			}
 		})
 	}
 }
 
-// Security test ST-16: the errors of a call on the back channel name its URL,
-// and a browser that signs in gets none of them.
+// The errors of a call on the back channel name its URL, and a browser that
+// signs in gets none of them: no internal detail reaches a client.
 func TestAFailureOnTheBackChannelNamesNothingOfItToTheBrowser(t *testing.T) {
 	for _, tt := range []struct {
 		path string
@@ -1122,9 +1170,9 @@ func TestAFailureOnTheBackChannelNamesNothingOfItToTheBrowser(t *testing.T) {
 	}
 }
 
-// Security test ST-16: the exchange of an ID token that does not verify fails
-// without its cause, which can name the back channel: the API repeats the
-// error to its client.
+// The exchange of an ID token that does not verify fails without its cause,
+// which can name the back channel, so that no caller can repeat it to a
+// client.
 func TestARefusedExchangeNamesNothingOfTheBackChannel(t *testing.T) {
 	idp := newMockIDP(t)
 	idp.discovery = idp.backChannelDocument(frontIssuer)
