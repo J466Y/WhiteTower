@@ -48,10 +48,11 @@ func makeDecisionEvent(source string, seq int64, agentID string) []byte {
 // under sustained load (200 eps, NFR-07) and peak burst (2,000 eps, NFR-09).
 func TestThroughputSustainedAndBurst(t *testing.T) {
 	d := dbtest.New(t)
-	pool, superuser := d.Open(t), d.Superuser(t)
+	pool := d.Open(t)
 
-	now := time.Now().UTC()
-	ensurePartition(t, superuser, now.Year(), int(now.Month()))
+	// The ingester de-duplicates in the month of the system clock, which at
+	// the turn of a month may still be in the month before the database's.
+	d.EnsureAuditPartitions(t, time.Now())
 
 	cat, err := LoadCatalog(events.Files)
 	if err != nil {
@@ -230,15 +231,8 @@ func TestThroughputSustainedAndBurst(t *testing.T) {
 // BenchmarkSealerRound benchmarks the sealing performance of a 100-event batch.
 func BenchmarkSealerRound(b *testing.B) {
 	d := dbtest.New(b)
-	pool, superuser := d.Open(b), d.Superuser(b)
-	now := time.Now().UTC()
-
-	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	end := start.AddDate(0, 1, 0)
-	suffix := fmt.Sprintf("%04d_%02d", now.Year(), int(now.Month()))
-	_, _ = superuser.Exec(context.Background(), fmt.Sprintf(`CREATE TABLE IF NOT EXISTS whitetower.audit_events_%s
-		PARTITION OF whitetower.audit_events FOR VALUES FROM ('%s') TO ('%s')`,
-		suffix, start.Format(time.RFC3339), end.Format(time.RFC3339)))
+	pool := d.Open(b)
+	d.EnsureAuditPartitions(b, time.Now())
 
 	cat, err := LoadCatalog(events.Files)
 	if err != nil {

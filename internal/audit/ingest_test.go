@@ -21,6 +21,9 @@ import (
 func setupIngester(t *testing.T, clk *clocktest.Fake) (*db.DB, *audit.Ingester) {
 	t.Helper()
 	d := dbtest.New(t)
+	// The ingester de-duplicates in the month of its clock, which lies
+	// before the months that the migration made partitions for.
+	d.EnsureAuditPartitions(t, clk.Now())
 	pool := d.Open(t)
 	cat, err := audit.LoadCatalog(events.Files)
 	if err != nil {
@@ -194,6 +197,7 @@ func TestST10IngestionSecurityAndIsolation(t *testing.T) {
 
 	t.Run("PerInstanceRateLimiting", func(t *testing.T) {
 		d := dbtest.New(t)
+		d.EnsureAuditPartitions(t, clk.Now())
 		pool := d.Open(t)
 		cat, _ := audit.LoadCatalog(events.Files)
 		w := audit.NewWriter(cat, clk)
@@ -242,6 +246,7 @@ func TestST10IngestionSecurityAndIsolation(t *testing.T) {
 
 	t.Run("BackpressureOnSealingLag", func(t *testing.T) {
 		d := dbtest.New(t)
+		d.EnsureAuditPartitions(t, clk.Now())
 		pool := d.Open(t)
 		cat, _ := audit.LoadCatalog(events.Files)
 		w := audit.NewWriter(cat, clk)

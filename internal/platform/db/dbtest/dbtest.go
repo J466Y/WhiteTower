@@ -270,3 +270,43 @@ func (d *Database) Superuser(t testing.TB) *pgx.Conn {
 	t.Cleanup(func() { _ = conn.Close(ctx) })
 	return conn
 }
+
+// EnsureAuditPartitions creates the partitions of the audit tables for the
+// month of at, in UTC, unless they exist. The migration creates those of the
+// database's month and the next three, while a test's fake clock may decide a
+// partition key in another month: the month in which the ingester
+// de-duplicates, or the ingestion time of an event that the test stores
+// itself. Like whitetower.ensure_audit_partitions, it names and bounds them by
+// month, and creates them as the migration role.
+func (d *Database) EnsureAuditPartitions(t testing.TB, at time.Time) {
+	t.Helper()
+	at = at.UTC()
+	from := time.Date(at.Year(), at.Month(), 1, 0, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 1, 0)
+	suffix := from.Format("2006_01")
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, d.server.superuserURL(d.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		for _, stmt := range []string{
+			"SET LOCAL ROLE " + MigrationRole,
+			"CREATE TABLE IF NOT EXISTS whitetower.audit_events_" + suffix +
+				" PARTITION OF whitetower.audit_events FOR VALUES FROM ('" +
+				from.Format(time.RFC3339) + "') TO ('" + to.Format(time.RFC3339) + "')",
+			"CREATE TABLE IF NOT EXISTS whitetower.audit_event_ids_" + suffix +
+				" PARTITION OF whitetower.audit_event_ids FOR VALUES FROM ('" +
+				from.Format(time.DateOnly) + "') TO ('" + to.Format(time.DateOnly) + "')",
+		} {
+			if _, err := tx.Exec(ctx, stmt); err != nil {
+				return fmt.Errorf("%s: %w", stmt, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

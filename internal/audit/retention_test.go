@@ -3,7 +3,6 @@ package audit
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"testing"
 	"time"
@@ -18,57 +17,6 @@ import (
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 	"github.com/J466Y/WhiteTower/internal/platform/metrics"
 )
-
-func ensurePartition(t *testing.T, superuser *pgx.Conn, year, month int) {
-	t.Helper()
-	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
-	end := start.AddDate(0, 1, 0)
-	suffix := fmt.Sprintf("%04d_%02d", year, month)
-
-	sqlEvents := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS whitetower.audit_events_%s
-		PARTITION OF whitetower.audit_events
-		FOR VALUES FROM ('%s') TO ('%s')`,
-		suffix, start.Format(time.RFC3339), end.Format(time.RFC3339))
-	if _, err := superuser.Exec(context.Background(), sqlEvents); err != nil {
-		t.Fatalf("ensure events partition %s: %v", suffix, err)
-	}
-
-	sqlIDs := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS whitetower.audit_event_ids_%s
-		PARTITION OF whitetower.audit_event_ids
-		FOR VALUES FROM ('%s') TO ('%s')`,
-		suffix, start.Format("2006-01-02"), end.Format("2006-01-02"))
-	if _, err := superuser.Exec(context.Background(), sqlIDs); err != nil {
-		t.Fatalf("ensure ids partition %s: %v", suffix, err)
-	}
-}
-
-func recordInMonth(t *testing.T, pool *db.DB, w *Writer, n int) {
-	t.Helper()
-	for range n {
-		agentID, err := uuid.NewV7()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = pool.InTx(context.Background(), func(ctx context.Context, tx *db.Tx) error {
-			return w.Record(ctx, tx, Event{
-				Type:    "whitetower.agent.created.v1",
-				Subject: agentID.String(),
-				Data: map[string]any{
-					"slug":          "retention-test-agent",
-					"kind":          "in_house",
-					"risk_tier":     "high",
-					"use_case_id":   "0192f1c2-7a3b-7c4d-8e5f-000000000010",
-					"primary_owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
-					"actor":         map[string]any{"type": "human", "id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1"},
-					"state_version": 1,
-				},
-			})
-		})
-		if err != nil {
-			t.Fatalf("record event: %v", err)
-		}
-	}
-}
 
 func recordInPastMonth(t *testing.T, superuser *pgx.Conn, at time.Time, n int) {
 	t.Helper()
@@ -148,7 +96,7 @@ func TestRetentionDropsExpiredPartitionAndRecordsRange(t *testing.T) {
 	// 1. Ingest events into audit_events_2025_01.
 	past := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 	clk := clocktest.New(past)
-	ensurePartition(t, superuser, 2025, 1)
+	d.EnsureAuditPartitions(t, past)
 
 	key := newKey(t)
 	sealer := newTestSealer(t, pool, key, clk)
@@ -158,10 +106,9 @@ func TestRetentionDropsExpiredPartitionAndRecordsRange(t *testing.T) {
 	// Seal events into Merkle tree.
 	sealAll(t, sealer.Sealer)
 
-	// 2. Advance clock to Oct 2026 (> 180 days after Jan 2025).
+	// 2. Advance clock to September 2026 (> 180 days after Jan 2025).
 	clk.Advance(600 * 24 * time.Hour)
-	now := clk.Now().UTC()
-	ensurePartition(t, superuser, now.Year(), int(now.Month()))
+	d.EnsureAuditPartitions(t, clk.Now())
 
 	reg := prometheus.NewRegistry()
 	met := metrics.NewAudit(reg)
@@ -243,11 +190,13 @@ func TestRetentionRetainsActivePartitions(t *testing.T) {
 	d := dbtest.New(t)
 	pool, superuser := d.Open(t), d.Superuser(t)
 	clk := clocktest.New(time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC))
-	ensurePartition(t, superuser, 2026, 10)
+	d.EnsureAuditPartitions(t, clk.Now())
 
 	key := newKey(t)
 	sealer := newTestSealer(t, pool, key, clk)
-	recordInMonth(t, pool, sealer.writer, 3)
+	// The writer would store the events in the database's month: they go in
+	// the clock's month, whose partition retention must keep.
+	recordInPastMonth(t, superuser, clk.Now(), 3)
 
 	dropped, err := DropExpiredPartitions(context.Background(), RetentionOptions{
 		DB:     pool,
