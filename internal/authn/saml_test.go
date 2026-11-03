@@ -28,7 +28,7 @@ func TestSAMLThroughBroker(t *testing.T) {
 		"wt-operators": "operator",
 	}
 
-	svc, err := authn.NewOIDCService(context.Background(), authn.OIDCOptions{
+	svc := newService(t, authn.OIDCOptions{
 		Issuer:            idp.server.URL,
 		ClientID:          clientID,
 		ClientSecret:      "test-secret",
@@ -37,11 +37,7 @@ func TestSAMLThroughBroker(t *testing.T) {
 		RoleMapping:       roleMapping,
 		GroupsClaim:       "groups",
 		AllowedAlgorithms: []string{"RS256"},
-		HTTPClient:        idp.server.Client(),
 	}, database, principalStore, sessionStore)
-	if err != nil {
-		t.Fatalf("initializing OIDCService: %v", err)
-	}
 
 	// 1. User initiates login
 	loginReq := httptest.NewRequest(http.MethodGet, "/auth/login?return_url=/dashboard", nil)

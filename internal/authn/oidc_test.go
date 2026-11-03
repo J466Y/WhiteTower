@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +26,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
+	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 )
 
@@ -47,6 +50,18 @@ type mockIDP struct {
 }
 
 func newMockIDP(t *testing.T) *mockIDP {
+	t.Helper()
+	return startMockIDP(t, httptest.NewServer)
+}
+
+// newTLSMockIDP returns a mock that serves HTTPS, with a certificate of the
+// test server's own authority, which no system trusts.
+func newTLSMockIDP(t *testing.T) *mockIDP {
+	t.Helper()
+	return startMockIDP(t, httptest.NewTLSServer)
+}
+
+func startMockIDP(t *testing.T, start func(http.Handler) *httptest.Server) *mockIDP {
 	t.Helper()
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -122,7 +137,7 @@ func newMockIDP(t *testing.T) *mockIDP {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	m.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	m.server = start(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if m.hangUp != "" && r.URL.Path == m.hangUp {
 			if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
 				_ = conn.Close()
@@ -181,6 +196,34 @@ func (m *mockIDP) signIDToken(header map[string]any, payload map[string]any) str
 		panic(err)
 	}
 	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+// newStateKey returns a key of the shortest length that signs the state of a
+// sign-in.
+func newStateKey(t *testing.T) []byte {
+	t.Helper()
+	key := make([]byte, authn.MinStateKeyBytes)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
+	return key
+}
+
+// newService returns a service of opts that has discovered its provider, with
+// a state key of its own unless opts holds one.
+func newService(t *testing.T, opts authn.OIDCOptions, database *db.DB, principals *authn.PrincipalStore, sessions *authn.SessionStore) *authn.OIDCService {
+	t.Helper()
+	if opts.StateKey == nil {
+		opts.StateKey = newStateKey(t)
+	}
+	svc, err := authn.NewOIDCService(opts, database, principals, sessions)
+	if err != nil {
+		t.Fatalf("creating OIDC service: %v", err)
+	}
+	if err := svc.Discover(context.Background()); err != nil {
+		t.Fatalf("discovering the provider: %v", err)
+	}
+	return svc
 }
 
 // initiateLogin performs the login step: it returns the state cookie, and the
@@ -295,18 +338,14 @@ func TestLoginRateLimiting(t *testing.T) {
 	// Rate limiter with capacity for 2 requests
 	limiter := ratelimit.New(1, 2)
 
-	svc, err := authn.NewOIDCService(context.Background(), authn.OIDCOptions{
+	svc := newService(t, authn.OIDCOptions{
 		Issuer:       idp.server.URL,
 		ClientID:     "whitetower-client",
 		ClientSecret: "secret",
 		RedirectURL:  "https://127.0.0.1:8443/auth/callback",
 		Clock:        clk,
 		Limiter:      limiter,
-		HTTPClient:   idp.server.Client(),
 	}, database, principalStore, sessionStore)
-	if err != nil {
-		t.Fatalf("creating OIDC service: %v", err)
-	}
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/login", nil)
 	req.RemoteAddr = "192.0.2.1:12345"
@@ -358,7 +397,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		"wt-operators": "operator",
 	}
 
-	svc, err := authn.NewOIDCService(context.Background(), authn.OIDCOptions{
+	svc := newService(t, authn.OIDCOptions{
 		Issuer:            idp.server.URL,
 		ClientID:          clientID,
 		ClientSecret:      "test-secret",
@@ -366,11 +405,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		Clock:             clk,
 		RoleMapping:       roleMapping,
 		AllowedAlgorithms: []string{"RS256"},
-		HTTPClient:        idp.server.Client(),
 	}, database, principalStore, sessionStore)
-	if err != nil {
-		t.Fatalf("creating OIDC service: %v", err)
-	}
 
 	t.Run("successful login provisions principal and session", func(t *testing.T) {
 		stateCookie, stateParam, nonceParam := initiateLogin(t, svc, "/dashboard")
@@ -646,17 +681,13 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 	sessionStore, principalStore, _, database := setupAuthn(t, clk)
 
 	const clientID = "whitetower-console"
-	svc, err := authn.NewOIDCService(ctx, authn.OIDCOptions{
+	svc := newService(t, authn.OIDCOptions{
 		Issuer:       idp.server.URL,
 		ClientID:     clientID,
 		ClientSecret: "test-secret",
 		RedirectURL:  "https://127.0.0.1:8443/auth/callback",
 		Clock:        clk,
-		HTTPClient:   idp.server.Client(),
 	}, database, principalStore, sessionStore)
-	if err != nil {
-		t.Fatalf("creating OIDC service: %v", err)
-	}
 
 	// callback ends a sign-in whose ID token has the audience aud, with the
 	// browser's cookies, and returns the answer.
@@ -775,7 +806,7 @@ func TestExchangeIDToken(t *testing.T) {
 		"wt-operators": "operator",
 	}
 
-	svc, err := authn.NewOIDCService(context.Background(), authn.OIDCOptions{
+	svc := newService(t, authn.OIDCOptions{
 		Issuer:            idp.server.URL,
 		ClientID:          clientID,
 		CLIClientID:       cliClientID,
@@ -784,12 +815,8 @@ func TestExchangeIDToken(t *testing.T) {
 		Clock:             clk,
 		RoleMapping:       roleMapping,
 		AllowedAlgorithms: []string{"RS256"},
-		HTTPClient:        idp.server.Client(),
 		Tokens:            tokenStore,
 	}, database, principalStore, sessionStore)
-	if err != nil {
-		t.Fatalf("creating OIDC service: %v", err)
-	}
 
 	t.Run("successful exchange for wtctl audience returns 12-hour API token", func(t *testing.T) {
 		now := clk.Now()
@@ -922,7 +949,6 @@ func backChannelOptions(idp *mockIDP, clk *clocktest.Fake) authn.OIDCOptions {
 		Clock:             clk,
 		RoleMapping:       map[string]string{"wt-owners": "owner"},
 		AllowedAlgorithms: []string{"RS256"},
-		HTTPClient:        idp.server.Client(),
 	}
 }
 
@@ -961,10 +987,7 @@ func TestTheProviderIsDiscoveredThroughItsBackChannel(t *testing.T) {
 
 	opts := backChannelOptions(idp, clk)
 	opts.Tokens = tokenStore
-	svc, err := authn.NewOIDCService(context.Background(), opts, database, principalStore, sessionStore)
-	if err != nil {
-		t.Fatalf("creating OIDC service: %v", err)
-	}
+	svc := newService(t, opts, database, principalStore, sessionStore)
 
 	t.Run("sign-in sends the browser to the issuer, and the principal keeps it", func(t *testing.T) {
 		loginRec := httptest.NewRecorder()
@@ -1055,7 +1078,7 @@ func TestADiscoveryDocumentThatNamesAnotherIssuerIsRefused(t *testing.T) {
 				idp.discovery["issuer"] = tt.named(idp)
 			}
 
-			_, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil)
+			err := discover(t, opts)
 			var mismatch *oidc.IssuerMismatchError
 			if !errors.As(err, &mismatch) || mismatch.Provided != opts.Issuer {
 				t.Fatalf("got %v, want an issuer mismatch with %s", err, opts.Issuer)
@@ -1079,10 +1102,7 @@ func TestTheBrowsersEndpointsMayLeaveTheIssuersOrigin(t *testing.T) {
 	opts := backChannelOptions(idp, clk)
 	// A logout without a session cookie revokes nothing, so the session
 	// store needs no database.
-	svc, err := authn.NewOIDCService(context.Background(), opts, nil, nil, authn.NewSessionStore(nil, clk, authn.SessionOptions{}))
-	if err != nil {
-		t.Fatalf("creating OIDC service: %v", err)
-	}
+	svc := newService(t, opts, nil, nil, authn.NewSessionStore(nil, clk, authn.SessionOptions{}))
 
 	login := httptest.NewRecorder()
 	svc.ServeHTTP(login, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
@@ -1094,9 +1114,20 @@ func TestTheBrowsersEndpointsMayLeaveTheIssuersOrigin(t *testing.T) {
 	checkEndSessionRedirect(t, logout.Header().Get("Location"), "https://login.example.test/logout", opts.ClientID)
 }
 
-// A discovery that fails stops the service with an error that names the URL
-// it fetched, for the operator who reads the server's log. go-oidc names it
-// when the connection fails, but not when the provider answers an HTTP error.
+// discover returns the error of a first discovery by a new service of opts.
+func discover(t *testing.T, opts authn.OIDCOptions) error {
+	t.Helper()
+	opts.StateKey = newStateKey(t)
+	svc, err := authn.NewOIDCService(opts, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("creating OIDC service: %v", err)
+	}
+	return svc.Discover(context.Background())
+}
+
+// A discovery that fails returns an error that names the URL it fetched, for
+// the operator who reads the server's log. go-oidc names it when the
+// connection fails, but not when the provider answers an HTTP error.
 func TestAFailedDiscoveryNamesTheDocumentItFetched(t *testing.T) {
 	for name, fail := range map[string]func(*mockIDP){
 		"the provider hangs up":   func(idp *mockIDP) { idp.hangUp = "/.well-known/openid-configuration" },
@@ -1106,7 +1137,7 @@ func TestAFailedDiscoveryNamesTheDocumentItFetched(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			idp := newMockIDP(t)
 			fail(idp)
-			_, err := authn.NewOIDCService(context.Background(), backChannelOptions(idp, clocktest.New(testEpoch)), nil, nil, nil)
+			err := discover(t, backChannelOptions(idp, clocktest.New(testEpoch)))
 			if document := idp.server.URL + "/.well-known/openid-configuration"; err == nil || !strings.Contains(err.Error(), document) {
 				t.Fatalf("got %v, want an error that names %s", err, document)
 			}
@@ -1115,8 +1146,15 @@ func TestAFailedDiscoveryNamesTheDocumentItFetched(t *testing.T) {
 }
 
 // The service refuses options that leave it no issuer to check documents and
-// ID tokens against, or no origin to come back to after a logout.
-func TestTheServiceNeedsAnIssuerAndAnAbsoluteRedirectURL(t *testing.T) {
+// ID tokens against, no origin to come back to after a logout, a state key
+// too short to sign with, or certificate authorities it cannot read. These
+// are configuration errors, which stop the start before the provider is
+// reached.
+func TestTheServiceRefusesOptionsItCannotWorkWith(t *testing.T) {
+	notPEM := filepath.Join(t.TempDir(), "not.pem")
+	if err := os.WriteFile(notPEM, []byte("no certificate here"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range []struct {
 		name   string
 		change func(*authn.OIDCOptions)
@@ -1124,15 +1162,16 @@ func TestTheServiceNeedsAnIssuerAndAnAbsoluteRedirectURL(t *testing.T) {
 	}{
 		{"no issuer", func(o *authn.OIDCOptions) { o.Issuer = "" }, "an OIDC issuer is required"},
 		{"a relative redirect URL", func(o *authn.OIDCOptions) { o.RedirectURL = "/auth/callback" }, "must be an absolute URL"},
+		{"no state key", func(o *authn.OIDCOptions) { o.StateKey = nil }, "the OIDC state key holds 0 bytes: want at least 32"},
+		{"a short state key", func(o *authn.OIDCOptions) { o.StateKey = o.StateKey[:31] }, "the OIDC state key holds 31 bytes: want at least 32"},
+		{"a CA file without certificates", func(o *authn.OIDCOptions) { o.CAFile = notPEM }, "the identity provider's CA file: no PEM certificate in " + notPEM},
+		{"a CA file that does not exist", func(o *authn.OIDCOptions) { o.CAFile = notPEM + ".missing" }, "the identity provider's CA file: open " + notPEM + ".missing"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			idp := newMockIDP(t)
-			opts := backChannelOptions(idp, clocktest.New(testEpoch))
+			opts := backChannelOptions(newMockIDP(t), clocktest.New(testEpoch))
+			opts.StateKey = newStateKey(t)
 			tt.change(&opts)
-			// The document names the configured issuer, even an empty one, so
-			// that only the refusal under test can stop the service.
-			idp.discovery = idp.backChannelDocument(opts.Issuer)
-			if _, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil); err == nil || !strings.Contains(err.Error(), tt.want) {
+			if _, err := authn.NewOIDCService(opts, nil, nil, nil); err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("got %v, want a refusal that says %q", err, tt.want)
 			}
 		})
@@ -1154,10 +1193,7 @@ func TestAFailureOnTheBackChannelNamesNothingOfItToTheBrowser(t *testing.T) {
 			idp.discovery = idp.backChannelDocument(frontIssuer)
 			idp.hangUp = tt.path
 			clk := clocktest.New(testEpoch)
-			svc, err := authn.NewOIDCService(context.Background(), backChannelOptions(idp, clk), nil, nil, nil)
-			if err != nil {
-				t.Fatalf("creating OIDC service: %v", err)
-			}
+			svc := newService(t, backChannelOptions(idp, clk), nil, nil, nil)
 
 			rec := signInThroughBackChannel(t, svc, idp, clk, frontIssuer)
 			if rec.Code != tt.want {
@@ -1181,10 +1217,7 @@ func TestARefusedExchangeNamesNothingOfTheBackChannel(t *testing.T) {
 	opts := backChannelOptions(idp, clk)
 	// The token store is never reached: the ID token does not verify.
 	opts.Tokens = authn.NewTokenStore(nil, clk, nil)
-	svc, err := authn.NewOIDCService(context.Background(), opts, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("creating OIDC service: %v", err)
-	}
+	svc := newService(t, opts, nil, nil, nil)
 
 	rawToken := idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{
 		"iss": frontIssuer,
@@ -1192,7 +1225,7 @@ func TestARefusedExchangeNamesNothingOfTheBackChannel(t *testing.T) {
 		"sub": "cli-back-channel",
 		"exp": clk.Now().Add(time.Hour).Unix(),
 	})
-	_, err = svc.ExchangeIDToken(context.Background(), rawToken)
+	_, err := svc.ExchangeIDToken(context.Background(), rawToken)
 	if !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("got %v, want ErrInvalidToken", err)
 	}

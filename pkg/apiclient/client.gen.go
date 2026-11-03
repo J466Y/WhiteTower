@@ -2480,7 +2480,9 @@ type ClientInterface interface {
 	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
 	// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
 	// has no token exchange: the operation is then `not_found`, with the detail that token
-	// exchange is not configured.
+	// exchange is not configured. A server that has not reached its identity provider yet,
+	// which it keeps trying to do after it starts, cannot verify ID tokens: the operation is
+	// then `unavailable`, with `Retry-After`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2492,7 +2494,9 @@ type ClientInterface interface {
 	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
 	// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
 	// has no token exchange: the operation is then `not_found`, with the detail that token
-	// exchange is not configured.
+	// exchange is not configured. A server that has not reached its identity provider yet,
+	// which it keeps trying to do after it starts, cannot verify ID tokens: the operation is
+	// then `unavailable`, with `Retry-After`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3574,7 +3578,9 @@ func (c *Client) CreateToken(ctx context.Context, body CreateTokenJSONRequestBod
 // Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
 // API token (12 hours) bound to the same human principal. A server without OIDC sign-in
 // has no token exchange: the operation is then `not_found`, with the detail that token
-// exchange is not configured.
+// exchange is not configured. A server that has not reached its identity provider yet,
+// which it keeps trying to do after it starts, cannot verify ID tokens: the operation is
+// then `unavailable`, with `Retry-After`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3596,7 +3602,9 @@ func (c *Client) ExchangeTokenWithBody(ctx context.Context, contentType string, 
 // Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
 // API token (12 hours) bound to the same human principal. A server without OIDC sign-in
 // has no token exchange: the operation is then `not_found`, with the detail that token
-// exchange is not configured.
+// exchange is not configured. A server that has not reached its identity provider yet,
+// which it keeps trying to do after it starts, cannot verify ID tokens: the operation is
+// then `unavailable`, with `Retry-After`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6849,7 +6857,9 @@ type ClientWithResponsesInterface interface {
 	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
 	// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
 	// has no token exchange: the operation is then `not_found`, with the detail that token
-	// exchange is not configured.
+	// exchange is not configured. A server that has not reached its identity provider yet,
+	// which it keeps trying to do after it starts, cannot verify ID tokens: the operation is
+	// then `unavailable`, with `Retry-After`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -6861,7 +6871,9 @@ type ClientWithResponsesInterface interface {
 	// Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
 	// API token (12 hours) bound to the same human principal. A server without OIDC sign-in
 	// has no token exchange: the operation is then `not_found`, with the detail that token
-	// exchange is not configured.
+	// exchange is not configured. A server that has not reached its identity provider yet,
+	// which it keeps trying to do after it starts, cannot verify ID tokens: the operation is
+	// then `unavailable`, with `Retry-After`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -9871,7 +9883,9 @@ func (c *ClientWithResponses) CreateTokenWithResponse(ctx context.Context, body 
 // Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
 // API token (12 hours) bound to the same human principal. A server without OIDC sign-in
 // has no token exchange: the operation is then `not_found`, with the detail that token
-// exchange is not configured.
+// exchange is not configured. A server that has not reached its identity provider yet,
+// which it keeps trying to do after it starts, cannot verify ID tokens: the operation is
+// then `unavailable`, with `Retry-After`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -9889,7 +9903,9 @@ func (c *ClientWithResponses) ExchangeTokenWithBodyWithResponse(ctx context.Cont
 // Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
 // API token (12 hours) bound to the same human principal. A server without OIDC sign-in
 // has no token exchange: the operation is then `not_found`, with the detail that token
-// exchange is not configured.
+// exchange is not configured. A server that has not reached its identity provider yet,
+// which it keeps trying to do after it starts, cannot verify ID tokens: the operation is
+// then `unavailable`, with `Retry-After`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

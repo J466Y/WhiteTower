@@ -1,6 +1,7 @@
 package authn
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -16,6 +17,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -27,7 +29,9 @@ import (
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
+	"github.com/J466Y/WhiteTower/internal/platform/metrics"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
+	"github.com/J466Y/WhiteTower/internal/platform/tlsclient"
 )
 
 const (
@@ -35,15 +39,46 @@ const (
 	// Secure and with the __Host- prefix, as the session cookie is.
 	stateCookieName     = "__Host-wt_oidc"
 	stateCookieLifetime = 10 * time.Minute
+
+	// MinStateKeyBytes is the shortest key that may sign the state of a
+	// sign-in: the size of an HMAC-SHA256 output, below which RFC 2104
+	// (section 3) says that a key weakens the MAC.
+	MinStateKeyBytes = 32
+
+	// SignInRetryAfter is how long the sign-in routes and the token exchange
+	// ask a client to wait while the identity provider is not discovered.
+	SignInRetryAfter = 10 * time.Second
+
+	// providerTimeout bounds each call to the identity provider, unless the
+	// options set another timeout.
+	providerTimeout = 10 * time.Second
+
+	// Discovery is retried firstDiscoveryRetry after the first failure, then
+	// after twice the delay each time, up to maxDiscoveryRetry.
+	firstDiscoveryRetry = time.Second
+	maxDiscoveryRetry   = time.Minute
 )
+
+// ErrProviderUnavailable is returned while the service has not discovered its
+// identity provider, and so cannot verify ID tokens.
+var ErrProviderUnavailable = errors.New("the identity provider is not discovered yet")
 
 // OIDCOptions holds options for configuring the OpenID Connect backend-for-frontend service.
 type OIDCOptions struct {
-	Issuer            string
-	DiscoveryURL      string // The discovery document's base URL, when not the issuer: a back channel.
-	ClientID          string
-	CLIClientID       string
-	ClientSecret      string
+	Issuer       string
+	DiscoveryURL string // The discovery document's base URL, when not the issuer: a back channel.
+	// CAFile is a PEM file with the certificate authorities that sign the
+	// provider's certificate on the back channel. Empty: the system's.
+	CAFile string
+	// Timeout bounds each call to the provider: 10 seconds when zero.
+	Timeout      time.Duration
+	ClientID     string
+	CLIClientID  string
+	ClientSecret string
+	// StateKey signs the state of a sign-in, at least MinStateKeyBytes long.
+	// Every replica takes the same key, so that a sign-in may end on another
+	// replica than the one it started on, or after a restart (NFR-06).
+	StateKey          []byte
 	RedirectURL       string
 	Scopes            []string
 	GroupsClaim       string
@@ -52,7 +87,7 @@ type OIDCOptions struct {
 	Clock             clock.Clock
 	Logger            *slog.Logger
 	Limiter           *ratelimit.Limiter
-	HTTPClient        *http.Client
+	Metrics           *metrics.OIDC
 	Tokens            *TokenStore
 }
 
@@ -80,24 +115,39 @@ type idTokenClaims struct {
 // server-side session generation, and RP-initiated logout (plan P1-03, step 1; ADR-0009).
 type OIDCService struct {
 	opts          OIDCOptions
-	provider      *oidc.Provider
-	oauthConfig   *oauth2.Config
-	verifier      *oidc.IDTokenVerifier
-	cliVerifier   *oidc.IDTokenVerifier
+	client        *http.Client
+	discoveryURL  string
+	documentURL   string
 	database      *db.DB
 	principals    *PrincipalStore
 	sessions      *SessionStore
 	tokens        *TokenStore
 	stateKey      []byte
-	endSessionURL string
 	postLogoutURL string
 	logger        *slog.Logger
+	// provider is what discovery found, nil until it succeeds. A request
+	// reads it once, so that a discovery that ends meanwhile changes nothing
+	// halfway through the request.
+	provider atomic.Pointer[discovered]
 }
 
-// NewOIDCService initializes an OIDCService against the configured OpenID Connect provider.
-func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, principals *PrincipalStore, sessions *SessionStore) (*OIDCService, error) {
+// discovered is what the service uses of a discovered identity provider.
+type discovered struct {
+	oauthConfig   *oauth2.Config
+	verifier      *oidc.IDTokenVerifier
+	cliVerifier   *oidc.IDTokenVerifier
+	endSessionURL string
+}
+
+// NewOIDCService returns the service of the configured identity provider. It
+// checks the options and reads the CA file, but does not reach the provider:
+// Discover does, and Run retries it until it succeeds. Until then, sign-in and
+// the token exchange answer that the provider is unavailable, so that a core
+// that starts while the provider is down still serves break-glass and the
+// machine listener (KIL-08, HUM-06).
+func NewOIDCService(opts OIDCOptions, database *db.DB, principals *PrincipalStore, sessions *SessionStore) (*OIDCService, error) {
 	// Without an issuer, a discovery document without one would pass the
-	// issuer check below.
+	// issuer check of Discover.
 	if opts.Issuer == "" {
 		return nil, errors.New("an OIDC issuer is required")
 	}
@@ -108,7 +158,17 @@ func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, prin
 		return nil, fmt.Errorf("the OIDC redirect URL %q must be an absolute URL", opts.RedirectURL)
 	}
 	postLogoutURL := (&url.URL{Scheme: redirect.Scheme, Host: redirect.Host, Path: "/"}).String()
+	if len(opts.StateKey) < MinStateKeyBytes {
+		return nil, fmt.Errorf("the OIDC state key holds %d bytes: want at least %d", len(opts.StateKey), MinStateKeyBytes)
+	}
+	tlsConfig, err := tlsclient.Config(opts.CAFile)
+	if err != nil {
+		return nil, fmt.Errorf("the identity provider's CA file: %w", err)
+	}
 
+	if opts.Timeout <= 0 {
+		opts.Timeout = providerTimeout
+	}
 	if opts.Clock == nil {
 		opts.Clock = clock.System
 	}
@@ -125,11 +185,55 @@ func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, prin
 		opts.AllowedAlgorithms = []string{oidc.RS256, oidc.ES256, oidc.ES384, oidc.ES512, oidc.PS256}
 	}
 
-	pCtx := ctx
-	if opts.HTTPClient != nil {
-		pCtx = oidc.ClientContext(ctx, opts.HTTPClient)
+	discoveryURL := opts.Issuer
+	if opts.DiscoveryURL != "" {
+		discoveryURL = opts.DiscoveryURL
 	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
 
+	return &OIDCService{
+		opts: opts,
+		// Every call to the provider goes through this client, whose timeout
+		// bounds each of them: discovery; the signing keys, which go-oidc
+		// fetches with the client of the context that discovered the
+		// provider; and the token exchange, which oauth2 takes from its
+		// context.
+		client:        &http.Client{Transport: transport, Timeout: opts.Timeout},
+		discoveryURL:  discoveryURL,
+		documentURL:   strings.TrimSuffix(discoveryURL, "/") + "/.well-known/openid-configuration",
+		database:      database,
+		principals:    principals,
+		sessions:      sessions,
+		tokens:        opts.Tokens,
+		stateKey:      bytes.Clone(opts.StateKey),
+		postLogoutURL: postLogoutURL,
+		logger:        opts.Logger,
+	}, nil
+}
+
+// ParseStateKey decodes the key that signs the state of a sign-in, as a file
+// holds it: in base64, as `openssl rand -base64 32` writes it, at least
+// MinStateKeyBytes once decoded. Whitespace, such as the line breaks that
+// openssl writes in a longer key, is left out. Its errors never repeat the
+// file's content.
+func ParseStateKey(text []byte) ([]byte, error) {
+	key, err := base64.StdEncoding.DecodeString(strings.Join(strings.Fields(string(text)), ""))
+	if err != nil {
+		return nil, errors.New("not base64: want a key as openssl rand -base64 32 writes it")
+	}
+	if len(key) < MinStateKeyBytes {
+		return nil, fmt.Errorf("the key holds %d bytes: want at least %d, as openssl rand -base64 32 writes", len(key), MinStateKeyBytes)
+	}
+	return key, nil
+}
+
+// Discover makes one attempt to discover the identity provider: it fetches
+// the discovery document and checks that it names the configured issuer.
+// Once an attempt succeeds, the service signs people in and exchanges ID
+// tokens. Its error names the document's URL, for the operator who reads the
+// log.
+func (s *OIDCService) Discover(ctx context.Context) error {
 	// Discovery runs at the discovery URL when the server reaches the provider
 	// at another address than browsers do, and at the issuer otherwise. go-oidc
 	// would compare the document's issuer with the URL it fetched the document
@@ -137,88 +241,102 @@ func NewOIDCService(ctx context.Context, opts OIDCOptions, database *db.DB, prin
 	// ID tokens against the configured issuer, and the check below compares the
 	// document's issuer with the configured one, whichever URL served it, so
 	// that one tested path decides (ST-16).
-	discoveryURL := opts.Issuer
-	if opts.DiscoveryURL != "" {
-		discoveryURL = opts.DiscoveryURL
-	}
-	documentURL := strings.TrimSuffix(discoveryURL, "/") + "/.well-known/openid-configuration"
-	provider, err := oidc.NewProvider(oidc.InsecureIssuerURLContext(pCtx, opts.Issuer), discoveryURL)
+	ctx = oidc.InsecureIssuerURLContext(oidc.ClientContext(ctx, s.client), s.opts.Issuer)
+	provider, err := oidc.NewProvider(ctx, s.discoveryURL)
 	if err != nil {
-		return nil, fmt.Errorf("discovering OIDC provider at %s: %w", documentURL, err)
+		return fmt.Errorf("discovering OIDC provider at %s: %w", s.documentURL, err)
 	}
 
 	var disc discoveryClaims
 	if err := provider.Claims(&disc); err != nil {
-		return nil, fmt.Errorf("discovering OIDC provider at %s: %w", documentURL, err)
+		return fmt.Errorf("discovering OIDC provider at %s: %w", s.documentURL, err)
 	}
-	if disc.Issuer != opts.Issuer {
-		return nil, fmt.Errorf("discovering OIDC provider at %s: %w", documentURL,
-			&oidc.IssuerMismatchError{Provided: opts.Issuer, Discovered: disc.Issuer})
+	if disc.Issuer != s.opts.Issuer {
+		return fmt.Errorf("discovering OIDC provider at %s: %w", s.documentURL,
+			&oidc.IssuerMismatchError{Provided: s.opts.Issuer, Discovered: disc.Issuer})
 	}
 
-	verifier := provider.Verifier(&oidc.Config{
-		ClientID:             opts.ClientID,
-		SupportedSigningAlgs: opts.AllowedAlgorithms,
-		Now:                  opts.Clock.Now,
-	})
-
-	cliID := opts.CLIClientID
+	cliID := s.opts.CLIClientID
 	if cliID == "" {
 		cliID = "wtctl"
 	}
-	cliVerifier := provider.Verifier(&oidc.Config{
-		ClientID:             cliID,
-		SupportedSigningAlgs: opts.AllowedAlgorithms,
-		Now:                  opts.Clock.Now,
-	})
-
-	oauthConfig := &oauth2.Config{
-		ClientID:     opts.ClientID,
-		ClientSecret: opts.ClientSecret,
-		Endpoint:     provider.Endpoint(),
-		RedirectURL:  opts.RedirectURL,
-		Scopes:       opts.Scopes,
-	}
-
-	stateKey := make([]byte, 32)
-	if _, err := rand.Read(stateKey); err != nil {
-		return nil, fmt.Errorf("generating oidc state key: %w", err)
-	}
-
-	return &OIDCService{
-		opts:          opts,
-		provider:      provider,
-		oauthConfig:   oauthConfig,
-		verifier:      verifier,
-		cliVerifier:   cliVerifier,
-		database:      database,
-		principals:    principals,
-		sessions:      sessions,
-		tokens:        opts.Tokens,
-		stateKey:      stateKey,
+	s.provider.Store(&discovered{
+		oauthConfig: &oauth2.Config{
+			ClientID:     s.opts.ClientID,
+			ClientSecret: s.opts.ClientSecret,
+			Endpoint:     provider.Endpoint(),
+			RedirectURL:  s.opts.RedirectURL,
+			Scopes:       s.opts.Scopes,
+		},
+		verifier: provider.Verifier(&oidc.Config{
+			ClientID:             s.opts.ClientID,
+			SupportedSigningAlgs: s.opts.AllowedAlgorithms,
+			Now:                  s.opts.Clock.Now,
+		}),
+		cliVerifier: provider.Verifier(&oidc.Config{
+			ClientID:             cliID,
+			SupportedSigningAlgs: s.opts.AllowedAlgorithms,
+			Now:                  s.opts.Clock.Now,
+		}),
 		endSessionURL: disc.EndSessionEndpoint,
-		postLogoutURL: postLogoutURL,
-		logger:        opts.Logger,
-	}, nil
+	})
+	return nil
+}
+
+// Run discovers the identity provider, and retries until an attempt succeeds
+// or ctx ends: a second after the first failure, then twice as long after
+// each, up to a minute. It retries whatever an attempt returned, a document
+// that names another issuer included: a provider that restarts, or that is
+// being upgraded, can refuse connections, answer errors or serve a wrong
+// document for a while. Each failure is logged, at most once a minute once
+// the delay has grown.
+func (s *OIDCService) Run(ctx context.Context) {
+	for delay := firstDiscoveryRetry; ; delay = min(2*delay, maxDiscoveryRetry) {
+		err := s.Discover(ctx)
+		if err == nil {
+			if s.opts.Metrics != nil {
+				s.opts.Metrics.Discovered()
+			}
+			s.logger.Info("discovered the identity provider: sign-in is available", "issuer", s.opts.Issuer)
+			return
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		// The error can hold what the provider answered.
+		s.logger.Warn("sign-in is unavailable: discovering the identity provider failed",
+			"error", logging.Sanitize(err.Error()), "retry_in", delay.String())
+		timer := s.opts.Clock.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C():
+		}
+	}
 }
 
 // ServeHTTP handles /auth/* routes: /auth/login, /auth/callback, and /auth/logout.
 func (s *OIDCService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	provider := s.provider.Load()
 	path := strings.TrimPrefix(r.URL.Path, "/auth")
-	switch path {
-	case "/login":
-		s.handleLogin(w, r)
-	case "/callback":
-		s.handleCallback(w, r)
-	case "/logout":
-		s.handleLogout(w, r)
+	switch {
+	case (path == "/login" || path == "/callback") && provider == nil:
+		w.Header().Set("Retry-After", strconv.Itoa(int(SignInRetryAfter.Seconds())))
+		http.Error(w, "sign-in is unavailable: the server has not reached the identity provider yet; retry later", http.StatusServiceUnavailable)
+	case path == "/login":
+		s.handleLogin(w, r, provider)
+	case path == "/callback":
+		s.handleCallback(w, r, provider)
+	case path == "/logout":
+		s.handleLogout(w, r, provider)
 	default:
 		http.NotFound(w, r)
 	}
 }
 
 // handleLogin initiates the authorization code flow with PKCE, state, and nonce (ST-15, ST-22).
-func (s *OIDCService) handleLogin(w http.ResponseWriter, r *http.Request) {
+func (s *OIDCService) handleLogin(w http.ResponseWriter, r *http.Request, provider *discovered) {
 	// Security test ST-22: Login attempts are rate-limited.
 	if s.opts.Limiter != nil {
 		ip := clientIP(r)
@@ -291,7 +409,7 @@ func (s *OIDCService) handleLogin(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   int(stateCookieLifetime.Seconds()),
 	})
 
-	authURL := s.oauthConfig.AuthCodeURL(
+	authURL := provider.oauthConfig.AuthCodeURL(
 		stateToken,
 		oidc.Nonce(nonce),
 		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
@@ -303,7 +421,7 @@ func (s *OIDCService) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 // handleCallback validates the authorization code and ID token, provisions the principal,
 // resolves effective roles, and issues the session cookie (ST-16).
-func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
+func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, provider *discovered) {
 	cookie, err := r.Cookie(stateCookieName)
 	if err != nil {
 		http.Error(w, "missing OIDC state cookie", http.StatusBadRequest)
@@ -340,12 +458,9 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	if s.opts.HTTPClient != nil {
-		ctx = oidc.ClientContext(ctx, s.opts.HTTPClient)
-	}
-
-	token, err := s.oauthConfig.Exchange(
-		ctx,
+	token, err := provider.oauthConfig.Exchange(
+		// oauth2 takes its HTTP client from the context: the provider's.
+		oidc.ClientContext(ctx, s.client),
 		code,
 		oauth2.SetAuthURLParam("code_verifier", state.CodeVerifier),
 	)
@@ -365,7 +480,7 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Security test ST-16: ID tokens with a wrong issuer or audience, an expired one,
 	// a replayed nonce or an unexpected algorithm are refused.
-	idToken, err := s.verifier.Verify(ctx, rawIDToken)
+	idToken, err := provider.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		// Fetching the signing keys can fail on the back channel too.
 		s.logger.Warn("verifying id_token failed", "error", err)
@@ -472,15 +587,17 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 // handleLogout clears the session in PostgreSQL and the browser cookie, then
 // redirects to the IdP's end session endpoint if available (plan P1-03, step 1).
-func (s *OIDCService) handleLogout(w http.ResponseWriter, r *http.Request) {
+// Before discovery, the provider and its endpoint are unknown: the logout is
+// then local only, so that a person can always sign out of the core.
+func (s *OIDCService) handleLogout(w http.ResponseWriter, r *http.Request, provider *discovered) {
 	if cookie, err := r.Cookie(CookieName); err == nil && cookie.Value != "" {
 		_ = s.sessions.Revoke(r.Context(), cookie.Value)
 	}
 
 	http.SetCookie(w, s.sessions.ClearCookie())
 
-	if s.endSessionURL != "" {
-		if u, err := url.Parse(s.endSessionURL); err == nil {
+	if provider != nil && provider.endSessionURL != "" {
+		if u, err := url.Parse(provider.endSessionURL); err == nil {
 			q := u.Query()
 			// A provider needs the ID token or the client to accept a
 			// post-logout redirect: Keycloak refuses one with neither. The
@@ -577,21 +694,21 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 	if s.tokens == nil {
 		return nil, errors.New("token store not configured")
 	}
+	provider := s.provider.Load()
+	if provider == nil {
+		return nil, ErrProviderUnavailable
+	}
 
 	rawIDToken = strings.TrimSpace(rawIDToken)
 	if rawIDToken == "" {
 		return nil, fmt.Errorf("%w: empty id token", ErrInvalidToken)
 	}
 
-	vCtx := ctx
-	if s.opts.HTTPClient != nil {
-		vCtx = oidc.ClientContext(ctx, s.opts.HTTPClient)
-	}
-
-	// Verify ID token: try cliVerifier (audience wtctl), fallback to verifier (console client)
-	idToken, err := s.cliVerifier.Verify(vCtx, rawIDToken)
-	if err != nil && s.verifier != nil {
-		if fallback, fallbackErr := s.verifier.Verify(vCtx, rawIDToken); fallbackErr == nil {
+	// Verify ID token: try cliVerifier (audience wtctl), fallback to verifier
+	// (console client). Both fetch the signing keys with the provider's client.
+	idToken, err := provider.cliVerifier.Verify(ctx, rawIDToken)
+	if err != nil {
+		if fallback, fallbackErr := provider.verifier.Verify(ctx, rawIDToken); fallbackErr == nil {
 			idToken = fallback
 			err = nil
 		}

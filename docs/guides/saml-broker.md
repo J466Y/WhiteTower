@@ -140,6 +140,7 @@ auth:
     issuer: "https://<keycloak-host>/realms/whitetower"
     client_id: "whitetower-console"
     client_secret_file: "/etc/whitetower/secrets/oidc-client-secret"
+    state_key_file: "/etc/whitetower/secrets/oidc-state-key"
     redirect_url: "https://<whitetower-host>/auth/callback"
     scopes:
       - "openid"
@@ -158,6 +159,8 @@ auth:
       - "RS256"
       - "ES256"
 ```
+
+The state key signs the state of each sign-in, which the browser keeps in a cookie until Keycloak sends it back. Make it once, with `openssl rand -base64 32 > oidc-state-key`, and give every replica of the server the same file, so that a sign-in can end on another replica than the one it started on.
 
 The scopes leave out `groups`, which the server asks for by default. Keycloak defines no `groups` client scope and answers `invalid_scope` to a request for one, while the mapper of step 4 already puts the groups in the ID token. To ask for `groups`, first create a client scope named `groups` in Keycloak and add it to the client's default client scopes.
 

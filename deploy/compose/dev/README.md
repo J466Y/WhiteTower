@@ -78,7 +78,12 @@ The core of the `core` profile, and the one of `task run`, sign in through this 
 
 - **Two addresses.** Browsers reach Keycloak at `http://127.0.0.1:8180`, the issuer of its tokens (`KC_HOSTNAME`). The core in Docker reaches it at `http://keycloak:8080`, its discovery URL (`WT_AUTH_OIDC_DISCOVERY_URL`): Keycloak's back channel follows the address of each request (`KC_HOSTNAME_BACKCHANNEL_DYNAMIC`). `task run` reaches it at the issuer, as browsers do.
 - **Scopes.** The core asks for `openid`, `profile` and `email` only (`WT_AUTH_OIDC_SCOPES`). Keycloak defines no `groups` scope and refuses a request for one, while the client's own mapper already puts the groups in the ID token.
-- **Start order.** The core discovers Keycloak once, at start, and stops if it cannot: the `core` profile waits for a healthy Keycloak, and `task run` needs `task dev` first.
+- **Start order.** The core starts without Keycloak, and keeps trying to reach it, after a delay that doubles from one second to a minute. Until it does, `/auth/login` and `/auth/callback` answer 503, while break-glass, when it is on, and the rest of the core work. The `core` profile waits for a healthy Keycloak, so that sign-in works as soon as the core is up. Run `task dev` before `task run`, or the first sign-ins wait for the next attempt.
+- **State key.** The core signs the state of each sign-in, which the browser keeps in a cookie until Keycloak sends it back, with the key in `secrets/oidc-state-key` (`WT_AUTH_OIDC_STATE_KEY_FILE`). The key is public and for development only. A deployment makes its own, of at least 32 bytes in base64, and gives every replica the same file, so that a sign-in can end on another replica than the one it started on, or after a restart:
+
+  ```sh
+  openssl rand -base64 32 > oidc-state-key
+  ```
 - **A Keycloak from before 30 October 2026.** Keycloak imports the realm when its container is created, and keeps it in the container. A container created before signing in from a browser was fixed holds the old realm, which registers other callbacks, so Keycloak answers `Invalid parameter: redirect_uri`. Recreate it once, which imports the realm of the repository and drops what you changed in Keycloak's administration console:
 
   ```sh

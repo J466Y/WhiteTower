@@ -34,6 +34,7 @@ const (
 	RateLimited          Code = "rate_limited"
 	Internal             Code = "internal"
 	NotImplemented       Code = "not_implemented"
+	Unavailable          Code = "unavailable"
 )
 
 // Codes maps every code to its HTTP status and title.
@@ -54,6 +55,7 @@ var Codes = map[Code]struct {
 	RateLimited:          {http.StatusTooManyRequests, "Too many requests"},
 	Internal:             {http.StatusInternalServerError, "Internal error"},
 	NotImplemented:       {http.StatusNotImplemented, "The operation is not built yet"},
+	Unavailable:          {http.StatusServiceUnavailable, "A service that the operation depends on is unavailable"},
 }
 
 // TypeBase starts the type URI of every problem: it ends with the code, and

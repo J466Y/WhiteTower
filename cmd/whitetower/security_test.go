@@ -6,9 +6,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -80,12 +83,12 @@ var (
 		"listeners.console.key_file", "listeners.machine.key_file",
 		"database.password_file", "database.migration.password_file",
 		"audit.checkpoint_key_file", "audit.export.pseudonym_key_file",
-		"auth.oidc.client_secret_file", "auth.breakglass.credential_hash_file",
+		"auth.oidc.client_secret_file", "auth.oidc.state_key_file", "auth.breakglass.credential_hash_file",
 		"auth.scim.token_file",
 	}
 	otherFiles = []string{
 		"listeners.console.cert_file", "listeners.machine.cert_file",
-		"tracing.otlp.ca_file", "audit.export.otlp.ca_file",
+		"tracing.otlp.ca_file", "audit.export.otlp.ca_file", "auth.oidc.ca_file",
 	}
 )
 
@@ -253,20 +256,29 @@ func (p *refusingProvider) received(secret string) bool {
 	return slices.Contains(p.secrets, secret)
 }
 
-// startSignIn starts a sign-in at the console, and returns all of the answer,
-// the state that the provider would send back, and the state cookie.
-func startSignIn(t *testing.T, console string) (answer, state, cookie string) {
+// noRedirects trusts the development certificate, and returns redirects as
+// they come.
+var noRedirects = &http.Client{
+	Timeout:       insecure.Timeout,
+	Transport:     insecure.Transport,
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+}
+
+// signInStart is a sign-in started at the console: all of the answer, the
+// state and the nonce that the provider would send back, and the state
+// cookie.
+type signInStart struct {
+	answer, state, nonce, cookie string
+}
+
+// startSignIn starts a sign-in at the console.
+func startSignIn(t *testing.T, console string) signInStart {
 	t.Helper()
-	client := &http.Client{
-		Timeout:       insecure.Timeout,
-		Transport:     insecure.Transport,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, console+"/auth/login", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := client.Do(req)
+	resp, err := noRedirects.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,18 +287,21 @@ func startSignIn(t *testing.T, console string) (answer, state, cookie string) {
 	if resp.StatusCode != http.StatusFound || err != nil {
 		t.Fatalf("starting a sign-in: %s, location %v: OIDC is not on", resp.Status, err)
 	}
+	var s signInStart
 	for _, c := range resp.Cookies() {
 		if c.Name == "__Host-wt_oidc" {
-			cookie = c.Name + "=" + c.Value
+			s.cookie = c.Name + "=" + c.Value
 		}
 	}
-	if cookie == "" {
+	if s.cookie == "" {
 		t.Fatal("starting a sign-in set no state cookie")
 	}
 	var b bytes.Buffer
 	_ = resp.Header.Write(&b)
 	_, _ = io.Copy(&b, resp.Body)
-	return resp.Status + "\n" + b.String(), location.Query().Get("state"), cookie
+	s.answer = resp.Status + "\n" + b.String()
+	s.state, s.nonce = location.Query().Get("state"), location.Query().Get("nonce")
+	return s
 }
 
 // Security test ST-03: canary values in every secret file, and in the
@@ -338,6 +353,14 @@ func TestSecretsNeverLeak(t *testing.T) {
 	writeSecret(t, oidcFile, canaries["oidc client secret"]+"\n")
 	writeSecret(t, breakglassFile, canaries["breakglass credential hash"]+"\n")
 	writeSecret(t, scimFile, canaries["scim bearer token"]+"\n")
+	// The state key's file holds base64, which is its canary.
+	stateKeyFile := filepath.Join(dir, "oidc-state-key")
+	stateKey := make([]byte, 32)
+	if _, err := rand.Read(stateKey); err != nil {
+		t.Fatal(err)
+	}
+	canaries["oidc state key"] = base64.StdEncoding.EncodeToString(stateKey)
+	writeSecret(t, stateKeyFile, canaries["oidc state key"]+"\n")
 
 	c := newCollector(t)
 	env := []string{
@@ -351,6 +374,7 @@ func TestSecretsNeverLeak(t *testing.T) {
 		"WT_AUDIT_EXPORT_PSEUDONYMIZE=true",
 		"WT_AUDIT_EXPORT_PSEUDONYM_KEY_FILE=" + pseudonymFile,
 		"WT_AUTH_OIDC_CLIENT_SECRET_FILE=" + oidcFile,
+		"WT_AUTH_OIDC_STATE_KEY_FILE=" + stateKeyFile,
 		"WT_AUTH_BREAKGLASS_ENABLED=true",
 		"WT_AUTH_BREAKGLASS_CREDENTIAL_HASH_FILE=" + breakglassFile,
 		"WT_AUTH_SCIM_ENABLED=true",
@@ -412,10 +436,22 @@ func TestSecretsNeverLeak(t *testing.T) {
 	signIn := startServeOn(t, d, append(slices.Clone(env), "WT_DEV_SELF_SIGNED_TLS=true",
 		"WT_AUTH_OIDC_ISSUER="+idp.URL, "WT_AUTH_OIDC_CLIENT_ID=whitetower-console",
 		"WT_AUTH_OIDC_REDIRECT_URL=https://127.0.0.1:8443/auth/callback")...)
-	login, state, stateCookie := startSignIn(t, signIn.console)
-	answers.WriteString(login)
-	refusal = fetch(t, http.MethodGet, signIn.console+"/auth/callback?code="+canaries["authorization code"]+"&state="+state, "",
-		http.Header{"Cookie": {stateCookie + "; " + credentials["Cookie"][0]}})
+	signIn.waitForDiscovery(t)
+	login := startSignIn(t, signIn.console)
+	answers.WriteString(login.answer)
+	// The state cookie is signed with the key of the state key's file.
+	payload, signature, _ := strings.Cut(strings.TrimPrefix(login.cookie, "__Host-wt_oidc="), ".")
+	data, err := base64.RawURLEncoding.DecodeString(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mac := hmac.New(sha256.New, stateKey)
+	mac.Write(data)
+	if base64.RawURLEncoding.EncodeToString(mac.Sum(nil)) != signature {
+		t.Fatal("the state cookie is not signed with the key of the state key's file")
+	}
+	refusal = fetch(t, http.MethodGet, signIn.console+"/auth/callback?code="+canaries["authorization code"]+"&state="+login.state, "",
+		http.Header{"Cookie": {login.cookie + "; " + credentials["Cookie"][0]}})
 	if !strings.HasPrefix(refusal, "502 ") {
 		t.Fatalf("a sign-in whose code the provider refuses: %s", refusal)
 	}
