@@ -113,7 +113,9 @@ export interface paths {
          * @description Exchanges an OpenID Connect ID token from the CLI's public client login for a short-lived
          *     API token (12 hours) bound to the same human principal. A server without OIDC sign-in
          *     has no token exchange: the operation is then `not_found`, with the detail that token
-         *     exchange is not configured.
+         *     exchange is not configured. A server that has not reached its identity provider yet,
+         *     which it keeps trying to do after it starts, cannot verify ID tokens: the operation is
+         *     then `unavailable`, with `Retry-After`.
          */
         post: operations["exchangeToken"];
         delete?: never;

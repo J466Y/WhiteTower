@@ -143,12 +143,16 @@ type OIDC struct {
 	Issuer string `yaml:"issuer"`
 	// Base URL that the server fetches the identity provider's discovery document from, under /.well-known/openid-configuration, when the server reaches the provider at another address than browsers do, such as http://keycloak:8080/realms/whitetower inside a container network. The document must still name auth.oidc.issuer as its issuer, and ID tokens are verified against auth.oidc.issuer. The server sends the client secret and the authorization code to the endpoints the document names and takes the signing keys from them, so the URL is https when the issuer is. Empty: the issuer.
 	DiscoveryURL string `yaml:"discovery_url"`
+	// PEM file with the certificate authorities that sign the identity provider's certificate on the back channel, which carries discovery, the signing keys and the token exchange: auth.oidc.discovery_url, or auth.oidc.issuer without it, when that URL is https. Empty: the system's.
+	CAFile string `yaml:"ca_file"`
 	// Client ID of the confidential client in the IdP.
 	ClientID string `yaml:"client_id"`
 	// Client ID of the public client used by the CLI (wtctl): wtctl by default.
 	CLIClientID string `yaml:"cli_client_id"`
 	// File with the confidential client secret: the secret never belongs in the configuration file or the environment.
 	ClientSecretFile string `yaml:"client_secret_file"`
+	// File with the key that signs the state of a sign-in, which the browser keeps in a cookie from the sign-in's start to its end: at least 32 bytes, in base64, as openssl rand -base64 32 writes it. Required when auth.oidc.issuer is set. Every replica reads the same key, so that a sign-in may end on another replica than the one it started on, or after a restart.
+	StateKeyFile string `yaml:"state_key_file"`
 	// Absolute redirect URL registered with the IdP for this server, such as https://127.0.0.1:8443/auth/callback. After a logout, the IdP sends the browser to the console's root on the origin of this URL, such as https://127.0.0.1:8443/, which the IdP must also register among the client's post-logout redirect URIs: Keycloak refuses a logout to a URI it does not list.
 	RedirectURL string `yaml:"redirect_url"`
 	// Scopes requested during OIDC authorization: openid, profile, email, groups by default.
@@ -371,6 +375,9 @@ func (c Config) CheckServe() error {
 	if c.Auth.OIDC.Issuer != "" && c.Auth.OIDC.ClientSecretFile == "" {
 		errs = append(errs, errors.New("auth.oidc.client_secret_file: required when auth.oidc.issuer is set"))
 	}
+	if c.Auth.OIDC.Issuer != "" && c.Auth.OIDC.StateKeyFile == "" {
+		errs = append(errs, errors.New("auth.oidc.state_key_file: required when auth.oidc.issuer is set: every replica signs the state of a sign-in with its key"))
+	}
 	if c.Auth.Breakglass.Enabled && c.Auth.Breakglass.CredentialHashFile == "" {
 		errs = append(errs, errors.New("auth.breakglass.credential_hash_file: required when auth.breakglass.enabled is true"))
 	}
@@ -486,6 +493,15 @@ func (c Config) Validate() error {
 	if u := c.Auth.OIDC.DiscoveryURL; u != "" {
 		if err := checkDiscoveryURL(u, c.Auth.OIDC.Issuer); err != nil {
 			add("auth.oidc.discovery_url", "%v", err)
+		}
+	}
+	if c.Auth.OIDC.CAFile != "" {
+		backChannel := c.Auth.OIDC.DiscoveryURL
+		if backChannel == "" {
+			backChannel = c.Auth.OIDC.Issuer
+		}
+		if u, err := url.Parse(backChannel); backChannel == "" || err != nil || u.Scheme != "https" {
+			add("auth.oidc.ca_file", "set it only with an https back channel: auth.oidc.discovery_url, or auth.oidc.issuer without it")
 		}
 	}
 	if c.Auth.Breakglass.Enabled && c.Auth.Breakglass.CredentialHashFile == "" {

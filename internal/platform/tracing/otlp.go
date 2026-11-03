@@ -5,12 +5,10 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +18,7 @@ import (
 
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
+	"github.com/J466Y/WhiteTower/internal/platform/tlsclient"
 	"github.com/J466Y/WhiteTower/internal/version"
 )
 
@@ -41,16 +40,9 @@ const maxAttempts = 5
 var retryDelay = time.Second
 
 func newHTTPClient(cfg config.OTLP, v version.Info) (*httpClient, error) {
-	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
-	if cfg.CAFile != "" {
-		pem, err := os.ReadFile(cfg.CAFile) //nolint:gosec // G304: the operator chooses the file
-		if err != nil {
-			return nil, fmt.Errorf("tracing.otlp.ca_file: %w", err)
-		}
-		tlsConfig.RootCAs = x509.NewCertPool()
-		if !tlsConfig.RootCAs.AppendCertsFromPEM(pem) {
-			return nil, fmt.Errorf("tracing.otlp.ca_file: no PEM certificate in %s", cfg.CAFile)
-		}
+	tlsConfig, err := tlsclient.Config(cfg.CAFile)
+	if err != nil {
+		return nil, fmt.Errorf("tracing.otlp.ca_file: %w", err)
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = tlsConfig

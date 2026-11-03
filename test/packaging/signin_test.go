@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"go.yaml.in/yaml/v3"
 
+	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 )
@@ -168,8 +169,10 @@ func TestEachStackSignsInThroughItsKeycloak(t *testing.T) {
 				t.Errorf("the core's redirect URL is %q, want the console's published address, %q", got, want)
 			}
 
-			// The core reads the client's secret from a file, and discovers
-			// the provider at start, once Keycloak is ready.
+			// The core reads the client's secret and the state key from
+			// files. It discovers the provider in the background, and
+			// starts once Keycloak is ready, so that sign-in is available
+			// as soon as the core is.
 			if env["WT_AUTH_OIDC_CLIENT_SECRET_FILE"] != "/run/secrets/oidc-client-secret" || !slices.Contains(core.Secrets, "oidc-client-secret") {
 				t.Error("the core does not receive the secret oidc-client-secret")
 			}
@@ -177,6 +180,10 @@ func TestEachStackSignsInThroughItsKeycloak(t *testing.T) {
 			if err != nil {
 				t.Fatalf("reading the client secret: %v", err)
 			}
+			if env["WT_AUTH_OIDC_STATE_KEY_FILE"] != "/run/secrets/oidc-state-key" || !slices.Contains(core.Secrets, "oidc-state-key") {
+				t.Error("the core does not receive the secret oidc-state-key")
+			}
+			checkStateKey(t, filepath.Join(dir, cfg.Secrets["oidc-state-key"].File))
 			if core.DependsOn["keycloak"].Condition != "service_healthy" {
 				t.Error("the core does not wait for a healthy Keycloak")
 			}
@@ -224,6 +231,20 @@ func TestTaskRunSignsInThroughTheDevelopmentKeycloak(t *testing.T) {
 		t.Fatalf("reading task run's client secret: %v", err)
 	}
 	loadRealm(t, "dev").checkClient(t, env, string(secret))
+	checkStateKey(t, root+"/"+env["WT_AUTH_OIDC_STATE_KEY_FILE"])
+}
+
+// checkStateKey checks that the file holds a key that the core accepts to
+// sign the state of a sign-in.
+func checkStateKey(t *testing.T, path string) {
+	t.Helper()
+	text, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading the state key: %v", err)
+	}
+	if _, err := authn.ParseStateKey(text); err != nil {
+		t.Errorf("the state key of %s: %v", path, err)
+	}
 }
 
 // Both realms have the same users. Each has a fixed ID, which Keycloak puts in

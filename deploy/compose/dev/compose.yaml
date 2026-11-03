@@ -101,11 +101,13 @@ services:
       WT_AUTH_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/whitetower
       WT_AUTH_OIDC_CLIENT_ID: whitetower-console
       WT_AUTH_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc-client-secret
+      # The key that signs the state of a sign-in, for development only.
+      WT_AUTH_OIDC_STATE_KEY_FILE: /run/secrets/oidc-state-key
       WT_AUTH_OIDC_REDIRECT_URL: https://127.0.0.1:${WT_CONSOLE_PORT:-8443}/auth/callback
       # Keycloak defines no groups scope, and refuses a request for one: the
       # client's own mapper puts the groups in the ID token.
       WT_AUTH_OIDC_SCOPES: openid,profile,email
-    secrets: [db-app-password, audit-checkpoint-key, oidc-client-secret]
+    secrets: [db-app-password, audit-checkpoint-key, oidc-client-secret, oidc-state-key]
     ports:
       - "127.0.0.1:${WT_CONSOLE_PORT:-8443}:8443"
       - "127.0.0.1:${WT_MACHINE_PORT:-9443}:9443"
@@ -120,8 +122,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      # The core discovers the provider once, at start, and stops if it
-      # cannot.
+      # The core starts without the provider and retries its discovery, with
+      # a delay that grows to a minute: starting after a healthy Keycloak
+      # makes sign-in available as soon as the core is.
       keycloak:
         condition: service_healthy
     healthcheck:
@@ -154,3 +157,5 @@ secrets:
     file: ./secrets/audit-checkpoint-key
   oidc-client-secret:
     file: ./secrets/oidc-client-secret
+  oidc-state-key:
+    file: ./secrets/oidc-state-key

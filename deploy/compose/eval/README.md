@@ -40,6 +40,8 @@ Open <https://127.0.0.1:8443/auth/login> and sign in at Keycloak as one of the t
 
 Browsers reach Keycloak at `http://127.0.0.1:8180`, the issuer of its tokens (`KC_HOSTNAME`), while the core reaches it inside Docker's network at `http://keycloak:8080`, its discovery URL (`WT_AUTH_OIDC_DISCOVERY_URL`). The core asks for the scopes `openid`, `profile` and `email` only: Keycloak defines no `groups` scope and refuses a request for one, while the client's own mapper already puts the groups in the ID token.
 
+The core signs the state of each sign-in with the development key of the [development services](../dev/README.md#signing-in), `deploy/compose/dev/secrets/oidc-state-key`, which is public. A deployment makes its own, and gives every replica the same. The core starts once Keycloak is healthy, so that sign-in works from the start. A core that starts while Keycloak is down still starts: it answers sign-in with 503, and keeps trying to reach Keycloak.
+
 ## Test users
 
 Realm `whitetower` comes pre-configured with users for each governance role. All test user passwords are `whitetower`:

@@ -16,7 +16,7 @@ The public API answers every error with [RFC 9457](https://www.rfc-editor.org/rf
 - `code` is the stable error code, which `type` repeats in a link to this page. Clients, the console among them, rely on it; the console shows its own translated message for it.
 - `title` is the same for every occurrence of the code; `detail` explains this one, in English. Neither ever carries internal details (threat model, T-10).
 - `instance` is the request ID, which the response also returns in `X-Request-Id` and the server's logs record: quote it when you report a problem.
-- `429` answers carry `Retry-After`, and `405` answers carry `Allow`.
+- `429` and `503` answers carry `Retry-After`, and `405` answers carry `Allow`.
 
 ## Codes
 
@@ -37,6 +37,7 @@ The codes are defined in `internal/api/rest/problem`; a test keeps this table in
 | `rate_limited` | 429 | The caller sent too many requests; `Retry-After` says when to try again. |
 | `internal` | 500 | The server failed. The details are in its logs, under the request ID. |
 | `not_implemented` | 501 | The operation is in the API, but its server side is not built yet: a plan agrees on its operations before it builds them (pre-alpha). |
+| `unavailable` | 503 | A service that the operation depends on cannot be used yet: the token exchange answers it until the server has reached the identity provider, which it keeps trying after it starts. `Retry-After` says when to try again. |
 
 ## Conventions that go with them
 

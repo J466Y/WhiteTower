@@ -197,22 +197,33 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	principalStore := authn.NewPrincipalStore(database, clock.System, writer, sessionStore, tokenStore)
 	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, cfg.Auth.OIDC.RoleMapping)
 
+	registry := metrics.NewRegistry(v)
+
 	var oidcSvc *authn.OIDCService
 	// The public API exchanges ID tokens only when OIDC is on. A nil
 	// *authn.OIDCService would make a TokenExchanger that is not nil, which
 	// the API would call.
 	var exchanger rest.TokenExchanger
 	if cfg.Auth.OIDC.Issuer != "" {
+		// Only the local configuration stops the start: the service reaches
+		// the identity provider in the background, while the listeners serve
+		// break-glass (KIL-08, HUM-06).
 		clientSecret, err := os.ReadFile(cfg.Auth.OIDC.ClientSecretFile)
 		if err != nil {
 			return fmt.Errorf("auth.oidc.client_secret_file: %w", err)
 		}
-		oidcSvc, err = authn.NewOIDCService(ctx, authn.OIDCOptions{
+		stateKey, err := readStateKey(cfg.Auth.OIDC.StateKeyFile)
+		if err != nil {
+			return fmt.Errorf("auth.oidc.state_key_file: %w", err)
+		}
+		oidcSvc, err = authn.NewOIDCService(authn.OIDCOptions{
 			Issuer:            cfg.Auth.OIDC.Issuer,
 			DiscoveryURL:      cfg.Auth.OIDC.DiscoveryURL,
+			CAFile:            cfg.Auth.OIDC.CAFile,
 			ClientID:          cfg.Auth.OIDC.ClientID,
 			CLIClientID:       cfg.Auth.OIDC.CLIClientID,
 			ClientSecret:      strings.TrimSpace(string(clientSecret)),
+			StateKey:          stateKey,
 			RedirectURL:       cfg.Auth.OIDC.RedirectURL,
 			Scopes:            cfg.Auth.OIDC.Scopes,
 			GroupsClaim:       cfg.Auth.OIDC.GroupsClaim,
@@ -220,6 +231,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			AllowedAlgorithms: cfg.Auth.OIDC.AllowedAlgorithms,
 			Logger:            logger,
 			Limiter:           ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
+			Metrics:           metrics.NewOIDC(registry),
 			Tokens:            tokenStore,
 		}, database, principalStore, sessionStore)
 		if err != nil {
@@ -267,7 +279,6 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		scimHandler = scimSvc
 	}
 
-	registry := metrics.NewRegistry(v)
 	httpMetrics := metrics.NewHTTP(registry)
 	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
 	auditLog := audit.NewLog(database).WithWriter(writer)
@@ -401,8 +412,23 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	defer stopBackground()
 	running.Go(func() { bus.Run(background) })
 	running.Go(func() { runner.Run(background) })
+	if oidcSvc != nil {
+		// Readiness does not wait for it: a load balancer that took the
+		// replica out would cut off break-glass and the machine listener too.
+		running.Go(func() { oidcSvc.Run(background) })
+	}
 
 	return srv.Run(ctx)
+}
+
+// readStateKey reads the key that signs the state of a sign-in, which every
+// replica shares.
+func readStateKey(path string) ([]byte, error) {
+	text, err := os.ReadFile(path) //nolint:gosec // G304: the operator chooses the key file
+	if err != nil {
+		return nil, err
+	}
+	return authn.ParseStateKey(text)
 }
 
 // traceFlushTimeout bounds how long the last spans may take to leave after

@@ -279,6 +279,31 @@ func (m *Notify) Received(channel string) { m.received.WithLabelValues(channel).
 // Resynced counts a subscriber told to re-read what it follows.
 func (m *Notify) Resynced(reason string) { m.resyncs.WithLabelValues(reason).Inc() }
 
+// OIDC holds the metrics of sign-in through OpenID Connect.
+type OIDC struct {
+	discovered prometheus.Gauge
+}
+
+// NewOIDC registers the metrics of sign-in with reg. The server registers
+// them only when sign-in is on, so that a server without it reports no
+// identity provider as missing.
+func NewOIDC(reg prometheus.Registerer) *OIDC {
+	m := &OIDC{
+		discovered: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Subsystem: "oidc",
+			Name:      "provider_discovered",
+			Help: "1 once this replica has discovered the identity provider, so that people can sign in; " +
+				"0 while it retries, and sign-in and the token exchange answer 503.",
+		}),
+	}
+	reg.MustRegister(m.discovered)
+	return m
+}
+
+// Discovered records that the replica has discovered the identity provider.
+func (m *OIDC) Discovered() { m.discovered.Set(1) }
+
 // Audit holds the metrics of the audit log's sealer, on the replica that
 // runs it.
 type Audit struct {

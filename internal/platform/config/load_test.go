@@ -51,6 +51,20 @@ func TestEachCommandChecksWhatItNeeds(t *testing.T) {
 		t.Errorf("a release build without development settings: %v", errs)
 	}
 
+	// OIDC sign-in needs the client's secret, and the key that every replica
+	// signs the state of a sign-in with.
+	cfg.Auth.OIDC.Issuer = "https://idp.example.test/realms/whitetower"
+	err = cfg.CheckServe()
+	for _, key := range []string{"auth.oidc.client_secret_file", "auth.oidc.state_key_file"} {
+		if err == nil || !strings.Contains(err.Error(), key+": required when auth.oidc.issuer is set") {
+			t.Errorf("serving OIDC sign-in without its files: error %v, want it to name %s", err, key)
+		}
+	}
+	cfg.Auth.OIDC.ClientSecretFile, cfg.Auth.OIDC.StateKeyFile = "/run/secrets/oidc-client-secret", "/run/secrets/oidc-state-key"
+	if err := cfg.CheckServe(); err != nil {
+		t.Errorf("serving OIDC sign-in with its files: %v", err)
+	}
+
 	if err := Defaults().CheckMigrate(); err == nil || !strings.Contains(err.Error(), "database.migration.url") {
 		t.Errorf("migrating with the defaults: error %v, want it to name database.migration.url", err)
 	}
@@ -161,6 +175,15 @@ func TestLoadNamesTheBadSetting(t *testing.T) {
 		{"discovery URL that is the issuer", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://127.0.0.1:8180/realms/whitetower/"), "auth.oidc.discovery_url"},
 		{"discovery document instead of its base URL", oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower/.well-known/openid-configuration"), "auth.oidc.discovery_url"},
 		{"relative redirect URL", []string{"WT_AUTH_OIDC_ISSUER=http://127.0.0.1:8180/realms/whitetower", "WT_AUTH_OIDC_CLIENT_ID=whitetower-console", "WT_AUTH_OIDC_REDIRECT_URL=/auth/callback"}, "auth.oidc.redirect_url: want an absolute URL"},
+		{"OIDC CA file without an issuer", []string{"WT_AUTH_OIDC_CA_FILE=/ca.pem"}, "auth.oidc.ca_file"},
+		{"OIDC CA file with a plain issuer", []string{
+			"WT_AUTH_OIDC_ISSUER=http://127.0.0.1:8180/realms/whitetower", "WT_AUTH_OIDC_CLIENT_ID=whitetower-console",
+			"WT_AUTH_OIDC_REDIRECT_URL=https://127.0.0.1:8443/auth/callback", "WT_AUTH_OIDC_CA_FILE=/ca.pem",
+		}, "auth.oidc.ca_file"},
+		{"OIDC CA file with a plain discovery URL", append(oidcWithDiscovery("http://127.0.0.1:8180/realms/whitetower", "http://keycloak:8080/realms/whitetower"),
+			"WT_AUTH_OIDC_CA_FILE=/ca.pem"), "auth.oidc.ca_file"},
+		{"OIDC CA file with a plain discovery URL for an https issuer", append(oidcWithDiscovery("https://idp.example.test/realms/whitetower", "http://keycloak:8080/realms/whitetower"),
+			"WT_AUTH_OIDC_CA_FILE=/ca.pem"), "auth.oidc.ca_file"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -197,6 +220,25 @@ func TestTheDiscoveryURLIsABackChannelOfTheIssuer(t *testing.T) {
 		}
 		if cfg.Auth.OIDC.DiscoveryURL != tt.discovery {
 			t.Errorf("discovery URL %q, want %q", cfg.Auth.OIDC.DiscoveryURL, tt.discovery)
+		}
+	}
+}
+
+// The CA file is for the back channel, which is the discovery URL when there
+// is one, and the issuer otherwise: it goes with an https back channel only.
+func TestTheOIDCCAFileIsForAnHTTPSBackChannel(t *testing.T) {
+	for _, tt := range []struct{ issuer, discovery string }{
+		{"https://idp.example.test/realms/whitetower", ""},
+		{"http://127.0.0.1:8180/realms/whitetower", "https://keycloak:8443/realms/whitetower"},
+		{"https://idp.example.test/realms/whitetower", "https://keycloak.internal:8443/realms/whitetower"},
+	} {
+		environ := append(oidcWithDiscovery(tt.issuer, tt.discovery), "WT_DEV_SELF_SIGNED_TLS=true", "WT_AUTH_OIDC_CA_FILE=/ca.pem")
+		cfg, err := Load("", environ)
+		if err != nil {
+			t.Fatalf("issuer %s, discovery URL %q: %v", tt.issuer, tt.discovery, err)
+		}
+		if cfg.Auth.OIDC.CAFile != "/ca.pem" {
+			t.Errorf("CA file %q, want /ca.pem", cfg.Auth.OIDC.CAFile)
 		}
 	}
 }

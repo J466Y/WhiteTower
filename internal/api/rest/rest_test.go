@@ -1044,6 +1044,21 @@ func TestExchangeTokenEndpoint(t *testing.T) {
 		}
 	})
 
+	t.Run("an identity provider not discovered yet makes the exchange unavailable", func(t *testing.T) {
+		opts := options(io.Discard)
+		opts.Exchanger = mockTokenExchanger{err: authn.ErrProviderUnavailable}
+		h := Handler(opts)
+
+		body := strings.NewReader(`{"idToken":"some-token"}`)
+		res := call(h, http.MethodPost, "/api/v1/tokens/exchange", "", nil, body)
+		if p := problemOf(t, res, problem.Unavailable); p.Detail != "the server has not reached the identity provider yet; retry later" {
+			t.Errorf("detail %q, want the identity provider not reached yet", p.Detail)
+		}
+		if got := res.header.Get("Retry-After"); got != "10" {
+			t.Errorf("Retry-After %q, want 10", got)
+		}
+	})
+
 	t.Run("without an exchanger, the exchange is not found", func(t *testing.T) {
 		opts := options(io.Discard)
 		opts.Exchanger = nil
