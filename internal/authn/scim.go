@@ -174,6 +174,7 @@ type scimMeta struct {
 type scimUserResource struct {
 	Schemas     []string    `json:"schemas"`
 	ID          string      `json:"id"`
+	ExternalID  string      `json:"externalId,omitempty"`
 	UserName    string      `json:"userName"`
 	DisplayName string      `json:"displayName"`
 	Name        *scimName   `json:"name,omitempty"`
@@ -206,10 +207,15 @@ func principalToSCIM(p *Principal) scimUserResource {
 			Primary: true,
 		})
 	}
+	var externalID string
+	if p.ExternalID != nil {
+		externalID = *p.ExternalID
+	}
 	loc := "/scim/v2/Users/" + p.ID.String()
 	return scimUserResource{
 		Schemas:     []string{SchemaUser},
 		ID:          p.ID.String(),
+		ExternalID:  externalID,
 		UserName:    userName,
 		DisplayName: p.DisplayName,
 		Name: &scimName{
@@ -226,31 +232,48 @@ func principalToSCIM(p *Principal) scimUserResource {
 	}
 }
 
-var filterRegex = regexp.MustCompile(`(?i)(?:userName|emails\.value)\s+eq\s+["']?([^"']+)["']?`)
+// userNameFilter matches the one filter that the service supports, userName
+// eq "value" (RFC 7644, section 3.4.2.2), and captures the value as the JSON
+// string it is.
+var userNameFilter = regexp.MustCompile(`^(?i:userName)\s+(?i:eq)\s+("(?:[^"\\]|\\.)*")$`)
+
+// parseUserNameFilter returns the userName of filter when it is userName eq
+// "value", and false for any other filter.
+func parseUserNameFilter(filter string) (string, bool) {
+	var userName string
+	matches := userNameFilter.FindStringSubmatch(filter)
+	if matches == nil || json.Unmarshal([]byte(matches[1]), &userName) != nil {
+		return "", false
+	}
+	return userName, true
+}
 
 func (s *SCIMService) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
 	if filter != "" {
-		matches := filterRegex.FindStringSubmatch(filter)
-		if len(matches) > 1 {
-			val := matches[1]
-			p, err := s.principals.GetBySubjectOrEmail(ctx, val)
-			if err != nil {
-				if errors.Is(err, ErrPrincipalNotFound) {
-					s.writeListResponse(w, 0, 1, 0, []scimUserResource{})
-					return
-				}
-				safeFilter := strings.ReplaceAll(filter, "\n", "")
-				safeFilter = strings.ReplaceAll(safeFilter, "\r", "")
-				s.logger.Error("querying principal by filter", "error", err, "filter", logging.Sanitize(safeFilter))
-				s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
-				return
-			}
-			s.writeListResponse(w, 1, 1, 1, []scimUserResource{principalToSCIM(p)})
+		// Any other filter is refused rather than ignored: a client that
+		// looks a user up must never get every user back as the answer.
+		userName, ok := parseUserNameFilter(filter)
+		if !ok {
+			s.writeError(w, http.StatusBadRequest, "invalidFilter", `Only the filter userName eq "value" is supported`)
 			return
 		}
+		p, err := s.principals.GetBySCIMUserName(ctx, userName)
+		if err != nil {
+			if errors.Is(err, ErrPrincipalNotFound) {
+				s.writeListResponse(w, 0, 1, 0, []scimUserResource{})
+				return
+			}
+			safeFilter := strings.ReplaceAll(filter, "\n", "")
+			safeFilter = strings.ReplaceAll(safeFilter, "\r", "")
+			s.logger.Error("querying principal by filter", "error", err, "filter", logging.Sanitize(safeFilter))
+			s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
+			return
+		}
+		s.writeListResponse(w, 1, 1, 1, []scimUserResource{principalToSCIM(p)})
+		return
 	}
 
 	startIndex := int64(1)
@@ -279,9 +302,9 @@ func (s *SCIMService) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	} else if count > 1000 {
 		limit = 1000
 	}
-	humans, total, err := s.principals.ListHumans(ctx, limit, offset)
+	humans, total, err := s.principals.ListPeople(ctx, limit, offset)
 	if err != nil {
-		s.logger.Error("listing human principals", "error", err)
+		s.logger.Error("listing people", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
 		return
 	}
@@ -308,6 +331,7 @@ func (s *SCIMService) writeListResponse(w http.ResponseWriter, total, startIndex
 
 type scimCreateUserRequest struct {
 	Schemas     []string `json:"schemas"`
+	ExternalID  string   `json:"externalId"`
 	UserName    string   `json:"userName"`
 	DisplayName string   `json:"displayName"`
 	Name        *struct {
@@ -323,6 +347,11 @@ type scimCreateUserRequest struct {
 	Active *bool `json:"active"`
 }
 
+// handleCreateUser provisions a user, as ProvisionHuman does: a new principal,
+// or the one that the person signed in as before, which SCIM adopts. The
+// externalId is required: a sign-in finds the principal by it, so a user
+// without one could never be the person who signs in, and SCIM's
+// deactivation would miss them (ST-21).
 func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req scimCreateUserRequest
@@ -335,10 +364,9 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, "invalidValue", "userName is required")
 		return
 	}
-
-	// Check for collision
-	if existing, err := s.principals.GetBySubjectOrEmail(ctx, req.UserName); err == nil && existing != nil {
-		s.writeUserExists(w, req.UserName)
+	if checkExternalID(req.ExternalID) != nil {
+		s.writeError(w, http.StatusBadRequest, "invalidValue", fmt.Sprintf(
+			"externalId is required, of at most %d characters: the identity provider's ID of the person, which its ID tokens carry too", MaxExternalIDLength))
 		return
 	}
 
@@ -364,16 +392,20 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		email = &req.UserName
 	}
 
-	// A create that another one of the same userName overtook is a
-	// collision too.
+	// A create that another one of the same userName or externalId
+	// overtook is a collision too.
 	created, err := s.principals.ProvisionHuman(ctx, Identity{
-		Issuer:      "scim",
 		Subject:     req.UserName,
+		ExternalID:  req.ExternalID,
 		DisplayName: displayName,
 		Email:       email,
 	})
 	if errors.Is(err, ErrPrincipalExists) {
 		s.writeUserExists(w, req.UserName)
+		return
+	}
+	if errors.Is(err, ErrExternalIDExists) {
+		s.writeError(w, http.StatusConflict, "uniqueness", "A user with this externalId already exists")
 		return
 	}
 	if err != nil {
@@ -416,7 +448,9 @@ func (s *SCIMService) handleGetUser(w http.ResponseWriter, r *http.Request, idSt
 		return
 	}
 
-	p, err := s.principals.GetByID(ctx, id)
+	// SCIM reaches people only: never a service account or the break-glass
+	// custodian, which the identity provider must not disable (KIL-08).
+	p, err := s.principals.GetPerson(ctx, id)
 	if err != nil {
 		if errors.Is(err, ErrPrincipalNotFound) {
 			s.writeError(w, http.StatusNotFound, "", "User not found")
@@ -441,6 +475,36 @@ type scimPatchOp struct {
 	} `json:"Operations"`
 }
 
+// changesExternalID reports whether an operation of patch would remove the
+// external ID, or set another than current: through the path externalId, or
+// through a value without a path that names it (RFC 7644, section 3.5.2).
+func changesExternalID(patch scimPatchOp, current *string) bool {
+	isExternalID := func(name string) bool {
+		return strings.EqualFold(name, "externalId") || strings.EqualFold(name, SchemaUser+":externalId")
+	}
+	for _, op := range patch.Operations {
+		var value any
+		named := isExternalID(op.Path)
+		if named {
+			value = op.Value
+		} else if m, ok := op.Value.(map[string]any); ok && op.Path == "" {
+			for name, v := range m {
+				if isExternalID(name) {
+					value, named = v, true
+				}
+			}
+		}
+		if !named {
+			continue
+		}
+		kind := strings.ToLower(op.Op)
+		if v, ok := value.(string); !ok || (kind != "add" && kind != "replace") || current == nil || v != *current {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *SCIMService) handlePatchUser(w http.ResponseWriter, r *http.Request, idStr string) {
 	ctx := r.Context()
 	id, err := uuid.Parse(idStr)
@@ -449,7 +513,7 @@ func (s *SCIMService) handlePatchUser(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	p, err := s.principals.GetByID(ctx, id)
+	p, err := s.principals.GetPerson(ctx, id)
 	if err != nil {
 		if errors.Is(err, ErrPrincipalNotFound) {
 			s.writeError(w, http.StatusNotFound, "", "User not found")
@@ -469,6 +533,16 @@ func (s *SCIMService) handlePatchUser(w http.ResponseWriter, r *http.Request, id
 	var patchReq scimPatchOp
 	if err := json.Unmarshal(bodyBytes, &patchReq); err != nil {
 		s.writeError(w, http.StatusBadRequest, "invalidSyntax", "Malformed SCIM patch JSON payload")
+		return
+	}
+
+	// The external ID links the principal to the person who signs in.
+	// Changing it would hand the principal, with its roles and its agents,
+	// to whoever the new value names, so the whole patch is refused before
+	// any of it applies. The value it holds is accepted, as a client that
+	// sends every attribute does.
+	if changesExternalID(patchReq, p.ExternalID) {
+		s.writeError(w, http.StatusBadRequest, "mutability", "externalId cannot change: it links the user to the person who signs in")
 		return
 	}
 
@@ -545,7 +619,7 @@ func (s *SCIMService) handleDeleteUser(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 
-	p, err := s.principals.GetByID(ctx, id)
+	p, err := s.principals.GetPerson(ctx, id)
 	if err != nil {
 		if errors.Is(err, ErrPrincipalNotFound) {
 			s.writeError(w, http.StatusNotFound, "", "User not found")

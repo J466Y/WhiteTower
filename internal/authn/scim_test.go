@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
@@ -77,6 +79,7 @@ func TestSCIMDeprovisioningAndSecurity(t *testing.T) {
 	t.Run("provisions user via POST /scim/v2/Users", func(t *testing.T) {
 		payload := `{
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"externalId": "idp-olivia",
 			"userName": "olivia@example.com",
 			"displayName": "Olivia Owner",
 			"name": {
@@ -251,6 +254,7 @@ func TestSCIMDeprovisioningAndSecurity(t *testing.T) {
 		// Provision Bob
 		bobPayload := `{
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"externalId": "idp-bob",
 			"userName": "bob@example.test",
 			"displayName": "Bob Builder",
 			"active": true
@@ -334,4 +338,189 @@ func TestSCIMDeprovisioningAndSecurity(t *testing.T) {
 			t.Errorf("expected principal status active, got %s", principal.Status)
 		}
 	})
+}
+
+// scimClient returns a function that calls the SCIM service of principals with
+// its token, and returns the answer.
+func scimClient(t *testing.T, principals *authn.PrincipalStore) func(method, target, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	tokenFile := filepath.Join(t.TempDir(), "scim.token")
+	if err := os.WriteFile(tokenFile, []byte("scim-test-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc, err := authn.NewSCIMService(authn.SCIMOptions{Enabled: true, TokenFile: tokenFile}, principals)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return func(method, target, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, target, strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer scim-test-token")
+		rec := httptest.NewRecorder()
+		svc.ServeHTTP(rec, req)
+		return rec
+	}
+}
+
+// scimList is the part of a SCIM list response that the tests read.
+type scimList struct {
+	TotalResults int `json:"totalResults"`
+	Resources    []struct {
+		ID         string `json:"id"`
+		UserName   string `json:"userName"`
+		ExternalID string `json:"externalId"`
+		Active     bool   `json:"active"`
+	} `json:"Resources"`
+}
+
+// decodeSCIMList decodes the list response of rec.
+func decodeSCIMList(t *testing.T, rec *httptest.ResponseRecorder) scimList {
+	t.Helper()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("the list: got %d %q, want 200", rec.Code, rec.Body.String())
+	}
+	var list scimList
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	return list
+}
+
+// breakglassSignIn signs in through svc with credential, and returns the
+// session token that it sets.
+func breakglassSignIn(t *testing.T, svc *authn.BreakglassService, credential string) string {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/auth/breakglass", strings.NewReader(`{"credential":"`+credential+`"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	svc.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("break-glass: got %d %q, want 200", rec.Code, rec.Body.String())
+	}
+	return sessionToken(t, rec)
+}
+
+// Security test ST-21: SCIM reaches people only. The break-glass custodian, a
+// service account and SCIM's own principal are not found through a read, the
+// list, a filter, a patch or a deletion, and break-glass still works after a
+// SCIM client tried to deactivate the custodian (KIL-08, HUM-06; threat
+// model T-18)
+func TestSCIMReachesOnlyPeople(t *testing.T) {
+	ctx := context.Background()
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+	scim := scimClient(t, principalStore)
+	rawCred, hashStr, err := authn.GenerateBreakglassCredential()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashFile := filepath.Join(t.TempDir(), "breakglass.hash")
+	if err := os.WriteFile(hashFile, []byte(hashStr+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	breakglass := authn.NewBreakglassService(authn.BreakglassOptions{
+		Enabled: true, CredentialHashFile: hashFile, Clock: clk, Logger: slog.New(slog.DiscardHandler),
+	}, database, sessionStore, audit.NewWriter(mustCatalog(t), clk))
+
+	// Break-glass's first use creates the custodian's principal.
+	breakglassSignIn(t, breakglass, rawCred)
+	email := "olga@example.test"
+	olga, err := principalStore.SignIn(ctx, "oidc", authn.Identity{
+		Issuer: "https://idp.example.com", Subject: "sub-olga", ExternalID: "sub-olga", DisplayName: "Olga Owner", Email: &email, Groups: []string{"wt-auditors"},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saEmail := "export@example.test"
+	sa, err := principalStore.CreateServiceAccount(ctx, "Nightly export", &saEmail, []string{"auditor"},
+		auth.Principal{ID: olga.ID.String(), Kind: auth.Human, Roles: []string{"auditor"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// SCIM's own principal is no row: one with its ID stays out of reach too.
+	if _, err := database.Exec(ctx, `INSERT INTO whitetower.principals (id, kind, issuer, subject, display_name)
+		VALUES ($1, 'human', 'whitetower:scim', 'scim-provisioner', 'SCIM Provisioner')`, authn.SCIMPrincipalID); err != nil {
+		t.Fatal(err)
+	}
+
+	deactivate := `{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"replace","path":"active","value":false}]}`
+	unreachable := map[string]uuid.UUID{
+		"the custodian":     authn.BreakglassPrincipalID,
+		"a service account": sa.ID,
+		"SCIM's principal":  authn.SCIMPrincipalID,
+	}
+	for name, id := range unreachable {
+		for _, call := range []struct{ method, body string }{
+			{http.MethodGet, ""}, {http.MethodPatch, deactivate}, {http.MethodDelete, ""},
+		} {
+			if rec := scim(call.method, "/scim/v2/Users/"+id.String(), call.body); rec.Code != http.StatusNotFound {
+				t.Errorf("%s of %s: got %d %q, want 404", call.method, name, rec.Code, rec.Body.String())
+			}
+		}
+		if p, err := principalStore.GetByID(ctx, id); err != nil || p.Status != "active" {
+			t.Errorf("%s after SCIM's calls: %+v, %v, want it active", name, p, err)
+		}
+	}
+
+	list := decodeSCIMList(t, scim(http.MethodGet, "/scim/v2/Users", ""))
+	if len(list.Resources) != 1 || list.Resources[0].ID != olga.ID.String() || list.TotalResults != 1 {
+		t.Errorf("the list: %+v, want olga alone", list)
+	}
+	for _, userName := range []string{"custodian", "scim-provisioner", saEmail} {
+		filtered := decodeSCIMList(t, scim(http.MethodGet, "/scim/v2/Users?filter="+url.QueryEscape(`userName eq "`+userName+`"`), ""))
+		if filtered.TotalResults != 0 || len(filtered.Resources) != 0 {
+			t.Errorf("the filter on %q: %+v, want nothing", userName, filtered)
+		}
+	}
+
+	token := breakglassSignIn(t, breakglass, rawCred)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	req.AddCookie(&http.Cookie{Name: authn.CookieName, Value: token})
+	if p, err := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, nil).Authenticate(req); err != nil || p == nil || !p.IsBreakglass {
+		t.Errorf("a break-glass session after SCIM's calls: %+v, %v, want it to work", p, err)
+	}
+}
+
+// checkSCIMError fails the test unless rec is a SCIM error with the status and
+// scimType given, whose detail holds detail.
+func checkSCIMError(t *testing.T, rec *httptest.ResponseRecorder, status int, scimType, detail string) {
+	t.Helper()
+	var e struct {
+		ScimType string `json:"scimType"`
+		Detail   string `json:"detail"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil || rec.Code != status || e.ScimType != scimType || !strings.Contains(e.Detail, detail) {
+		t.Errorf("got %d %q, want %d %s with %q", rec.Code, rec.Body.String(), status, scimType, detail)
+	}
+}
+
+// SCIM supports one filter, userName eq, which matches the userName that SCIM
+// gave a user, and refuses every other rather than answering with every user.
+func TestSCIMRefusesTheFiltersItDoesNotSupport(t *testing.T) {
+	clk := clocktest.New(testEpoch)
+	_, principalStore, _, _ := setupAuthn(t, clk)
+	scim := scimClient(t, principalStore)
+	created := scim(http.MethodPost, "/scim/v2/Users", `{"externalId":"idp-ruth","userName":"ruth@example.test"}`)
+	var user struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &user); err != nil || created.Code != http.StatusCreated {
+		t.Fatalf("the creation: got %d %q, want 201", created.Code, created.Body.String())
+	}
+
+	for _, filter := range []string{
+		`emails.value eq "ruth@example.test"`,
+		`externalId eq "idp-ruth"`,
+		`userName eq "nobody@example.test" or userName eq "ruth@example.test"`,
+		`userName sw "ruth"`,
+		`userName eq ruth@example.test`,
+		`userName eq "ruth@example.test`,
+	} {
+		checkSCIMError(t, scim(http.MethodGet, "/scim/v2/Users?filter="+url.QueryEscape(filter), ""), http.StatusBadRequest, "invalidFilter", "userName eq")
+	}
+	for _, filter := range []string{`userName eq "ruth@example.test"`, `USERNAME EQ "ruth@example.test"`, "userName eq \"ruth\\u0040example.test\""} {
+		found := decodeSCIMList(t, scim(http.MethodGet, "/scim/v2/Users?filter="+url.QueryEscape(filter), ""))
+		if found.TotalResults != 1 || len(found.Resources) != 1 || found.Resources[0].ID != user.ID {
+			t.Errorf("the filter %s: %+v, want the user", filter, found)
+		}
+	}
 }

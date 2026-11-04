@@ -41,13 +41,67 @@ func (q *Queries) AddRoleBinding(ctx context.Context, arg AddRoleBindingParams) 
 	return err
 }
 
-const countHumanPrincipals = `-- name: CountHumanPrincipals :one
-SELECT COUNT(*) FROM whitetower.principals
-WHERE kind = 'human'
+const adoptHumanPrincipal = `-- name: AdoptHumanPrincipal :one
+UPDATE whitetower.principals
+SET issuer = $2,
+    subject = $3,
+    display_name = $4,
+    email = $5,
+    updated_at = $6,
+    version = version + 1
+WHERE id = $1
+RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id
 `
 
-func (q *Queries) CountHumanPrincipals(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countHumanPrincipals)
+type AdoptHumanPrincipalParams struct {
+	ID          uuid.UUID
+	Issuer      *string
+	Subject     *string
+	DisplayName string
+	Email       *string
+	UpdatedAt   time.Time
+}
+
+// SCIM takes over the principal of a person who signed in before SCIM
+// provisioned them: SCIM's issuer and userName, and the attributes it sends.
+func (q *Queries) AdoptHumanPrincipal(ctx context.Context, arg AdoptHumanPrincipalParams) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, adoptHumanPrincipal,
+		arg.ID,
+		arg.Issuer,
+		arg.Subject,
+		arg.DisplayName,
+		arg.Email,
+		arg.UpdatedAt,
+	)
+	var i WhitetowerPrincipal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.Email,
+		&i.Status,
+		&i.StatusChangedAt,
+		&i.StatusReason,
+		&i.IdpGroups,
+		&i.LastLoginAt,
+		&i.ResponsiblePrincipalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+		&i.ExternalID,
+	)
+	return i, err
+}
+
+const countPeople = `-- name: CountPeople :one
+SELECT COUNT(*) FROM whitetower.principals
+WHERE kind = 'human' AND id <> ALL($1::uuid[])
+`
+
+func (q *Queries) CountPeople(ctx context.Context, systemIds []uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPeople, systemIds)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -94,7 +148,7 @@ INSERT INTO whitetower.principals (
 ) VALUES (
     $1, 'service_account', $2, $3, 'active', $4, $5, $5
 )
-RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version
+RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id
 `
 
 type CreateServiceAccountPrincipalParams struct {
@@ -130,6 +184,7 @@ func (q *Queries) CreateServiceAccountPrincipal(ctx context.Context, arg CreateS
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.ExternalID,
 	)
 	return i, err
 }
@@ -237,7 +292,7 @@ func (q *Queries) GetAPITokenByID(ctx context.Context, id uuid.UUID) (Whitetower
 }
 
 const getHumanPrincipalByEmail = `-- name: GetHumanPrincipalByEmail :one
-SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
 WHERE kind = 'human' AND email = $1
 `
 
@@ -260,12 +315,13 @@ func (q *Queries) GetHumanPrincipalByEmail(ctx context.Context, email *string) (
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.ExternalID,
 	)
 	return i, err
 }
 
 const getHumanPrincipalByIdentity = `-- name: GetHumanPrincipalByIdentity :one
-SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
 WHERE issuer = $1 AND subject = $2 AND kind = 'human'
 `
 
@@ -293,18 +349,25 @@ func (q *Queries) GetHumanPrincipalByIdentity(ctx context.Context, arg GetHumanP
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.ExternalID,
 	)
 	return i, err
 }
 
-const getHumanPrincipalBySubjectOrEmail = `-- name: GetHumanPrincipalBySubjectOrEmail :one
-SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
-WHERE kind = 'human' AND (subject = $1 OR email = $1)
-LIMIT 1
+const getPerson = `-- name: GetPerson :one
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
+WHERE id = $1 AND kind = 'human' AND id <> ALL($2::uuid[])
 `
 
-func (q *Queries) GetHumanPrincipalBySubjectOrEmail(ctx context.Context, subject *string) (WhitetowerPrincipal, error) {
-	row := q.db.QueryRow(ctx, getHumanPrincipalBySubjectOrEmail, subject)
+type GetPersonParams struct {
+	ID        uuid.UUID
+	SystemIds []uuid.UUID
+}
+
+// People: human principals other than those that White Tower acts as, such
+// as the break-glass custodian.
+func (q *Queries) GetPerson(ctx context.Context, arg GetPersonParams) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, getPerson, arg.ID, arg.SystemIds)
 	var i WhitetowerPrincipal
 	err := row.Scan(
 		&i.ID,
@@ -322,12 +385,13 @@ func (q *Queries) GetHumanPrincipalBySubjectOrEmail(ctx context.Context, subject
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.ExternalID,
 	)
 	return i, err
 }
 
 const getPrincipalByID = `-- name: GetPrincipalByID :one
-SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
 WHERE id = $1
 `
 
@@ -350,6 +414,7 @@ func (q *Queries) GetPrincipalByID(ctx context.Context, id uuid.UUID) (Whitetowe
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.ExternalID,
 	)
 	return i, err
 }
@@ -379,18 +444,19 @@ func (q *Queries) GetSessionByHash(ctx context.Context, idHash []byte) (Whitetow
 
 const insertHumanPrincipal = `-- name: InsertHumanPrincipal :one
 INSERT INTO whitetower.principals (
-    id, kind, issuer, subject, display_name, email, status, idp_groups, last_login_at, created_at, updated_at
+    id, kind, issuer, subject, external_id, display_name, email, status, idp_groups, last_login_at, created_at, updated_at
 ) VALUES (
-    $1, 'human', $2, $3, $4, $5, 'active', $6, $7, $8, $8
+    $1, 'human', $2, $3, $4, $5, $6, 'active', $7, $8, $9, $9
 )
-ON CONFLICT (issuer, subject) WHERE kind = 'human' DO NOTHING
-RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version
+ON CONFLICT DO NOTHING
+RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id
 `
 
 type InsertHumanPrincipalParams struct {
 	ID          uuid.UUID
 	Issuer      *string
 	Subject     *string
+	ExternalID  *string
 	DisplayName string
 	Email       *string
 	IdpGroups   []string
@@ -398,13 +464,15 @@ type InsertHumanPrincipalParams struct {
 	CreatedAt   time.Time
 }
 
-// Returns no row when a principal with the issuer and subject exists, or
-// another transaction created one meanwhile, once that transaction commits.
+// Returns no row when a principal with the issuer and subject, or with the
+// external ID, exists, or another transaction created one meanwhile, once
+// that transaction commits.
 func (q *Queries) InsertHumanPrincipal(ctx context.Context, arg InsertHumanPrincipalParams) (WhitetowerPrincipal, error) {
 	row := q.db.QueryRow(ctx, insertHumanPrincipal,
 		arg.ID,
 		arg.Issuer,
 		arg.Subject,
+		arg.ExternalID,
 		arg.DisplayName,
 		arg.Email,
 		arg.IdpGroups,
@@ -428,6 +496,7 @@ func (q *Queries) InsertHumanPrincipal(ctx context.Context, arg InsertHumanPrinc
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.ExternalID,
 	)
 	return i, err
 }
@@ -496,7 +565,7 @@ func (q *Queries) ListActiveRoleBindings(ctx context.Context, principalID uuid.U
 }
 
 const listAllServiceAccounts = `-- name: ListAllServiceAccounts :many
-SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
 WHERE kind = 'service_account'
 ORDER BY created_at DESC
 `
@@ -526,6 +595,7 @@ func (q *Queries) ListAllServiceAccounts(ctx context.Context) ([]WhitetowerPrinc
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Version,
+			&i.ExternalID,
 		); err != nil {
 			return nil, err
 		}
@@ -537,20 +607,21 @@ func (q *Queries) ListAllServiceAccounts(ctx context.Context) ([]WhitetowerPrinc
 	return items, nil
 }
 
-const listHumanPrincipals = `-- name: ListHumanPrincipals :many
-SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
-WHERE kind = 'human'
-ORDER BY created_at DESC
+const listPeople = `-- name: ListPeople :many
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
+WHERE kind = 'human' AND id <> ALL($3::uuid[])
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
 `
 
-type ListHumanPrincipalsParams struct {
-	Limit  int32
-	Offset int32
+type ListPeopleParams struct {
+	Limit     int32
+	Offset    int32
+	SystemIds []uuid.UUID
 }
 
-func (q *Queries) ListHumanPrincipals(ctx context.Context, arg ListHumanPrincipalsParams) ([]WhitetowerPrincipal, error) {
-	rows, err := q.db.Query(ctx, listHumanPrincipals, arg.Limit, arg.Offset)
+func (q *Queries) ListPeople(ctx context.Context, arg ListPeopleParams) ([]WhitetowerPrincipal, error) {
+	rows, err := q.db.Query(ctx, listPeople, arg.Limit, arg.Offset, arg.SystemIds)
 	if err != nil {
 		return nil, err
 	}
@@ -574,6 +645,7 @@ func (q *Queries) ListHumanPrincipals(ctx context.Context, arg ListHumanPrincipa
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Version,
+			&i.ExternalID,
 		); err != nil {
 			return nil, err
 		}
@@ -586,7 +658,7 @@ func (q *Queries) ListHumanPrincipals(ctx context.Context, arg ListHumanPrincipa
 }
 
 const listServiceAccountsByResponsiblePrincipal = `-- name: ListServiceAccountsByResponsiblePrincipal :many
-SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
 WHERE kind = 'service_account' AND responsible_principal_id = $1
 ORDER BY created_at DESC
 `
@@ -616,6 +688,7 @@ func (q *Queries) ListServiceAccountsByResponsiblePrincipal(ctx context.Context,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Version,
+			&i.ExternalID,
 		); err != nil {
 			return nil, err
 		}
@@ -627,9 +700,42 @@ func (q *Queries) ListServiceAccountsByResponsiblePrincipal(ctx context.Context,
 	return items, nil
 }
 
-const lockHumanPrincipalByIdentity = `-- name: LockHumanPrincipalByIdentity :one
+const lockHumanPrincipalByExternalID = `-- name: LockHumanPrincipalByExternalID :one
 
-SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
+WHERE external_id = $1 AND kind = 'human'
+FOR UPDATE
+`
+
+// Queries of the human authentication and session domain (plan P1-03).
+// Locks the principal of the person whom the identity provider names by the
+// external ID, so that a sign-in reads the groups that it changes.
+func (q *Queries) LockHumanPrincipalByExternalID(ctx context.Context, externalID *string) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, lockHumanPrincipalByExternalID, externalID)
+	var i WhitetowerPrincipal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.Email,
+		&i.Status,
+		&i.StatusChangedAt,
+		&i.StatusReason,
+		&i.IdpGroups,
+		&i.LastLoginAt,
+		&i.ResponsiblePrincipalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+		&i.ExternalID,
+	)
+	return i, err
+}
+
+const lockHumanPrincipalByIdentity = `-- name: LockHumanPrincipalByIdentity :one
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
 WHERE issuer = $1 AND subject = $2 AND kind = 'human'
 FOR UPDATE
 `
@@ -639,7 +745,6 @@ type LockHumanPrincipalByIdentityParams struct {
 	Subject *string
 }
 
-// Queries of the human authentication and session domain (plan P1-03).
 // Locks the principal, so that a sign-in reads the groups that it changes.
 func (q *Queries) LockHumanPrincipalByIdentity(ctx context.Context, arg LockHumanPrincipalByIdentityParams) (WhitetowerPrincipal, error) {
 	row := q.db.QueryRow(ctx, lockHumanPrincipalByIdentity, arg.Issuer, arg.Subject)
@@ -660,6 +765,7 @@ func (q *Queries) LockHumanPrincipalByIdentity(ctx context.Context, arg LockHuma
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.ExternalID,
 	)
 	return i, err
 }
@@ -797,17 +903,19 @@ func (q *Queries) TouchSession(ctx context.Context, arg TouchSessionParams) erro
 
 const updateHumanPrincipalAtSignIn = `-- name: UpdateHumanPrincipalAtSignIn :one
 UPDATE whitetower.principals
-SET display_name = $2,
-    email = $3,
-    idp_groups = $4,
-    last_login_at = $5,
-    updated_at = $5
+SET external_id = $2,
+    display_name = $3,
+    email = $4,
+    idp_groups = $5,
+    last_login_at = $6,
+    updated_at = $6
 WHERE id = $1
-RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version
+RETURNING id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id
 `
 
 type UpdateHumanPrincipalAtSignInParams struct {
 	ID          uuid.UUID
+	ExternalID  *string
 	DisplayName string
 	Email       *string
 	IdpGroups   []string
@@ -817,6 +925,7 @@ type UpdateHumanPrincipalAtSignInParams struct {
 func (q *Queries) UpdateHumanPrincipalAtSignIn(ctx context.Context, arg UpdateHumanPrincipalAtSignInParams) (WhitetowerPrincipal, error) {
 	row := q.db.QueryRow(ctx, updateHumanPrincipalAtSignIn,
 		arg.ID,
+		arg.ExternalID,
 		arg.DisplayName,
 		arg.Email,
 		arg.IdpGroups,
@@ -839,6 +948,7 @@ func (q *Queries) UpdateHumanPrincipalAtSignIn(ctx context.Context, arg UpdateHu
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.ExternalID,
 	)
 	return i, err
 }

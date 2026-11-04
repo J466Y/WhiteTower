@@ -132,6 +132,13 @@
     "outcome": "",
     "reason": ""
   },
+  "whitetower.principal.adopted.v1": {
+    "action": "principal.adopted",
+    "actor_id": "00000000-0000-0000-0000-000000000002",
+    "actor_type": "service_account",
+    "outcome": "success",
+    "reason": ""
+  },
   "whitetower.principal.created.v1": {
     "action": "principal.created",
     "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",

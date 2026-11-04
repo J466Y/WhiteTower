@@ -652,7 +652,7 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
 
 	email := "operator@example.com"
-	user, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-op", DisplayName: "Test Operator", Email: &email, Groups: []string{"operators"}}, nil)
+	user, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-op", ExternalID: "sub-op", DisplayName: "Test Operator", Email: &email, Groups: []string{"operators"}}, nil)
 	if err != nil {
 		t.Fatalf("upserting test user: %v", err)
 	}
@@ -751,7 +751,7 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 		}
 
 		adaEmail := "ada@example.com"
-		ada, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-ada", DisplayName: "Ada Admin", Email: &adaEmail}, nil)
+		ada, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-ada", ExternalID: "sub-ada", DisplayName: "Ada Admin", Email: &adaEmail}, nil)
 		if err != nil {
 			t.Fatalf("upserting the administrator: %v", err)
 		}
@@ -826,7 +826,7 @@ func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorRevokesAToken(t *tes
 
 	human := func(subject, name string, roles ...string) auth.Principal {
 		t.Helper()
-		p, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: subject, DisplayName: name}, nil)
+		p, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: subject, ExternalID: subject, DisplayName: name}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1030,6 +1030,20 @@ func TestExchangeTokenEndpoint(t *testing.T) {
 		body := strings.NewReader(`{"idToken":"inactive-user-token"}`)
 		res := call(h, http.MethodPost, "/api/v1/tokens/exchange", "", nil, body)
 		problemOf(t, res, problem.Forbidden)
+	})
+
+	t.Run("an ID token that names the person otherwise than expected is refused with forbidden", func(t *testing.T) {
+		for _, err := range []error{
+			fmt.Errorf("reading id token claims: %w", authn.ErrNoExternalID),
+			fmt.Errorf("locking principal: %w: principal 0192f1c2-7a3b-7c4d-8e5f-000000000002", authn.ErrExternalIDConflict),
+		} {
+			opts := options(io.Discard)
+			opts.Exchanger = mockTokenExchanger{err: err}
+			res := call(Handler(opts), http.MethodPost, "/api/v1/tokens/exchange", "", nil, strings.NewReader(`{"idToken":"some-token"}`))
+			if p := problemOf(t, res, problem.Forbidden); p.Detail != "the identity provider does not name this person as the server expects" {
+				t.Errorf("%v: detail %q, want the fixed detail", err, p.Detail)
+			}
+		}
 	})
 
 	t.Run("invalid ID token is refused with unauthenticated", func(t *testing.T) {
