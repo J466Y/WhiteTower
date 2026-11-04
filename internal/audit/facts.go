@@ -56,6 +56,7 @@ var rules = map[string]rule{
 	"whitetower.halt.released.v1":           {actor: "approved_by", reason: "reason"},
 	"whitetower.audit.checkpoint.v1":        {},
 	"whitetower.audit.gap_detected.v1":      {},
+	"whitetower.audit.repeat_detected.v1":   {},
 	"whitetower.audit.partition_dropped.v1": {fixed: "success", reason: "reason"},
 	"whitetower.principal.deactivated.v1":   {actor: "actor", fixed: "success", reason: "reason"},
 	"whitetower.principal.reactivated.v1":   {actor: "actor", fixed: "success", reason: "reason"},
@@ -110,7 +111,8 @@ func factsOf(t eventType, event map[string]any) (facts, error) {
 }
 
 // emitter returns who emitted an event from its source (contracts, section
-// 8.2): the agent of an enforcement point inside it, a module, or the core.
+// 8.2): the agent of an enforcement point inside it, a module by its slug, or
+// the core. Ingestion checks the same value against the caller.
 func emitter(source string) (actorType, actorID string) {
 	parts := strings.Split(strings.TrimPrefix(source, "/"), "/")
 	switch {

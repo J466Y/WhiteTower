@@ -8,11 +8,9 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/J466Y/WhiteTower/internal/audit/auditdb"
@@ -50,11 +48,25 @@ type IngestResult struct {
 	Reason string
 }
 
-// IngestCaller identifies the module instance publishing events and its authorized scope.
+// IngestCaller identifies the module instance publishing events and its
+// authorized scope (contracts, section 4.3).
 type IngestCaller struct {
-	// InstanceID is the caller's unique module instance identifier.
+	// InstanceID is the caller's unique module instance identifier. It keys
+	// the per-instance rate limit, and the findings name it; a source never
+	// does.
 	InstanceID string
-	// AllowedAgents are the IDs of the agents this instance serves.
+	// Module is the slug of the instance's module (metadata.name). An
+	// instance that does not run inside an agent publishes only from
+	// /modules/<Module>/<stream-id>.
+	Module string
+	// Agent is the agent that an enforcement point inside an agent
+	// (identity: agent) authenticates as, and uuid.Nil for any other
+	// instance. Such an enforcement point publishes only from
+	// /agents/<Agent>/ep/<stream-id>, about its agent.
+	Agent uuid.UUID
+	// AllowedAgents are the IDs of the agents in the instance's scope: its
+	// own agent for an enforcement point inside an agent, otherwise the
+	// agents bound to its module.
 	AllowedAgents []uuid.UUID
 	// AllowedTypes are the event types declared in the instance's manifest.
 	AllowedTypes []string
@@ -95,8 +107,8 @@ func (e *ErrResourceExhausted) Error() string {
 var ErrBatchTooLarge = fmt.Errorf("audit: batch exceeds maximum size of %d events", MaxBatchEvents)
 
 // Ingester processes batches of audit events from module instances (plan P1-02, step 5).
-// It authorizes, validates, de-duplicates, tracks sequence numbers, detects gaps, and
-// writes events to storage atomically.
+// It validates, de-duplicates, authorizes, tracks sequence numbers, detects gaps and
+// repeats, and writes events to storage atomically.
 type Ingester struct {
 	db            *db.DB
 	catalog       *Catalog
@@ -148,8 +160,9 @@ type preparedEvent struct {
 	source    string
 	seq       int64
 	typ       string
+	emitters  []string
 	time      time.Time
-	subject   *uuid.UUID
+	subject   *uuid.UUID // the agent the event is about, once authorized
 	actorType string
 	actorID   *string
 	action    string
@@ -159,10 +172,16 @@ type preparedEvent struct {
 	canonical []byte
 }
 
+// eventKey names an event as de-duplication does: by its source and ID.
+type eventKey struct{ source, eventID string }
+
 // Ingest processes a batch of raw CloudEvents from caller. Delivery is at least once.
-// Events are validated against the catalog and authorized against the instance scope.
-// Duplicate events are marked as StatusDuplicate, invalid/unauthorized as StatusRejected,
-// and fresh valid events as StatusAccepted. Gaps in sequences produce whitetower.audit.gap_detected.v1 events.
+// Each event is decided on its own (contracts, section 8.4): an invalid one is
+// StatusRejected; then one the audit log already holds is StatusDuplicate,
+// whatever the caller's scope is now; then one outside the rules of section 4.3
+// is StatusRejected, and the others are stored, StatusAccepted. A gap in a
+// source's sequence records whitetower.audit.gap_detected.v1, and a position
+// that repeats or goes back under a new event ID whitetower.audit.repeat_detected.v1.
 func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents [][]byte) ([]IngestResult, error) {
 	if len(rawEvents) == 0 {
 		return []IngestResult{}, nil
@@ -173,6 +192,9 @@ func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents 
 	if caller.InstanceID == "" {
 		return nil, errors.New("audit: missing instance id")
 	}
+	if caller.Module == "" {
+		return nil, errors.New("audit: missing module slug")
+	}
 
 	now := ing.clock.Now().UTC()
 
@@ -182,7 +204,7 @@ func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents 
 	}
 
 	// Backpressure: check sealing lag (NFR-08, NFR-09; ST-10).
-	if err := ing.checkSealingLag(ctx, now); err != nil {
+	if err := ing.checkSealingLag(ctx); err != nil {
 		return nil, err
 	}
 
@@ -207,56 +229,14 @@ func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents 
 			continue
 		}
 
-		typ, _ := decoded["type"].(string)
-		if !slices.Contains(caller.AllowedTypes, typ) {
-			results[i] = IngestResult{Status: StatusRejected, Reason: fmt.Sprintf("event type %q is not declared by instance", typ)}
-			continue
-		}
-		if slices.Contains(et.emitters, "core") && len(et.emitters) == 1 {
-			results[i] = IngestResult{Status: StatusRejected, Reason: fmt.Sprintf("event type %q cannot be emitted by modules", typ)}
-			continue
-		}
-
-		source, _ := decoded["source"].(string)
-		parts := strings.Split(strings.TrimPrefix(source, "/"), "/")
-		var subjectAgentID *uuid.UUID
-		switch {
-		case len(parts) == 4 && parts[0] == "agents" && parts[2] == "ep":
-			agentID, err := uuid.Parse(parts[1])
-			if err != nil || !slices.Contains(caller.AllowedAgents, agentID) {
-				results[i] = IngestResult{Status: StatusRejected, Reason: fmt.Sprintf("instance is not authorized for agent %q", parts[1])}
+		// The envelope's schema requires wtseq of every source but /core,
+		// which no module owns.
+		var seq int64
+		if seqStr, ok := decoded["wtseq"].(string); ok {
+			if seq, err = strconv.ParseInt(seqStr, 10, 64); err != nil || seq <= 0 {
+				results[i] = IngestResult{Status: StatusRejected, Reason: "invalid wtseq"}
 				continue
 			}
-			subjectAgentID = &agentID
-			if subjStr, ok := decoded["subject"].(string); ok && subjStr != "" {
-				if subjStr != parts[1] {
-					results[i] = IngestResult{Status: StatusRejected, Reason: "subject does not match agent in source"}
-					continue
-				}
-			}
-		case len(parts) == 3 && parts[0] == "modules":
-			if parts[2] != caller.InstanceID {
-				results[i] = IngestResult{Status: StatusRejected, Reason: fmt.Sprintf("instance is not authorized for module source %q", source)}
-				continue
-			}
-			if subjStr, ok := decoded["subject"].(string); ok && subjStr != "" {
-				subjID, err := uuid.Parse(subjStr)
-				if err != nil || !slices.Contains(caller.AllowedAgents, subjID) {
-					results[i] = IngestResult{Status: StatusRejected, Reason: fmt.Sprintf("instance is not authorized for subject agent %q", subjStr)}
-					continue
-				}
-				subjectAgentID = &subjID
-			}
-		default:
-			results[i] = IngestResult{Status: StatusRejected, Reason: fmt.Sprintf("invalid or unauthorized source %q", source)}
-			continue
-		}
-
-		seqStr, _ := decoded["wtseq"].(string)
-		seq, err := strconv.ParseInt(seqStr, 10, 64)
-		if err != nil || seq <= 0 {
-			results[i] = IngestResult{Status: StatusRejected, Reason: "invalid or missing wtseq"}
-			continue
 		}
 
 		eventID, _ := decoded["id"].(string)
@@ -278,6 +258,16 @@ func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents 
 			continue
 		}
 
+		var subject *uuid.UUID
+		if s, ok := decoded["subject"].(string); ok {
+			id, err := uuid.Parse(s)
+			if err != nil {
+				results[i] = IngestResult{Status: StatusRejected, Reason: "invalid subject"}
+				continue
+			}
+			subject = &id
+		}
+
 		auditID, err := uuid.NewV7()
 		if err != nil {
 			return nil, err
@@ -289,6 +279,8 @@ func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents 
 			traceID = &tid
 		}
 
+		typ, _ := decoded["type"].(string)
+		source, _ := decoded["source"].(string)
 		prepared = append(prepared, preparedEvent{
 			index:     i,
 			id:        auditID,
@@ -296,8 +288,9 @@ func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents 
 			source:    source,
 			seq:       seq,
 			typ:       typ,
+			emitters:  et.emitters,
 			time:      eventTime,
-			subject:   subjectAgentID,
+			subject:   subject,
 			actorType: f.actorType,
 			actorID:   optional(f.actorID),
 			action:    f.action,
@@ -308,42 +301,77 @@ func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents 
 		})
 	}
 
-	if len(prepared) == 0 || ing.db == nil {
+	if len(prepared) == 0 {
+		return results, nil
+	}
+	if ing.db == nil {
+		// Without a database, as the fuzz test runs, the log holds no event
+		// yet and nothing is stored.
+		decide(caller, prepared, map[eventKey]bool{}, results)
 		return results, nil
 	}
 
-	// Persist the batch atomically in one transaction.
+	// Persist the batch atomically in one transaction. De-duplication comes
+	// first (contracts, section 8.4), so that a retry of an accepted event
+	// stays a duplicate whatever the caller's scope is now; an event refused
+	// then records no ID and moves no sequence, so the gap it leaves stays
+	// visible.
 	err := ing.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		qtx := auditdb.New(tx)
-		ingestMonth := pgtype.Date{
-			Time:  time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC),
-			Valid: true,
-		}
+		month := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 
-		// 1. De-duplication on (source, event_id, ingest_month).
-		var fresh []preparedEvent
+		// 1. De-duplication on source and ID, for at least 28 days: in the
+		// previous month's partition as in this month's. The next month's
+		// partition holds what a replica whose clock is ahead recorded.
+		lookup := auditdb.SeenEventIDsParams{
+			FromMonth: pgtype.Date{Time: month.AddDate(0, -1, 0), Valid: true},
+			ToMonth:   pgtype.Date{Time: month.AddDate(0, 1, 0), Valid: true},
+		}
 		for _, p := range prepared {
-			_, err := qtx.RecordEventID(ctx, auditdb.RecordEventIDParams{
-				Source:      p.source,
-				EventID:     p.eventID,
-				IngestMonth: ingestMonth,
-				AuditID:     p.id,
-			})
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					results[p.index] = IngestResult{Status: StatusDuplicate}
-					continue
-				}
-				return fmt.Errorf("audit: recording event id: %w", err)
-			}
-			fresh = append(fresh, p)
+			lookup.Sources = append(lookup.Sources, p.source)
+			lookup.EventIds = append(lookup.EventIds, p.eventID)
 		}
-
+		seenRows, err := qtx.SeenEventIDs(ctx, lookup)
+		if err != nil {
+			return fmt.Errorf("audit: looking up event ids: %w", err)
+		}
+		seen := make(map[eventKey]bool, len(seenRows))
+		for _, r := range seenRows {
+			seen[eventKey{r.Source, r.EventID}] = true
+		}
+		fresh := decide(caller, prepared, seen, results)
 		if len(fresh) == 0 {
 			return nil
 		}
 
-		// 2. Lock sequence rows in alphabetical order of sources to prevent deadlocks (spike S3).
+		// 2. Record the new events' IDs in this month. One that another
+		// transaction recorded since the lookup is a duplicate.
+		ids := auditdb.RecordEventIDsParams{IngestMonth: pgtype.Date{Time: month, Valid: true}}
+		for _, p := range fresh {
+			ids.Sources = append(ids.Sources, p.source)
+			ids.EventIds = append(ids.EventIds, p.eventID)
+			ids.AuditIds = append(ids.AuditIds, p.id)
+		}
+		recorded, err := qtx.RecordEventIDs(ctx, ids)
+		if err != nil {
+			return fmt.Errorf("audit: recording event ids: %w", err)
+		}
+		isRecorded := make(map[eventKey]bool, len(recorded))
+		for _, r := range recorded {
+			isRecorded[eventKey{r.Source, r.EventID}] = true
+		}
+		fresh = slices.DeleteFunc(fresh, func(p preparedEvent) bool {
+			if !isRecorded[eventKey{p.source, p.eventID}] {
+				results[p.index] = IngestResult{Status: StatusDuplicate}
+				return true
+			}
+			return false
+		})
+		if len(fresh) == 0 {
+			return nil
+		}
+
+		// 3. Lock sequence rows in alphabetical order of sources to prevent deadlocks (spike S3).
 		sourceSet := map[string]bool{}
 		for _, p := range fresh {
 			sourceSet[p.source] = true
@@ -359,70 +387,60 @@ func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents 
 			return fmt.Errorf("audit: locking source sequences: %w", err)
 		}
 		lastSeqs := map[string]int64{}
-		seenSources := map[string]bool{}
 		for _, r := range lockedRows {
 			lastSeqs[r.Source] = r.LastSeq
-			seenSources[r.Source] = true
 		}
 
-		// 3. Check sequences, detect gaps, and update sequence records in sorted source order.
+		// 4. Check sequences, record findings, and update sequence records in
+		// sorted source order.
 		freshBySource := map[string][]preparedEvent{}
 		for _, p := range fresh {
 			freshBySource[p.source] = append(freshBySource[p.source], p)
 		}
 
 		for _, source := range uniqueSources {
-			events := freshBySource[source]
-			lastSeq, seen := lastSeqs[source]
-			var expected int64
-			if !seen {
-				expected = 1 // New source starts at 1 (contract, section 8.4)
-			} else {
-				expected = lastSeq + 1
-			}
-
-			maxSeq := lastSeq
-			for _, p := range events {
-				if p.seq > expected {
-					// Gap detected!
-					gapSize := p.seq - expected
-					var subject string
-					if p.subject != nil {
-						subject = p.subject.String()
-					}
-					gapData := map[string]any{
+			// A new source has reached no position, and starts at 1
+			// (contracts, section 8.4).
+			last := lastSeqs[source]
+			for _, p := range freshBySource[source] {
+				switch {
+				case p.seq <= last:
+					// A position the source reached already, under an event
+					// ID new to it: the event is decided as any other.
+					if err := ing.recordFinding(ctx, tx, "whitetower.audit.repeat_detected.v1", p, map[string]any{
 						"source":       source,
-						"expected_seq": expected,
+						"last_seq":     last,
 						"received_seq": p.seq,
-						"gap_size":     gapSize,
+						"event_id":     p.eventID,
 						"instance_id":  caller.InstanceID,
-					}
-					if err := ing.writer.Record(ctx, tx, Event{
-						Type:    "whitetower.audit.gap_detected.v1",
-						Subject: subject,
-						Data:    gapData,
 					}); err != nil {
-						return fmt.Errorf("audit: recording gap event: %w", err)
+						return err
 					}
-					expected = p.seq + 1
-				} else if p.seq == expected {
-					expected = p.seq + 1
+				case p.seq > last+1:
+					if err := ing.recordFinding(ctx, tx, "whitetower.audit.gap_detected.v1", p, map[string]any{
+						"source":       source,
+						"expected_seq": last + 1,
+						"received_seq": p.seq,
+						"gap_size":     p.seq - last - 1,
+						"instance_id":  caller.InstanceID,
+					}); err != nil {
+						return err
+					}
 				}
-				if p.seq > maxSeq {
-					maxSeq = p.seq
-				}
+				last = max(last, p.seq)
 			}
 
+			// The recorded position never moves back.
 			if err := qtx.UpsertSourceSequence(ctx, auditdb.UpsertSourceSequenceParams{
 				Source:     source,
-				LastSeq:    maxSeq,
+				LastSeq:    last,
 				LastSeenAt: now,
 			}); err != nil {
 				return fmt.Errorf("audit: updating sequence for %s: %w", source, err)
 			}
 		}
 
-		// 4. Store accepted events and queue them for sealing in one atomic statement.
+		// 5. Store accepted events and queue them for sealing in one atomic statement.
 		for _, p := range fresh {
 			err := qtx.IngestEvent(ctx, auditdb.IngestEventParams{
 				ID:             p.id,
@@ -456,23 +474,93 @@ func (ing *Ingester) Ingest(ctx context.Context, caller IngestCaller, rawEvents 
 	return results, nil
 }
 
-func (ing *Ingester) checkSealingLag(ctx context.Context, now time.Time) error {
+// decide decides the valid events of a batch, in its order: an event whose
+// key is in seen, the keys of the events that the audit log holds, is a
+// duplicate, and one outside the rules of section 4.3 is refused. It adds the
+// key of every other event to seen, so that a later copy in the batch is a
+// duplicate, and returns those events, to store.
+func decide(caller IngestCaller, valid []preparedEvent, seen map[eventKey]bool, results []IngestResult) []preparedEvent {
+	var fresh []preparedEvent
+	for _, p := range valid {
+		key := eventKey{p.source, p.eventID}
+		if seen[key] {
+			results[p.index] = IngestResult{Status: StatusDuplicate}
+			continue
+		}
+		if reason := authorize(caller, &p); reason != "" {
+			results[p.index] = IngestResult{Status: StatusRejected, Reason: reason}
+			continue
+		}
+		seen[key] = true
+		fresh = append(fresh, p)
+	}
+	return fresh
+}
+
+// authorize applies the rules of contracts section 4.3 to an event: a type
+// that the caller's manifest declares and a module may emit, from a source
+// the caller owns, about an agent in its scope. It sets the agent the event
+// is about, and returns why the event is refused, or "".
+func authorize(caller IngestCaller, p *preparedEvent) string {
+	if !slices.Contains(caller.AllowedTypes, p.typ) {
+		return fmt.Sprintf("event type %q is not declared by instance", p.typ)
+	}
+	if slices.Equal(p.emitters, []string{"core"}) {
+		return fmt.Sprintf("event type %q cannot be emitted by modules", p.typ)
+	}
+	// The emitter that the source names is the actor that the audit log
+	// indexes, so the actor is the agent or the module checked here.
+	kind, owner := emitter(p.source)
+	if caller.Agent != uuid.Nil {
+		if kind != "agent" || owner != caller.Agent.String() {
+			return fmt.Sprintf("instance does not own source %q", p.source)
+		}
+		if p.subject != nil && *p.subject != caller.Agent {
+			return "subject does not match agent in source"
+		}
+		agent := caller.Agent
+		p.subject = &agent
+	} else if kind != "module" || owner != caller.Module {
+		return fmt.Sprintf("instance does not own source %q", p.source)
+	}
+	if p.subject != nil && !slices.Contains(caller.AllowedAgents, *p.subject) {
+		return fmt.Sprintf("instance is not authorized for agent %q", p.subject.String())
+	}
+	return ""
+}
+
+// recordFinding records a finding about the sequence of p's source, in tx
+// (AUD-02). The finding stays, whatever comes later.
+func (ing *Ingester) recordFinding(ctx context.Context, tx *db.Tx, typ string, p preparedEvent, data map[string]any) error {
+	var subject string
+	if p.subject != nil {
+		subject = p.subject.String()
+	}
+	if err := ing.writer.Record(ctx, tx, Event{Type: typ, Subject: subject, Data: data}); err != nil {
+		return fmt.Errorf("audit: recording %s: %w", typ, err)
+	}
+	return nil
+}
+
+// checkSealingLag refuses a batch while the oldest event awaiting sealing has
+// waited longer than the threshold (NFR-08, NFR-09). The wait is measured on
+// the database's clock, which stamped the event's ingestion time and dates the
+// sealer's leaves: the ingester's clock, ahead of the database's, would refuse
+// every batch, and behind it would hide the lag.
+func (ing *Ingester) checkSealingLag(ctx context.Context) error {
 	if ing.maxSealingLag <= 0 || ing.db == nil {
 		return nil
 	}
-	var oldest time.Time
+	var lagMicros int64
 	err := ing.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		var err error
-		oldest, err = auditdb.New(tx).OldestUnsealedTime(ctx)
+		lagMicros, err = auditdb.New(tx).SealingLag(ctx)
 		return err
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
 		return fmt.Errorf("audit: checking sealing lag: %w", err)
 	}
-	if !oldest.IsZero() && now.Sub(oldest) > ing.maxSealingLag {
+	if lagMicros > ing.maxSealingLag.Microseconds() {
 		return &ErrResourceExhausted{
 			Reason:     "sealing lag exceeded threshold",
 			RetryAfter: time.Second,

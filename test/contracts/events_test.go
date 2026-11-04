@@ -126,6 +126,9 @@ func TestTheEventSchemasFollowSections5And8(t *testing.T) {
 	traceparent := func(value string) func(map[string]any) {
 		return func(e map[string]any) { e["traceparent"] = value }
 	}
+	source := func(value string) func(map[string]any) {
+		return func(e map[string]any) { e["source"] = value }
+	}
 	resource := func(value map[string]any) func(map[string]any) {
 		return func(e map[string]any) { e["data"].(map[string]any)["resource"] = value }
 	}
@@ -133,9 +136,12 @@ func TestTheEventSchemasFollowSections5And8(t *testing.T) {
 		return func(e map[string]any) { e["data"].(map[string]any)["arguments"] = value }
 	}
 	const (
-		decision = "whitetower.decision.made.v1"
-		halted   = "whitetower.instance.halted.v1"
-		expired  = "whitetower.lease.expired.v1"
+		decision    = "whitetower.decision.made.v1"
+		halted      = "whitetower.instance.halted.v1"
+		expired     = "whitetower.lease.expired.v1"
+		quarantined = "whitetower.quarantine.applied.v1"
+		agentStream = "/agents/0192f1c2-7a3b-7c4d-8e5f-000000000001/ep/"
+		quarantine  = "/modules/k8s-quarantine/"
 	)
 	cases := []struct {
 		name    string
@@ -158,6 +164,19 @@ func TestTheEventSchemasFollowSections5And8(t *testing.T) {
 		{"a traceparent of a higher version whose flags are followed by no dash", decision, traceparent("cc-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01x"), false},
 		{"a traceparent of a higher version with a short trace ID", decision, traceparent("cc-4bf92f3577b34da6a3ce929d0e0e473-00f067aa0ba902b7-01"), false},
 		{"a traceparent with an uppercase version", decision, traceparent("0A-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"), false},
+		// A source names its evidence buffer by 16 to 64 lowercase hexadecimal
+		// characters, never by a host, pod, cluster or instance name.
+		{"an agent's stream ID of 16 characters", decision, source(agentStream + hash[:16]), true},
+		{"an agent's stream ID of 64 characters", decision, source(agentStream + hash), true},
+		{"an agent's stream ID of 15 characters", decision, source(agentStream + hash[:15]), false},
+		{"an agent's stream ID of 65 characters", decision, source(agentStream + hash + "0"), false},
+		{"an agent's stream ID in uppercase", decision, source(agentStream + strings.ToUpper(hash[:16])), false},
+		{"an agent's stream named after its host", decision, source(agentStream + "ep-host-01"), false},
+		{"a module's stream ID of 16 characters", quarantined, source(quarantine + hash[:16]), true},
+		{"a module's stream ID of 64 characters", quarantined, source(quarantine + hash), true},
+		{"a module's stream ID of 15 characters", quarantined, source(quarantine + hash[:15]), false},
+		{"a module's stream ID of 65 characters", quarantined, source(quarantine + hash + "0"), false},
+		{"a module's stream named after its cluster", quarantined, source(quarantine + "prod-eu-1"), false},
 
 		// Section 8.3: what a decision event records.
 		{"a resource ID recorded as its SHA-256", decision, resource(map[string]any{"type": "tool", "id_sha256": hash}), true},

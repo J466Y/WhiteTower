@@ -1,0 +1,16 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000030",
+  "source": "/core",
+  "type": "whitetower.audit.repeat_detected.v1",
+  "time": "2026-09-29T10:15:02.118Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "datacontenttype": "application/json",
+  "data": {
+    "source": "/agents/0192f1c2-7a3b-7c4d-8e5f-000000000001/ep/b7e2c1d40f9a3e65",
+    "last_seq": 1043,
+    "received_seq": 1041,
+    "event_id": "0192f1d0-3c5a-7e21-8a4b-000000000031",
+    "instance_id": "ep-instance-01"
+  }
+}

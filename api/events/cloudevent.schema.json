@@ -25,9 +25,9 @@
       "maxLength": 128
     },
     "source": {
-      "description": "The evidence stream: /core, /agents/<agent-id>/ep/<stream-id> or /modules/<module>/<stream-id>.",
+      "description": "The evidence stream: /core, /agents/<agent-id>/ep/<stream-id> or /modules/<module>/<stream-id>, where <module> is the module's slug and <stream-id> names an evidence buffer: at least 64 random bits, as 16 to 64 lowercase hexadecimal characters, never a host, pod, cluster or instance name (contracts, section 8.2).",
       "type": "string",
-      "pattern": "^(/core|/agents/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ep/[a-z0-9-]{1,64}|/modules/[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?/[a-z0-9-]{1,64})$"
+      "pattern": "^(/core|/agents/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ep/[0-9a-f]{16,64}|/modules/[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?/[0-9a-f]{16,64})$"
     },
     "type": {
       "type": "string",
