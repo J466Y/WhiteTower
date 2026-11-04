@@ -191,8 +191,8 @@ func TestCheckRefusesInvalidEvents(t *testing.T) {
 func TestEmitterAndAction(t *testing.T) {
 	for source, want := range map[string][2]string{
 		"/core": {"system", ""},
-		"/agents/0192f1c2-7a3b-7c4d-8e5f-000000000001/ep/b7e2c1d4": {"agent", "0192f1c2-7a3b-7c4d-8e5f-000000000001"},
-		"/modules/k8s-quarantine/cluster-a":                        {"module", "k8s-quarantine"},
+		"/agents/0192f1c2-7a3b-7c4d-8e5f-000000000001/ep/b7e2c1d40f9a3e65": {"agent", "0192f1c2-7a3b-7c4d-8e5f-000000000001"},
+		"/modules/k8s-quarantine/5c1e8a2f7d3b9046":                         {"module", "k8s-quarantine"},
 	} {
 		if typ, id := emitter(source); typ != want[0] || id != want[1] {
 			t.Errorf("%s: %s %s, want %v", source, typ, id, want)

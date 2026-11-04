@@ -206,6 +206,16 @@
       "example": "examples/whitetower.audit.gap_detected.v1.json"
     },
     {
+      "type": "whitetower.audit.repeat_detected.v1",
+      "summary": "A source's sequence repeated, or went back, under a new event ID during ingestion (contracts, section 8.4; AUD-02).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.audit.repeat_detected.v1.json",
+      "example": "examples/whitetower.audit.repeat_detected.v1.json"
+    },
+    {
       "type": "whitetower.audit.partition_dropped.v1",
       "summary": "An audit events partition was dropped according to the retention policy (plan P1-02, step 9).",
       "emitters": [

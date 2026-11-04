@@ -2,11 +2,8 @@ package audit_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/J466Y/WhiteTower/api/events"
 	"github.com/J466Y/WhiteTower/internal/audit"
@@ -29,20 +26,20 @@ func FuzzIngestionParser(f *testing.F) {
 		MaxSealingLag: 10 * time.Minute,
 	})
 
-	agentUUID := uuid.MustParse(agent)
-	caller := audit.IngestCaller{
-		InstanceID:    "inst-01",
-		AllowedAgents: []uuid.UUID{agentUUID},
-		AllowedTypes: []string{
-			"whitetower.decision.made.v1",
-			"whitetower.action.executed.v1",
-			"whitetower.instance.started.v1",
-		},
+	// An enforcement point inside the agent, and an instance of a module
+	// whose scope is the agent, each with its own sources.
+	types := []string{
+		"whitetower.decision.made.v1",
+		"whitetower.action.executed.v1",
+		"whitetower.instance.started.v1",
 	}
+	ep, module := enforcementPoint(), quarantineModule()
+	ep.AllowedTypes, module.AllowedTypes = types, types
+	callers := []audit.IngestCaller{ep, module}
 
 	// Seeds
-	f.Add(decisionEvent(fmt.Sprintf("/agents/%s/ep/ep-01", agent), "ev-fuzz-01", 1, agent, "allow", "policy.permit"))
-	f.Add(instanceStartedEvent("/modules/mod-01/inst-01", "ev-fuzz-02", 1, "inst-01"))
+	f.Add(decisionEvent(epSource(agent, stream), "ev-fuzz-01", 1, agent, "allow", "policy.permit"))
+	f.Add(instanceStartedEvent(moduleSource("k8s-quarantine", stream), "ev-fuzz-02", 1, agent))
 	f.Add([]byte(`{"specversion": "1.0", "id": "ev-01", "source": "/agents/`))
 	f.Add([]byte(`{"specversion": 1, "id": null, "data": 12345}`))
 	f.Add([]byte(`{"specversion": "1.0", "id": "", "source": "core", "type": "whitetower.decision.made.v1", "time": "invalid", "wtseq": "not-a-number"}`))
@@ -55,7 +52,13 @@ func FuzzIngestionParser(f *testing.F) {
 	ctx := context.Background()
 
 	f.Fuzz(func(t *testing.T, data []byte) {
+		// The fake clock moves on, so that the rate limit never stops an
+		// input before the parser: on a clock that stands still, a worker's
+		// burst runs out after 100,000 inputs.
+		clk.Advance(time.Second)
 		// The parser and validation must never panic, crash or hang on untrusted input.
-		_, _ = ing.Ingest(ctx, caller, [][]byte{data})
+		for _, caller := range callers {
+			_, _ = ing.Ingest(ctx, caller, [][]byte{data})
+		}
 	})
 }

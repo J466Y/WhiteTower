@@ -62,6 +62,13 @@
     "outcome": "success",
     "reason": ""
   },
+  "whitetower.audit.repeat_detected.v1": {
+    "action": "audit.repeat_detected",
+    "actor_id": "",
+    "actor_type": "system",
+    "outcome": "",
+    "reason": ""
+  },
   "whitetower.breakglass.used.v1": {
     "action": "breakglass.used",
     "actor_id": "00000000-0000-0000-0000-000000000001",

@@ -1,7 +1,7 @@
 {
   "specversion": "1.0",
   "id": "0192f1d0-3c5a-7e21-8a4b-000000000009",
-  "source": "/modules/k8s-quarantine/prod-eu-1",
+  "source": "/modules/k8s-quarantine/5c1e8a2f7d3b9046",
   "type": "whitetower.quarantine.lifted.v1",
   "time": "2026-09-29T10:15:02.118Z",
   "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",

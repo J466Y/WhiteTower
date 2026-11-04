@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Audit repeat detected",
+  "description": "A source's sequence repeated, or went back, under a new event ID during ingestion (contracts, section 8.4; AUD-02). The event itself is decided as any other.",
+  "type": "object",
+  "required": [
+    "source",
+    "last_seq",
+    "received_seq",
+    "event_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "source": {
+      "description": "The event source whose sequence repeated or went back.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "last_seq": {
+      "description": "The highest sequence number that the source had reached.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "received_seq": {
+      "description": "The sequence number received, at most last_seq.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "event_id": {
+      "description": "The ID of the event that repeated a position, new to its source.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "instance_id": {
+      "description": "The module instance that published the batch, if known.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  }
+}

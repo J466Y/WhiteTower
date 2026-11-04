@@ -108,9 +108,10 @@ func TestThroughputSustainedAndBurst(t *testing.T) {
 	}()
 
 	agentUUID := uuid.New()
-	instanceID := uuid.NewString()
 	caller := IngestCaller{
-		InstanceID:    instanceID,
+		InstanceID:    uuid.NewString(),
+		Module:        "ep-python",
+		Agent:         agentUUID,
 		AllowedAgents: []uuid.UUID{agentUUID},
 		AllowedTypes:  []string{"whitetower.decision.made.v1"},
 	}
@@ -132,7 +133,7 @@ func TestThroughputSustainedAndBurst(t *testing.T) {
 				wg.Add(1)
 				go func(pubIdx int) {
 					defer wg.Done()
-					src := fmt.Sprintf("/agents/%s/ep/%s-pub-%d", agentUUID, instanceID[:8], pubIdx)
+					src := fmt.Sprintf("/agents/%s/ep/%016x", agentUUID, pubIdx)
 					var seq int64
 
 					for time.Now().Before(deadline) {
@@ -263,13 +264,14 @@ func BenchmarkSealerRound(b *testing.B) {
 	})
 
 	agentUUID := uuid.New()
-	instanceID := uuid.NewString()
 	caller := IngestCaller{
-		InstanceID:    instanceID,
+		InstanceID:    uuid.NewString(),
+		Module:        "ep-python",
+		Agent:         agentUUID,
 		AllowedAgents: []uuid.UUID{agentUUID},
 		AllowedTypes:  []string{"whitetower.decision.made.v1"},
 	}
-	src := fmt.Sprintf("/agents/%s/ep/bench", agentUUID)
+	src := fmt.Sprintf("/agents/%s/ep/%016x", agentUUID, 0)
 
 	ctx := context.Background()
 	var seq int64

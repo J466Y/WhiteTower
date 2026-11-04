@@ -103,47 +103,117 @@ func (q *Queries) LockSourceSequences(ctx context.Context, sources []string) ([]
 	return items, nil
 }
 
-const oldestUnsealedTime = `-- name: OldestUnsealedTime :one
-SELECT ingested_at
-FROM whitetower.audit_unsealed
-ORDER BY ingested_at, audit_id
-LIMIT 1
-`
-
-// The ingestion time of the oldest event awaiting sealing, for measuring lag.
-func (q *Queries) OldestUnsealedTime(ctx context.Context) (time.Time, error) {
-	row := q.db.QueryRow(ctx, oldestUnsealedTime)
-	var ingested_at time.Time
-	err := row.Scan(&ingested_at)
-	return ingested_at, err
-}
-
-const recordEventID = `-- name: RecordEventID :one
+const recordEventIDs = `-- name: RecordEventIDs :many
 INSERT INTO whitetower.audit_event_ids (source, event_id, ingest_month, audit_id)
-VALUES ($1, $2, $3, $4)
+SELECT k.source, k.event_id, $1::date, k.audit_id
+FROM (SELECT unnest($2::text[]) AS source, unnest($3::text[]) AS event_id,
+             unnest($4::uuid[]) AS audit_id) AS k
+ORDER BY k.source, k.event_id
 ON CONFLICT (source, event_id, ingest_month) DO NOTHING
-RETURNING audit_id
+RETURNING source, event_id
 `
 
-type RecordEventIDParams struct {
-	Source      string
-	EventID     string
+type RecordEventIDsParams struct {
 	IngestMonth pgtype.Date
-	AuditID     uuid.UUID
+	Sources     []string
+	EventIds    []string
+	AuditIds    []uuid.UUID
 }
 
-// Inserts an event ID for de-duplication within the current month.
-// Returns the audit ID if the event is fresh, or no rows if already seen.
-func (q *Queries) RecordEventID(ctx context.Context, arg RecordEventIDParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, recordEventID,
-		arg.Source,
-		arg.EventID,
+type RecordEventIDsRow struct {
+	Source  string
+	EventID string
+}
+
+// Records the IDs of a batch's new events in its month, in the order of their
+// keys, so that batches that share events cannot deadlock. It returns the keys
+// it recorded: a key that another transaction recorded since the batch's
+// lookup is left out.
+func (q *Queries) RecordEventIDs(ctx context.Context, arg RecordEventIDsParams) ([]RecordEventIDsRow, error) {
+	rows, err := q.db.Query(ctx, recordEventIDs,
 		arg.IngestMonth,
-		arg.AuditID,
+		arg.Sources,
+		arg.EventIds,
+		arg.AuditIds,
 	)
-	var audit_id uuid.UUID
-	err := row.Scan(&audit_id)
-	return audit_id, err
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RecordEventIDsRow
+	for rows.Next() {
+		var i RecordEventIDsRow
+		if err := rows.Scan(&i.Source, &i.EventID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const sealingLag = `-- name: SealingLag :one
+SELECT coalesce(extract(epoch FROM clock_timestamp() - min(ingested_at)) * 1000000, 0)::bigint AS lag_us
+FROM whitetower.audit_unsealed
+`
+
+// How long, in microseconds, the oldest event awaiting sealing has waited, on
+// the database's clock: the clock that stamped its ingestion time, and that
+// dates the sealer's leaves. It is 0 when no event waits.
+func (q *Queries) SealingLag(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, sealingLag)
+	var lag_us int64
+	err := row.Scan(&lag_us)
+	return lag_us, err
+}
+
+const seenEventIDs = `-- name: SeenEventIDs :many
+SELECT e.source, e.event_id
+FROM whitetower.audit_event_ids e
+JOIN (SELECT unnest($1::text[]) AS source, unnest($2::text[]) AS event_id) AS k
+  ON e.source = k.source AND e.event_id = k.event_id
+WHERE e.ingest_month BETWEEN $3::date AND $4::date
+`
+
+type SeenEventIDsParams struct {
+	Sources   []string
+	EventIds  []string
+	FromMonth pgtype.Date
+	ToMonth   pgtype.Date
+}
+
+type SeenEventIDsRow struct {
+	Source  string
+	EventID string
+}
+
+// Returns which of a batch's events, by source and ID, the audit log recorded
+// in the months from from_month to to_month.
+func (q *Queries) SeenEventIDs(ctx context.Context, arg SeenEventIDsParams) ([]SeenEventIDsRow, error) {
+	rows, err := q.db.Query(ctx, seenEventIDs,
+		arg.Sources,
+		arg.EventIds,
+		arg.FromMonth,
+		arg.ToMonth,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SeenEventIDsRow
+	for rows.Next() {
+		var i SeenEventIDsRow
+		if err := rows.Scan(&i.Source, &i.EventID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const upsertSourceSequence = `-- name: UpsertSourceSequence :exec

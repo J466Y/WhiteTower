@@ -1,10 +1,24 @@
--- name: RecordEventID :one
--- Inserts an event ID for de-duplication within the current month.
--- Returns the audit ID if the event is fresh, or no rows if already seen.
+-- name: SeenEventIDs :many
+-- Returns which of a batch's events, by source and ID, the audit log recorded
+-- in the months from from_month to to_month.
+SELECT e.source, e.event_id
+FROM whitetower.audit_event_ids e
+JOIN (SELECT unnest(sqlc.arg(sources)::text[]) AS source, unnest(sqlc.arg(event_ids)::text[]) AS event_id) AS k
+  ON e.source = k.source AND e.event_id = k.event_id
+WHERE e.ingest_month BETWEEN sqlc.arg(from_month)::date AND sqlc.arg(to_month)::date;
+
+-- name: RecordEventIDs :many
+-- Records the IDs of a batch's new events in its month, in the order of their
+-- keys, so that batches that share events cannot deadlock. It returns the keys
+-- it recorded: a key that another transaction recorded since the batch's
+-- lookup is left out.
 INSERT INTO whitetower.audit_event_ids (source, event_id, ingest_month, audit_id)
-VALUES (sqlc.arg(source), sqlc.arg(event_id), sqlc.arg(ingest_month), sqlc.arg(audit_id))
+SELECT k.source, k.event_id, sqlc.arg(ingest_month)::date, k.audit_id
+FROM (SELECT unnest(sqlc.arg(sources)::text[]) AS source, unnest(sqlc.arg(event_ids)::text[]) AS event_id,
+             unnest(sqlc.arg(audit_ids)::uuid[]) AS audit_id) AS k
+ORDER BY k.source, k.event_id
 ON CONFLICT (source, event_id, ingest_month) DO NOTHING
-RETURNING audit_id;
+RETURNING source, event_id;
 
 -- name: LockSourceSequences :many
 -- Locks and returns the sequence rows for the given sources in source order,
@@ -38,9 +52,9 @@ WITH stored AS (
 INSERT INTO whitetower.audit_unsealed (audit_id, ingested_at)
 SELECT id, ingested_at FROM stored;
 
--- name: OldestUnsealedTime :one
--- The ingestion time of the oldest event awaiting sealing, for measuring lag.
-SELECT ingested_at
-FROM whitetower.audit_unsealed
-ORDER BY ingested_at, audit_id
-LIMIT 1;
+-- name: SealingLag :one
+-- How long, in microseconds, the oldest event awaiting sealing has waited, on
+-- the database's clock: the clock that stamped its ingestion time, and that
+-- dates the sealer's leaves. It is 0 when no event waits.
+SELECT coalesce(extract(epoch FROM clock_timestamp() - min(ingested_at)) * 1000000, 0)::bigint AS lag_us
+FROM whitetower.audit_unsealed;
