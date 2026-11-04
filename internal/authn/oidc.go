@@ -53,6 +53,10 @@ const (
 	// options set another timeout.
 	providerTimeout = 10 * time.Second
 
+	// signInRefused answers a sign-in whose ID token names the person
+	// otherwise than the server expects; the log says why.
+	signInRefused = "sign-in refused: the identity provider does not name this person as the server expects; ask an administrator"
+
 	// Discovery is retried firstDiscoveryRetry after the first failure, then
 	// after twice the delay each time, up to maxDiscoveryRetry.
 	firstDiscoveryRetry = time.Second
@@ -62,6 +66,13 @@ const (
 // ErrProviderUnavailable is returned while the service has not discovered its
 // identity provider, and so cannot verify ID tokens.
 var ErrProviderUnavailable = errors.New("the identity provider is not discovered yet")
+
+// ErrNoExternalID is returned for a verified ID token whose external ID
+// claim is missing, is not a string, or is no external ID: the sign-in cannot
+// tell which principal is the person's, and no other claim stands in for it,
+// since a principal found by another claim would be one that SCIM does not
+// reach.
+var ErrNoExternalID = errors.New("the ID token carries no external ID in its configured claim")
 
 // OIDCOptions holds options for configuring the OpenID Connect backend-for-frontend service.
 type OIDCOptions struct {
@@ -82,6 +93,7 @@ type OIDCOptions struct {
 	RedirectURL       string
 	Scopes            []string
 	GroupsClaim       string
+	ExternalIDClaim   string // The claim of the person's external ID, which SCIM sends as externalId: sub when empty.
 	RoleMapping       map[string]string
 	AllowedAlgorithms []string
 	Clock             clock.Clock
@@ -176,6 +188,9 @@ func NewOIDCService(opts OIDCOptions, principals *PrincipalStore, sessions *Sess
 	}
 	if opts.GroupsClaim == "" {
 		opts.GroupsClaim = "groups"
+	}
+	if opts.ExternalIDClaim == "" {
+		opts.ExternalIDClaim = "sub"
 	}
 	if len(opts.Scopes) == 0 {
 		opts.Scopes = []string{oidc.ScopeOpenID, "profile", "email", "groups"}
@@ -493,6 +508,10 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 	}
 
 	id, err := s.identityOf(idToken)
+	if errors.Is(err, ErrNoExternalID) {
+		http.Error(w, signInRefused, http.StatusForbidden)
+		return
+	}
 	if err != nil {
 		http.Error(w, "reading id token claims failed", http.StatusBadRequest)
 		return
@@ -514,6 +533,10 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 	switch {
 	case errors.Is(err, ErrPrincipalInactive):
 		http.Error(w, "account is deactivated", http.StatusForbidden)
+		return
+	case errors.Is(err, ErrExternalIDConflict):
+		s.logger.Warn("refusing a sign-in", "error", err, "claim", s.opts.ExternalIDClaim)
+		http.Error(w, signInRefused, http.StatusForbidden)
 		return
 	case err != nil:
 		s.logger.Error("signing in", "error", err)
@@ -696,6 +719,9 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 		created, err = s.tokens.createWithLifetimeTx(ctx, tx, p.ID, "wtctl", authz.PermissionsList(effectiveRoles), 12*time.Hour, actor)
 		return err
 	})
+	if errors.Is(err, ErrExternalIDConflict) {
+		s.logger.Warn("refusing a token exchange", "error", err, "claim", s.opts.ExternalIDClaim)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -703,9 +729,12 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 }
 
 // identityOf returns what a verified ID token says of the person: the
-// configured issuer, the subject, a name, the email address and the groups of
-// the groups claim. The name falls back to the preferred username, the email
-// address and the subject, in that order.
+// configured issuer, the subject, the external ID of the external ID claim, a
+// name, the email address and the groups of the groups claim. The name falls
+// back to the preferred username, the email address and the subject, in that
+// order. An external ID claim that is missing, is not a string or is no
+// external ID is ErrNoExternalID, and is logged by its name, never with its
+// value.
 func (s *OIDCService) identityOf(idToken *oidc.IDToken) (Identity, error) {
 	var claims idTokenClaims
 	if err := idToken.Claims(&claims); err != nil {
@@ -714,6 +743,13 @@ func (s *OIDCService) identityOf(idToken *oidc.IDToken) (Identity, error) {
 	var rawClaims map[string]any
 	if err := idToken.Claims(&rawClaims); err != nil {
 		return Identity{}, err
+	}
+
+	externalID, ok := rawClaims[s.opts.ExternalIDClaim].(string)
+	if !ok || checkExternalID(externalID) != nil {
+		s.logger.Warn("refusing a sign-in: the ID token's external ID claim is missing, not a string, blank or too long",
+			"claim", s.opts.ExternalIDClaim)
+		return Identity{}, ErrNoExternalID
 	}
 
 	var groups []string
@@ -748,6 +784,7 @@ func (s *OIDCService) identityOf(idToken *oidc.IDToken) (Identity, error) {
 	return Identity{
 		Issuer:      s.opts.Issuer,
 		Subject:     claims.Subject,
+		ExternalID:  externalID,
 		DisplayName: displayName,
 		Email:       email,
 		Groups:      groups,

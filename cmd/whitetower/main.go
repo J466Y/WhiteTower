@@ -227,6 +227,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			RedirectURL:       cfg.Auth.OIDC.RedirectURL,
 			Scopes:            cfg.Auth.OIDC.Scopes,
 			GroupsClaim:       cfg.Auth.OIDC.GroupsClaim,
+			ExternalIDClaim:   cfg.Auth.OIDC.ExternalIDClaim,
 			RoleMapping:       cfg.Auth.OIDC.RoleMapping,
 			AllowedAlgorithms: cfg.Auth.OIDC.AllowedAlgorithms,
 			Logger:            logger,

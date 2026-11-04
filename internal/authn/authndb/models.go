@@ -40,6 +40,7 @@ type WhitetowerPrincipal struct {
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	Version                int64
+	ExternalID             *string
 }
 
 type WhitetowerSession struct {

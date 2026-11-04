@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Principal adopted by SCIM",
+  "description": "SCIM provisioned a person who had signed in before: the externalId it sent is the external ID of the principal that the sign-in created, so SCIM took that principal over rather than creating a second one, and set its userName and attributes on it (HUM-05, AUD-01). From then on SCIM manages the principal, and its deactivation reaches the person who signs in. It names the person by the principal's pseudonymous ID only, never by name, email address, userName, IdP subject or external ID (NFR-20).",
+  "type": "object",
+  "required": [
+    "principal_id",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "principal_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "actor": {
+      "description": "SCIM's service account.",
+      "$ref": "common.schema.json#/$defs/actor"
+    }
+  }
+}

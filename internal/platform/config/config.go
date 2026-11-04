@@ -159,6 +159,8 @@ type OIDC struct {
 	Scopes []string `yaml:"scopes"`
 	// Claim name in the ID token that contains group memberships: groups by default.
 	GroupsClaim string `yaml:"groups_claim"`
+	// Claim name in the ID token whose value is the person's external ID, the value that the identity provider sends as externalId through SCIM: sub by default, oid for Microsoft Entra ID. A sign-in finds the principal with this external ID, so that SCIM's deactivation reaches the person who signs in. The claim must be a string that the person cannot change; an ID token without it is refused.
+	ExternalIDClaim string `yaml:"external_id_claim"`
 	// Map from IdP group names to White Tower roles (steering, advisory, owner, user, operator, auditor, admin).
 	RoleMapping map[string]string `yaml:"role_mapping"`
 	// Allowed signature algorithms for ID tokens: RS256, ES256, ES384, ES512, PS256 by default.
@@ -300,6 +302,7 @@ func Defaults() Config {
 				CLIClientID:       "wtctl",
 				Scopes:            []string{"openid", "profile", "email", "groups"},
 				GroupsClaim:       "groups",
+				ExternalIDClaim:   "sub",
 				AllowedAlgorithms: []string{"RS256", "ES256", "ES384", "ES512", "PS256"},
 				RoleMapping: map[string]string{
 					"wt-steering":  "steering",

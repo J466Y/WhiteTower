@@ -66,6 +66,7 @@ var rules = map[string]rule{
 	// People's principals and their sessions (plan P1-03).
 	"whitetower.principal.created.v1":        {actor: "actor", fixed: "success"},
 	"whitetower.principal.groups_changed.v1": {actor: "actor", fixed: "success"},
+	"whitetower.principal.adopted.v1":        {actor: "actor", fixed: "success"},
 	"whitetower.session.created.v1":          {actor: "actor", fixed: "success"},
 	"whitetower.session.revoked.v1":          {actor: "actor", fixed: "success", reason: "reason"},
 }

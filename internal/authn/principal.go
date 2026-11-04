@@ -7,9 +7,11 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn/authndb"
@@ -26,6 +28,26 @@ var ErrPrincipalNotFound = errors.New("principal not found")
 // issuer and subject of one that exists.
 var ErrPrincipalExists = errors.New("a principal with this issuer and subject exists")
 
+var (
+	// ErrExternalIDExists is returned when SCIM would provision a person
+	// whose external ID is that of a principal SCIM already manages.
+	ErrExternalIDExists = errors.New("SCIM already manages the principal with this external ID")
+
+	// ErrExternalIDConflict is returned when a sign-in finds no principal by
+	// its external ID, and the principal with its issuer and subject holds
+	// another external ID.
+	ErrExternalIDConflict = errors.New("the principal with the sign-in's issuer and subject holds another external ID")
+
+	// ErrInvalidExternalID is returned for an external ID that is empty,
+	// blank or longer than MaxExternalIDLength characters.
+	ErrInvalidExternalID = fmt.Errorf("an external ID is a string of 1 to %d characters, not blank", MaxExternalIDLength)
+)
+
+// MaxExternalIDLength is the longest external ID, in characters, as the
+// database bounds it: an identity provider's IDs, such as a UUID or Entra
+// ID's object ID, are far shorter.
+const MaxExternalIDLength = 255
+
 // scimIssuer is the issuer of the principals that SCIM manages, whose subject
 // is the userName that SCIM gave them.
 const scimIssuer = "scim"
@@ -34,6 +56,16 @@ const scimIssuer = "scim"
 // break-glass custodian, and SCIM's service account, which audit events name
 // as actor. They are nobody's, so SCIM never reaches them (KIL-08, HUM-06).
 var systemPrincipalIDs = []uuid.UUID{BreakglassPrincipalID, SCIMPrincipalID}
+
+// checkExternalID returns ErrInvalidExternalID unless v can be an external
+// ID: the identity provider's ID of a person, which a sign-in and SCIM
+// compare exactly, so it is stored as given.
+func checkExternalID(v string) error {
+	if strings.TrimSpace(v) == "" || utf8.RuneCountInString(v) > MaxExternalIDLength {
+		return ErrInvalidExternalID
+	}
+	return nil
+}
 
 var (
 	// ErrResponsibleNotHuman is returned when a principal that is not a human
@@ -56,6 +88,7 @@ type Principal struct {
 	Status                 string
 	StatusChangedAt        *time.Time
 	StatusReason           *string
+	ExternalID             *string
 	IDPGroups              []string
 	LastLoginAt            *time.Time
 	ResponsiblePrincipalID *uuid.UUID
@@ -85,29 +118,42 @@ func NewPrincipalStore(database *db.DB, clk clock.Clock, writer *audit.Writer, s
 }
 
 // Identity is what an identity provider says of a person at a sign-in, or
-// what SCIM provisions: the issuer and subject that name them, their name and
-// email address, and the groups from which their roles come.
+// what SCIM provisions: the issuer and subject that name them, their external
+// ID, their name and email address, and the groups from which their roles
+// come.
 type Identity struct {
 	Issuer      string
 	Subject     string
 	DisplayName string
 	Email       *string
 	Groups      []string
+	// ExternalID is the identity provider's ID of the person, which it sends
+	// as externalId through SCIM, and in a claim of its ID tokens
+	// (auth.oidc.external_id_claim): a sign-in finds the principal by it.
+	ExternalID string
 }
 
 // SignIn creates the principal of the person whom id names, or updates the
-// one with its issuer and subject, at a sign-in through method: "oidc" from a
-// browser, or "token_exchange" from the CLI. In the same transaction it
-// records what changed (AUD-01): whitetower.principal.created.v1 for a new
-// principal, and whitetower.principal.groups_changed.v1 when the groups,
-// compared as sets, are not those the principal had. Then, still in that
-// transaction, it runs then, when not nil, for the rest of the sign-in: its
-// session or its token. An inactive principal is refused with
-// ErrPrincipalInactive, and nothing is written: neither its record nor an
+// one it finds, at a sign-in through method: "oidc" from a browser, or
+// "token_exchange" from the CLI. It finds the principal with the external ID
+// of id, which SCIM may have provisioned, else the one with its issuer and
+// subject that has no external ID yet, which it then gives the external ID:
+// a principal that a sign-in created before external IDs existed. In the same
+// transaction it records what changed (AUD-01):
+// whitetower.principal.created.v1 for a new principal, and
+// whitetower.principal.groups_changed.v1 when the groups, compared as sets,
+// are not those the principal had. Then, still in that transaction, it runs
+// then, when not nil, for the rest of the sign-in: its session or its token.
+// An inactive principal is refused with ErrPrincipalInactive, and a principal
+// with the issuer and subject but another external ID with
+// ErrExternalIDConflict; nothing is written then: neither a record nor an
 // event.
 func (ps *PrincipalStore) SignIn(ctx context.Context, method string, id Identity, then func(ctx context.Context, tx *db.Tx, p *Principal) error) (*Principal, error) {
 	if id.Issuer == "" || id.Subject == "" || id.DisplayName == "" {
 		return nil, errors.New("issuer, subject, and displayName are required")
+	}
+	if err := checkExternalID(id.ExternalID); err != nil {
+		return nil, err
 	}
 	newID, err := uuid.NewV7()
 	if err != nil {
@@ -137,22 +183,25 @@ func (ps *PrincipalStore) SignIn(ctx context.Context, method string, id Identity
 }
 
 // signInHuman creates the principal of id in tx, with newID, or updates the
-// one with its issuer and subject, at a sign-in through method, and records
-// what changed. It locks the principal's row before it reads the groups, so
-// that two sign-ins of one person at once, on one replica or two, create one
+// one that lockAtSignIn finds, at a sign-in through method, and records what
+// changed. It locks the principal's row before it reads the groups, so that
+// two sign-ins of one person at once, on one replica or two, create one
 // principal and record one creation, and the second records its change from
 // the groups that the first wrote. Under READ COMMITTED, an insert that meets
-// a principal that another transaction created waits for that transaction,
-// and once it commits inserts nothing: the next lock, a new statement, finds
-// the principal.
+// a principal that another transaction created, with the external ID or the
+// issuer and subject, waits for that transaction, and once it commits inserts
+// nothing: the next lock, a new statement, finds the principal. Break-glass
+// signs in with no external ID: its custodian has none, and is found by its
+// issuer and subject alone.
 func signInHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.Time, newID uuid.UUID, method string, id Identity) (*Principal, error) {
 	q := authndb.New(tx)
 	groups := groupSet(id.Groups)
 	for attempt := 1; ; attempt++ {
-		held, err := q.LockHumanPrincipalByIdentity(ctx, authndb.LockHumanPrincipalByIdentityParams{Issuer: &id.Issuer, Subject: &id.Subject})
+		held, err := lockAtSignIn(ctx, q, id)
 		if err == nil {
 			row, err := q.UpdateHumanPrincipalAtSignIn(ctx, authndb.UpdateHumanPrincipalAtSignInParams{
 				ID:          held.ID,
+				ExternalID:  externalID(id),
 				DisplayName: id.DisplayName,
 				Email:       id.Email,
 				IdpGroups:   groups,
@@ -196,39 +245,153 @@ func signInHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.
 	}
 }
 
-// ProvisionHuman creates the principal of the person whom id names, as SCIM
-// provisions it, and records whitetower.principal.created.v1 in the same
-// transaction, with SCIM's service account as actor. A principal with the
-// issuer and subject exists already: ErrPrincipalExists, and nothing is
-// written. SCIM is never a sign-in, so the principal has no last login.
+// lockAtSignIn locks the principal that a sign-in of id finds: the one with
+// its external ID, else the one with its issuer and subject, which the
+// sign-in links when it has no external ID yet. A principal with the issuer
+// and subject but another external ID is ErrExternalIDConflict: the identity
+// provider now names the person by another value than their principal holds,
+// as after auth.oidc.external_id_claim changed, and the sign-in neither
+// changes that external ID, by which SCIM may know the principal, nor creates
+// a second principal with the same issuer and subject. None: pgx.ErrNoRows.
+func lockAtSignIn(ctx context.Context, q *authndb.Queries, id Identity) (authndb.WhitetowerPrincipal, error) {
+	if id.ExternalID != "" {
+		held, err := q.LockHumanPrincipalByExternalID(ctx, &id.ExternalID)
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return held, err
+		}
+	}
+	held, err := q.LockHumanPrincipalByIdentity(ctx, authndb.LockHumanPrincipalByIdentityParams{Issuer: &id.Issuer, Subject: &id.Subject})
+	// A sign-in of the same person that linked the principal while this
+	// lock waited for it leaves the principal with this external ID.
+	if err == nil && held.ExternalID != nil && *held.ExternalID != id.ExternalID {
+		return held, fmt.Errorf("%w: principal %s", ErrExternalIDConflict, held.ID)
+	}
+	return held, err
+}
+
+// externalID returns the external ID of id, or nil for none.
+func externalID(id Identity) *string {
+	if id.ExternalID == "" {
+		return nil
+	}
+	return &id.ExternalID
+}
+
+// ProvisionHuman provisions the person whom id names, as SCIM does: their
+// principal takes SCIM's issuer, scim, and their userName, in id.Subject, as
+// its subject, so that SCIM finds it by its userName, and the external ID of
+// id, by which the person's sign-ins find it. In the same transaction it
+// records what it did, with SCIM's service account as actor:
+//
+//   - a person who never signed in gets a new principal, and
+//     whitetower.principal.created.v1;
+//   - a person who signed in before SCIM provisioned them has the principal
+//     that their first sign-in created, with the same external ID: SCIM
+//     adopts that principal rather than creating a second one, sets its
+//     userName, name and email address on it, and records
+//     whitetower.principal.adopted.v1. Its ID, status, groups and last login
+//     stay as they are.
+//
+// A principal with the userName exists already: ErrPrincipalExists. One that
+// SCIM manages has the external ID: ErrExternalIDExists. Nothing is written
+// then. SCIM is never a sign-in, so it gives no principal a last login.
 func (ps *PrincipalStore) ProvisionHuman(ctx context.Context, id Identity) (*Principal, error) {
-	if id.Issuer == "" || id.Subject == "" || id.DisplayName == "" {
-		return nil, errors.New("issuer, subject, and displayName are required")
+	id.Issuer = scimIssuer
+	if id.Subject == "" || id.DisplayName == "" {
+		return nil, errors.New("userName and displayName are required")
+	}
+	if err := checkExternalID(id.ExternalID); err != nil {
+		return nil, err
 	}
 	newID, err := uuid.NewV7()
 	if err != nil {
 		return nil, fmt.Errorf("generating principal UUID: %w", err)
 	}
-	var created *Principal
-	err = ps.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) (err error) {
-		created, err = createHuman(ctx, tx, ps.writer, ps.clk.Now().UTC(), newID, "scim", id, nil)
-		return err
+	now := ps.clk.Now().UTC()
+	var provisioned *Principal
+	err = ps.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
+		q := authndb.New(tx)
+		_, err := q.GetHumanPrincipalByIdentity(ctx, authndb.GetHumanPrincipalByIdentityParams{Issuer: &id.Issuer, Subject: &id.Subject})
+		if err == nil {
+			return ErrPrincipalExists
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("reading the principal with the userName: %w", err)
+		}
+		for attempt := 1; ; attempt++ {
+			held, err := q.LockHumanPrincipalByExternalID(ctx, &id.ExternalID)
+			switch {
+			case err == nil && held.Issuer != nil && *held.Issuer == scimIssuer:
+				return ErrExternalIDExists
+			case err == nil:
+				provisioned, err = adoptHuman(ctx, tx, ps.writer, now, held.ID, id)
+				return err
+			case !errors.Is(err, pgx.ErrNoRows):
+				return fmt.Errorf("locking principal: %w", err)
+			case attempt > 1:
+				// The creation met a principal with the userName, which
+				// another transaction created since the check above.
+				return ErrPrincipalExists
+			}
+			provisioned, err = createHuman(ctx, tx, ps.writer, now, newID, "scim", id, nil)
+			if !errors.Is(err, ErrPrincipalExists) {
+				return err
+			}
+			// Another transaction created a principal with the userName or
+			// the external ID since the lock found none, and has committed:
+			// the next lock tells which.
+		}
 	})
 	if err != nil {
 		return nil, err
 	}
-	return created, nil
+	return provisioned, nil
+}
+
+// adoptHuman gives the principal with the ID given, which a sign-in created,
+// SCIM's issuer and the userName, name and email address of id, in tx, and
+// records the adoption. Another transaction created a principal with the
+// userName since ProvisionHuman checked: ErrPrincipalExists.
+func adoptHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.Time, principalID uuid.UUID, id Identity) (*Principal, error) {
+	row, err := authndb.New(tx).AdoptHumanPrincipal(ctx, authndb.AdoptHumanPrincipalParams{
+		ID:          principalID,
+		Issuer:      &id.Issuer,
+		Subject:     &id.Subject,
+		DisplayName: id.DisplayName,
+		Email:       id.Email,
+		UpdatedAt:   now,
+	})
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "principals_idp_identity" {
+		return nil, ErrPrincipalExists
+	}
+	if err != nil {
+		return nil, fmt.Errorf("adopting principal: %w", err)
+	}
+	if err := writer.Record(ctx, tx, audit.Event{
+		Type:    "whitetower.principal.adopted.v1",
+		Subject: row.ID.String(),
+		Data: map[string]any{
+			"principal_id": row.ID.String(),
+			"actor":        actorOf("scim", row.ID),
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("recording the principal's adoption: %w", err)
+	}
+	return fromDBModel(row), nil
 }
 
 // createHuman inserts the principal of id in tx, with newID, and records its
-// creation through method. A principal with the issuer and subject exists, or
-// another transaction created one that committed: ErrPrincipalExists.
+// creation through method. A principal with the issuer and subject or the
+// external ID exists, or another transaction created one that committed:
+// ErrPrincipalExists.
 func createHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.Time, newID uuid.UUID, method string, id Identity, lastLogin *time.Time) (*Principal, error) {
 	groups := groupSet(id.Groups)
 	row, err := authndb.New(tx).InsertHumanPrincipal(ctx, authndb.InsertHumanPrincipalParams{
 		ID:          newID,
 		Issuer:      &id.Issuer,
 		Subject:     &id.Subject,
+		ExternalID:  externalID(id),
 		DisplayName: id.DisplayName,
 		Email:       id.Email,
 		IdpGroups:   groups,
@@ -325,8 +488,8 @@ func (ps *PrincipalStore) GetPerson(ctx context.Context, id uuid.UUID) (*Princip
 	return fromDBModel(row), nil
 }
 
-// GetBySCIMUserName returns the principal that SCIM provisioned with the
-// userName given.
+// GetBySCIMUserName returns the principal that SCIM provisioned, or adopted,
+// with the userName given.
 func (ps *PrincipalStore) GetBySCIMUserName(ctx context.Context, userName string) (*Principal, error) {
 	return ps.GetByIdentity(ctx, scimIssuer, userName)
 }
@@ -508,6 +671,7 @@ func fromDBModel(r authndb.WhitetowerPrincipal) *Principal {
 		Status:                 r.Status,
 		StatusChangedAt:        r.StatusChangedAt,
 		StatusReason:           r.StatusReason,
+		ExternalID:             r.ExternalID,
 		IDPGroups:              append([]string{}, r.IdpGroups...),
 		LastLoginAt:            r.LastLoginAt,
 		ResponsiblePrincipalID: r.ResponsiblePrincipalID,

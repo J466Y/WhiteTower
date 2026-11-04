@@ -147,6 +147,7 @@ auth:
       - "profile"
       - "email"
     groups_claim: "groups"
+    external_id_claim: "sub"
     role_mapping:
       wt-steering: steering
       wt-advisory: advisory
@@ -161,6 +162,8 @@ auth:
 ```
 
 The state key signs the state of each sign-in, which the browser keeps in a cookie until Keycloak sends it back. Make it once, with `openssl rand -base64 32 > oidc-state-key`, and give every replica of the server the same file, so that a sign-in can end on another replica than the one it started on.
+
+`external_id_claim` names the claim of the ID token that identifies the person to SCIM as well: the section on SCIM below says which to choose.
 
 The scopes leave out `groups`, which the server asks for by default. Keycloak defines no `groups` client scope and answers `invalid_scope` to a request for one, while the mapper of step 4 already puts the groups in the ID token. To ask for `groups`, first create a client scope named `groups` in Keycloak and add it to the client's default client scopes.
 
@@ -186,6 +189,33 @@ The scopes leave out `groups`, which the server asks for by default. Keycloak de
      }
      ```
    - The audit log records nothing of the sign-in yet: the first sign-in creates the principal, and each sign-in updates its groups and its last sign-in time, without an audit event. The events of people and sessions are planned (requirement AUD-01). A sign-in that fails leaves its cause in the server's log.
+
+---
+
+## SCIM and sign-in: one principal per person
+
+When the identity provider also provisions people through SCIM (`auth.scim.enabled`), the user that SCIM creates and the person who signs in must be the same principal, or SCIM's deactivation does not reach the person (requirement HUM-05, security test ST-21). White Tower links them by one value, the person's **external ID**:
+
+- SCIM sends it as the user's `externalId`. White Tower refuses a user without one (`400`, `invalidValue`), and a change of it in a `PATCH` (`400`, `mutability`): the external ID is what ties the user to the person who signs in.
+- The ID token carries it in the claim that `auth.oidc.external_id_claim` names: `sub` by default. A sign-in finds the principal with that external ID. An ID token without the claim, or whose claim is not a string, is refused (`403`), and the server's log names the claim, never its value. No other claim stands in for it.
+
+Map both to the same value, one that never changes and that the person cannot edit: not an email address or a username.
+
+| Who issues the ID token | `auth.oidc.external_id_claim` | SCIM's `externalId` |
+| --- | --- | --- |
+| Keycloak, for its own users | `sub`, the default: the user's ID in Keycloak | The user's ID, if a SCIM client provisions from Keycloak |
+| Microsoft Entra ID, signing in to White Tower directly | `oid`: the user's object ID, which Entra ID puts in the ID token with the `profile` scope. Entra ID's `sub` differs from one client to another, the console's and the CLI's included | The object ID. Entra ID's default SCIM mapping sends `mailNickname` as `externalId`: in the enterprise application, under **Provisioning** > **Mappings** > **Provision Microsoft Entra ID Users**, edit the mapping of `externalId` and choose the source attribute `objectId` |
+| Keycloak, brokering Entra ID through SAML as this guide does | `oid`, which Keycloak must add: its own `sub` is a user ID that Entra ID does not know. Import the SAML attribute `http://schemas.microsoft.com/identity/claims/objectidentifier` into a user attribute with an **Attribute Importer** mapper (step 3), and add a **User Attribute** mapper to the `whitetower-console` client that writes it into the ID token as `oid` | The object ID, mapped from `objectId` as above |
+
+If the two values differ, SCIM's user and the person who signs in are two principals: SCIM's deactivation deactivates its own, and the person's sessions and API tokens stay valid.
+
+A person who signed in before SCIM provisioned them already has a principal with their external ID. SCIM's creation of that user takes the principal over rather than creating a second one: the answer is `201` with the principal's ID, SCIM's `userName`, name and email address are set on it, and the audit log records `whitetower.principal.adopted.v1`. A user whose `externalId` SCIM already gave another user is refused (`409`, `uniqueness`).
+
+SCIM supports one filter, `userName eq "value"`, which finds the user that SCIM created, or took over, with that `userName`. Any other filter, such as `emails.value eq` or `externalId eq`, is refused (`400`, `invalidFilter`). SCIM reaches people only: never a service account or the break-glass custodian.
+
+Choose the claim before people sign in: changing `auth.oidc.external_id_claim` afterwards is not supported yet. The principal of a person who signed in before holds the old value, so their sign-in finds no principal by the new one, finds theirs by its issuer and subject, and is refused (`403`); the server logs `refusing a sign-in` with the principal's ID and the claim's name, and no value of the token.
+
+When upgrading from a version without external IDs, the principals that people signed in as have none until their next sign-in, which gives them theirs. If SCIM provisions such a person before they sign in again, it creates a second principal, which their sign-ins find from then on. No release of White Tower came before external IDs, so this concerns development and evaluation data only.
 
 ---
 

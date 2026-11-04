@@ -50,11 +50,11 @@ func TestOnlyThePrefixedSessionCookieSignsIn(t *testing.T) {
 	sessionStore, principalStore, tokenStore, _ := setupAuthn(t, clk)
 	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, nil)
 
-	victim, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-victim", DisplayName: "Vera Victim"}, nil)
+	victim, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-victim", ExternalID: "sub-victim", DisplayName: "Vera Victim"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	attacker, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-attacker", DisplayName: "Mallory Planter"}, nil)
+	attacker, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-attacker", ExternalID: "sub-attacker", DisplayName: "Mallory Planter"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestSessionLifecycleAndSecurity(t *testing.T) {
 	sessionStore, principalStore, _, _ := setupAuthn(t, clk)
 
 	email := "alice@example.com"
-	principal, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-12345", DisplayName: "Alice Operator", Email: &email, Groups: []string{"operators"}}, nil)
+	principal, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-12345", ExternalID: "sub-12345", DisplayName: "Alice Operator", Email: &email, Groups: []string{"operators"}}, nil)
 	if err != nil {
 		t.Fatalf("upserting principal: %v", err)
 	}

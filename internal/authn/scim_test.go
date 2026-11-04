@@ -79,6 +79,7 @@ func TestSCIMDeprovisioningAndSecurity(t *testing.T) {
 	t.Run("provisions user via POST /scim/v2/Users", func(t *testing.T) {
 		payload := `{
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"externalId": "idp-olivia",
 			"userName": "olivia@example.com",
 			"displayName": "Olivia Owner",
 			"name": {
@@ -253,6 +254,7 @@ func TestSCIMDeprovisioningAndSecurity(t *testing.T) {
 		// Provision Bob
 		bobPayload := `{
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"externalId": "idp-bob",
 			"userName": "bob@example.test",
 			"displayName": "Bob Builder",
 			"active": true
@@ -423,7 +425,7 @@ func TestSCIMReachesOnlyPeople(t *testing.T) {
 	breakglassSignIn(t, breakglass, rawCred)
 	email := "olga@example.test"
 	olga, err := principalStore.SignIn(ctx, "oidc", authn.Identity{
-		Issuer: "https://idp.example.com", Subject: "sub-olga", DisplayName: "Olga Owner", Email: &email, Groups: []string{"wt-auditors"},
+		Issuer: "https://idp.example.com", Subject: "sub-olga", ExternalID: "sub-olga", DisplayName: "Olga Owner", Email: &email, Groups: []string{"wt-auditors"},
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -497,7 +499,7 @@ func TestSCIMRefusesTheFiltersItDoesNotSupport(t *testing.T) {
 	clk := clocktest.New(testEpoch)
 	_, principalStore, _, _ := setupAuthn(t, clk)
 	scim := scimClient(t, principalStore)
-	created := scim(http.MethodPost, "/scim/v2/Users", `{"userName":"ruth@example.test"}`)
+	created := scim(http.MethodPost, "/scim/v2/Users", `{"externalId":"idp-ruth","userName":"ruth@example.test"}`)
 	var user struct {
 		ID string `json:"id"`
 	}

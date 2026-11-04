@@ -399,6 +399,10 @@ func (s Server) ExchangeToken(ctx context.Context, request gen.ExchangeTokenRequ
 		if errors.Is(err, authn.ErrPrincipalInactive) {
 			return nil, problem.New(problem.Forbidden, "account is deactivated")
 		}
+		if errors.Is(err, authn.ErrNoExternalID) || errors.Is(err, authn.ErrExternalIDConflict) {
+			// The server's log says which, by the claim's name.
+			return nil, problem.New(problem.Forbidden, "the identity provider does not name this person as the server expects")
+		}
 		if errors.Is(err, authn.ErrInvalidToken) {
 			// A fixed detail: the exchanger's error names an API token, and
 			// its cause stays in the log.

@@ -256,6 +256,16 @@
       "example": "examples/whitetower.principal.groups_changed.v1.json"
     },
     {
+      "type": "whitetower.principal.adopted.v1",
+      "summary": "SCIM took over the principal of a person who had signed in before it provisioned them, rather than creating a second one (HUM-05).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.principal.adopted.v1.json",
+      "example": "examples/whitetower.principal.adopted.v1.json"
+    },
+    {
       "type": "whitetower.session.created.v1",
       "summary": "A person signed in to the console from a browser through the identity provider (HUM-01).",
       "emitters": [

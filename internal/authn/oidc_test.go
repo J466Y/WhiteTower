@@ -593,7 +593,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 	t.Run("inactive principal cannot log in", func(t *testing.T) {
 		// First deactivate principal
 		deactEmail := "inactive@example.com"
-		p, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "sub-inactive-123", DisplayName: "Inactive User", Email: &deactEmail}, nil)
+		p, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "sub-inactive-123", ExternalID: "sub-inactive-123", DisplayName: "Inactive User", Email: &deactEmail}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -643,7 +643,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 
 	t.Run("logout revokes session and redirects", func(t *testing.T) {
 		// Create a session to log out from
-		p, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "sub-logout-user", DisplayName: "Logout User"}, nil)
+		p, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "sub-logout-user", ExternalID: "sub-logout-user", DisplayName: "Logout User"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -752,7 +752,7 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 	})
 
 	t.Run("a session planted under the unprefixed name", func(t *testing.T) {
-		mallory, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-mallory", DisplayName: "Mallory Planter"}, nil)
+		mallory, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-mallory", ExternalID: "usr-mallory", DisplayName: "Mallory Planter"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

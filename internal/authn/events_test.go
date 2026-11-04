@@ -32,6 +32,7 @@ import (
 
 const (
 	principalCreated = "whitetower.principal.created.v1"
+	principalAdopted = "whitetower.principal.adopted.v1"
 	groupsChanged    = "whitetower.principal.groups_changed.v1"
 	sessionCreated   = "whitetower.session.created.v1"
 	sessionRevoked   = "whitetower.session.revoked.v1"
@@ -110,10 +111,11 @@ func checkEvent(t *testing.T, e recorded, actorType, actorID string, want map[st
 }
 
 // checkNoneHolds fails the test if an event of people or their sessions holds
-// one of values: names, email addresses, IdP subjects and tokens.
+// one of values: names, email addresses, IdP subjects, external IDs and
+// tokens.
 func checkNoneHolds(t *testing.T, database *db.DB, values ...string) {
 	t.Helper()
-	for _, typ := range []string{principalCreated, groupsChanged, sessionCreated, sessionRevoked} {
+	for _, typ := range []string{principalCreated, principalAdopted, groupsChanged, sessionCreated, sessionRevoked} {
 		for _, e := range eventsOf(t, database, typ) {
 			for _, v := range values {
 				if strings.Contains(e.canonical, v) {
@@ -224,7 +226,7 @@ func TestASignInRecordsThePrincipalsCreationAndAChangeOfItsGroups(t *testing.T) 
 	_, principalStore, _, database := setupAuthn(t, clk)
 	email := "carol@example.com"
 	id := authn.Identity{
-		Issuer: "https://idp.example.com", Subject: "sub-carol", DisplayName: "Carol Canary", Email: &email,
+		Issuer: "https://idp.example.com", Subject: "sub-carol", ExternalID: "sub-carol", DisplayName: "Carol Canary", Email: &email,
 		Groups: []string{"wt-owners", "wt-auditors", "wt-owners"},
 	}
 
@@ -273,19 +275,27 @@ func TestASignInRecordsThePrincipalsCreationAndAChangeOfItsGroups(t *testing.T) 
 	checkNoneHolds(t, database, "Carol Canary", email, "sub-carol")
 }
 
-// Sign-ins of one person at once, on two replicas, record one creation, and
-// each change of groups from the groups before it: the second sign-in waits
-// for the first, which holds the principal it created or changed, until the
-// first commits. The audit log holds the first sign-in at its event until the
-// second waits.
+// Sign-ins of one person at once, on two replicas, find one principal by its
+// external ID, record one creation, and each change of groups from the groups
+// before it: the second sign-in waits for the first, which holds the
+// principal it created or changed, until the first commits. That holds when
+// the two sign-ins carry two subjects, as Entra ID's sub differs between the
+// console's client and the CLI's, and when they link a principal that has no
+// external ID yet. The audit log holds the first sign-in at its event until
+// the second waits.
 func TestSignInsOfOnePersonAtOnceRecordEachChangeOnce(t *testing.T) {
 	for _, tt := range []struct {
-		name    string
-		known   bool
-		changes [][2][]string // before and after, oldest first
+		name     string
+		known    bool          // the person signed in before
+		unlinked bool          // and their principal has no external ID, as before external IDs
+		subjects [2]string     // of the two sign-ins
+		changes  [][2][]string // before and after, oldest first
 	}{
-		{"first sign-ins", false, [][2][]string{{{"first"}, {"second"}}}},
-		{"sign-ins of a known person", true, [][2][]string{{{"known"}, {"first"}}, {{"first"}, {"second"}}}},
+		{"first sign-ins", false, false, [2]string{"sub-dana", "sub-dana"}, [][2][]string{{{"first"}, {"second"}}}},
+		{"first sign-ins with two subjects", false, false, [2]string{"sub-dana", "sub-dana-cli"}, [][2][]string{{{"first"}, {"second"}}}},
+		{"sign-ins of a known person", true, false, [2]string{"sub-dana", "sub-dana"}, [][2][]string{{{"known"}, {"first"}}, {{"first"}, {"second"}}}},
+		{"sign-ins of a known person with two subjects", true, false, [2]string{"sub-dana-cli", "sub-dana"}, [][2][]string{{{"known"}, {"first"}}, {{"first"}, {"second"}}}},
+		{"sign-ins that link a known person's principal", true, true, [2]string{"sub-dana", "sub-dana"}, [][2][]string{{{"known"}, {"first"}}, {{"first"}, {"second"}}}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -303,12 +313,18 @@ func TestSignInsOfOnePersonAtOnceRecordEachChangeOnce(t *testing.T) {
 			}
 			pool, first := replica("replica-a")
 			_, second := replica("replica-b")
-			dana := func(groups ...string) authn.Identity {
-				return authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-dana", DisplayName: "Dana Canary", Groups: groups}
+			dana := func(subject string, groups ...string) authn.Identity {
+				return authn.Identity{Issuer: "https://idp.example.com", Subject: subject, ExternalID: "idp-dana", DisplayName: "Dana Canary", Groups: groups}
 			}
 			if tt.known {
-				if _, err := first.SignIn(ctx, "oidc", dana("known"), nil); err != nil {
+				known, err := first.SignIn(ctx, "oidc", dana("sub-dana", "known"), nil)
+				if err != nil {
 					t.Fatal(err)
+				}
+				if tt.unlinked {
+					if _, err := pool.Exec(ctx, "UPDATE whitetower.principals SET external_id = NULL WHERE id = $1", known.ID); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 
@@ -324,13 +340,13 @@ func TestSignInsOfOnePersonAtOnceRecordEachChangeOnce(t *testing.T) {
 				err error
 			}
 			results := make(chan result, 2)
-			signIn := func(store *authn.PrincipalStore, groups string) {
-				p, err := store.SignIn(ctx, "oidc", dana(groups), nil)
+			signIn := func(store *authn.PrincipalStore, subject, groups string) {
+				p, err := store.SignIn(ctx, "oidc", dana(subject, groups), nil)
 				results <- result{p, err}
 			}
-			go signIn(first, "first")
+			go signIn(first, tt.subjects[0], "first")
 			awaitLockWaits(t, pool, 1)
-			go signIn(second, "second")
+			go signIn(second, tt.subjects[1], "second")
 			awaitLockWaits(t, pool, 2)
 			if err := hold.Rollback(ctx); err != nil {
 				t.Fatal(err)
@@ -351,8 +367,8 @@ func TestSignInsOfOnePersonAtOnceRecordEachChangeOnce(t *testing.T) {
 				checkEvent(t, changed[i], "human", a.p.ID.String(), map[string]any{"before": want[0], "after": want[1]})
 			}
 			stored, err := first.GetByID(ctx, a.p.ID)
-			if err != nil || !reflect.DeepEqual(stored.IDPGroups, []string{"second"}) {
-				t.Errorf("the principal keeps %v (%v), want the second sign-in's groups", stored, err)
+			if err != nil || !reflect.DeepEqual(stored.IDPGroups, []string{"second"}) || stored.ExternalID == nil || *stored.ExternalID != "idp-dana" {
+				t.Errorf("the principal keeps %+v (%v), want the second sign-in's groups and the external ID", stored, err)
 			}
 		})
 	}
@@ -385,7 +401,7 @@ func TestAChangeAndItsEventCommitTogether(t *testing.T) {
 	ctx := context.Background()
 	clk := clocktest.New(testEpoch)
 	sessionStore, principalStore, _, database := setupAuthn(t, clk)
-	erin := authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-erin", DisplayName: "Erin Canary", Groups: []string{"wt-owners"}}
+	erin := authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-erin", ExternalID: "sub-erin", DisplayName: "Erin Canary", Groups: []string{"wt-owners"}}
 	failed := errors.New("the session cannot be created")
 	failing := func(context.Context, *db.Tx, *authn.Principal) error { return failed }
 	unchanged := func(t *testing.T, id authn.Identity, groups []string) {
@@ -425,7 +441,7 @@ func TestAChangeAndItsEventCommitTogether(t *testing.T) {
 
 	t.Run("the event cannot be recorded", func(t *testing.T) {
 		refusing := authn.NewPrincipalStore(database, clk, refusingWriter(t, clk, principalCreated, groupsChanged), nil, nil)
-		frank := authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-frank", DisplayName: "Frank Canary"}
+		frank := authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-frank", ExternalID: "sub-frank", DisplayName: "Frank Canary"}
 		if _, err := refusing.SignIn(ctx, "oidc", frank, nil); err == nil {
 			t.Fatal("a creation that cannot be recorded succeeded")
 		}
@@ -577,7 +593,7 @@ func TestAnInactivePrincipalsSignInWritesNothing(t *testing.T) {
 	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
 	svc := eventsService(t, idp, clk, principalStore, sessionStore, tokenStore)
 
-	gina, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-gina", DisplayName: "Gina Canary", Groups: []string{"wt-owners"}}, nil)
+	gina, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-gina", ExternalID: "usr-gina", DisplayName: "Gina Canary", Groups: []string{"wt-owners"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -586,7 +602,7 @@ func TestAnInactivePrincipalsSignInWritesNothing(t *testing.T) {
 	}
 	// Later, so that a sign-in that wrote the last login would show.
 	clk.Advance(time.Hour)
-	hank, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-hank", DisplayName: "Hank Canary"}, nil)
+	hank, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-hank", ExternalID: "usr-hank", DisplayName: "Hank Canary"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -646,7 +662,7 @@ func TestASignOutIsRecordedOnlyWhenItEndsAnActiveSession(t *testing.T) {
 		return eventsOf(t, database, sessionRevoked)
 	}
 
-	jane, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-jane", DisplayName: "Jane Canary"}, nil)
+	jane, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-jane", ExternalID: "usr-jane", DisplayName: "Jane Canary"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -744,7 +760,7 @@ func TestABreakglassSignInIsRecordedOnce(t *testing.T) {
 		}
 	}
 
-	alice, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-alice", DisplayName: "Alice Canary"}, nil)
+	alice, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-alice", ExternalID: "sub-alice", DisplayName: "Alice Canary"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -783,8 +799,8 @@ func TestABreakglassSignInIsRecordedOnce(t *testing.T) {
 
 // SCIM's creation of a person records the principal's creation, with SCIM's
 // service account as actor, and no sign-in. A userName that exists is not
-// created again, nor recorded, whether the handler finds it or the store does,
-// as for a create that another one overtook.
+// created again, nor recorded, through the handler or the store, with the
+// same external ID or another.
 func TestASCIMProvisioningIsRecordedAsSCIMs(t *testing.T) {
 	ctx := context.Background()
 	clk := clocktest.New(testEpoch)
@@ -799,7 +815,7 @@ func TestASCIMProvisioningIsRecordedAsSCIMs(t *testing.T) {
 	}
 	create := func() int {
 		req := httptest.NewRequest(http.MethodPost, "/scim/v2/Users", strings.NewReader(
-			`{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"kim@example.test","displayName":"Kim Canary"}`))
+			`{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"externalId":"idp-kim","userName":"kim@example.test","displayName":"Kim Canary"}`))
 		req.Header.Set("Authorization", "Bearer scim-test-token")
 		rec := httptest.NewRecorder()
 		scim.ServeHTTP(rec, req)
@@ -827,7 +843,7 @@ func TestASCIMProvisioningIsRecordedAsSCIMs(t *testing.T) {
 	if code := create(); code != http.StatusConflict {
 		t.Errorf("the same userName again: got %d, want 409", code)
 	}
-	_, err = principalStore.ProvisionHuman(ctx, authn.Identity{Issuer: "scim", Subject: "kim@example.test", DisplayName: "Kim Canary"})
+	_, err = principalStore.ProvisionHuman(ctx, authn.Identity{Issuer: "scim", Subject: "kim@example.test", ExternalID: "idp-kim-2", DisplayName: "Kim Canary"})
 	if !errors.Is(err, authn.ErrPrincipalExists) {
 		t.Errorf("the store's creation of a principal that exists: %v, want ErrPrincipalExists", err)
 	}
@@ -837,5 +853,5 @@ func TestASCIMProvisioningIsRecordedAsSCIMs(t *testing.T) {
 	if n := len(eventsOf(t, database, sessionCreated)); n != 0 {
 		t.Errorf("SCIM recorded %d sign-ins, want none", n)
 	}
-	checkNoneHolds(t, database, "Kim Canary", "kim@example.test")
+	checkNoneHolds(t, database, "Kim Canary", "kim@example.test", "idp-kim")
 }

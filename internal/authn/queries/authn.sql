@@ -1,5 +1,12 @@
 -- Queries of the human authentication and session domain (plan P1-03).
 
+-- name: LockHumanPrincipalByExternalID :one
+-- Locks the principal of the person whom the identity provider names by the
+-- external ID, so that a sign-in reads the groups that it changes.
+SELECT * FROM whitetower.principals
+WHERE external_id = $1 AND kind = 'human'
+FOR UPDATE;
+
 -- name: LockHumanPrincipalByIdentity :one
 -- Locks the principal, so that a sign-in reads the groups that it changes.
 SELECT * FROM whitetower.principals
@@ -7,23 +14,38 @@ WHERE issuer = $1 AND subject = $2 AND kind = 'human'
 FOR UPDATE;
 
 -- name: InsertHumanPrincipal :one
--- Returns no row when a principal with the issuer and subject exists, or
--- another transaction created one meanwhile, once that transaction commits.
+-- Returns no row when a principal with the issuer and subject, or with the
+-- external ID, exists, or another transaction created one meanwhile, once
+-- that transaction commits.
 INSERT INTO whitetower.principals (
-    id, kind, issuer, subject, display_name, email, status, idp_groups, last_login_at, created_at, updated_at
+    id, kind, issuer, subject, external_id, display_name, email, status, idp_groups, last_login_at, created_at, updated_at
 ) VALUES (
-    $1, 'human', $2, $3, $4, $5, 'active', $6, $7, $8, $8
+    $1, 'human', $2, $3, $4, $5, $6, 'active', $7, $8, $9, $9
 )
-ON CONFLICT (issuer, subject) WHERE kind = 'human' DO NOTHING
+ON CONFLICT DO NOTHING
 RETURNING *;
 
 -- name: UpdateHumanPrincipalAtSignIn :one
 UPDATE whitetower.principals
-SET display_name = $2,
-    email = $3,
-    idp_groups = $4,
-    last_login_at = $5,
-    updated_at = $5
+SET external_id = $2,
+    display_name = $3,
+    email = $4,
+    idp_groups = $5,
+    last_login_at = $6,
+    updated_at = $6
+WHERE id = $1
+RETURNING *;
+
+-- name: AdoptHumanPrincipal :one
+-- SCIM takes over the principal of a person who signed in before SCIM
+-- provisioned them: SCIM's issuer and userName, and the attributes it sends.
+UPDATE whitetower.principals
+SET issuer = $2,
+    subject = $3,
+    display_name = $4,
+    email = $5,
+    updated_at = $6,
+    version = version + 1
 WHERE id = $1
 RETURNING *;
 
