@@ -26,6 +26,15 @@ var ErrPrincipalNotFound = errors.New("principal not found")
 // issuer and subject of one that exists.
 var ErrPrincipalExists = errors.New("a principal with this issuer and subject exists")
 
+// scimIssuer is the issuer of the principals that SCIM manages, whose subject
+// is the userName that SCIM gave them.
+const scimIssuer = "scim"
+
+// systemPrincipalIDs are the principals that White Tower itself acts as: the
+// break-glass custodian, and SCIM's service account, which audit events name
+// as actor. They are nobody's, so SCIM never reaches them (KIL-08, HUM-06).
+var systemPrincipalIDs = []uuid.UUID{BreakglassPrincipalID, SCIMPrincipalID}
+
 var (
 	// ErrResponsibleNotHuman is returned when a principal that is not a human
 	// would be responsible for a service account.
@@ -299,17 +308,27 @@ func (ps *PrincipalStore) GetByIdentity(ctx context.Context, issuer, subject str
 	return fromDBModel(row), nil
 }
 
-// GetBySubjectOrEmail returns the human principal matching the given subject or email.
-func (ps *PrincipalStore) GetBySubjectOrEmail(ctx context.Context, identifier string) (*Principal, error) {
+// GetPerson returns the principal with the given UUID when it is a person's:
+// a human principal that is not one White Tower acts as, such as the
+// break-glass custodian. Any other principal is ErrPrincipalNotFound, so that
+// SCIM, which reaches people only, cannot tell it from one that does not
+// exist.
+func (ps *PrincipalStore) GetPerson(ctx context.Context, id uuid.UUID) (*Principal, error) {
 	q := authndb.New(ps.database)
-	row, err := q.GetHumanPrincipalBySubjectOrEmail(ctx, &identifier)
+	row, err := q.GetPerson(ctx, authndb.GetPersonParams{ID: id, SystemIds: systemPrincipalIDs})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrPrincipalNotFound
 		}
-		return nil, fmt.Errorf("querying principal by subject or email: %w", err)
+		return nil, fmt.Errorf("querying person by ID: %w", err)
 	}
 	return fromDBModel(row), nil
+}
+
+// GetBySCIMUserName returns the principal that SCIM provisioned with the
+// userName given.
+func (ps *PrincipalStore) GetBySCIMUserName(ctx context.Context, userName string) (*Principal, error) {
+	return ps.GetByIdentity(ctx, scimIssuer, userName)
 }
 
 // GetByEmail returns the human principal matching the given email address.
@@ -325,19 +344,21 @@ func (ps *PrincipalStore) GetByEmail(ctx context.Context, email string) (*Princi
 	return fromDBModel(row), nil
 }
 
-// ListHumans returns a paginated list of human principals and the total count.
-func (ps *PrincipalStore) ListHumans(ctx context.Context, limit, offset int32) ([]*Principal, int64, error) {
+// ListPeople returns a page of the principals that GetPerson returns, newest
+// first, and how many there are.
+func (ps *PrincipalStore) ListPeople(ctx context.Context, limit, offset int32) ([]*Principal, int64, error) {
 	q := authndb.New(ps.database)
-	count, err := q.CountHumanPrincipals(ctx)
+	count, err := q.CountPeople(ctx, systemPrincipalIDs)
 	if err != nil {
-		return nil, 0, fmt.Errorf("counting human principals: %w", err)
+		return nil, 0, fmt.Errorf("counting people: %w", err)
 	}
-	rows, err := q.ListHumanPrincipals(ctx, authndb.ListHumanPrincipalsParams{
-		Limit:  limit,
-		Offset: offset,
+	rows, err := q.ListPeople(ctx, authndb.ListPeopleParams{
+		Limit:     limit,
+		Offset:    offset,
+		SystemIds: systemPrincipalIDs,
 	})
 	if err != nil {
-		return nil, 0, fmt.Errorf("listing human principals: %w", err)
+		return nil, 0, fmt.Errorf("listing people: %w", err)
 	}
 	principals := make([]*Principal, len(rows))
 	for i, r := range rows {

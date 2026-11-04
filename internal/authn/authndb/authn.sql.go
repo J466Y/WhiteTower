@@ -41,13 +41,13 @@ func (q *Queries) AddRoleBinding(ctx context.Context, arg AddRoleBindingParams) 
 	return err
 }
 
-const countHumanPrincipals = `-- name: CountHumanPrincipals :one
+const countPeople = `-- name: CountPeople :one
 SELECT COUNT(*) FROM whitetower.principals
-WHERE kind = 'human'
+WHERE kind = 'human' AND id <> ALL($1::uuid[])
 `
 
-func (q *Queries) CountHumanPrincipals(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countHumanPrincipals)
+func (q *Queries) CountPeople(ctx context.Context, systemIds []uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPeople, systemIds)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -297,14 +297,20 @@ func (q *Queries) GetHumanPrincipalByIdentity(ctx context.Context, arg GetHumanP
 	return i, err
 }
 
-const getHumanPrincipalBySubjectOrEmail = `-- name: GetHumanPrincipalBySubjectOrEmail :one
+const getPerson = `-- name: GetPerson :one
 SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
-WHERE kind = 'human' AND (subject = $1 OR email = $1)
-LIMIT 1
+WHERE id = $1 AND kind = 'human' AND id <> ALL($2::uuid[])
 `
 
-func (q *Queries) GetHumanPrincipalBySubjectOrEmail(ctx context.Context, subject *string) (WhitetowerPrincipal, error) {
-	row := q.db.QueryRow(ctx, getHumanPrincipalBySubjectOrEmail, subject)
+type GetPersonParams struct {
+	ID        uuid.UUID
+	SystemIds []uuid.UUID
+}
+
+// People: human principals other than those that White Tower acts as, such
+// as the break-glass custodian.
+func (q *Queries) GetPerson(ctx context.Context, arg GetPersonParams) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, getPerson, arg.ID, arg.SystemIds)
 	var i WhitetowerPrincipal
 	err := row.Scan(
 		&i.ID,
@@ -537,20 +543,21 @@ func (q *Queries) ListAllServiceAccounts(ctx context.Context) ([]WhitetowerPrinc
 	return items, nil
 }
 
-const listHumanPrincipals = `-- name: ListHumanPrincipals :many
+const listPeople = `-- name: ListPeople :many
 SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version FROM whitetower.principals
-WHERE kind = 'human'
-ORDER BY created_at DESC
+WHERE kind = 'human' AND id <> ALL($3::uuid[])
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
 `
 
-type ListHumanPrincipalsParams struct {
-	Limit  int32
-	Offset int32
+type ListPeopleParams struct {
+	Limit     int32
+	Offset    int32
+	SystemIds []uuid.UUID
 }
 
-func (q *Queries) ListHumanPrincipals(ctx context.Context, arg ListHumanPrincipalsParams) ([]WhitetowerPrincipal, error) {
-	rows, err := q.db.Query(ctx, listHumanPrincipals, arg.Limit, arg.Offset)
+func (q *Queries) ListPeople(ctx context.Context, arg ListPeopleParams) ([]WhitetowerPrincipal, error) {
+	rows, err := q.db.Query(ctx, listPeople, arg.Limit, arg.Offset, arg.SystemIds)
 	if err != nil {
 		return nil, err
 	}

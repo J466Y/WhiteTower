@@ -155,18 +155,19 @@ INSERT INTO whitetower.role_bindings (
 SELECT * FROM whitetower.principals
 WHERE kind = 'human' AND email = $1;
 
--- name: GetHumanPrincipalBySubjectOrEmail :one
+-- name: GetPerson :one
+-- People: human principals other than those that White Tower acts as, such
+-- as the break-glass custodian.
 SELECT * FROM whitetower.principals
-WHERE kind = 'human' AND (subject = $1 OR email = $1)
-LIMIT 1;
+WHERE id = $1 AND kind = 'human' AND id <> ALL(sqlc.arg(system_ids)::uuid[]);
 
--- name: ListHumanPrincipals :many
+-- name: ListPeople :many
 SELECT * FROM whitetower.principals
-WHERE kind = 'human'
-ORDER BY created_at DESC
+WHERE kind = 'human' AND id <> ALL(sqlc.arg(system_ids)::uuid[])
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2;
 
--- name: CountHumanPrincipals :one
+-- name: CountPeople :one
 SELECT COUNT(*) FROM whitetower.principals
-WHERE kind = 'human';
+WHERE kind = 'human' AND id <> ALL(sqlc.arg(system_ids)::uuid[]);
 

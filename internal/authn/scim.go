@@ -226,31 +226,48 @@ func principalToSCIM(p *Principal) scimUserResource {
 	}
 }
 
-var filterRegex = regexp.MustCompile(`(?i)(?:userName|emails\.value)\s+eq\s+["']?([^"']+)["']?`)
+// userNameFilter matches the one filter that the service supports, userName
+// eq "value" (RFC 7644, section 3.4.2.2), and captures the value as the JSON
+// string it is.
+var userNameFilter = regexp.MustCompile(`^(?i:userName)\s+(?i:eq)\s+("(?:[^"\\]|\\.)*")$`)
+
+// parseUserNameFilter returns the userName of filter when it is userName eq
+// "value", and false for any other filter.
+func parseUserNameFilter(filter string) (string, bool) {
+	var userName string
+	matches := userNameFilter.FindStringSubmatch(filter)
+	if matches == nil || json.Unmarshal([]byte(matches[1]), &userName) != nil {
+		return "", false
+	}
+	return userName, true
+}
 
 func (s *SCIMService) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
 	if filter != "" {
-		matches := filterRegex.FindStringSubmatch(filter)
-		if len(matches) > 1 {
-			val := matches[1]
-			p, err := s.principals.GetBySubjectOrEmail(ctx, val)
-			if err != nil {
-				if errors.Is(err, ErrPrincipalNotFound) {
-					s.writeListResponse(w, 0, 1, 0, []scimUserResource{})
-					return
-				}
-				safeFilter := strings.ReplaceAll(filter, "\n", "")
-				safeFilter = strings.ReplaceAll(safeFilter, "\r", "")
-				s.logger.Error("querying principal by filter", "error", err, "filter", logging.Sanitize(safeFilter))
-				s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
-				return
-			}
-			s.writeListResponse(w, 1, 1, 1, []scimUserResource{principalToSCIM(p)})
+		// Any other filter is refused rather than ignored: a client that
+		// looks a user up must never get every user back as the answer.
+		userName, ok := parseUserNameFilter(filter)
+		if !ok {
+			s.writeError(w, http.StatusBadRequest, "invalidFilter", `Only the filter userName eq "value" is supported`)
 			return
 		}
+		p, err := s.principals.GetBySCIMUserName(ctx, userName)
+		if err != nil {
+			if errors.Is(err, ErrPrincipalNotFound) {
+				s.writeListResponse(w, 0, 1, 0, []scimUserResource{})
+				return
+			}
+			safeFilter := strings.ReplaceAll(filter, "\n", "")
+			safeFilter = strings.ReplaceAll(safeFilter, "\r", "")
+			s.logger.Error("querying principal by filter", "error", err, "filter", logging.Sanitize(safeFilter))
+			s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
+			return
+		}
+		s.writeListResponse(w, 1, 1, 1, []scimUserResource{principalToSCIM(p)})
+		return
 	}
 
 	startIndex := int64(1)
@@ -279,9 +296,9 @@ func (s *SCIMService) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	} else if count > 1000 {
 		limit = 1000
 	}
-	humans, total, err := s.principals.ListHumans(ctx, limit, offset)
+	humans, total, err := s.principals.ListPeople(ctx, limit, offset)
 	if err != nil {
-		s.logger.Error("listing human principals", "error", err)
+		s.logger.Error("listing people", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
 		return
 	}
@@ -337,7 +354,7 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for collision
-	if existing, err := s.principals.GetBySubjectOrEmail(ctx, req.UserName); err == nil && existing != nil {
+	if existing, err := s.principals.GetBySCIMUserName(ctx, req.UserName); err == nil && existing != nil {
 		s.writeUserExists(w, req.UserName)
 		return
 	}
@@ -416,7 +433,9 @@ func (s *SCIMService) handleGetUser(w http.ResponseWriter, r *http.Request, idSt
 		return
 	}
 
-	p, err := s.principals.GetByID(ctx, id)
+	// SCIM reaches people only: never a service account or the break-glass
+	// custodian, which the identity provider must not disable (KIL-08).
+	p, err := s.principals.GetPerson(ctx, id)
 	if err != nil {
 		if errors.Is(err, ErrPrincipalNotFound) {
 			s.writeError(w, http.StatusNotFound, "", "User not found")
@@ -449,7 +468,7 @@ func (s *SCIMService) handlePatchUser(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	p, err := s.principals.GetByID(ctx, id)
+	p, err := s.principals.GetPerson(ctx, id)
 	if err != nil {
 		if errors.Is(err, ErrPrincipalNotFound) {
 			s.writeError(w, http.StatusNotFound, "", "User not found")
@@ -545,7 +564,7 @@ func (s *SCIMService) handleDeleteUser(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 
-	p, err := s.principals.GetByID(ctx, id)
+	p, err := s.principals.GetPerson(ctx, id)
 	if err != nil {
 		if errors.Is(err, ErrPrincipalNotFound) {
 			s.writeError(w, http.StatusNotFound, "", "User not found")
