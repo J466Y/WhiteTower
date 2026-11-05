@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted provisionally in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md) on 2026-10-23, with the tooling of agents from [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), accepted provisionally on 2026-10-26. Contract version `v1alpha1`, a draft until `contracts/v0.1.0` is tagged (section 10) |
-| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)), 2026-10-22 and 2026-10-23 (changes to what the conformance vectors expect need an RFC, and the corrections from the review of RFC-0001, which [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) list) and 2026-10-26 (the MCP servers, tools and models of agents, from [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): sections 4.10, 5.10, 6.9 to 6.11 and 7.7, and the sections they change) and 2026-10-28 (a bundle manifest that is not I-JSON, in sections 1 and 7.4, the maintainer's decision from the review of code part 6, which P0-03's progress notes record) and 2026-10-29 (the hashed mode of arguments beyond I-JSON, the maintainer's decision, and what decision and lease events record, from the review of code part 7: sections 1, 5.3, 8.3 and 8.5) and 2026-11-05 (the end of RFC-0001's code parts: how YAML 1.1's types are read and where YAML parsers differ, in section 3.1; the mechanism of a network quarantine, in RC-5; the evidence buffer of S-11; the counts of vectors in section 9.1; and appendix A's references) |
+| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)), 2026-10-22 and 2026-10-23 (changes to what the conformance vectors expect need an RFC, and the corrections from the review of RFC-0001, which [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) list) and 2026-10-26 (the MCP servers, tools and models of agents, from [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): sections 4.10, 5.10, 6.9 to 6.11 and 7.7, and the sections they change) and 2026-10-28 (a bundle manifest that is not I-JSON, in sections 1 and 7.4, the maintainer's decision from the review of code part 6, which P0-03's progress notes record) and 2026-10-29 (the hashed mode of arguments beyond I-JSON, the maintainer's decision, and what decision and lease events record, from the review of code part 7: sections 1, 5.3, 8.3 and 8.5) and 2026-11-05 (the end of RFC-0001's code parts: how YAML 1.1's types are read and where YAML parsers differ, in section 3.1; the mechanism of a network quarantine, in RC-5; the evidence buffer of S-11; the counts of vectors in section 9.1; and appendix A's references; and, from step 12's pull request 2, the members of a function's definition, in section 4.10; when a snapshot's blocks apply, in section 5.10; the required properties of tools and models, in section 6.3; a rule's ID, in section 6.11; the catalog file's entries and argument types, in section 7.7; lone surrogates in events, the maintainer's decision, in section 8.3; and appendix A's examples of the tooling reports and the blocks record) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |
 | **Conformance** | [`test/conformance/`](../../test/conformance/README.md) |
@@ -299,7 +299,7 @@ Blocks and events name a reference by the SHA-256 of the UTF-8 bytes of its stri
 **Definitions.** A definition hash is the lowercase hexadecimal SHA-256 of the canonical JSON of the following members, leaving out those that are absent or `null`:
 
 - **MCP tool:** the members `name`, `title`, `description`, `inputSchema`, `outputSchema` and `annotations` of the tool, as the `tools/list` result carries them in the JSON-RPC message itself. SDKs turn tools into objects that add defaults or drop members, so their objects are not the input.
-- **Function, `http` or `other` tool:** its name and the JSON Schema of its parameters, as the framework presents them to the model. Their descriptions belong to the agent's own code, which its owner controls ([threat model](../security/threat-model.md), A-6).
+- **Function, `http` or `other` tool:** its name and the JSON Schema of its parameters, as the framework presents them to the model, as the members `name` and `inputSchema`, so that one schema hashes alike whatever the tool's kind. Their descriptions belong to the agent's own code, which its owner controls ([threat model](../security/threat-model.md), A-6).
 
 The canonical JSON of a definition is that of section 1, with one extension. Tool schemas often hold integers beyond I-JSON's 2^53 - 1, such as 18446744073709551615, the bound of an unsigned 64-bit field. A library that rounds it, as `gowebpki/jcs` does (it writes 18446744073709552000), gives a hash that the other stack does not compute, and two schemas that differ only in such a number hash alike; one that refuses it makes the tool unusable. So **a number written without a fraction or an exponent is written as its exact value in decimal**, with `-0` as `0`: for a magnitude of at most 2^53 - 1, this is what RFC 8785 writes. Any other number is written as RFC 8785 says. A number that is not finite as a double, a member name that repeats, or a string with a lone surrogate leaves the definition without a hash. A tool without a hash is reported without one and can never be approved, so its calls are denied (`catalog.not_approved`, or `catalog.definition_changed` once another definition is pinned).
 
@@ -482,7 +482,7 @@ A block of one of the agent's own tools covers that name in every agent.
 
 Blocks name references, not keys (section 4.10), so an enforcement point applies them without waiting for a new bundle. They never change an entry's status and never travel in bundles, so issuing or lifting one rebuilds no bundle, and lifting one leaves the entry as it was.
 
-- **The blocks record.** Blocks travel in their own record of the watch stream, apart from every agent's state and from the fleet state. A snapshot carries every active block, and changes carry the blocks added and the IDs of those removed. The first part of a snapshot carries the record, with the fleet state, and a snapshot's record replaces the instance's whole set of blocks. A change adds the blocks it carries, replacing one whose ID the instance knows, and removes the IDs it lists, ignoring those it does not know. Only enforcement points' streams carry the record.
+- **The blocks record.** Blocks travel in their own record of the watch stream, apart from every agent's state and from the fleet state. A snapshot carries every active block, and changes carry the blocks added and the IDs of those removed. The first part of a snapshot carries the record, with the fleet state, and a snapshot's record replaces the instance's whole set of blocks: the instance applies the blocks of the first part as soon as it arrives, beside those it holds, and drops those that the snapshot does not carry only once the snapshot is complete, so that no block is lifted by a snapshot that never completes. A change adds the blocks it carries, replacing one whose ID the instance knows, and removes the IDs it lists, ignoring those it does not know. The core never names one ID both among the blocks a change adds and among those it removes; an instance that receives such a change keeps the block. Only enforcement points' streams carry the record.
 - **A block** (`Block`) carries its ID, its kind (`server`, `tool`, `model`, `provider` or `endpoint`), the SHA-256 of what it covers and its issue time. What it covers is hashed as the UTF-8 bytes of its string form (section 4.10): the reference of a server, a tool or a model, the name of a provider, or the normalized base URL of an endpoint. Hashes keep blocks small, and keep local paths out of a record that every enforcement point receives; the references and the reasons stay in the core, which shows them. Enforcement points compute the hashes of an entry once, when a tool list or a model changes, never on each call.
 - **Versions.** Blocks take their versions from the same version counter as the rest of the state ([the design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes), section 2), so a lease renewal still means "your state is current" (CORE-6).
 - **CORE-12.** A block is committed, and the stream updated, without waiting for any bundle, as for halts (CORE-8).
@@ -568,12 +568,12 @@ An enforcement point that evaluates `agent.start` SHOULD meet EP-1 before it let
 
 | Resource type | ID | Properties |
 | --- | --- | --- |
-| `tool` | Its key in the catalog (section 4.10); for a tool the catalog does not list, its name as the agent sees it | From the catalog, never from the agent: `kind` (required: `function`, `mcp`, `builtin`, `http` or `other`), `origin`, `name`, `read_only`, `destructive` and `open_world`; for MCP tools, `server` (the server's key) and `transport`; for built-in tools, `provider` |
-| `model` | Its key in the catalog; for a model the catalog does not list, its name as requested | From the catalog: `provider`, the lowercase identifier of the service that serves the model, from the table below; `name`; and `endpoint`, the normalized base URL of its endpoint (section 4.10) |
+| `tool` | Its key in the catalog (section 4.10); for a tool the catalog does not list, its name as the agent sees it | From the catalog, never from the agent, and all required: `kind` (`function`, `mcp`, `builtin`, `http` or `other`), `origin`, `name`, `read_only`, `destructive` and `open_world`; for MCP tools, also `server` (the server's key) and `transport`; for built-in tools, also `provider` |
+| `model` | Its key in the catalog; for a model the catalog does not list, its name as requested | From the catalog, and all required: `provider`, the lowercase identifier of the service that serves the model, from the table below; `name`; and `endpoint`, the normalized base URL of its endpoint (section 4.10) |
 | `agent` | The requesting agent's ID: an agent action concerns the agent itself | None |
 | `mcp_server`, `dataset`, `skill`, `url` | Reserved for later actions. In Cedar, an MCP server is already the parent of its tools (section 6.7) | None |
 
-A request whose resource type does not match its action, or whose agent action names another agent, is invalid and denied (`error.invalid_request`), and so is one whose resource ID is empty or longer than 512 characters.
+A request whose resource type does not match its action, or whose agent action names another agent, is invalid and denied (`error.invalid_request`), and so is one whose resource ID is empty or longer than 512 characters, or whose tool or model lacks a property that the table requires. A tool or a model that the catalog does not list has no properties, and the catalog check denies it first (`catalog.unknown`, section 6.6).
 
 **Model providers.** `provider` takes a value of this table, or, for any other provider, a lowercase name of its own, such as `ollama` for a model that Ollama serves locally. The table copies the well-known values of OpenTelemetry's `gen_ai.provider.name` in semantic conventions v1.41.1. They are pinned here, because OpenTelemetry's values are still in development and have been renamed since; a new row is an additive change.
 
@@ -765,7 +765,7 @@ Legitimate values that these rules refuse are rare: a URL without a scheme, a qu
 
 | Field | Meaning |
 | --- | --- |
-| `id` | Unique within its policy |
+| `id` | From 1 to 128 characters, unique within its policy |
 | `description` | Why the pattern is forbidden, for reviewers |
 | `tools` | Tool keys |
 | `when` | Conditions. The rule forbids a call when all of them hold |
@@ -924,7 +924,8 @@ Every bundle carries its agent's catalog file, `catalog.json`, listed in the man
 - **Status and enablement.** `status` comes from the catalog and is `discovered` or `approved`; `enabled` comes from the agent's enablement. An agent is enabled to use tools and models, so servers carry no `enabled` field, and a tool of an MCP server can be approved only once its server is. Blocks never appear in the file: they travel in the watch stream (section 5.10).
 - **Pinned values.** `definition` and `digest` are pinned when the entry, or its new definition or digest, is approved.
 - **Classification.** `read_only`, `destructive` and `open_world` are set by the reviewer. They start from the tool's MCP annotations, or, when those are absent, from the protocol's conservative defaults: not read-only, destructive, open world. Annotations are hints from the server; the catalog's values have been reviewed.
-- **Arguments.** `args` lists the tool's arguments that policies may see (section 6.11): each with its name, which is its key in `context.args`; its path, as the array of the property names that lead to it; its transform, when it has one; and its type.
+- **Entries and references.** A server's entry carries its reference. A tool's entry carries what makes up its reference (section 4.10): an MCP tool's `server` and `name`; a built-in tool's `provider` and `type`, in place of `server`, and no `definition`; the name alone of a function, `http` or `other` tool. A model's entry carries its `provider`, `endpoint` and `name`.
+- **Arguments.** `args` lists the tool's arguments that policies may see (section 6.11): each with its name, which is its key in `context.args`; its path, as the array of the property names that lead to it; its transform, when it has one; and its type, as Cedar names it: `String`, `Long`, `Bool`, `Set<String>` or `Set<Long>`.
 - **Redaction rules.** `redaction` carries the deployment's redaction rules (EP-14): URL prefixes, after each of which the next path segment is a secret, and flag names whose values are secrets, beyond those EP-14 lists. Some services put an account's secret in a URL's path, as Zapier's MCP server does. A change of the rules rebuilds every bundle.
 - **Size.** The core keeps every bundle within the limit of V1 (2 MiB). The entries enabled for the agent come first: a request to enable an entry that would take the agent's bundle over the limit is refused, with that reason. Entries observed but not enabled are listed while they fit, those seen most recently first; one left out is denied as `catalog.unknown`, the decision it would get anyway, with a less precise reason. A tool takes a few hundred bytes of the file: an agent with 300 tools has a file of about 130 KiB, while one at the limits of a report (section 4.10) would need from about 1.8 MiB, with short references, to 4.5 MiB. When the enabled entries and the policies alone do not fit, the core publishes no bundle: the agent keeps the one it has, and the console says why.
 - **An empty catalog.** The file is there even when nothing is observed or enabled for the agent. An enforcement point treats a bundle without one as an empty catalog: every tool and model action is then `catalog.unknown`.
@@ -972,7 +973,7 @@ Events are minimized by design (NFR-20, domain model section 7):
 
 - People appear only as pseudonymous principal IDs, never as names or email addresses.
 - Decision events record the **names** of a call's arguments, or nothing, or, in the hashed mode, the HMAC-SHA-256, in lowercase hexadecimal, of the canonical JSON of the arguments object as the tool receives it, with a key the deployment holds and that key's ID (`key_id`), as configured. They never record argument values in `v1alpha1`. The canonical JSON is that of section 4.10, which writes integers exactly, so that an ID beyond 2^53 - 1 gives the same HMAC on every stack. Arguments without one, because of a number that is not finite as a double, a member name that repeats or a string with a lone surrogate, are recorded by their names alone.
-- A resource ID that is empty or longer than 512 characters, or an argument name longer than 128, is recorded as the SHA-256 of its UTF-8 bytes, in lowercase hexadecimal, marked as such. A request with such an ID is invalid (section 6.3), but its denial is still recorded.
+- A resource ID that is empty or longer than 512 characters, or an argument name longer than 128, is recorded as the SHA-256 of its UTF-8 bytes, in lowercase hexadecimal, marked as such. A request with such an ID is invalid (section 6.3), but its denial is still recorded. A resource ID or an argument name with a lone surrogate, which an event cannot write, since events are I-JSON, is recorded the same way, as the SHA-256 of the UTF-8 bytes of the string with each lone surrogate replaced by U+FFFD.
 - Tooling is named by its key or, when the catalog does not list it, by its name as the agent sees it, with the SHA-256 of its reference (`reference_sha256`, section 4.10). Events never carry a reference in clear, a description or a schema. The hash keeps the reference's text out, but it is not a pseudonym: a local path that can be guessed can be checked against it.
 - Values that a module copies from the agent or its framework, such as `task_id` or an extension attribute, follow the first rule. A framework's run or thread ID is recorded only when the deployment declares it opaque; otherwise it is recorded as its HMAC, or not at all.
 - Every `detail` field carries fixed text or codes: never messages, values, paths or names.
@@ -1149,7 +1150,7 @@ Examples use the Connect protocol (version 1) with JSON. Field names are the pro
 ```json
 {
   "module": "ep-python",
-  "manifestSha256": "0e84b01b12edde377a877b0d07adef73300fb6166480da2753204d1f4688c870",
+  "manifestSha256": "12fe48e1ed7b710b22155b4f2a6dd2347f40965926c1d8baba32693bafc912b1",
   "moduleVersion": "0.1.0",
   "instanceKey": "5b0e3c8a-2f71-4d96-a3b4-9c1e7f20d815",
   "contractVersions": ["v1alpha1"],
@@ -1182,13 +1183,54 @@ Examples use the Connect protocol (version 1) with JSON. Field names are the pro
 {}
 ```
 
+**`RegistryService.ReportTooling`**, for an agent with a remote MCP server and one of its tools, a tool of its own, a provider's built-in tool and a model:
+
+```json
+{
+  "instanceId": "0192f1c2-9e00-7c4d-8e5f-000000000051",
+  "agentId": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "servers": [{
+    "reference": "https://api.githubcopilot.com/mcp/", "transport": "SERVER_TRANSPORT_HTTP", "origin": "ORIGIN_AGENT",
+    "name": "github", "version": "1.4.0", "display": "https://api.githubcopilot.com/mcp/"
+  }],
+  "tools": [
+    { "kind": "TOOL_KIND_MCP", "origin": "ORIGIN_AGENT", "serverIndex": 0, "name": "create_pull_request", "definitionSha256": "4d1c…" },
+    { "kind": "TOOL_KIND_FUNCTION", "origin": "ORIGIN_AGENT", "name": "send_email", "definitionSha256": "9b03…" },
+    { "kind": "TOOL_KIND_BUILTIN", "origin": "ORIGIN_PROVIDER", "provider": "openai", "type": "web_search", "name": "web_search" }
+  ],
+  "models": [{ "provider": "openai", "endpoint": "https://api.openai.com/v1", "name": "gpt-4o" }]
+}
+```
+
+```json
+{ "missingDefinitions": ["4d1c…"] }
+```
+
+**`RegistryService.ReportDefinitions`**, with the definition that the core asked for, its schemas and annotations as JSON text:
+
+```json
+{
+  "instanceId": "0192f1c2-9e00-7c4d-8e5f-000000000051",
+  "definitions": [{
+    "name": "create_pull_request",
+    "description": "Create a pull request in a GitHub repository",
+    "inputSchema": "{\"type\":\"object\",\"properties\":{\"base\":{\"type\":\"string\"},\"head\":{\"type\":\"string\"}},\"required\":[\"base\",\"head\"]}",
+    "annotations": "{\"readOnlyHint\":false,\"destructiveHint\":false,\"openWorldHint\":true}"
+  }]
+}
+```
+
+```json
+{}
+```
+
 **`GovernanceService.Watch`** is a server stream. The request:
 
 ```json
 { "instanceId": "0192f1c2-9e00-7c4d-8e5f-000000000051", "sinceVersion": "0" }
 ```
 
-Then the stream's messages, in order: a snapshot in one part, a renewal, and a halt.
+Then the stream's messages, in order: a snapshot in one part, with a block of an MCP server, a renewal, a halt, and the block's removal.
 
 ```json
 {
@@ -1209,6 +1251,12 @@ Then the stream's messages, in order: a snapshot in one part, a renewal, and a h
         "kind": "in_house", "riskTier": "high", "dataCategories": ["customer data"],
         "labels": { "team": "finance" }, "ownerId": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1"
       }
+    }],
+    "blocks": [{
+      "blockId": "0192f1c4-2b6e-7d11-8c3a-000000000077",
+      "kind": "BLOCK_KIND_SERVER",
+      "coveredSha256": "3e7e1ebb74a5af44491feec1adc16a67edb1087eb9940f9498ba73b97e4118c2",
+      "issuedAt": "2026-09-29T09:58:12.040Z"
     }]
   }
 }
@@ -1236,6 +1284,12 @@ Then the stream's messages, in order: a snapshot in one part, a renewal, and a h
   }
 }
 ```
+
+```json
+{ "version": "921", "change": { "removedBlockIds": ["0192f1c4-2b6e-7d11-8c3a-000000000077"] } }
+```
+
+The block covers the server whose reference is `https://tools.example.com/mcp/`: `coveredSha256` is the SHA-256 of that string's UTF-8 bytes (section 5.10).
 
 When the token that opened the stream expires (CORE-1), the stream ends with this end-of-stream message:
 
