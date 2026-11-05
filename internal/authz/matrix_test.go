@@ -91,9 +91,10 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 			PermissionIdentityMeRead:  ScopeAll,
 		},
 		RoleAdmin: {
-			PermissionInventoryView:  ScopeAll,
-			PermissionSettingsManage: ScopeAll,
-			PermissionIdentityMeRead: ScopeAll,
+			PermissionInventoryView:        ScopeAll,
+			PermissionSettingsManage:       ScopeAll,
+			PermissionIdentityMeRead:       ScopeAll,
+			PermissionIdentityTokensManage: ScopeAll,
 		},
 	}
 
@@ -103,8 +104,8 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 	if len(roles) != 7 {
 		t.Fatalf("expected 7 roles, got %d", len(roles))
 	}
-	if len(permissions) != 25 {
-		t.Fatalf("expected 25 permissions, got %d", len(permissions))
+	if len(permissions) != 26 {
+		t.Fatalf("expected 26 permissions, got %d", len(permissions))
 	}
 
 	totalChecked := 0
@@ -126,8 +127,8 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 		}
 	}
 
-	if totalChecked != 7*25 {
-		t.Fatalf("expected 175 checks, got %d", totalChecked)
+	if totalChecked != 7*26 {
+		t.Fatalf("expected 182 checks, got %d", totalChecked)
 	}
 }
 
@@ -350,6 +351,42 @@ func TestBreakglassReadsTheInventoryAndChangesNothing(t *testing.T) {
 		if err := az.Authorize(context.Background(), custodian, op); !errors.Is(err, auth.ErrDenied) {
 			t.Errorf("%s: got %v, want refused", op, err)
 		}
+	}
+}
+
+// Only the platform administrator manages the API tokens of any principal,
+// and through an API token only when the token's scopes hold the permission:
+// the role alone is not enough. A break-glass session never does.
+func TestOnlyTheAdministratorManagesTheTokensOfAnyPrincipal(t *testing.T) {
+	az := NewAuthorizer()
+	manage := string(PermissionIdentityTokensManage)
+	type caller struct {
+		name    string
+		p       auth.Principal
+		allowed bool
+	}
+	cases := []caller{
+		{"the administrator", auth.Principal{Roles: []string{string(RoleAdmin)}}, true},
+		{"an administrator's token that holds the permission", auth.Principal{Roles: []string{string(RoleAdmin)}, Scopes: []string{manage}}, true},
+		{"an administrator's token that does not", auth.Principal{Roles: []string{string(RoleAdmin)}, Scopes: []string{string(PermissionIdentityMeRead)}}, false},
+		{"a token that holds the permission, of a principal without the role", auth.Principal{Roles: []string{string(RoleOperator)}, Scopes: []string{manage}}, false},
+		{"a break-glass session", auth.Principal{
+			Roles: []string{string(RoleOperator), string(RoleAdmin)}, Scopes: []string{manage}, IsBreakglass: true,
+		}, false},
+	}
+	for _, role := range AllRoles() {
+		if role != RoleAdmin {
+			cases = append(cases, caller{"the role " + string(role), auth.Principal{Roles: []string{string(role)}}, false})
+		}
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.p.ID = "p1"
+			err := az.Authorize(context.Background(), &tt.p, manage)
+			if tt.allowed != (err == nil) {
+				t.Errorf("got %v, want allowed=%v", err, tt.allowed)
+			}
+		})
 	}
 }
 

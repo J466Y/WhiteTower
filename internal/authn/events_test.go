@@ -23,6 +23,7 @@ import (
 	"github.com/J466Y/WhiteTower/api/events"
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
+	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
@@ -309,7 +310,7 @@ func TestSignInsOfOnePersonAtOnceRecordEachChangeOnce(t *testing.T) {
 			replica := func(name string) (*db.DB, *authn.PrincipalStore) {
 				pool := d.OpenReplica(t, name)
 				sessions := authn.NewSessionStore(pool, clk, writer, authn.SessionOptions{})
-				return pool, authn.NewPrincipalStore(pool, clk, writer, sessions, authn.NewTokenStore(pool, clk, writer))
+				return pool, authn.NewPrincipalStore(pool, clk, writer, sessions, authn.NewTokenStore(pool, clk, writer, authz.NewAuthorizer()))
 			}
 			pool, first := replica("replica-a")
 			_, second := replica("replica-b")
@@ -641,24 +642,28 @@ func TestAnInactivePrincipalsSignInWritesNothing(t *testing.T) {
 // A sign-out records the revocation of the session it ended, with the
 // session's principal and how it signed in, a break-glass session's included.
 // A cookie of no active session, revoked, expired, unknown or empty, writes
-// nothing: signing out needs no authentication.
+// nothing: signing out with it needs no CSRF token.
 func TestASignOutIsRecordedOnlyWhenItEndsAnActiveSession(t *testing.T) {
 	ctx := context.Background()
 	idp := newMockIDP(t)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
-	svc := eventsService(t, idp, clk, principalStore, sessionStore, tokenStore)
+	sessionStore, principalStore, _, database := setupAuthn(t, clk)
+	logout := authn.NewLogoutService(sessionStore, authn.LogoutOptions{Logger: slog.New(slog.DiscardHandler)})
+	// signOut signs out with the cookie value, or none for "-", and the
+	// session's CSRF token when the cookie names an active session, as the
+	// console sends it.
 	signOut := func(t *testing.T, value string) []recorded {
 		t.Helper()
-		req := httptest.NewRequest(http.MethodGet, "/auth/logout", nil)
+		req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
 		if value != "-" {
 			req.AddCookie(&http.Cookie{Name: authn.CookieName, Value: value})
 		}
-		rec := httptest.NewRecorder()
-		svc.ServeHTTP(rec, req)
-		if rec.Code != http.StatusFound {
-			t.Fatalf("logout: got %d, want 302", rec.Code)
+		if s, err := sessionStore.Get(ctx, value); err == nil {
+			req.Header.Set("X-CSRF-Token", s.CSRFToken)
 		}
+		rec := httptest.NewRecorder()
+		logout.ServeHTTP(rec, req)
+		redirectOf(t, rec)
 		return eventsOf(t, database, sessionRevoked)
 	}
 

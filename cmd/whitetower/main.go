@@ -193,7 +193,8 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		IdleTimeout:      cfg.Auth.Session.IdleTimeout,
 		AbsoluteLifetime: cfg.Auth.Session.AbsoluteLifetime,
 	})
-	tokenStore := authn.NewTokenStore(database, clock.System, writer)
+	authorizer := authz.NewAuthorizer()
+	tokenStore := authn.NewTokenStore(database, clock.System, writer, authorizer)
 	principalStore := authn.NewPrincipalStore(database, clock.System, writer, sessionStore, tokenStore)
 	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, cfg.Auth.OIDC.RoleMapping)
 
@@ -255,13 +256,19 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	if oidcSvc != nil {
 		authMux.Handle("/auth/login", oidcSvc)
 		authMux.Handle("/auth/callback", oidcSvc)
-		authMux.Handle("/auth/logout", oidcSvc)
 	}
 	if breakglassSvc != nil {
 		authMux.Handle("/auth/breakglass", breakglassSvc)
 	}
 	var authHandler http.Handler
 	if oidcSvc != nil || breakglassSvc != nil {
+		// Both ways of signing in make sessions, which a browser ends here
+		// before they expire, a break-glass session included (ST-14).
+		logout := authn.LogoutOptions{Logger: logger}
+		if oidcSvc != nil {
+			logout.EndSession = oidcSvc.EndSessionURL
+		}
+		authMux.Handle("/auth/logout", authn.NewLogoutService(sessionStore, logout))
 		authHandler = authMux
 	}
 
@@ -283,7 +290,6 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	httpMetrics := metrics.NewHTTP(registry)
 	observer := server.NewObserver(logger, httpMetrics, traces.TracerProvider())
 	auditLog := audit.NewLog(database).WithWriter(writer)
-	authorizer := authz.NewAuthorizer()
 
 	// The notifications across replicas, which the domain plans publish and
 	// subscribe to. The bus stops before the database closes.

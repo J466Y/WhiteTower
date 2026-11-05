@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -23,9 +24,11 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/uuid"
 
+	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
+	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 )
 
@@ -641,7 +644,7 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 		}
 	})
 
-	t.Run("logout revokes session and redirects", func(t *testing.T) {
+	t.Run("logout revokes session and sends the browser to the end session endpoint", func(t *testing.T) {
 		// Create a session to log out from
 		p, err := principalStore.SignIn(context.Background(), "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "sub-logout-user", ExternalID: "sub-logout-user", DisplayName: "Logout User"}, nil)
 		if err != nil {
@@ -652,15 +655,9 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/auth/logout", nil)
-		req.AddCookie(sessionStore.Cookie(sess.Token))
-		rec := httptest.NewRecorder()
-
-		svc.ServeHTTP(rec, req)
-		if rec.Code != http.StatusFound {
-			t.Errorf("expected 302 Found on logout, got %d", rec.Code)
-		}
-		checkEndSessionRedirect(t, rec.Header().Get("Location"), idp.server.URL+"/logout", clientID)
+		logout := authn.NewLogoutService(sessionStore, authn.LogoutOptions{EndSession: svc.EndSessionURL})
+		rec := postLogout(t, logout, http.MethodPost, sess.Token, sess.CSRFToken)
+		checkEndSessionRedirect(t, redirectOf(t, rec), idp.server.URL+"/logout", clientID)
 
 		// Session in PostgreSQL must now be revoked
 		_, err = sessionStore.Get(context.Background(), sess.Token)
@@ -790,6 +787,94 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 			t.Errorf("cookies %v, want the state cookie and the session cookie", names)
 		}
 	})
+}
+
+// Security test ST-14: a sign-in that changes a person's groups, from which
+// their roles come, revokes the person's other sessions in its transaction,
+// through the callback and the CLI's exchange, so that no session keeps the
+// roles of the groups before; the session of that sign-in is the one left. A
+// sign-in with the same groups, another person's sign-in, a sign-in that
+// fails after the change, and break-glass, whose custodian has no groups,
+// revoke nothing
+func TestASignInThatChangesThePersonsGroupsRevokesTheirOtherSessions(t *testing.T) {
+	ctx := context.Background()
+	idp := newMockIDP(t)
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+	svc := eventsService(t, idp, clk, principalStore, sessionStore, tokenStore)
+	// signIn signs in from a browser of its own, with no session cookie, and
+	// returns the new session's token.
+	signIn := func(t *testing.T, subject string, groups ...string) string {
+		t.Helper()
+		return sessionToken(t, browserSignIn(t, svc, idp, clk, map[string]any{"sub": subject, "name": "Ivy Canary", "groups": groups}))
+	}
+	check := func(t *testing.T, what, token string, want error) {
+		t.Helper()
+		if _, err := sessionStore.Get(ctx, token); !errors.Is(err, want) {
+			t.Errorf("%s: got %v, want %v", what, err, want)
+		}
+	}
+	revocations := func() int { return len(eventsOf(t, database, sessionRevoked)) }
+
+	first := signIn(t, "usr-ivy", "wt-owners")
+	second := signIn(t, "usr-ivy", "wt-owners")
+	jacks := signIn(t, "usr-jack", "wt-owners", "wt-auditors")
+	check(t, "a session after a sign-in with the same groups", first, nil)
+	check(t, "the session of a sign-in with the same groups", second, nil)
+
+	recorded := revocations()
+	third := signIn(t, "usr-ivy", "wt-owners", "wt-auditors")
+	check(t, "a session of the groups before", first, authn.ErrSessionRevoked)
+	check(t, "another session of the groups before", second, authn.ErrSessionRevoked)
+	check(t, "the session of the sign-in that changed the groups", third, nil)
+	check(t, "another person's session", jacks, nil)
+	// The change of groups records the revocations, as a deactivation
+	// records its own.
+	if n := revocations(); n != recorded {
+		t.Errorf("%d revocations of sessions recorded, want none: the change of groups records them", n-recorded)
+	}
+	if n := len(eventsOf(t, database, groupsChanged)); n != 1 {
+		t.Errorf("%d changes of groups recorded, want 1", n)
+	}
+
+	if _, err := svc.ExchangeIDToken(ctx, exchangeToken(idp, clk, map[string]any{"sub": "usr-ivy", "groups": []string{"wt-owners"}})); err != nil {
+		t.Fatal(err)
+	}
+	check(t, "a session after an exchange that changed the groups", third, authn.ErrSessionRevoked)
+	check(t, "another person's session after the exchange", jacks, nil)
+
+	fourth := signIn(t, "usr-ivy", "wt-owners")
+	failed := errors.New("the rest of the sign-in fails")
+	if _, err := principalStore.SignIn(ctx, "oidc", authn.Identity{
+		Issuer: idp.server.URL, Subject: "usr-ivy", ExternalID: "usr-ivy", DisplayName: "Ivy Canary", Groups: []string{"wt-admins"},
+	}, func(context.Context, *db.Tx, *authn.Principal) error { return failed }); !errors.Is(err, failed) {
+		t.Fatalf("a sign-in that fails: got %v", err)
+	}
+	check(t, "a session after a sign-in that changed the groups, then failed", fourth, nil)
+
+	// Break-glass signs in its custodian, whose groups are always none: two
+	// custodians signed in at once both keep their sessions.
+	rawCred, hashStr, err := authn.GenerateBreakglassCredential()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashFile := filepath.Join(t.TempDir(), "breakglass.hash")
+	if err := os.WriteFile(hashFile, []byte(hashStr+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	breakglass := authn.NewBreakglassService(authn.BreakglassOptions{
+		Enabled: true, CredentialHashFile: hashFile, Clock: clk, Logger: slog.New(slog.DiscardHandler),
+	}, database, sessionStore, audit.NewWriter(mustCatalog(t), clk))
+	custodian := func() string {
+		req := httptest.NewRequest(http.MethodPost, "/auth/breakglass", strings.NewReader(`{"credential":"`+rawCred+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		breakglass.ServeHTTP(rec, req)
+		return sessionToken(t, rec)
+	}
+	one, two := custodian(), custodian()
+	check(t, "the first custodian's session", one, nil)
+	check(t, "the second custodian's session", two, nil)
 }
 
 func TestExchangeIDToken(t *testing.T) {
@@ -1038,12 +1123,7 @@ func TestTheProviderIsDiscoveredThroughItsBackChannel(t *testing.T) {
 	})
 
 	t.Run("logout sends the browser to the issuer's end session endpoint", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		svc.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/auth/logout", nil))
-		if rec.Code != http.StatusFound {
-			t.Fatalf("logout: got %d, want 302", rec.Code)
-		}
-		checkEndSessionRedirect(t, rec.Header().Get("Location"), frontIssuer+"/protocol/openid-connect/logout", opts.ClientID)
+		checkEndSessionRedirect(t, svc.EndSessionURL(), frontIssuer+"/protocol/openid-connect/logout", opts.ClientID)
 	})
 }
 
@@ -1099,18 +1179,14 @@ func TestTheBrowsersEndpointsMayLeaveTheIssuersOrigin(t *testing.T) {
 	idp.discovery["end_session_endpoint"] = "https://login.example.test/logout"
 	clk := clocktest.New(testEpoch)
 	opts := backChannelOptions(idp, clk)
-	// A logout without a session cookie revokes nothing, so the session
-	// store needs no database.
-	svc := newService(t, opts, nil, authn.NewSessionStore(nil, clk, nil, authn.SessionOptions{}))
+	svc := newService(t, opts, nil, nil)
 
 	login := httptest.NewRecorder()
 	svc.ServeHTTP(login, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
 	if loc := login.Header().Get("Location"); !strings.HasPrefix(loc, "https://login.example.test/authorize?") {
 		t.Errorf("login redirects to %q, want the document's authorization endpoint", loc)
 	}
-	logout := httptest.NewRecorder()
-	svc.ServeHTTP(logout, httptest.NewRequest(http.MethodGet, "/auth/logout", nil))
-	checkEndSessionRedirect(t, logout.Header().Get("Location"), "https://login.example.test/logout", opts.ClientID)
+	checkEndSessionRedirect(t, svc.EndSessionURL(), "https://login.example.test/logout", opts.ClientID)
 }
 
 // discover returns the error of a first discovery by a new service of opts.
@@ -1215,7 +1291,7 @@ func TestARefusedExchangeNamesNothingOfTheBackChannel(t *testing.T) {
 	clk := clocktest.New(testEpoch)
 	opts := backChannelOptions(idp, clk)
 	// The token store is never reached: the ID token does not verify.
-	opts.Tokens = authn.NewTokenStore(nil, clk, nil)
+	opts.Tokens = authn.NewTokenStore(nil, clk, nil, nil)
 	svc := newService(t, opts, nil, nil)
 
 	rawToken := idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{

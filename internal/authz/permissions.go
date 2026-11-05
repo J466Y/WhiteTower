@@ -83,6 +83,12 @@ const (
 
 	// PermissionIdentityMeRead allows reading the caller's own identity, roles, and permissions.
 	PermissionIdentityMeRead Permission = "identity.me.read"
+
+	// PermissionIdentityTokensManage allows listing, creating and revoking the
+	// API tokens of any principal. Everyone manages their own, and those of
+	// the service accounts they are responsible for, with
+	// PermissionIdentityMeRead.
+	PermissionIdentityTokensManage Permission = "identity.tokens.manage"
 )
 
 // allPermissions lists all permissions in deterministic order.
@@ -112,6 +118,7 @@ var allPermissions = []Permission{
 	PermissionAuditExport,
 	PermissionSettingsManage,
 	PermissionIdentityMeRead,
+	PermissionIdentityTokensManage,
 }
 
 // AllPermissions returns a copy of all defined permissions.
