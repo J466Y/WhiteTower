@@ -240,7 +240,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
-| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. Split into parts before it starts | Not started |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In four parts, 3a to 3d, which the note of the review of pull request 2, of 2026-11-05, lists | Not started |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -950,7 +950,7 @@ RFC-0001's eight code parts are merged: #77, #79, #81, #88, #85, #84 with #86, #
 | What | Where |
 | --- | --- |
 | The counts of vectors, 186 in all, which both stacks pass: 39 combination, 18 fail-closed, 4 of the hashed mode, 50 bundles, 8 manifests and the 67 documents of `documents.json`. Section 9.1 names the files that code parts 5 and 7 added, and the Python stack's PyYAML and `jsonschema` | Section 9.1; RFC-0001, item 7 and its record |
-| The valid bundle, `87188a2a…` of 4506 bytes, with its signature and its three files, and ep-python's manifest hash, `0e84b01b…`, in `RegisterInstance`. A sentence says which vectors give them | Appendix A |
+| The valid bundle, `87188a2a…` of 4506 bytes, with its signature and its three files, and ep-python's real manifest hash in `RegisterInstance`, in place of a placeholder: `12fe48e1…` once step 12's pull request 2 is merged (below). A sentence says which vectors give them | Appendix A |
 | How YAML 1.1's types are read: a float has one decimal point, so that the version `0.1.0` stays a string. MAN-1 does not name the syntax on which YAML parsers differ, each by refusing it: the escape `\/`, the `%YAML` directive, tabs, and NEL, LS and PS. The section says what a manifest that uses it risks, and that a JSON manifest avoids it all | Section 3.1 |
 | The mechanism that both quarantine events name, an open value, and its four known values | RC-5, section 5.8 |
 | The evidence buffer's capacity that the driver gives for S-11, and a module that cannot take it reported as not run | S-11, section 9.3 |
@@ -960,7 +960,7 @@ Details:
 - **MAN-1 and the parsers.** Naming that syntax in MAN-1 would make every reader refuse it, and would change both reference readers and the manifest vectors, for syntax that no manifest needs. The section states the risk instead, which changes no outcome. The two reference readers agree on every vector and document. A third parser could keep a NEL inside quotes, as YAML 1.2 does, where both fold it into a space: the manifest's hash would then differ, and its registration fails closed (MAN-2).
 - **Sections 5.7 and 5.8.** The note of code part 8 names both, but enforcement points emit no quarantine event, so RC-5 alone names the mechanism.
 - **ASM-05.** The four CNIs are those that ASM-05 names. The description of `quarantineMechanism` in `common.schema.json` says KIL-10: step 12, which edits that file, corrects it.
-- **What step 12 changes again.** The manifest's schema will require `tool.expose` of an enforcement point, so ep-python's manifest changes, and each bundle copies the Cedar schema, which RFC-0002 extends; step 12 also adds the vector files that section 9.1 lists. The reviewer's pull request after step 12 updates appendix A's references and the counts again, with appendix A's examples of `ReportTooling`, `ReportDefinitions` and the blocks record (2026-10-26). The example of `whitetower.bundle.activated.v1` still names the valid bundle as it was before code part 3, `d3309704…`: step 12's pull request 3, which regenerates the bundle vectors, gives it the valid bundle's reference.
+- **What step 12 changes again.** Pull request 2 requires `tool.expose` of an enforcement point, so ep-python's manifest changes; the note of its review, below, gives appendix A the new hash. Pull request 3 changes the Cedar schema that each bundle copies, and adds the vector files that section 9.1 lists: the reviewer's pull request after it updates appendix A's bundle reference and the counts again. The example of `whitetower.bundle.activated.v1` still names the valid bundle as it was before code part 3, `d3309704…`: the part of pull request 3 that regenerates the bundle vectors gives it the valid bundle's reference.
 
 What remains of P0-03 is step 12 and the tag.
 
@@ -1026,3 +1026,31 @@ For the specification, which is the reviewer's:
 - **A** (recommended): record it in `names_sha256`, as the SHA-256 of the UTF-8 bytes of the name with each lone surrogate replaced by U+FFFD, which Go's decoder already does. Every stack records the same hash, a trace of the argument stays, and no schema changes; only the description of `names_sha256` grows.
 - **B:** leave the name out. Simplest, but the evidence loses that the argument existed.
 - **C:** a new member that counts the names left out. Exact, but a schema change for a rare input.
+
+### 2026-11-05: the review of step 12's pull request 2, and the specification for pull request 3
+
+The review found pull request 2 complete, and CI passed. `buf generate` changes nothing, and the Python checker passes the 186 vectors. Apart from the agent's break experiments, the reviewer's own two each failed a test: a manifest schema that no longer requires `tool.expose`, and an `action.executed` that requires `decision_id` with the origin `provider`. The review accepts the four items of `api/policy` moved to pull request 3, for the reasons the note above gives, and a size a little over 800 lines, of which about 70 are documentation. Until pull request 3, the event and response schemas know `tool.expose` and the `catalog.*` reasons while the request schema does not; nothing evaluates them yet.
+
+**Lone surrogates in events.** On 2026-11-05 the maintainer chose option A of the proposal above: an argument name with a lone surrogate is recorded in `names_sha256`, as the SHA-256 of the UTF-8 bytes of the name with each lone surrogate replaced by U+FFFD. The alternatives were to leave the name out, which loses that the argument existed, and a new member that counts the names left out, a schema change for a rare input. Section 8.3 now says so, and applies the same rule to a resource ID, which an event cannot write either: the agent's name for a tool that the catalog does not list comes from the agent.
+
+**The specification's answers** to the questions of the note above:
+
+| Question | Answer | Where |
+| --- | --- | --- |
+| The member of a function's parameters | `inputSchema`, beside `name`, so that one schema hashes alike whatever the tool's kind | Section 4.10 |
+| A rule's ID | From 1 to 128 characters, unique within its policy, as the event's schema already says | Section 6.11 |
+| A snapshot's blocks | The instance applies the blocks of the first part as soon as it arrives, beside those it holds, and drops those the snapshot lacks only once it is complete, so that no block is lifted by a snapshot that never completes. The core never names one ID both among the blocks a change adds and among those it removes; an instance that receives such a change keeps the block. Both readings deny more | Section 5.10 |
+| The catalog file's entries | A tool's entry carries what makes up its reference: an MCP tool's `server` and `name`, a built-in tool's `provider` and `type` and no `definition`, and the name alone of the other tools. Argument types are named as Cedar names them: `String`, `Long`, `Bool`, `Set<String>` and `Set<Long>` | Section 7.7 |
+| A tool's required properties | All six, as RFC-0002's Cedar schema has them, with `server` and `transport` for MCP tools and `provider` for built-in tools; a model's three too. A tool or a model that the catalog does not list has none, and the catalog check denies it first (`catalog.unknown`), before the request's own checks (section 6.6) | Section 6.3 |
+| Appendix A | ep-python's manifest hash, `12fe48e1…`; examples of `ReportTooling` and `ReportDefinitions`; a block in the snapshot of `Watch`, and a change that removes it | Appendix A |
+
+**Pull request 3, in four parts.** Each part comes after the one before, and keeps to about 800 lines:
+
+| Part | What | Exception |
+| --- | --- | --- |
+| 3a | Section 4.10's canonical JSON with exact integers, on both stacks; references, string forms, normalized URLs with `url_host`'s reading, redaction and definition hashes, in `tooling.json`; the hashed mode's new cases and lone surrogates, and the checker's `canonical_json`; the comments of `SnapshotPart` on when blocks apply | No |
+| 3b | Per-tool arguments and the four transforms, in `arguments.json`, with the cases of the URL and address check | No |
+| 3c | The Cedar schema, the catalog file's schema and the bundle manifest's `catalog`; V4, V5 and V7 on both stacks, with the refusal of a bundle manifest that is not I-JSON (2026-10-28); bundles with a catalog file; the valid bundle's reference in the example of `bundle.activated` | Yes, for the bundle vectors |
+| 3d | The request schema, the Go profile and the Python checker; the rewritten combination vectors; `catalog-check.json`, `exposure.json` and `usage-rules.json` | No |
+
+The reviewer's pull request after 3d updates the counts of section 9.1 and appendix A's bundle reference, which 3c changes. Then the tag, `contracts/v0.1.0`, is the maintainer's.
