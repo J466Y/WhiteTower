@@ -142,7 +142,7 @@ Added on 2026-10-27 ([progress notes](#progress-notes)). People have a right to 
   Its ID, its issuer, its last login and every record that refers to it stay. Every check that a principal is inactive treats an erased one the same way, so that an erased owner still suspends their agents (INV-05), and a service account whose responsible principal is erased stays unusable for good (the fix of 2026-10-19).
 - **Final.** An erased principal is never reactivated. If the person logs in again, the login finds no principal with their external ID or their subject and creates a new one, with a new ID.
 - **Audited.** The erasure records `whitetower.principal.erased.v1`, with its actor, the principal's ID and the reference, and nothing that names the person: a new core event type, with every step of AGENTS.md's checklist.
-- **Nothing else to erase.** No other table holds the name, the email or the subject. Text that people wrote into sealed events, such as halt reasons and agents' names, stays until retention drops it; the domain model's section 7 asks them to keep personal data out of it.
+- **Nothing else to erase.** No other table holds the name, the email or the subject. Text that people wrote into sealed events, such as halt reasons and agents' names, stays until retention drops it, and so do the person's groups that `principal.created` and `principal.groups_changed` recorded (added on 2026-11-05); the domain model's section 7 asks them to keep personal data out of it.
 
 **Done when:** after an erasure, a canary name, email, subject and external ID appear in no table and in no API response; an active principal and a service account are refused; an erased principal cannot be reactivated, and the same person logging in again gets a new principal (ST-88).
 
@@ -506,3 +506,20 @@ The maintainer's decision 3 of 2026-11-02, above. SCIM created a principal under
   - A `PATCH` still ignores every attribute other than `active` and `externalId`, such as `userName`, without saying so.
   - A creation with `active: false` deactivates the principal in a second transaction, and answers 201 with an active user if that fails.
   - `internal/inventory` and `adoptHuman` each read a unique violation from PostgreSQL's error: a helper in `internal/platform/db` would serve both.
+
+### 2026-11-05: the reviews of the fixes, and the maintainer's decisions
+
+The reviewer found the four fixes above complete: access control and sessions (#100), the identity provider's availability (#103), the audit events of people and their sessions (#104), and one principal for SCIM and sign-in (#105). The review of the last one found SCIM's reach, which the fix then closed. The follow-ups that the notes above list are unchanged. The reviews add three:
+
+- **A stolen SCIM token.** Since #105, a SCIM token that knows a person's external ID can take over the principal that the person's sign-in created, and set its name and email address. It records `principal.adopted`, and gives neither a sign-in nor a role. The threat model's T-18 now says so (version 0.1.8).
+- **Entra ID.** The SAML broker guide's details for Entra ID, `oid` with the `profile` scope and the default mapping of `mailNickname`, come from the provider's documentation, not from a tenant. The acceptance criteria already ask for one commercial identity provider, or for it as the first task of the pilot: that check covers them.
+- **A refused sign-in leaves no trace**, neither in the log nor in a metric: decision 3 below.
+
+The maintainer's decisions of 2026-11-05, on what the reviews left open:
+
+1. **The administrator's exception for API tokens.** `listTokens`, `createToken` for another principal and `TokenStore.Revoke` let the platform administrator act on any principal's tokens because of the role, so a token of an administrator scoped to `identity.me.read` does so too. The exception becomes a permission, `identity.tokens.manage`, held by the platform administrator and checked by the authorizer, so that a token needs it in its scopes. The permission matrix gains its row (requirements, section 5.2.1). The alternatives: no exception for a token with scopes, which needs no new permission but leaves the exception outside the matrix; and `settings.manage`, which mixes settings with tokens.
+2. **Roles after a change of groups (ST-14).** A session copies its roles at sign-in. A sign-in that changes a person's groups revokes the person's other sessions, in its transaction, so that no session keeps the roles of the groups before. API tokens already take their roles from the principal at each request. The alternatives: roles read at each request for sessions too, a larger change with one more query per request; and the 12 hours of a session accepted as a residual risk.
+3. **Refused sign-ins.** A sign-in refused through the callback, the CLI's exchange or break-glass logs one line with its reason, and the principal's ID when there is one, and counts in a metric by method and result. It writes no audit event, since it changes nothing. The alternatives: an audit event, which would seal attempts that change no state; and nothing.
+4. **SCIM's `PATCH`.** It keeps ignoring the attributes other than `active` and `externalId`, and the SAML broker guide says so: Entra ID sends `displayName`, `emails` and `name` at every synchronization, so refusing them would break its provisioning, and a sign-in already updates the name and the email. The alternatives: applying the name and the email, which a sign-in does anyway; and refusing them.
+
+The work queue's rows "P1-03 fix: tokens and sessions" and "P1-03 fix: what identity records, and SCIM" take decisions 1 to 4, the two gaps of ST-14 and the follow-ups of #104 and #105 that they name. "Small fixes from the reviews of the identity and ingestion fixes" takes `task verify:gen` and the CA file of the audit sink.
