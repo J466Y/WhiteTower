@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -80,7 +79,9 @@ func TestHealthcheck(t *testing.T) {
 	}{
 		{"healthy server", healthy.Listener.Addr().String(), 0},
 		{"unhealthy server", failing.Listener.Addr().String(), 1},
-		{"nothing listening", unusedAddr(t), 1},
+		// Nothing ever listens on port 0, since a bind to port 0 takes another
+		// port: unlike a free port, no other test can take this address.
+		{"nothing listening", "127.0.0.1:0", 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -89,20 +90,10 @@ func TestHealthcheck(t *testing.T) {
 			if code := run([]string{"healthcheck"}, env, &stdout, &stderr); code != tt.want {
 				t.Fatalf("exit code %d, want %d (stderr %q)", code, tt.want, stderr.String())
 			}
+			// The configuration is valid, so a failure is the check's own.
+			if tt.want != 0 && !strings.Contains(stderr.String(), "unhealthy") {
+				t.Fatalf("stderr %q, want the server reported unhealthy", stderr.String())
+			}
 		})
 	}
-}
-
-// unusedAddr returns an address where nothing listens. Any process may bind
-// its port again once it is returned, so never give it to a listener: give
-// the listener port 0 instead (startServeOn).
-func unusedAddr(t *testing.T) string {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := listener.Addr().String()
-	_ = listener.Close()
-	return addr
 }

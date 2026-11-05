@@ -423,3 +423,23 @@ The reviewer found the fix of 2026-11-04 complete (#106). The reviewer's own bre
 - **The caller.** When P1-07.1 wires `Publish` (its step 7), it fills `IngestCaller.Module` and `IngestCaller.Agent`, against which the sources are checked; MAN-6, the types that a manifest may emit, stays its own check, through `AllowedTypes`. P1-07.1's step 7 now says so.
 - **Two helpers.** `awaitLockWait` is the fourth copy of a test helper that waits for a lock in `pg_stat_activity`, beside those of `internal/authn`, `internal/govstate` and `internal/inventory`. A shared one in `dbtest` is a change of its own.
 - **From earlier fixes**, in the work queue's row of small fixes from the reviews: `audit.export.otlp.ca_file` adds its authorities to the system's, unlike its reference and `tracing.otlp.ca_file` ([P1-03's progress notes](P1-03-human-identity-and-access.md#progress-notes) of 2026-11-03); and `golang.org/x/net` 0.60.0 has GO-2026-6860 and GO-2026-6866, which the code does not reach and 0.62.0 fixes (found by the fix of the audit tests' dates).
+
+### 2026-11-05: small fixes from the reviews of the identity and ingestion fixes
+
+A fix outside the eight pull requests, from the work queue's row of small fixes. Two of its items are this plan's; [P1-01's progress notes](P1-01-core-platform-skeleton.md#progress-notes) of the same day hold the other two, `task verify:gen` and the healthcheck test.
+
+- **`audit.export.otlp.ca_file` replaces the system's authorities**, as its reference says and as `tracing.otlp.ca_file` and `auth.oidc.ca_file` do ([P1-03's progress notes](P1-03-human-identity-and-access.md#progress-notes) of 2026-11-03). The OTLP sink takes its TLS configuration from `tlsclient.Config`, as they do, rather than adding the file's authorities to the system's pool. A receiver whose certificate chains only to a system root is now refused when the file is set, so a file must hold the root of the receiver's chain. Without a file, the sink trusts the system's, as before. A file that cannot be read, or holds no certificate, still stops the start, and both errors now name the file. No setting's comment changes, so the configuration reference stays as it is.
+- **`golang.org/x/net` 0.62.0**, in `go.mod` and `hack/tools/go.mod`, fixes GO-2026-6860 and GO-2026-6866, both in `x/net/html`, which neither the product nor the pinned tools link. It is an upgrade, not a new dependency. What moves with it:
+
+  | Module | From | To | Why |
+  | --- | --- | --- | --- |
+  | `golang.org/x/crypto` | 0.57.0 | 0.58.0 | `x/net` 0.62.0 requires it |
+  | `golang.org/x/sys` | 0.48.0 | 0.49.0 | `x/net` 0.62.0 requires it |
+  | `golang.org/x/text` | 0.42.0 | 0.43.0 | `x/net` 0.62.0 requires it |
+  | `golang.org/x/term` | 0.46.0 | 0.47.0 | `x/net` 0.62.0 requires it; in the product's `go.sum` only, since no package of the product imports it |
+  | `golang.org/x/sync` | 0.23.0 | 0.24.0 | `x/text` 0.43.0 requires it |
+  | `golang.org/x/tools`, tools only | 0.50.0 | 0.51.0 | `x/text` 0.43.0 requires it |
+  | `golang.org/x/telemetry`, tools only | `4bcc4b2ee518` | `ed294f943157` | `x/tools` 0.51.0 requires it |
+
+  `task gen` with the new tools changes no generated file. govulncheck reported both advisories in the product's module before the upgrade, and neither after, in the product or in the pinned tools; GO-2026-5932 (`x/crypto/openpgp`, never to be fixed) remains in both modules, ignored by their `osv-scanner.toml` as before.
+- **Tests:** `TestTheOTLPSinksCAFileReplacesTheSystemsAuthorities` exports to an HTTPS receiver trusted through the CA file, checks that the sink's pool holds the file's authorities and no other, since no test receiver has a certificate from a system root, refuses the receiver's certificate without the file, and refuses a file without certificates with an error that names it. Back on the system's pool with the file appended, it fails, on Windows and on Linux.
