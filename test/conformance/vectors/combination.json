@@ -782,7 +782,7 @@
     },
     {
       "id": "C-15",
-      "description": "The environment comes from the credential",
+      "description": "The environment that registration returns decides",
       "section": "6.2",
       "policies": [
         {

@@ -31,7 +31,7 @@
       "$ref": "common.schema.json#/$defs/action"
     },
     "resource": {
-      "description": "What the action applies to (section 6.3). A resource ID longer than 512 characters, which makes the request invalid, is recorded as its SHA-256, in id_sha256 rather than id (section 8.3).",
+      "description": "What the action applies to (section 6.3). A resource ID that is empty or longer than 512 characters, which makes the request invalid, is recorded as the SHA-256 of its UTF-8 bytes, in id_sha256 rather than id (section 8.3).",
       "oneOf": [
         {
           "$ref": "common.schema.json#/$defs/resource"
@@ -48,7 +48,7 @@
               "$ref": "common.schema.json#/$defs/resourceType"
             },
             "id_sha256": {
-              "description": "The SHA-256 of a resource ID longer than 512 characters, recorded in place of the ID.",
+              "description": "The SHA-256 of the resource ID's UTF-8 bytes, in lowercase hexadecimal, recorded in place of an ID that is empty or longer than 512 characters.",
               "$ref": "common.schema.json#/$defs/sha256"
             }
           }
@@ -101,7 +101,7 @@
           }
         },
         "names_sha256": {
-          "description": "The SHA-256 of each argument name longer than 128 characters, recorded in place of the name.",
+          "description": "The SHA-256 of the UTF-8 bytes of each argument name longer than 128 characters, in lowercase hexadecimal, recorded in place of the name.",
           "type": "array",
           "uniqueItems": true,
           "items": {

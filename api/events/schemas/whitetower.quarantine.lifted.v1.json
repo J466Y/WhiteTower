@@ -6,7 +6,8 @@
   "required": [
     "workloads",
     "rule",
-    "cluster"
+    "cluster",
+    "mechanism"
   ],
   "additionalProperties": false,
   "properties": {
@@ -23,6 +24,9 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128
+    },
+    "mechanism": {
+      "$ref": "common.schema.json#/$defs/quarantineMechanism"
     }
   }
 }

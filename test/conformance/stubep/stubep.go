@@ -30,11 +30,6 @@ import (
 type Config struct {
 	// The agent it serves.
 	AgentID string
-	// The environment of its credential: "production" or "non_production".
-	// Its gate and the subject of its decisions take it, as an enforcement
-	// point takes the environment that its registration returned (sections
-	// 5.4 and 6.2).
-	Environment string
 	// Its trust root for bundles, which a harness reads from the JWK Set file
 	// that the driver protocol names (bundle.ParseKeys).
 	Trusted []bundle.Key
@@ -64,6 +59,10 @@ const (
 // its first part lacks the fleet state (section 5.2).
 var errSnapshotWithoutFleet = errors.New("malformed snapshot: its first part lacks the fleet state")
 
+// errUnknownEnvironment refuses a registration that returned no environment,
+// or one that the stub does not know (I-7).
+var errUnknownEnvironment = errors.New("refused registration: it returned no environment that the stub knows")
+
 // EP is the stub enforcement point.
 type EP struct {
 	cfg        Config
@@ -73,6 +72,12 @@ type EP struct {
 
 	mu         sync.RWMutex
 	instanceID string
+	// environment is the one that the last registration returned,
+	// "production" or "non_production", which the gate and the subject of
+	// every decision take (sections 5.4 and 6.2). It is empty until a
+	// registration of this process returns an environment that the stub
+	// knows, and again after one that returns none or an unknown one (I-7).
+	environment string
 	// applied is the highest state version applied. It never goes back
 	// (section 5.2).
 	applied       uint64
@@ -118,9 +123,10 @@ func (e *EP) Run(ctx context.Context) {
 }
 
 // session registers, then watches until the stream ends. PERMISSION_DENIED
-// from either call ends the lease at once, and so does FAILED_PRECONDITION
-// from RegisterInstance; Run then registers again with backoff, never taking
-// the code as final (section 4.6).
+// from either call ends the lease at once, and so do FAILED_PRECONDITION from
+// RegisterInstance and a registration that returns no environment that the
+// stub knows (I-7); Run then registers again with backoff, never taking the
+// refusal as final (section 4.6).
 func (e *EP) session(ctx context.Context) error {
 	reg, err := e.registry.RegisterInstance(ctx, connect.NewRequest(&modulev1alpha1.RegisterInstanceRequest{
 		Module:           "conformance-stub",
@@ -138,10 +144,12 @@ func (e *EP) session(ctx context.Context) error {
 		}
 		return err
 	}
-	e.mu.Lock()
-	e.instanceID = reg.Msg.GetInstanceId()
+	if err := e.register(reg.Msg); err != nil {
+		return err
+	}
+	e.mu.RLock()
 	since := e.applied
-	e.mu.Unlock()
+	e.mu.RUnlock()
 
 	stream, err := e.governance.Watch(ctx, connect.NewRequest(&modulev1alpha1.WatchRequest{
 		InstanceId: reg.Msg.GetInstanceId(), SinceVersion: since,
@@ -166,6 +174,40 @@ func (e *EP) session(ctx context.Context) error {
 		e.endLease()
 	}
 	return err
+}
+
+// register applies the response of a registration: the instance ID that later
+// calls carry, and the environment that the stub's decisions take (I-7). A
+// response with no environment, or one that the stub does not know, refuses
+// the registration, as PERMISSION_DENIED would (section 4.6): the stub ends its
+// lease at once and keeps no environment, so that nothing opens its gate, and
+// register returns an error, so that the session watches nothing and the stub
+// registers again.
+func (e *EP) register(resp *modulev1alpha1.RegisterInstanceResponse) error {
+	environment, known := environmentName(resp.GetEnvironment())
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.environment = environment
+	if !known {
+		e.leaseDeadline = time.Time{}
+		return errUnknownEnvironment
+	}
+	e.instanceID = resp.GetInstanceId()
+	return nil
+}
+
+// environmentName maps the environment that a registration returned to its
+// name in the subject of decisions (section 6.2). known is false for
+// ENVIRONMENT_UNSPECIFIED and for a value that the stub does not know.
+func environmentName(env modulev1alpha1.Environment) (name string, known bool) {
+	switch env {
+	case modulev1alpha1.Environment_ENVIRONMENT_PRODUCTION:
+		return "production", true
+	case modulev1alpha1.Environment_ENVIRONMENT_NON_PRODUCTION:
+		return "non_production", true
+	default:
+		return "", false
+	}
 }
 
 // endLease ends the lease at once, as PERMISSION_DENIED from RegisterInstance
@@ -407,10 +449,12 @@ func (e *EP) fetchAndVerify(ctx context.Context, want, active bundle.Ref) (*prof
 
 // Decide runs the gate, then the policies (obligation EP-2), on the body of
 // the driver's decide call: an AuthZEN request without its subject
-// (test/conformance/driver-protocol.md). The stub builds the subject from its
-// state and configuration, never from the body, and passes the rest to the
-// profile as the body gives it, so that a body outside the profile is denied
-// with error.invalid_request and its numbers keep their digits (section 6.6).
+// (test/conformance/driver-protocol.md). The stub builds the subject from the
+// governance state and the environment that its registration returned, never
+// from the body or its configuration (section 6.2, I-7), and passes the rest
+// to the profile as the body gives it, so that a body outside the profile is
+// denied with error.invalid_request, its time included, and its numbers keep
+// their digits (section 6.6).
 func (e *EP) Decide(body []byte) profile.Response {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -421,7 +465,7 @@ func (e *EP) Decide(body []byte) profile.Response {
 		AgentHalted:    len(e.agent.GetHalts()) > 0,
 		FleetHalted:    len(e.fleet.GetHalts()) > 0,
 		LifecycleState: lifecycleName(e.agent.GetLifecycleState()),
-		Environment:    e.cfg.Environment,
+		Environment:    e.environment,
 		BundleActive:   e.engine != nil,
 	}
 	if reason := profile.GateReason(gate); reason != "" {
@@ -469,7 +513,7 @@ func (e *EP) requestLocked(body []byte) ([]byte, error) {
 		labels = map[string]string{}
 	}
 	subject, err := json.Marshal(profile.Subject{Type: "agent", ID: e.cfg.AgentID, Properties: profile.SubjectProperties{
-		Slug: e.agent.GetSlug(), Kind: attrs.GetKind(), RiskTier: attrs.GetRiskTier(), Environment: e.cfg.Environment,
+		Slug: e.agent.GetSlug(), Kind: attrs.GetKind(), RiskTier: attrs.GetRiskTier(), Environment: e.environment,
 		DataCategories: categories, Owner: attrs.GetOwnerId(), Labels: labels,
 	}})
 	if err != nil {

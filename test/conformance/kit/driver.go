@@ -14,8 +14,9 @@ import (
 )
 
 // DecideRequest asks the module under test to decide: an AuthZEN request
-// without its subject, which the enforcement point builds from its own state
-// and credential (driver protocol, test/conformance/driver-protocol.md).
+// without its subject, which the enforcement point builds from the governance
+// state and the environment that its registration returned (section 6.2, I-7;
+// driver protocol, test/conformance/driver-protocol.md).
 type DecideRequest struct {
 	Action   profile.Action   `json:"action"`
 	Resource profile.Resource `json:"resource"`
