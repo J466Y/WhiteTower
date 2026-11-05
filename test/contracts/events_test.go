@@ -118,8 +118,8 @@ func TestTheDecisionEventTiesItsEnvironmentAndBundleVersionToItsReason(t *testin
 
 // TestTheEventSchemasFollowSections5And8 changes one thing in an example and
 // checks it against the envelope's schema and its type's: the rules of
-// sections 5.3, 5.5, 8.2 and 8.3 that the schemas state, each refusal next to
-// what the rule accepts.
+// sections 5.3, 5.5, 5.8, 8.2 and 8.3 that the schemas state, each refusal
+// next to what the rule accepts.
 func TestTheEventSchemasFollowSections5And8(t *testing.T) {
 	envelope := compile(t, api+"/events/cloudevent.schema.json")
 	hash := strings.Repeat("0123456789abcdef", 4)
@@ -135,11 +135,18 @@ func TestTheEventSchemasFollowSections5And8(t *testing.T) {
 	arguments := func(value map[string]any) func(map[string]any) {
 		return func(e map[string]any) { e["data"].(map[string]any)["arguments"] = value }
 	}
+	mechanism := func(value string) func(map[string]any) {
+		return func(e map[string]any) { e["data"].(map[string]any)["mechanism"] = value }
+	}
+	without := func(member string) func(map[string]any) {
+		return func(e map[string]any) { delete(e["data"].(map[string]any), member) }
+	}
 	const (
 		decision    = "whitetower.decision.made.v1"
 		halted      = "whitetower.instance.halted.v1"
 		expired     = "whitetower.lease.expired.v1"
 		quarantined = "whitetower.quarantine.applied.v1"
+		lifted      = "whitetower.quarantine.lifted.v1"
 		agentStream = "/agents/0192f1c2-7a3b-7c4d-8e5f-000000000001/ep/"
 		quarantine  = "/modules/k8s-quarantine/"
 	)
@@ -182,6 +189,7 @@ func TestTheEventSchemasFollowSections5And8(t *testing.T) {
 		{"a resource ID recorded as its SHA-256", decision, resource(map[string]any{"type": "tool", "id_sha256": hash}), true},
 		{"a resource with both its ID and a SHA-256", decision, resource(map[string]any{"type": "tool", "id": "send_email", "id_sha256": hash}), false},
 		{"a resource with neither its ID nor a SHA-256", decision, resource(map[string]any{"type": "tool"}), false},
+		{"an empty resource ID, which is recorded as its SHA-256", decision, resource(map[string]any{"type": "tool", "id": ""}), false},
 		{"a resource ID of 513 characters", decision, resource(map[string]any{"type": "tool", "id": strings.Repeat("a", 513)}), false},
 		{"a resource's SHA-256 in uppercase", decision, resource(map[string]any{"type": "tool", "id_sha256": strings.ToUpper(hash)}), false},
 		{"argument names, one recorded as its SHA-256", decision, arguments(map[string]any{"names": []any{"to"}, "names_sha256": []any{hash}}), true},
@@ -209,6 +217,23 @@ func TestTheEventSchemasFollowSections5And8(t *testing.T) {
 		// A lease under 10 seconds is applied as it is, and can run out.
 		{"a lease of 5 seconds", expired, func(e map[string]any) { e["data"].(map[string]any)["lease_ttl_ms"] = 5000 }, true},
 		{"a lease of 0 milliseconds", expired, func(e map[string]any) { e["data"].(map[string]any)["lease_ttl_ms"] = 0 }, false},
+
+		// Section 5.8: the quarantine events name their cluster and their
+		// mechanism, an open value in the form of a slug.
+		{"a quarantine by another known mechanism", quarantined, mechanism("admin-network-policy"), true},
+		{"a quarantine by a mechanism that the schema does not list", quarantined, mechanism("ovn-kubernetes"), true},
+		{"a quarantine by a mechanism of 63 characters", quarantined, mechanism(strings.Repeat("a", 63)), true},
+		{"a quarantine by a mechanism of 64 characters", quarantined, mechanism(strings.Repeat("a", 64)), false},
+		{"a quarantine by a mechanism in uppercase", quarantined, mechanism("Cilium"), false},
+		{"a quarantine by a mechanism that ends with a dash", quarantined, mechanism("cilium-"), false},
+		{"a quarantine by an empty mechanism", quarantined, mechanism(""), false},
+		{"a quarantine without its mechanism", quarantined, without("mechanism"), false},
+		{"a quarantine without its cluster", quarantined, without("cluster"), false},
+		{"a quarantine that still names its CNI", quarantined, func(e map[string]any) { e["data"].(map[string]any)["cni"] = "cilium" }, false},
+		{"a lift by a mechanism that the schema does not list", lifted, mechanism("ovn-kubernetes"), true},
+		{"a lift by a mechanism in uppercase", lifted, mechanism("Cilium"), false},
+		{"a lift without its mechanism", lifted, without("mechanism"), false},
+		{"a lift without its cluster", lifted, without("cluster"), false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

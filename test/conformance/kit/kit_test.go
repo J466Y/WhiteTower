@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	modulev1alpha1 "github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1"
@@ -26,6 +27,23 @@ func TestStartClosedAgainstStub(t *testing.T) {
 	}
 	if n := len(core.Instances()); n == 0 {
 		t.Error("the stub never registered")
+	}
+}
+
+// TestTheFakeCoreReturnsTheProductionEnvironment checks that the fake core
+// returns an environment at registration, as the core returns the one recorded
+// for the instance's credential (MAN-5), and that it is production, the one
+// the scenarios of the skeleton run with.
+func TestTheFakeCoreReturnsTheProductionEnvironment(t *testing.T) {
+	core := kit.NewCore(nil)
+	resp, err := core.RegisterInstance(t.Context(), connect.NewRequest(&modulev1alpha1.RegisterInstanceRequest{
+		Module: "conformance-stub", ContractVersions: []string{"v1alpha1"},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := resp.Msg.GetEnvironment(), modulev1alpha1.Environment_ENVIRONMENT_PRODUCTION; got != want {
+		t.Errorf("the registration returned %v, want %v", got, want)
 	}
 }
 
@@ -61,7 +79,7 @@ func startStub(t *testing.T, ttl time.Duration) (context.Context, *kit.Core, *ki
 	t.Cleanup(server.Close)
 
 	ep := stubep.New(stubep.Config{
-		AgentID: agentID, Environment: "production", Trusted: keys,
+		AgentID: agentID, Trusted: keys,
 		CoreURL: server.URL, HTTPClient: server.Client(),
 	})
 	driverServer := httptest.NewServer(ep.DriverHandler())

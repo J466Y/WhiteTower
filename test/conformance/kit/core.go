@@ -204,7 +204,11 @@ func (c *Core) renewalLocked() *modulev1alpha1.WatchResponse {
 	}
 }
 
-// RegisterInstance records the registration and selects v1alpha1.
+// RegisterInstance records the registration, selects v1alpha1, and returns
+// the production environment, as the core returns the environment recorded
+// for the instance's credential (MAN-5). The module under test puts it in the
+// subject of its decisions (I-7). Plan P1-07.2 has the kit return each
+// environment in turn, for S-25.
 func (c *Core) RegisterInstance(_ context.Context, req *connect.Request[modulev1alpha1.RegisterInstanceRequest]) (*connect.Response[modulev1alpha1.RegisterInstanceResponse], error) {
 	if !slices.Contains(req.Msg.GetContractVersions(), "v1alpha1") {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("no common contract version: the server supports v1alpha1"))
@@ -216,6 +220,7 @@ func (c *Core) RegisterInstance(_ context.Context, req *connect.Request[modulev1
 		InstanceId:        fmt.Sprintf("00000000-0000-7000-8000-%012d", len(c.instances)),
 		ContractVersion:   "v1alpha1",
 		HeartbeatInterval: durationpb.New(30 * time.Second),
+		Environment:       modulev1alpha1.Environment_ENVIRONMENT_PRODUCTION,
 	}), nil
 }
 

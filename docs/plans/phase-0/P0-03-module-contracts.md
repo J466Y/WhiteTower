@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/`, then step 12's protobuf, schemas and vectors, and the tag remain (see [progress notes](#progress-notes)) |
+| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/` are done (2026-11-05); the reviewer's pull request on appendix A and the counts of vectors, step 12's protobuf, schemas and vectors, and the tag remain (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
@@ -320,7 +320,7 @@ The review of RFC-0001 covered the specification as it stands, with every change
 | 5. Manifests, bundles and versions | Points 9, 13, 14, 16, 20, 21 and 39 | Done |
 | 6. Events and halt reports | Points 3, 7, 10, 12, 22, 27, 28, 35 and 36 | Done |
 | 7. Conformance, runtime control and the rest | Points 33 and 34, the rest of point 38, and the editorial corrections | Done |
-| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | In progress: code parts 1 to 7 done (2026-10-27 to 2026-10-29); the others queued in AGENTS.md's work queue |
+| Code parts | What follows each part of the text in `api/`, the vectors, the stub and the kit, as parts for the coding agents | Done: code parts 1 to 8 (2026-10-27 to 2026-11-05) |
 | Last. Acceptance | The record of the review in RFC-0001, the commit of the accepted text, the roadmap's summary and risks of the reviews, and step 11 closed | Done |
 
 RFC-0002's review follows, the same way.
@@ -909,3 +909,34 @@ The review found code part 7 complete (#92), with the five corrections of its se
 - **Kept as they are.** The envelope accepts trace and parent IDs of zeros, which W3C Trace Context calls invalid, since refusing an event for its trace context would lose evidence; and any character after a higher version's flags, of which W3C reads nothing. `key_id` stays required with `hmac_sha256`, and ep-python's condition stays, though no test checks it on its own.
 
 The reviewer's pull request at the end of the code parts also takes, with the items of 2026-10-28, the counts of vectors as they stand then, `hashed-arguments.json` among them, and ep-python's hash, `0e84b01b…`, in appendix A.
+
+### 2026-11-05: corrections, code part 8
+
+The eighth and last code part of RFC-0001's review follows what the sixth part of the corrections (2026-10-23) leaves to the coding agents, with the stub's time from the review of code part 4 and the descriptions from the review of code part 7, in `api/` and the conformance kit. It regenerates `internal/audit`'s golden file of indexed examples, which did not change, and no vectors.
+
+| What | Change |
+| --- | --- |
+| `whitetower.quarantine.applied.v1` | `cni`, a closed list of four CNIs, becomes `mechanism`, required, an open value (section 5.8). `cluster` stays required |
+| `whitetower.quarantine.lifted.v1` | Gains `mechanism`, required, so that both quarantine events name it, as P1-15 step 5 says |
+| `common.schema.json` | `quarantineMechanism`, which both events share: the slug's pattern, a lowercase name of at most 63 characters, with the four known values in its description and its `examples`: `cilium`, `calico`, `antrea` and `admin-network-policy`. `after_ms` counts from the moment the lease ran out in `lease.expired` (section 5.3), and as before in `instance.halted` |
+| `whitetower.lease.expired.v1` | Descriptions only: `lease_ttl_ms` is in milliseconds rounded up, so that a lease under a millisecond records 1, and `layers` give each layer's time since the lease ran out (section 5.3) |
+| `whitetower.decision.made.v1` | Descriptions only: `id_sha256` and `names_sha256` are the SHA-256 of UTF-8 bytes, in lowercase hexadecimal, and `id_sha256` also records a resource ID that is empty (section 8.3) |
+| Examples | The quarantine examples name the mechanism `cilium`. The `traceparent` of `action.executed` has a span ID of its own, `b7ad6b7169203331`, since it records another call than the example of `decision.made`; the trace stays the same |
+| `combination.json` | C-15's description says that the environment that registration returns decides |
+| The kit's fake core | `RegisterInstance` returns `ENVIRONMENT_PRODUCTION` |
+| The stub enforcement point | `Config.Environment` is gone: the stub takes the environment of its gate and of its subjects from each registration (I-7). A registration that returns `ENVIRONMENT_UNSPECIFIED` or a value it does not know is refused, as `PERMISSION_DENIED` from `RegisterInstance` is (section 4.6): the stub ends its lease at once, keeps no environment, opens no watch, and registers again with backoff. The comments of `Decide` and `kit.DecideRequest` say that the subject comes from the state and the registration |
+| The driver protocol | `WT_CONFORMANCE_ENVIRONMENT` is gone, and the harness sets no environment. `WT_CONFORMANCE_EVIDENCE_CAPACITY`, set for S-11 only, gives the number of events that the module's evidence buffer holds; a module that cannot take it says so in its conformance report, and S-11 is reported as not run, never as passed, as for an endpoint it cannot support. `POST /v1/decide` says that the module builds the subject from the governance state and its registration |
+| The stub's tests | The gate and the subject take the environment of a registration (`TestTheStubsGateTakesItsEnvironment`, `TestTheSubjectTakesTheEnvironmentOfTheRegistration`). `TestARegistrationWithoutAKnownEnvironmentAllowsNothing`: after such a registration the lease has ended, and even a fresh renewal opens nothing until a registration returns a known environment. `TestARegistrationWithoutAKnownEnvironmentIsRefused` runs the stub's session against the kit's fake core, wrapped so that the test chooses the environment of each registration, as the test of refusals already wraps it: the stub watches nothing and registers again. From the review of code part 4, a body whose time has no milliseconds is denied with `error.invalid_request`, which a stub that replaced the time with its clock would allow |
+| Other tests | `TestTheFakeCoreReturnsTheProductionEnvironment`, in the kit. `TestTheEventSchemasFollowSections5And8` checks the mechanism both ways, in both events: known and unknown values, 63 and 64 characters, uppercase, a final dash and an empty one; that both require `mechanism` and `cluster`, and refuse `cni`; and that an empty resource ID is refused in `id`, so that it is recorded as its SHA-256 |
+
+Details the list of 2026-10-23 does not name:
+
+- **The four known values.** Sections 5.7 and 5.8 do not list them. They are the values of the enumeration that `mechanism` replaces, which are the CNIs that KIL-10 and ASM-05 name, and the templates of P1-15 step 3.
+- **The pattern.** A slug's, that of a DNS label in lowercase (RFC 1123), which `common.schema.json` already defines for the module of `instance.started`. JSON Schema's `examples` lists the known values for tools, beside the description.
+- **`quarantine.lifted`.** It had no `cni`. Point 33 and P1-15 step 5 name the mechanism in both events, so it gains a required `mechanism`.
+- **The module's configuration.** `k8s-quarantine.yaml` keeps its `cni` setting, a closed list: it chooses which deny rules the module writes, one template per CNI, and the events' open value does not change it. Changing it would change the module's manifest hash and the manifest vectors.
+- **A refused registration.** I-7 says to treat it as refused, and section 4.6 says what a refused registration does. The stub also keeps no environment after one, so that nothing reopens its gate on an earlier one; until a registration of the process returns one, its decisions carry none.
+- **The buffer's capacity.** It counts events, as row 7 of section 5.4 does, so that the kit knows how many decisions fill the buffer, whatever a module's encoding.
+- **What no test observes.** The descriptions and `examples` change nothing that a schema accepts. Nor does any test see that the two examples' span IDs differ. The golden file of indexed examples did not change, since what the audit log indexes of these events comes from their envelope and fixed facts. S-01 and S-17 pass with a fake core that returns `ENVIRONMENT_NON_PRODUCTION`, since the fixture's agent is active: `TestTheFakeCoreReturnsTheProductionEnvironment` sees it.
+
+The counts of vectors do not change. The runs of S-25 with each environment, and of S-11, stay with P1-07.2.
