@@ -2,7 +2,9 @@ package audit
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"io"
 	"log/slog"
@@ -10,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -402,6 +405,51 @@ func TestOTLPSinkExportProtobuf(t *testing.T) {
 	}
 	if !foundCheckpoint {
 		t.Error("expected checkpoint event to be exported as an ordinary event (AUD-06)")
+	}
+}
+
+// With audit.export.otlp.ca_file, the sink trusts the file's authorities in
+// place of the system's, so a receiver whose certificate chains only to a
+// system root is refused. No test receiver has such a certificate, so the
+// test compares the pool with the file's authorities alone. Without the file,
+// the sink trusts the system's, which do not know the test receiver.
+func TestTheOTLPSinksCAFileReplacesTheSystemsAuthorities(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(srv.Close)
+	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
+	caFile := filepath.Join(t.TempDir(), "ca.pem")
+	if err := os.WriteFile(caFile, caPEM, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	batch := []auditdb.ExportLeavesRow{{LeafIndex: 1, EventID: "an-event", Type: "whitetower.audit.checkpoint.v1"}}
+
+	trusted, err := NewOTLPSink(OTLPSinkOptions{Endpoint: srv.URL, CAFile: caFile})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := trusted.Export(context.Background(), batch); err != nil {
+		t.Fatalf("with the CA file: %v", err)
+	}
+	fileOnly := x509.NewCertPool()
+	fileOnly.AppendCertsFromPEM(caPEM)
+	if pool := trusted.client.Transport.(*http.Transport).TLSClientConfig.RootCAs; !pool.Equal(fileOnly) {
+		t.Error("with the CA file, the sink trusts other authorities than the file's")
+	}
+
+	untrusted, err := NewOTLPSink(OTLPSinkOptions{Endpoint: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := untrusted.Export(context.Background(), batch); err == nil || !strings.Contains(err.Error(), "certificate") {
+		t.Fatalf("without the CA file: %v, want a certificate error", err)
+	}
+
+	notPEM := filepath.Join(t.TempDir(), "not.pem")
+	if err := os.WriteFile(notPEM, []byte("no certificate here"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewOTLPSink(OTLPSinkOptions{Endpoint: srv.URL, CAFile: notPEM}); err == nil || !strings.Contains(err.Error(), notPEM) {
+		t.Fatalf("a CA file without certificates: %v, want an error that names it", err)
 	}
 }
 
