@@ -1,4 +1,5 @@
-// Module contracts v0.1 (RFC-0001): governance state, leases and acknowledgements.
+// Module contracts v0.1 (RFC-0001): governance state, leases and acknowledgements,
+// and the blocks of RFC-0002.
 // Normative text: docs/contracts/module-contract-v0.1.md, sections 5 and 6.
 
 syntax = "proto3";
@@ -102,6 +103,10 @@ message SnapshotPart {
   // Agents in the instance's scope. An agent that the snapshot does not carry
   // has left the scope (I-11).
   repeated AgentState agents = 4;
+  // The blocks record, in the first part, with the fleet state, and only on
+  // an enforcement point's stream: every active block. A snapshot's blocks
+  // replace the instance's whole set of blocks (contract, section 5.10).
+  repeated Block blocks = 5;
 }
 
 // StateChange carries the new state of what changed.
@@ -115,6 +120,12 @@ message StateChange {
   // at once, the instance drops the acknowledgements it has queued for it,
   // and an enforcement point's gate for it closes with gate.no_state (I-11).
   repeated string removed_agent_ids = 3;
+  // Only on an enforcement point's stream: the blocks added, each replacing a
+  // block of the same ID that the instance knows (contract, section 5.10).
+  repeated Block blocks = 4;
+  // Only on an enforcement point's stream: the IDs of the blocks removed. The
+  // instance ignores an ID it does not know.
+  repeated string removed_block_ids = 5;
 }
 
 // LeaseRenewal renews the lease of every agent in scope, if it is fresh. Each
@@ -167,6 +178,46 @@ message FleetState {
   // Active fleet halts. Every agent is halted while this list is not empty,
   // wherever the instance runs (contract, section 5.1).
   repeated Halt halts = 2;
+}
+
+// Block denies, for every agent and at once, an MCP server and all its tools,
+// a single tool, a model, or every model of a provider or of an endpoint
+// (contract, section 5.10). It belongs to no agent and halts nothing: it
+// denies every later call to, exposure of, and result from what it covers,
+// through the catalog check, without a new bundle (EP-15). Blocks never travel
+// in bundles, and never change an entry's status. Their reasons stay in the
+// core.
+message Block {
+  // The block's identifier (UUIDv7).
+  string block_id = 1;
+  // What the block covers.
+  BlockKind kind = 2;
+  // The lowercase hexadecimal SHA-256 of the UTF-8 bytes of the string form
+  // of what the block covers (contract, section 4.10): the reference of a
+  // server, a tool or a model, the name of a provider, or the normalized base
+  // URL of an endpoint. An enforcement point computes the hashes of an entry
+  // once, when a tool list or a model changes, never on each call.
+  string covered_sha256 = 3;
+  // When the block was issued (server time).
+  google.protobuf.Timestamp issued_at = 4;
+}
+
+// BlockKind says what a block covers. A block of a kind that the instance does
+// not know denies every tool and model call while it is active (EP-10, EP-15).
+enum BlockKind {
+  // Unknown. Denies every tool and model call while the block is active.
+  BLOCK_KIND_UNSPECIFIED = 0;
+  // An MCP server and all its tools, by the server's reference.
+  BLOCK_KIND_SERVER = 1;
+  // A single tool, by its reference. A block of one of the agent's own tools
+  // covers that name in every agent.
+  BLOCK_KIND_TOOL = 2;
+  // A model, by its reference.
+  BLOCK_KIND_MODEL = 3;
+  // Every model of a provider, by the provider's name.
+  BLOCK_KIND_PROVIDER = 4;
+  // Every model of an endpoint, by its normalized base URL.
+  BLOCK_KIND_ENDPOINT = 5;
 }
 
 // LifecycleState is the agent's lifecycle state (docs/architecture/lifecycle.md).
@@ -380,6 +431,9 @@ message BundleAcknowledgement {
 // StateAcknowledgement reports the state version applied, so the console can
 // show instances that lag behind. An instance that serves several agents
 // acknowledges the state per agent, in one acknowledgement for each (EP-12).
+// Once it has applied a block, an enforcement point acknowledges at once a
+// state version at or above the one that carried it, for at least one agent
+// it serves, without waiting for the 60 seconds of EP-12 (EP-15).
 message StateAcknowledgement {
   // The last state version applied.
   uint64 version = 1;

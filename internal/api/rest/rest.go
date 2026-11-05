@@ -148,8 +148,7 @@ func (s Server) ListTokens(ctx context.Context, request gen.ListTokensRequestObj
 				return nil, problem.New(problem.NotFound, "principal not found")
 			}
 			isResponsible := targetP.ResponsiblePrincipalID != nil && *targetP.ResponsiblePrincipalID == targetPrincipalID
-			isAdmin := slices.Contains(p.Roles, "admin")
-			if !isResponsible && !isAdmin {
+			if !isResponsible && !s.tokens.MayManageAnyToken(ctx, *p) {
 				return nil, problem.New(problem.Forbidden, "cannot list tokens for another principal")
 			}
 			targetPrincipalID = requestedID
@@ -204,8 +203,7 @@ func (s Server) CreateToken(ctx context.Context, request gen.CreateTokenRequestO
 			return nil, problem.New(problem.NotFound, "target principal not found")
 		}
 		isResponsible := targetP.ResponsiblePrincipalID != nil && *targetP.ResponsiblePrincipalID == targetPrincipalID
-		isAdmin := slices.Contains(p.Roles, "admin")
-		if !isResponsible && !isAdmin {
+		if !isResponsible && !s.tokens.MayManageAnyToken(ctx, *p) {
 			return nil, problem.New(problem.Forbidden, "cannot create token for another principal")
 		}
 		targetPrincipalID = requestedID

@@ -184,7 +184,7 @@ The scopes leave out `groups`, which the server asks for by default. Keycloak de
        "displayName": "Alice Admin",
        "id": "0192f2c4-8d1e-7c3a-9b2f-5e1d2c3b4a59",
        "kind": "human",
-       "permissions": ["identity.me.read", "inventory.view", "settings.manage"],
+       "permissions": ["identity.me.read", "identity.tokens.manage", "inventory.view", "settings.manage"],
        "roles": ["admin"]
      }
      ```

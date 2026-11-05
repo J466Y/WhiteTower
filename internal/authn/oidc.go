@@ -269,6 +269,15 @@ func (s *OIDCService) Discover(ctx context.Context) error {
 			&oidc.IssuerMismatchError{Provided: s.opts.Issuer, Discovered: disc.Issuer})
 	}
 
+	// The console sends browsers to the end session endpoint itself, from its
+	// own origin. One that it may not use leaves the sign-out the core's own,
+	// as before discovery, and never refuses the provider.
+	endSession, err := usableEndSession(disc.EndSessionEndpoint, s.opts.Issuer)
+	if err != nil {
+		s.logger.Warn("not using the identity provider's end session endpoint: a sign-out ends the core's session only",
+			"end_session_endpoint", logging.Sanitize(disc.EndSessionEndpoint), "reason", err.Error())
+	}
+
 	cliID := s.opts.CLIClientID
 	if cliID == "" {
 		cliID = "wtctl"
@@ -291,9 +300,38 @@ func (s *OIDCService) Discover(ctx context.Context) error {
 			SupportedSigningAlgs: s.opts.AllowedAlgorithms,
 			Now:                  s.opts.Clock.Now,
 		}),
-		endSessionURL: disc.EndSessionEndpoint,
+		endSessionURL: endSession,
 	})
 	return nil
+}
+
+// usableEndSession returns the end session endpoint of a discovery document
+// when browsers may be sent there: an absolute URL with a host, whose scheme
+// is https, or http when the issuer's is too, as only development allows
+// (T-13). A document without one has none. Any other endpoint, such as a
+// javascript: or data: URL, a relative one or plain HTTP for an https issuer,
+// is an error that says why, and the endpoint is none.
+func usableEndSession(endpoint, issuer string) (string, error) {
+	if endpoint == "" {
+		return "", nil
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", errors.New("it is not a URL")
+	}
+	iss, issErr := url.Parse(issuer)
+	switch {
+	case u.Host == "":
+		return "", errors.New("it is not an absolute URL with a host")
+	case u.Scheme == "https":
+		return endpoint, nil
+	case u.Scheme == "http" && issErr == nil && iss.Scheme == "http":
+		return endpoint, nil
+	case u.Scheme == "http":
+		return "", errors.New("it is plain HTTP, and the issuer is not")
+	default:
+		return "", errors.New("its scheme is neither https nor http")
+	}
 }
 
 // Run discovers the identity provider, and retries until an attempt succeeds
@@ -329,7 +367,9 @@ func (s *OIDCService) Run(ctx context.Context) {
 	}
 }
 
-// ServeHTTP handles /auth/* routes: /auth/login, /auth/callback, and /auth/logout.
+// ServeHTTP handles /auth/login and /auth/callback. LogoutService handles
+// /auth/logout, which break-glass needs too, and sends the browser to
+// EndSessionURL.
 func (s *OIDCService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	provider := s.provider.Load()
 	path := strings.TrimPrefix(r.URL.Path, "/auth")
@@ -341,8 +381,6 @@ func (s *OIDCService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleLogin(w, r, provider)
 	case path == "/callback":
 		s.handleCallback(w, r, provider)
-	case path == "/logout":
-		s.handleLogout(w, r, provider)
 	default:
 		http.NotFound(w, r)
 	}
@@ -558,36 +596,29 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 	http.Redirect(w, r, state.ReturnURL, http.StatusFound)
 }
 
-// handleLogout clears the session in PostgreSQL and the browser cookie, then
-// redirects to the IdP's end session endpoint if available (plan P1-03, step 1).
-// Before discovery, the provider and its endpoint are unknown: the logout is
-// then local only, so that a person can always sign out of the core. A
-// revocation that fails still clears the cookie, and is logged.
-func (s *OIDCService) handleLogout(w http.ResponseWriter, r *http.Request, provider *discovered) {
-	if cookie, err := r.Cookie(CookieName); err == nil && cookie.Value != "" {
-		if err := s.sessions.SignOut(r.Context(), cookie.Value); err != nil {
-			s.logger.Error("signing out: revoking the session failed", "error", err)
-		}
+// EndSessionURL returns where a browser goes once signed out of the core:
+// the identity provider's end session endpoint, which ends the person's
+// session there too, then sends the browser back to the console (plan P1-03,
+// step 1). Before discovery the endpoint is unknown, and a provider may have
+// none: the sign-out is then the core's only, and EndSessionURL is "".
+func (s *OIDCService) EndSessionURL() string {
+	provider := s.provider.Load()
+	if provider == nil || provider.endSessionURL == "" {
+		return ""
 	}
-
-	http.SetCookie(w, s.sessions.ClearCookie())
-
-	if provider != nil && provider.endSessionURL != "" {
-		if u, err := url.Parse(provider.endSessionURL); err == nil {
-			q := u.Query()
-			// A provider needs the ID token or the client to accept a
-			// post-logout redirect: Keycloak refuses one with neither. The
-			// core keeps no ID token, so it names its client, and the
-			// provider asks the person to confirm before it ends its session.
-			q.Set("client_id", s.opts.ClientID)
-			q.Set("post_logout_redirect_uri", s.postLogoutURL)
-			u.RawQuery = q.Encode()
-			http.Redirect(w, r, u.String(), http.StatusFound)
-			return
-		}
+	u, err := url.Parse(provider.endSessionURL)
+	if err != nil {
+		return ""
 	}
-
-	http.Redirect(w, r, "/", http.StatusFound)
+	q := u.Query()
+	// A provider needs the ID token or the client to accept a post-logout
+	// redirect: Keycloak refuses one with neither. The core keeps no ID
+	// token, so it names its client, and the provider asks the person to
+	// confirm before it ends its session.
+	q.Set("client_id", s.opts.ClientID)
+	q.Set("post_logout_redirect_uri", s.postLogoutURL)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func (s *OIDCService) encodeStateCookie(state oidcState) (string, error) {

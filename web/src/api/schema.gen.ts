@@ -56,14 +56,23 @@ export interface paths {
         };
         /**
          * List API tokens
-         * @description Lists active and historical API tokens for the calling principal or a service account.
+         * @description Lists active and historical API tokens for the calling principal or
+         *     another one. A caller lists their own tokens, those of the service
+         *     accounts they are responsible for, and, with the permission
+         *     `identity.tokens.manage`, those of any principal: an API token needs
+         *     that permission in its scopes too. Another principal's tokens are
+         *     otherwise `forbidden`.
          */
         get: operations["listTokens"];
         put?: never;
         /**
          * Create an API token
          * @description Generates a new API token. The raw token secret is returned in the response
-         *     and is never retrievable again. A token never does more than whoever
+         *     and is never retrievable again. A caller creates tokens for
+         *     themselves, for the service accounts they are responsible for, and,
+         *     with the permission `identity.tokens.manage`, for any principal: an
+         *     API token needs that permission in its scopes too. Another principal
+         *     is otherwise `forbidden`. A token never does more than whoever
          *     creates it: each scope must be a permission of the token's principal
          *     and of the caller, and one of the scopes of the caller's own token when
          *     the caller uses one; otherwise the request is refused (`forbidden`).
@@ -89,9 +98,10 @@ export interface paths {
          * Revoke an API token
          * @description Revokes an active API token by its ID. A caller revokes their own
          *     tokens, those of the service accounts they are responsible for, and,
-         *     as an administrator, any token: the tokens they may list. Any other
-         *     token is `not_found`, as a token that does not exist is, so that a
-         *     token's ID never shows whether the token exists.
+         *     with the permission `identity.tokens.manage`, any token: the tokens
+         *     they may list. An API token needs that permission in its scopes too.
+         *     Any other token is `not_found`, as a token that does not exist is, so
+         *     that a token's ID never shows whether the token exists.
          */
         delete: operations["revokeToken"];
         options?: never;
@@ -943,7 +953,7 @@ export interface components {
             expiresInDays: number;
             /**
              * Format: uuid
-             * @description Optional principal ID to issue the token for (service account owned by caller or by admin).
+             * @description Optional principal ID to issue the token for (a service account that the caller is responsible for, or any principal for a holder of `identity.tokens.manage`).
              */
             principalId?: string;
         };
@@ -1719,7 +1729,7 @@ export interface operations {
     listTokens: {
         parameters: {
             query?: {
-                /** @description Optional principal ID to filter tokens (allowed for responsible owners and administrators). */
+                /** @description Optional principal ID whose tokens to list (the person responsible for a service account, or a holder of `identity.tokens.manage`). */
                 principalId?: string;
             };
             header?: never;

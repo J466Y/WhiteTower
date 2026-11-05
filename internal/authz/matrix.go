@@ -140,9 +140,10 @@ var Matrix = map[Role]map[Permission]Grant{
 	},
 
 	RoleAdmin: {
-		PermissionInventoryView:  {Scope: ScopeAll},
-		PermissionSettingsManage: {Scope: ScopeAll},
-		PermissionIdentityMeRead: {Scope: ScopeAll},
+		PermissionInventoryView:        {Scope: ScopeAll},
+		PermissionSettingsManage:       {Scope: ScopeAll},
+		PermissionIdentityMeRead:       {Scope: ScopeAll},
+		PermissionIdentityTokensManage: {Scope: ScopeAll},
 	},
 }
 

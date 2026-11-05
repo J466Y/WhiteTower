@@ -89,3 +89,39 @@ func TestTheManifestSchemaRequiresTheEventsEachCapabilityEmits(t *testing.T) {
 		}
 	}
 }
+
+// TestTheManifestSchemaRequiresTheActionsAnEnforcementPointMustEvaluate
+// removes, in turn, each of the three actions that an enforcement point must
+// evaluate, tool.expose, tool.invoke and model.invoke, from each example that
+// declares the capability (section 6.3).
+func TestTheManifestSchemaRequiresTheActionsAnEnforcementPointMustEvaluate(t *testing.T) {
+	sch := compile(t, api+"/manifest/module-manifest.schema.json")
+	// enforcementPoint returns a manifest's enforcement-point capability, or
+	// nil when it declares none.
+	enforcementPoint := func(m any) map[string]any {
+		for _, c := range m.(map[string]any)["spec"].(map[string]any)["capabilities"].([]any) {
+			if c := c.(map[string]any); c["name"] == "enforcement-point" {
+				return c
+			}
+		}
+		return nil
+	}
+	var examples int
+	for _, path := range glob(t, api+"/manifest/examples/*.yaml") {
+		if enforcementPoint(loadYAML(t, path)) == nil {
+			continue
+		}
+		examples++
+		for _, action := range []string{"tool.expose", "tool.invoke", "model.invoke"} {
+			m := loadYAML(t, path)
+			capability := enforcementPoint(m)
+			capability["interventionPoints"] = slices.DeleteFunc(capability["interventionPoints"].([]any), func(p any) bool { return p == action })
+			if err := sch.Validate(m); err == nil {
+				t.Errorf("%s without %s: accepted", filepath.Base(path), action)
+			}
+		}
+	}
+	if examples == 0 {
+		t.Error("no example declares an enforcement point")
+	}
+}

@@ -897,7 +897,7 @@ type CreateTokenRequest struct {
 	// Name Friendly name for the token.
 	Name string `json:"name"`
 
-	// PrincipalId Optional principal ID to issue the token for (service account owned by caller or by admin).
+	// PrincipalId Optional principal ID to issue the token for (a service account that the caller is responsible for, or any principal for a holder of `identity.tokens.manage`).
 	PrincipalId *openapi_types.UUID `json:"principalId,omitempty"`
 
 	// Scopes The permissions granted to the token (must be subset of effective permissions).
@@ -1777,7 +1777,7 @@ type SignOffReviewParams struct {
 
 // ListTokensParams defines parameters for ListTokens.
 type ListTokensParams struct {
-	// PrincipalId Optional principal ID to filter tokens (allowed for responsible owners and administrators).
+	// PrincipalId Optional principal ID whose tokens to list (the person responsible for a service account, or a holder of `identity.tokens.manage`).
 	PrincipalId *openapi_types.UUID `form:"principalId,omitempty" json:"principalId,omitempty"`
 }
 

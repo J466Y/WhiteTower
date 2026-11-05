@@ -648,7 +648,7 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 	}
 	writer := audit.NewWriter(cat, clk)
 	sessionStore := authn.NewSessionStore(database, clk, writer, authn.SessionOptions{})
-	tokenStore := authn.NewTokenStore(database, clk, writer)
+	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer())
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
 
 	email := "operator@example.com"
@@ -807,10 +807,13 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 	})
 }
 
-// Security test ST-19: a token is revoked only by its principal, by the person
-// responsible for its service account, or by an administrator; any other
-// token is not found, as one that does not exist
-func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorRevokesAToken(t *testing.T) {
+// Security test ST-19: a principal's tokens are listed, created and revoked
+// only by the principal, by the person responsible for its service account, or
+// by a holder of identity.tokens.manage, an administrator, whose API token
+// needs that permission in its scopes too; any other token is not found, as
+// one that does not exist, and listing or creating another principal's tokens
+// is forbidden
+func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorManagesAToken(t *testing.T) {
 	ctx := context.Background()
 	d := dbtest.New(t)
 	database := d.Open(t)
@@ -821,7 +824,7 @@ func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorRevokesAToken(t *tes
 	}
 	writer := audit.NewWriter(cat, clk)
 	sessionStore := authn.NewSessionStore(database, clk, writer, authn.SessionOptions{})
-	tokenStore := authn.NewTokenStore(database, clk, writer)
+	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer())
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
 
 	human := func(subject, name string, roles ...string) auth.Principal {
@@ -835,6 +838,17 @@ func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorRevokesAToken(t *tes
 	uma := human("sub-uma", "Uma User", "user")
 	otto := human("sub-otto", "Otto Owner", "owner")
 	ada := human("sub-ada", "Ada Admin", "admin")
+	// Ada's API tokens: the operations on tokens need identity.me.read, and
+	// another principal's tokens identity.tokens.manage too.
+	adasToken := func(scopes ...authz.Permission) auth.Principal {
+		p := ada
+		p.Scopes = []string{string(authz.PermissionIdentityMeRead)}
+		for _, s := range scopes {
+			p.Scopes = append(p.Scopes, string(s))
+		}
+		return p
+	}
+	adaReading, adaManaging := adasToken(), adasToken(authz.PermissionIdentityTokensManage)
 	bot := func(responsible auth.Principal, name string) auth.Principal {
 		t.Helper()
 		sa, err := principalStore.CreateServiceAccount(ctx, name, nil, responsible.Roles, responsible)
@@ -924,6 +938,8 @@ func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorRevokesAToken(t *tes
 		{"the token of one's service account", uma, umasBot, false, true},
 		{"another person's token, as an administrator", ada, otto, false, true},
 		{"the token of another person's service account, as an administrator", ada, ottosBot, false, true},
+		{"another person's token, with an administrator's token without identity.tokens.manage", adaReading, otto, false, false},
+		{"another person's token, with an administrator's token with identity.tokens.manage", adaManaging, otto, false, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			tok := token(tt.owner, tt.revoked)
@@ -956,6 +972,70 @@ func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorRevokesAToken(t *tes
 			if e := events[0]; e.Actor != tt.caller.ID || e.Data.Actor.ID != tt.caller.ID || e.Data.PrincipalID != tt.owner.ID {
 				t.Errorf("revocation event by %s (data: %s) of a token of %s, want by %s of a token of %s",
 					e.Actor, e.Data.Actor.ID, e.Data.PrincipalID, tt.caller.ID, tt.owner.ID)
+			}
+		})
+	}
+
+	// Listing and creating the tokens of Otto's service account, whose role
+	// gives it identity.me.read. A break-glass session does neither: it never
+	// holds identity.tokens.manage, and creates no token.
+	custodian := auth.Principal{
+		ID: authn.BreakglassPrincipalID.String(), Kind: auth.Human, Roles: []string{string(authz.RoleOperator)},
+		Scopes: append([]string{}, authn.BreakglassScopes...), IsBreakglass: true,
+	}
+	as := func(caller auth.Principal) http.Handler {
+		o := opts
+		o.Authenticator = fixedAuthenticator{caller}
+		return Handler(o)
+	}
+	for _, tt := range []struct {
+		name    string
+		caller  auth.Principal
+		allowed bool
+	}{
+		{"another person", uma, false},
+		{"the person responsible for it", otto, true},
+		{"an administrator", ada, true},
+		{"an administrator's token without identity.tokens.manage", adaReading, false},
+		{"an administrator's token with identity.tokens.manage", adaManaging, true},
+		{"a break-glass session", custodian, false},
+	} {
+		t.Run("listing the tokens of another principal's service account, as "+tt.name, func(t *testing.T) {
+			res := call(as(tt.caller), http.MethodGet, "/api/v1/tokens?principalId="+ottosBot.ID, "", nil, nil)
+			if !tt.allowed {
+				problemOf(t, res, problem.Forbidden)
+				return
+			}
+			var listed []gen.ApiTokenMetadata
+			if res.status != http.StatusOK || json.Unmarshal(res.body, &listed) != nil || len(listed) == 0 {
+				t.Fatalf("status %d, body %s, want the service account's tokens", res.status, res.body)
+			}
+			for _, tok := range listed {
+				if tok.PrincipalId.String() != ottosBot.ID {
+					t.Errorf("listed a token of %s, want only %s's", tok.PrincipalId, ottosBot.ID)
+				}
+			}
+		})
+		t.Run("creating a token for another principal's service account, as "+tt.name, func(t *testing.T) {
+			before, err := tokenStore.ListByPrincipal(ctx, uuid.MustParse(ottosBot.ID))
+			if err != nil {
+				t.Fatal(err)
+			}
+			body := strings.NewReader(`{"name":"made for the bot","scopes":["identity.me.read"],"principalId":"` + ottosBot.ID + `"}`)
+			res := call(as(tt.caller), http.MethodPost, "/api/v1/tokens", "", nil, body)
+			after, err := tokenStore.ListByPrincipal(ctx, uuid.MustParse(ottosBot.ID))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !tt.allowed {
+				problemOf(t, res, problem.Forbidden)
+				if len(after) != len(before) {
+					t.Errorf("%d tokens, want %d", len(after), len(before))
+				}
+				return
+			}
+			if res.status != http.StatusCreated || len(after) != len(before)+1 {
+				t.Fatalf("status %d, body %s, %d tokens: want one more than %d", res.status, res.body, len(after), len(before))
 			}
 		})
 	}

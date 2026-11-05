@@ -19,7 +19,7 @@ spec:
   capabilities:
     - name: enforcement-point
       interventionPoints:
-        [agent.start, input.receive, model.invoke, model.result, tool.invoke, tool.result, output.emit, agent.stop]
+        [agent.start, input.receive, tool.expose, model.invoke, model.result, tool.invoke, tool.result, output.emit, agent.stop]
       haltModes: [block, interrupt, terminate]
       haltLayers: [gate_closed, in_flight_interrupted, process_terminated]
       frameworks:

@@ -368,6 +368,14 @@ func TestStubsAreUnimplemented(t *testing.T) {
 			_, err := registry.DeregisterInstance(ctx, authorized(&modulev1alpha1.DeregisterInstanceRequest{}))
 			return err
 		},
+		modulev1alpha1connect.RegistryServiceReportToolingProcedure: func() error {
+			_, err := registry.ReportTooling(ctx, authorized(&modulev1alpha1.ReportToolingRequest{}))
+			return err
+		},
+		modulev1alpha1connect.RegistryServiceReportDefinitionsProcedure: func() error {
+			_, err := registry.ReportDefinitions(ctx, authorized(&modulev1alpha1.ReportDefinitionsRequest{}))
+			return err
+		},
 		modulev1alpha1connect.GovernanceServiceWatchProcedure: func() error {
 			stream, err := governance.Watch(ctx, authorized(&modulev1alpha1.WatchRequest{}))
 			if err != nil {

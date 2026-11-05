@@ -896,7 +896,7 @@ type CreateTokenRequest struct {
 	// Name Friendly name for the token.
 	Name string `json:"name"`
 
-	// PrincipalId Optional principal ID to issue the token for (service account owned by caller or by admin).
+	// PrincipalId Optional principal ID to issue the token for (a service account that the caller is responsible for, or any principal for a holder of `identity.tokens.manage`).
 	PrincipalId *openapi_types.UUID `json:"principalId,omitempty"`
 
 	// Scopes The permissions granted to the token (must be subset of effective permissions).
@@ -1776,7 +1776,7 @@ type SignOffReviewParams struct {
 
 // ListTokensParams defines parameters for ListTokens.
 type ListTokensParams struct {
-	// PrincipalId Optional principal ID to filter tokens (allowed for responsible owners and administrators).
+	// PrincipalId Optional principal ID whose tokens to list (the person responsible for a service account, or a holder of `identity.tokens.manage`).
 	PrincipalId *openapi_types.UUID `form:"principalId,omitempty" json:"principalId,omitempty"`
 }
 
@@ -2444,7 +2444,12 @@ type ClientInterface interface {
 
 	// ListTokens List API tokens
 	//
-	// Lists active and historical API tokens for the calling principal or a service account.
+	// Lists active and historical API tokens for the calling principal or
+	// another one. A caller lists their own tokens, those of the service
+	// accounts they are responsible for, and, with the permission
+	// `identity.tokens.manage`, those of any principal: an API token needs
+	// that permission in its scopes too. Another principal's tokens are
+	// otherwise `forbidden`.
 	//
 	// Corresponds with GET /tokens (the `ListTokens` operationId).
 	ListTokens(ctx context.Context, params *ListTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2452,7 +2457,11 @@ type ClientInterface interface {
 	// CreateTokenWithBody Create an API token
 	//
 	// Generates a new API token. The raw token secret is returned in the response
-	// and is never retrievable again. A token never does more than whoever
+	// and is never retrievable again. A caller creates tokens for
+	// themselves, for the service accounts they are responsible for, and,
+	// with the permission `identity.tokens.manage`, for any principal: an
+	// API token needs that permission in its scopes too. Another principal
+	// is otherwise `forbidden`. A token never does more than whoever
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
@@ -2465,7 +2474,11 @@ type ClientInterface interface {
 	// CreateToken Create an API token
 	//
 	// Generates a new API token. The raw token secret is returned in the response
-	// and is never retrievable again. A token never does more than whoever
+	// and is never retrievable again. A caller creates tokens for
+	// themselves, for the service accounts they are responsible for, and,
+	// with the permission `identity.tokens.manage`, for any principal: an
+	// API token needs that permission in its scopes too. Another principal
+	// is otherwise `forbidden`. A token never does more than whoever
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
@@ -2507,9 +2520,10 @@ type ClientInterface interface {
 	//
 	// Revokes an active API token by its ID. A caller revokes their own
 	// tokens, those of the service accounts they are responsible for, and,
-	// as an administrator, any token: the tokens they may list. Any other
-	// token is `not_found`, as a token that does not exist is, so that a
-	// token's ID never shows whether the token exists.
+	// with the permission `identity.tokens.manage`, any token: the tokens
+	// they may list. An API token needs that permission in its scopes too.
+	// Any other token is `not_found`, as a token that does not exist is, so
+	// that a token's ID never shows whether the token exists.
 	//
 	// Corresponds with DELETE /tokens/{id} (the `RevokeToken` operationId).
 	RevokeToken(ctx context.Context, id openapi_types.UUID, params *RevokeTokenParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3512,7 +3526,12 @@ func (c *Client) CreateServiceAccount(ctx context.Context, body CreateServiceAcc
 
 // ListTokens List API tokens
 //
-// Lists active and historical API tokens for the calling principal or a service account.
+// Lists active and historical API tokens for the calling principal or
+// another one. A caller lists their own tokens, those of the service
+// accounts they are responsible for, and, with the permission
+// `identity.tokens.manage`, those of any principal: an API token needs
+// that permission in its scopes too. Another principal's tokens are
+// otherwise `forbidden`.
 //
 // Corresponds with GET /tokens (the `ListTokens` operationId).
 func (c *Client) ListTokens(ctx context.Context, params *ListTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3530,7 +3549,11 @@ func (c *Client) ListTokens(ctx context.Context, params *ListTokensParams, reqEd
 // CreateTokenWithBody Create an API token
 //
 // Generates a new API token. The raw token secret is returned in the response
-// and is never retrievable again. A token never does more than whoever
+// and is never retrievable again. A caller creates tokens for
+// themselves, for the service accounts they are responsible for, and,
+// with the permission `identity.tokens.manage`, for any principal: an
+// API token needs that permission in its scopes too. Another principal
+// is otherwise `forbidden`. A token never does more than whoever
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
@@ -3553,7 +3576,11 @@ func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, bo
 // CreateToken Create an API token
 //
 // Generates a new API token. The raw token secret is returned in the response
-// and is never retrievable again. A token never does more than whoever
+// and is never retrievable again. A caller creates tokens for
+// themselves, for the service accounts they are responsible for, and,
+// with the permission `identity.tokens.manage`, for any principal: an
+// API token needs that permission in its scopes too. Another principal
+// is otherwise `forbidden`. A token never does more than whoever
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
@@ -3625,9 +3652,10 @@ func (c *Client) ExchangeToken(ctx context.Context, body ExchangeTokenJSONReques
 //
 // Revokes an active API token by its ID. A caller revokes their own
 // tokens, those of the service accounts they are responsible for, and,
-// as an administrator, any token: the tokens they may list. Any other
-// token is `not_found`, as a token that does not exist is, so that a
-// token's ID never shows whether the token exists.
+// with the permission `identity.tokens.manage`, any token: the tokens
+// they may list. An API token needs that permission in its scopes too.
+// Any other token is `not_found`, as a token that does not exist is, so
+// that a token's ID never shows whether the token exists.
 //
 // Corresponds with DELETE /tokens/{id} (the `RevokeToken` operationId).
 func (c *Client) RevokeToken(ctx context.Context, id openapi_types.UUID, params *RevokeTokenParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6819,7 +6847,12 @@ type ClientWithResponsesInterface interface {
 
 	// ListTokensWithResponse List API tokens
 	//
-	// Lists active and historical API tokens for the calling principal or a service account.
+	// Lists active and historical API tokens for the calling principal or
+	// another one. A caller lists their own tokens, those of the service
+	// accounts they are responsible for, and, with the permission
+	// `identity.tokens.manage`, those of any principal: an API token needs
+	// that permission in its scopes too. Another principal's tokens are
+	// otherwise `forbidden`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -6829,7 +6862,11 @@ type ClientWithResponsesInterface interface {
 	// CreateTokenWithBodyWithResponse Create an API token
 	//
 	// Generates a new API token. The raw token secret is returned in the response
-	// and is never retrievable again. A token never does more than whoever
+	// and is never retrievable again. A caller creates tokens for
+	// themselves, for the service accounts they are responsible for, and,
+	// with the permission `identity.tokens.manage`, for any principal: an
+	// API token needs that permission in its scopes too. Another principal
+	// is otherwise `forbidden`. A token never does more than whoever
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
@@ -6842,7 +6879,11 @@ type ClientWithResponsesInterface interface {
 	// CreateTokenWithResponse Create an API token
 	//
 	// Generates a new API token. The raw token secret is returned in the response
-	// and is never retrievable again. A token never does more than whoever
+	// and is never retrievable again. A caller creates tokens for
+	// themselves, for the service accounts they are responsible for, and,
+	// with the permission `identity.tokens.manage`, for any principal: an
+	// API token needs that permission in its scopes too. Another principal
+	// is otherwise `forbidden`. A token never does more than whoever
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
@@ -6884,9 +6925,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Revokes an active API token by its ID. A caller revokes their own
 	// tokens, those of the service accounts they are responsible for, and,
-	// as an administrator, any token: the tokens they may list. Any other
-	// token is `not_found`, as a token that does not exist is, so that a
-	// token's ID never shows whether the token exists.
+	// with the permission `identity.tokens.manage`, any token: the tokens
+	// they may list. An API token needs that permission in its scopes too.
+	// Any other token is `not_found`, as a token that does not exist is, so
+	// that a token's ID never shows whether the token exists.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -9827,7 +9869,12 @@ func (c *ClientWithResponses) CreateServiceAccountWithResponse(ctx context.Conte
 
 // ListTokensWithResponse List API tokens
 //
-// Lists active and historical API tokens for the calling principal or a service account.
+// Lists active and historical API tokens for the calling principal or
+// another one. A caller lists their own tokens, those of the service
+// accounts they are responsible for, and, with the permission
+// `identity.tokens.manage`, those of any principal: an API token needs
+// that permission in its scopes too. Another principal's tokens are
+// otherwise `forbidden`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -9843,7 +9890,11 @@ func (c *ClientWithResponses) ListTokensWithResponse(ctx context.Context, params
 // CreateTokenWithBodyWithResponse Create an API token
 //
 // Generates a new API token. The raw token secret is returned in the response
-// and is never retrievable again. A token never does more than whoever
+// and is never retrievable again. A caller creates tokens for
+// themselves, for the service accounts they are responsible for, and,
+// with the permission `identity.tokens.manage`, for any principal: an
+// API token needs that permission in its scopes too. Another principal
+// is otherwise `forbidden`. A token never does more than whoever
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
@@ -9862,7 +9913,11 @@ func (c *ClientWithResponses) CreateTokenWithBodyWithResponse(ctx context.Contex
 // CreateTokenWithResponse Create an API token
 //
 // Generates a new API token. The raw token secret is returned in the response
-// and is never retrievable again. A token never does more than whoever
+// and is never retrievable again. A caller creates tokens for
+// themselves, for the service accounts they are responsible for, and,
+// with the permission `identity.tokens.manage`, for any principal: an
+// API token needs that permission in its scopes too. Another principal
+// is otherwise `forbidden`. A token never does more than whoever
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
@@ -9922,9 +9977,10 @@ func (c *ClientWithResponses) ExchangeTokenWithResponse(ctx context.Context, bod
 //
 // Revokes an active API token by its ID. A caller revokes their own
 // tokens, those of the service accounts they are responsible for, and,
-// as an administrator, any token: the tokens they may list. Any other
-// token is `not_found`, as a token that does not exist is, so that a
-// token's ID never shows whether the token exists.
+// with the permission `identity.tokens.manage`, any token: the tokens
+// they may list. An API token needs that permission in its scopes too.
+// Any other token is `not_found`, as a token that does not exist is, so
+// that a token's ID never shows whether the token exists.
 //
 // Returns a wrapper object for the known response body format(s).
 //

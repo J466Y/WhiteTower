@@ -1,4 +1,5 @@
-// Module contracts v0.1 (RFC-0001): instance registration.
+// Module contracts v0.1 (RFC-0001): instance registration, and the tooling
+// reports of RFC-0002.
 // Normative text: docs/contracts/module-contract-v0.1.md, section 4.
 
 syntax = "proto3";
@@ -8,8 +9,8 @@ package whitetower.module.v1alpha1;
 import "google/protobuf/duration.proto";
 
 // RegistryService lets a module instance announce itself, report its health and
-// leave cleanly. Every other method of the module API needs a registered
-// instance.
+// leave cleanly, and an enforcement point report the tooling of the agents it
+// serves. Every other method of the module API needs a registered instance.
 service RegistryService {
   // RegisterInstance announces an instance and negotiates the contract version.
   // Registering again with the same module and instance key, under the same
@@ -30,6 +31,40 @@ service RegistryService {
   // closes its gate for every agent it serves, and allows nothing afterwards
   // (I-5).
   rpc DeregisterInstance(DeregisterInstanceRequest) returns (DeregisterInstanceResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ReportTooling reports the MCP servers, tools and models of one agent. A
+  // report is an observation: it never approves, enables or unblocks anything
+  // (CORE-10). It is complete, and replaces the instance's previous report for
+  // that agent. The response lists the definitions that the core does not
+  // have, which the instance then sends with ReportDefinitions (contract,
+  // section 4.10, EP-13).
+  //
+  // Only an instance of a module that declares the enforcement-point
+  // capability calls it, about an agent in its scope: the core refuses any
+  // other call as a whole with PERMISSION_DENIED (CORE-2). It refuses a report
+  // over the limits of section 4.10 as a whole with INVALID_ARGUMENT, and may
+  // refuse more than one report per instance and agent every 10 seconds with
+  // RESOURCE_EXHAUSTED. The instance keeps at most one report per agent in
+  // flight, and retries a report with the agent's tooling as it is when the
+  // retry is sent, never as it was (EP-13).
+  rpc ReportTooling(ReportToolingRequest) returns (ReportToolingResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ReportDefinitions sends the definitions that the responses of
+  // ReportTooling listed. The core recomputes the hash of each definition and
+  // stores the definition under it. It refuses on its own, and lists in the
+  // response, a definition whose hash none of the instance's current reports
+  // names, for any of its agents, and still stores the others (CORE-2).
+  // Definitions are content-addressed, so each is sent once, whatever the
+  // number of agents, instances and restarts.
+  //
+  // The same instances call it as ReportTooling, under the same rules, and
+  // the core refuses a call over the limits of section 4.10 as a whole with
+  // INVALID_ARGUMENT.
+  rpc ReportDefinitions(ReportDefinitionsRequest) returns (ReportDefinitionsResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 }
@@ -117,8 +152,9 @@ enum Health {
   // The instance can do what the state asks.
   HEALTH_HEALTHY = 1;
   // Enforcement works, but needs an operator: for example, renewals arrive
-  // stale while the lease still holds, events are rejected by the core, or the
-  // oldest undelivered event is older than a threshold (contract, section 8.4).
+  // stale while the lease still holds, events are rejected by the core, the
+  // oldest undelivered event is older than a threshold (contract, section
+  // 8.4), or a tooling report leaves something out (EP-13).
   HEALTH_DEGRADED = 2;
   // The instance cannot enforce what the state asks: the lease ran out while
   // it was connected, the evidence buffer is full, a bundle the state names
@@ -168,3 +204,205 @@ message DeregisterInstanceRequest {
 
 // DeregisterInstanceResponse is empty.
 message DeregisterInstanceResponse {}
+
+// ReportToolingRequest reports the tooling of one agent: what the agent is
+// configured with, not only what it has called (EP-13). Every string is
+// redacted as EP-14 says, with the deployment's redaction rules once a bundle
+// is active. The instance leaves out, and logs, what is over the limits that
+// each field states, and reports HEALTH_DEGRADED while anything is left out: a
+// server left out takes its tools with it, and what is left out stays unknown,
+// so its calls are denied (catalog.unknown). The limits let a full report fit
+// the message limit in binary protobuf; an instance that calls in JSON leaves
+// out what does not fit it in the same way (contract, sections 4.8 and 4.10).
+message ReportToolingRequest {
+  // Identifier returned by RegisterInstance.
+  string instance_id = 1;
+  // The agent the tooling belongs to, in the instance's scope.
+  string agent_id = 2;
+  // The MCP servers that the agent launches or connects to, and those that
+  // its model provider calls for it: at most 256.
+  repeated ReportedServer servers = 3;
+  // The tools that the agent's models can call: at most 4,096.
+  repeated ReportedTool tools = 4;
+  // The models that the agent calls: at most 256.
+  repeated ReportedModel models = 5;
+}
+
+// ReportedServer is an MCP server of the agent (contract, section 4.10).
+message ReportedServer {
+  // The server's reference, of at most 2 KiB: a remote server's URL,
+  // normalized as section 4.10 says; "connector:<provider>/<connector ID>"
+  // for a server that the model provider hosts and names by an ID rather than
+  // a URL; or, for a local server, "stdio:" followed by the canonical JSON of
+  // the array of its command and arguments, as configured.
+  string reference = 1;
+  // How the server is reached.
+  ServerTransport transport = 2;
+  // Who calls the server: the agent, or its model provider.
+  Origin origin = 3;
+  // The name that the server announces, of at most 256 bytes.
+  string name = 4;
+  // The version that the server announces, of at most 128 bytes.
+  string version = 5;
+  // What people see of the server, of at most 2 KiB: its URL or its command
+  // line.
+  string display = 6;
+}
+
+// ServerTransport is how an MCP server is reached.
+enum ServerTransport {
+  // Unknown.
+  SERVER_TRANSPORT_UNSPECIFIED = 0;
+  // A local process that the agent launches.
+  SERVER_TRANSPORT_STDIO = 1;
+  // A remote server, over streamable HTTP or SSE.
+  SERVER_TRANSPORT_HTTP = 2;
+}
+
+// Origin says who runs a tool, or calls an MCP server.
+enum Origin {
+  // Unknown.
+  ORIGIN_UNSPECIFIED = 0;
+  // The agent's process, or an MCP server that the agent connects to.
+  ORIGIN_AGENT = 1;
+  // The model provider, during a model call: its built-in tools, and the
+  // remote MCP servers that it calls for the agent.
+  ORIGIN_PROVIDER = 2;
+}
+
+// ReportedTool is a tool that the agent's models can call (contract, section
+// 4.10).
+message ReportedTool {
+  // What the tool is.
+  ToolKind kind = 1;
+  // Who runs the tool.
+  Origin origin = 2;
+  // For an MCP tool: the position of its server in the report's servers,
+  // from 0. The tool's reference is its server's reference and its name.
+  optional uint32 server_index = 3;
+  // For a built-in tool: the model provider that defines it, as in the table
+  // of model providers (contract, section 6.3), of at most 128 bytes.
+  string provider = 4;
+  // For a built-in tool: its type, which the provider versions, of at most
+  // 128 bytes. A built-in tool's reference is its provider and its type.
+  string type = 5;
+  // The tool's name, of at most 256 bytes. A function, http or other tool's
+  // reference is its name alone.
+  string name = 6;
+  // The lowercase hexadecimal SHA-256 of the canonical JSON of the tool's
+  // definition, which writes integers exactly (contract, section 4.10).
+  // Empty for a built-in tool, which has no definition, and for a definition
+  // that has no hash: one with a number that is not finite as a double, a
+  // member name that repeats or a string with a lone surrogate. A tool
+  // without a hash can never be approved, so its calls are denied.
+  string definition_sha256 = 7;
+}
+
+// ToolKind is what a tool is.
+enum ToolKind {
+  // Unknown.
+  TOOL_KIND_UNSPECIFIED = 0;
+  // The agent's own code.
+  TOOL_KIND_FUNCTION = 1;
+  // A tool of an MCP server.
+  TOOL_KIND_MCP = 2;
+  // Defined by the model provider, such as web search.
+  TOOL_KIND_BUILTIN = 3;
+  // The decision profile's kind http.
+  TOOL_KIND_HTTP = 4;
+  // Any other tool.
+  TOOL_KIND_OTHER = 5;
+}
+
+// ReportedModel is a model that the agent calls (contract, section 4.10). Its
+// reference is its provider, its endpoint and its name.
+message ReportedModel {
+  // The model provider, as in the table of model providers, or another
+  // provider's own lowercase name (contract, section 6.3), of at most 128
+  // bytes.
+  string provider = 1;
+  // The base URL of the endpoint that the agent calls, normalized as section
+  // 4.10 says, even when it is the provider's default, of at most 2 KiB.
+  string endpoint = 2;
+  // The model's name as requested, of at most 256 bytes.
+  string name = 3;
+  // The digest of the model's weights, of at most 128 bytes, when the runtime
+  // reports one.
+  string digest = 4;
+}
+
+// ReportToolingResponse says what the core needs, and what it left out.
+message ReportToolingResponse {
+  // The definition hashes of the report's tools that the core does not have.
+  // The instance sends their definitions with ReportDefinitions (EP-13).
+  repeated string missing_definitions = 1;
+  // How much of what is new in the report the core left out, beyond its
+  // bound on what waits for review (CORE-13). Absent when it left out
+  // nothing.
+  ToolingLeftOut left_out = 2;
+}
+
+// ToolingLeftOut counts what the core left out of a report, beyond its bound,
+// for each agent, on what the agent's reports brought that still waits for
+// review (CORE-13). A new entry left out stays unknown (catalog.unknown), and
+// a new definition or digest left out is not stored, so the tool or the model
+// stays denied, until reviewers approve or decline enough of what the agent
+// brought.
+message ToolingLeftOut {
+  // New MCP servers.
+  uint32 servers = 1;
+  // New tools.
+  uint32 tools = 2;
+  // New models.
+  uint32 models = 3;
+  // New definitions of known tools.
+  uint32 definitions = 4;
+  // New digests of known models.
+  uint32 digests = 5;
+}
+
+// ReportDefinitionsRequest carries definitions that the core does not have,
+// within the message limit (contract, section 4.8).
+message ReportDefinitionsRequest {
+  // Identifier returned by RegisterInstance.
+  string instance_id = 1;
+  // The definitions.
+  repeated ToolDefinition definitions = 2;
+}
+
+// ToolDefinition is what a model sees of a tool: the members that its
+// definition hash covers, taken as section 4.10 says. For an MCP tool, they
+// are the members of the tool as the tools/list result carries them in the
+// JSON-RPC message itself, never as an SDK's object. The core recomputes the
+// hash from them, leaving out the members that are absent. Schemas and
+// annotations travel as JSON text, never as a google.protobuf.Struct, whose
+// numbers would change the hash.
+message ToolDefinition {
+  // The tool's name, of at most 256 bytes.
+  string name = 1;
+  // An MCP tool's title, of at most 256 bytes. Absent when the tool has none,
+  // or when it is null.
+  optional string title = 2;
+  // An MCP tool's description, of at most 16 KiB. Absent when the tool has
+  // none, or when it is null.
+  optional string description = 3;
+  // As JSON text of at most 64 KiB: an MCP tool's inputSchema, or the JSON
+  // Schema of the parameters of a function, http or other tool, as the
+  // framework presents them to the model. Empty when the tool has none, or
+  // when it is null.
+  string input_schema = 4;
+  // An MCP tool's outputSchema, as JSON text of at most 64 KiB. Empty when the
+  // tool has none, or when it is null.
+  string output_schema = 5;
+  // An MCP tool's annotations, as JSON text of at most 4 KiB. Empty when the
+  // tool has none, or when they are null.
+  string annotations = 6;
+}
+
+// ReportDefinitionsResponse lists the definitions that the core refused.
+message ReportDefinitionsResponse {
+  // The hashes, as the core recomputed them, of the definitions that it
+  // refused because none of the instance's current reports names them, for
+  // any of its agents (CORE-2). The core stored the others.
+  repeated string refused_definitions = 1;
+}

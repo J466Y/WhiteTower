@@ -86,7 +86,7 @@ To sign in:
 
 To change user, sign out first:
 
-1. Open <https://127.0.0.1:8443/auth/logout>. The core ends its session, and Keycloak asks whether you want to log out of it too: choose **Logout**.
+1. Open the console at <https://127.0.0.1:8443/> and choose **Sign out**. The core ends its session, and Keycloak asks whether you want to log out of it too: choose **Logout**. Opening `/auth/logout` signs nobody out: the console signs out with a POST that carries the session's CSRF token, so that no other site can sign you out.
 2. Keycloak sends you back to the console, at `https://127.0.0.1:8443/`. Sign in again as another user.
 
 A terminal has no session to send: reading the API from a terminal waits for `wtctl login` (plan P1-11).

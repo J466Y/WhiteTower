@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Session revoked",
-  "description": "A request ended a session that was active: the person signed out, or a sign-in in the browser that held the session replaced it (ST-14, AUD-01). A session that expires, or that the deactivation of its principal revokes, records no such event: whitetower.principal.deactivated.v1 records the deactivation. It carries no token, nor any hash of one.",
+  "description": "A request ended a session that was active: the person signed out, or a sign-in in the browser that held the session replaced it (ST-14, AUD-01). A session that expires, or that the deactivation of its principal revokes, records no such event: whitetower.principal.deactivated.v1 records the deactivation. The revocations of a change of groups, like those of a deactivation, are recorded by whitetower.principal.groups_changed.v1 rather than by this event. It carries no token, nor any hash of one.",
   "type": "object",
   "required": [
     "principal_id",
