@@ -25,6 +25,7 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 )
@@ -382,6 +383,51 @@ func TestWithoutSCIMItsPathsAreUnknown(t *testing.T) {
 	if strings.Contains(s.logs.String(), "panic") {
 		t.Errorf("a SCIM path panicked:\n%s", s.logs)
 	}
+}
+
+// Security test ST-14: with break-glass alone, without OIDC, a browser signs
+// out before its session's hour ends. Through the server's wiring,
+// /auth/logout ends the session only through a POST that carries the CSRF
+// token that /me gives the console; a GET, and a POST without the token, sign
+// nobody out
+func TestWithBreakglassAloneABrowserSignsOut(t *testing.T) {
+	credential, hash, err := authn.GenerateBreakglassCredential()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashFile := filepath.Join(t.TempDir(), "breakglass-hash")
+	writeSecret(t, hashFile, hash+"\n")
+	s := startServe(t, "WT_AUTH_BREAKGLASS_ENABLED=true", "WT_AUTH_BREAKGLASS_CREDENTIAL_HASH_FILE="+hashFile)
+
+	header, _ := call(t, http.StatusOK, http.MethodPost, s.console+"/auth/breakglass",
+		`{"credential":"`+credential+`"}`, http.Header{"Content-Type": {"application/json"}})
+	var cookie string
+	for _, c := range (&http.Response{Header: header}).Cookies() {
+		if c.Name == authn.CookieName {
+			cookie = c.Name + "=" + c.Value
+		}
+	}
+	signedIn := http.Header{"Cookie": {cookie}}
+	_, me := get(t, s.console+"/api/v1/me", signedIn)
+	var principal struct {
+		CSRFToken string `json:"csrfToken"`
+	}
+	if err := json.Unmarshal([]byte(me), &principal); err != nil || principal.CSRFToken == "" {
+		t.Fatalf("/me with the break-glass session: %s, want its CSRF token", me)
+	}
+
+	if header, _ := call(t, http.StatusMethodNotAllowed, http.MethodGet, s.console+"/auth/logout", "", signedIn); header.Get("Allow") != http.MethodPost {
+		t.Errorf("a GET: Allow %q, want POST", header.Get("Allow"))
+	}
+	call(t, http.StatusForbidden, http.MethodPost, s.console+"/auth/logout", "", signedIn)
+	get(t, s.console+"/api/v1/me", signedIn)
+
+	_, answer := call(t, http.StatusOK, http.MethodPost, s.console+"/auth/logout", "",
+		http.Header{"Cookie": {cookie}, "X-Csrf-Token": {principal.CSRFToken}})
+	if !strings.Contains(answer, `"redirect_url":"/"`) {
+		t.Errorf("the sign-out answers %s, want the console's root", answer)
+	}
+	call(t, http.StatusUnauthorized, http.MethodGet, s.console+"/api/v1/me", "", signedIn)
 }
 
 // The criterion of plan P1-01, step 3, through the server binary's own wiring:

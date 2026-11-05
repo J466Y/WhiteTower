@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -66,17 +65,20 @@ type CreatedToken struct {
 
 // TokenStore manages the lifecycle, hashing, and authentication of API tokens.
 type TokenStore struct {
-	database *db.DB
-	clk      clock.Clock
-	writer   *audit.Writer
+	database   *db.DB
+	clk        clock.Clock
+	writer     *audit.Writer
+	authorizer auth.Authorizer
 }
 
-// NewTokenStore returns an initialized TokenStore.
-func NewTokenStore(database *db.DB, clk clock.Clock, writer *audit.Writer) *TokenStore {
+// NewTokenStore returns an initialized TokenStore. The authorizer decides who
+// holds the permission to manage the tokens of any principal.
+func NewTokenStore(database *db.DB, clk clock.Clock, writer *audit.Writer, authorizer auth.Authorizer) *TokenStore {
 	return &TokenStore{
-		database: database,
-		clk:      clk,
-		writer:   writer,
+		database:   database,
+		clk:        clk,
+		writer:     writer,
+		authorizer: authorizer,
 	}
 }
 
@@ -309,11 +311,11 @@ func (ts *TokenStore) GetByToken(ctx context.Context, rawToken string) (*APIToke
 
 // Revoke revokes a single token by its ID, recording an audited event. The
 // actor revokes their own tokens, those of the service accounts they are
-// responsible for, and any token as an administrator: those whose tokens they
-// may list (HUM-03, ST-19). Any other token is ErrTokenNotFound, as one that
-// does not exist, so that an ID never shows whether a token exists. The rule
-// is checked here, in the transaction that revokes, so that no caller of the
-// store can skip it.
+// responsible for, and any token with the permission identity.tokens.manage
+// (MayManageAnyToken): those whose tokens they may list (HUM-03, ST-19). Any
+// other token is ErrTokenNotFound, as one that does not exist, so that an ID
+// never shows whether a token exists. The rule is checked here, in the
+// transaction that revokes, so that no caller of the store can skip it.
 func (ts *TokenStore) Revoke(ctx context.Context, tokenID uuid.UUID, actor auth.Principal, reason string) error {
 	if reason == "" {
 		reason = "manual revocation"
@@ -328,7 +330,7 @@ func (ts *TokenStore) Revoke(ctx context.Context, tokenID uuid.UUID, actor auth.
 			}
 			return fmt.Errorf("reading token: %w", err)
 		}
-		allowed, err := mayRevoke(ctx, q, token.PrincipalID, actor)
+		allowed, err := ts.mayRevoke(ctx, q, token.PrincipalID, actor)
 		if err != nil {
 			return err
 		}
@@ -379,11 +381,21 @@ func (ts *TokenStore) Revoke(ctx context.Context, tokenID uuid.UUID, actor auth.
 	})
 }
 
+// MayManageAnyToken reports whether actor may list, create and revoke the API
+// tokens of any principal: whether it holds the permission
+// identity.tokens.manage, as the authorizer judges it. An API token needs the
+// permission in its scopes, so that an administrator's token scoped to
+// reading their own identity does not manage everyone's tokens, and a
+// break-glass session never holds it (HUM-03, HUM-07, ST-19).
+func (ts *TokenStore) MayManageAnyToken(ctx context.Context, actor auth.Principal) bool {
+	return ts.authorizer.Authorize(ctx, &actor, string(authz.PermissionIdentityTokensManage)) == nil
+}
+
 // mayRevoke reports whether actor may revoke a token of the principal owner:
-// their own, one of a service account they are responsible for, or any as an
-// administrator.
-func mayRevoke(ctx context.Context, q *authndb.Queries, owner uuid.UUID, actor auth.Principal) (bool, error) {
-	if slices.Contains(actor.Roles, string(authz.RoleAdmin)) || owner.String() == actor.ID {
+// their own, one of a service account they are responsible for, or any with
+// the permission to manage the tokens of any principal.
+func (ts *TokenStore) mayRevoke(ctx context.Context, q *authndb.Queries, owner uuid.UUID, actor auth.Principal) (bool, error) {
+	if owner.String() == actor.ID || ts.MayManageAnyToken(ctx, actor) {
 		return true, nil
 	}
 	p, err := q.GetPrincipalByID(ctx, owner)

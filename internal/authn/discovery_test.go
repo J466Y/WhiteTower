@@ -91,8 +91,9 @@ func checkUnavailable(t *testing.T, rec *httptest.ResponseRecorder) {
 
 // Until the service has discovered its provider, the sign-in routes answer
 // 503 with Retry-After and the token exchange is unavailable, while a logout
-// still signs the browser out of the core. Once discovery succeeds, sign-in
-// works, without a new service.
+// still signs the browser out of the core, and sends it to the console's
+// root. Once discovery succeeds, sign-in works, without a new service, and a
+// logout sends the browser on to the provider's end session endpoint.
 func TestBeforeDiscoverySignInIsUnavailable(t *testing.T) {
 	idp := newMockIDP(t)
 	idp.discovery = idp.backChannelDocument(frontIssuer)
@@ -101,20 +102,21 @@ func TestBeforeDiscoverySignInIsUnavailable(t *testing.T) {
 	opts.StateKey = newStateKey(t)
 	// Nothing reaches the stores before discovery, and a logout without a
 	// session cookie revokes nothing.
-	opts.Tokens = authn.NewTokenStore(nil, clk, nil)
-	svc, err := authn.NewOIDCService(opts, nil, authn.NewSessionStore(nil, clk, nil, authn.SessionOptions{}))
+	opts.Tokens = authn.NewTokenStore(nil, clk, nil, nil)
+	svc, err := authn.NewOIDCService(opts, nil, nil)
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)
 	}
+	logout := authn.NewLogoutService(authn.NewSessionStore(nil, clk, nil, authn.SessionOptions{}),
+		authn.LogoutOptions{EndSession: svc.EndSessionURL, Logger: slog.New(slog.DiscardHandler)})
 
 	checkUnavailable(t, visit(svc, "/auth/login"))
 	checkUnavailable(t, visit(svc, "/auth/callback?code=a-code&state=a-state"))
 	if _, err := svc.ExchangeIDToken(context.Background(), "an ID token"); !errors.Is(err, authn.ErrProviderUnavailable) {
 		t.Errorf("exchange: got %v, want ErrProviderUnavailable", err)
 	}
-	logout := visit(svc, "/auth/logout")
-	if logout.Code != http.StatusFound || logout.Header().Get("Location") != "/" {
-		t.Errorf("logout: got %d to %q, want a redirect to the console's root", logout.Code, logout.Header().Get("Location"))
+	if next := redirectOf(t, postLogout(t, logout, http.MethodPost, "", "")); next != "/" {
+		t.Errorf("logout: to %q, want the console's root", next)
 	}
 
 	if err := svc.Discover(context.Background()); err != nil {
@@ -124,6 +126,7 @@ func TestBeforeDiscoverySignInIsUnavailable(t *testing.T) {
 		!strings.HasPrefix(login.Header().Get("Location"), frontIssuer+"/protocol/openid-connect/auth?") {
 		t.Errorf("login after discovery: got %d to %q, want the issuer's authorization endpoint", login.Code, login.Header().Get("Location"))
 	}
+	checkEndSessionRedirect(t, redirectOf(t, postLogout(t, logout, http.MethodPost, "", "")), frontIssuer+"/protocol/openid-connect/logout", opts.ClientID)
 }
 
 // Discovery is retried after one second, then after twice as long each time,

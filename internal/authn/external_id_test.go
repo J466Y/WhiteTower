@@ -17,6 +17,7 @@ import (
 	"github.com/J466Y/WhiteTower/api/events"
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
+	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
@@ -430,7 +431,7 @@ func TestASCIMAdoptionThatACreationOvertookIsRefused(t *testing.T) {
 	}
 	writer := audit.NewWriter(cat, clk)
 	pool := d.Open(t)
-	principals := authn.NewPrincipalStore(pool, clk, writer, authn.NewSessionStore(pool, clk, writer, authn.SessionOptions{}), authn.NewTokenStore(pool, clk, writer))
+	principals := authn.NewPrincipalStore(pool, clk, writer, authn.NewSessionStore(pool, clk, writer, authn.SessionOptions{}), authn.NewTokenStore(pool, clk, writer, authz.NewAuthorizer()))
 	signedIn, err := principals.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-vic", ExternalID: "idp-vic", DisplayName: "Vic Canary"}, nil)
 	if err != nil {
 		t.Fatal(err)

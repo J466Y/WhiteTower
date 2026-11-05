@@ -13,6 +13,7 @@ import (
 	"github.com/J466Y/WhiteTower/api/events"
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
+	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
@@ -36,7 +37,7 @@ func setupAuthn(t *testing.T, clk *clocktest.Fake) (*authn.SessionStore, *authn.
 		IdleTimeout:      30 * time.Minute,
 		AbsoluteLifetime: 12 * time.Hour,
 	})
-	tokenStore := authn.NewTokenStore(database, clk, writer)
+	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer())
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
 	return sessionStore, principalStore, tokenStore, database
 }

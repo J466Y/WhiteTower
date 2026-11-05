@@ -81,9 +81,14 @@ test("signing out ends the session at the core and at Keycloak", async ({ page, 
   await backAtTheConsole(page, baseURL);
   expect((await me(page)).status()).toBe(200);
 
+  // A GET signs nobody out: another site could make one.
+  expect((await page.request.get("/auth/logout")).status()).toBe(405);
+  expect((await me(page)).status()).toBe(200);
+
+  // The console signs out with a POST that carries the session's CSRF token.
   // The core ends its session, then Keycloak asks to confirm the end of its
   // own, and sends the browser back to the console.
-  await page.goto("/auth/logout");
+  await page.getByRole("button", { name: "Sign out" }).click();
   await page.locator("#kc-logout").click();
   await backAtTheConsole(page, baseURL);
   expect((await me(page)).status()).toBe(401);

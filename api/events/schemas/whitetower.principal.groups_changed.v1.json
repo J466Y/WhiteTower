@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Principal's groups changed",
-  "description": "A sign-in brought a person's principal other groups from the identity provider than it had, compared as sets; roles come from groups (HUM-02, AUD-01). The identity provider decides the groups: the person who signed in only carried them. The first sign-in records its groups in whitetower.principal.created.v1 instead.",
+  "description": "A sign-in brought a person's principal other groups from the identity provider than it had, compared as sets; roles come from groups (HUM-02, AUD-01). The identity provider decides the groups: the person who signed in only carried them. A change of groups also revokes every session of the person, whose roles came from the groups before, and this event records those revocations (ST-14). The first sign-in records its groups in whitetower.principal.created.v1 instead.",
   "type": "object",
   "required": [
     "principal_id",

@@ -257,7 +257,7 @@
     },
     {
       "type": "whitetower.principal.groups_changed.v1",
-      "summary": "A sign-in brought a person's principal other groups from the identity provider, from which its roles come (HUM-02).",
+      "summary": "A sign-in brought a person's principal other groups from the identity provider, from which its roles come, and revoked every session of the person (HUM-02, ST-14).",
       "emitters": [
         "core"
       ],

@@ -36,7 +36,7 @@ docker compose -f deploy/compose/eval/compose.yaml up -d --build --wait
 
 ## Signing in
 
-Open <https://127.0.0.1:8443/auth/login> and sign in at Keycloak as one of the test users below. <https://127.0.0.1:8443/auth/logout> signs out of the core, then Keycloak asks you to confirm that you sign out of it too: choose **Logout**, or Keycloak keeps its session and the next sign-in asks for no password. Use `127.0.0.1`, never `localhost`: the cookies of a sign-in belong to one host name.
+Open <https://127.0.0.1:8443/auth/login> and sign in at Keycloak as one of the test users below. The console's **Sign out**, at <https://127.0.0.1:8443/>, signs out of the core, then Keycloak asks you to confirm that you sign out of it too: choose **Logout**, or Keycloak keeps its session and the next sign-in asks for no password. The console signs out with a POST that carries the session's CSRF token, so that no other site can sign you out: opening `/auth/logout` signs nobody out. Use `127.0.0.1`, never `localhost`: the cookies of a sign-in belong to one host name.
 
 Browsers reach Keycloak at `http://127.0.0.1:8180`, the issuer of its tokens (`KC_HOSTNAME`), while the core reaches it inside Docker's network at `http://keycloak:8080`, its discovery URL (`WT_AUTH_OIDC_DISCOVERY_URL`). The core asks for the scopes `openid`, `profile` and `email` only: Keycloak defines no `groups` scope and refuses a request for one, while the client's own mapper already puts the groups in the ID token.
 

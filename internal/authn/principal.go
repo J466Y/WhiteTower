@@ -142,8 +142,11 @@ type Identity struct {
 // transaction it records what changed (AUD-01):
 // whitetower.principal.created.v1 for a new principal, and
 // whitetower.principal.groups_changed.v1 when the groups, compared as sets,
-// are not those the principal had. Then, still in that transaction, it runs
-// then, when not nil, for the rest of the sign-in: its session or its token.
+// are not those the principal had. A change of groups also revokes every
+// session of the principal, whose roles came from the groups before (ST-14).
+// Then, still in that transaction, it runs then, when not nil, for the rest
+// of the sign-in: its session, which is thus the only one left after a change
+// of groups, or its token.
 // An inactive principal is refused with ErrPrincipalInactive, and a principal
 // with the issuer and subject but another external ID with
 // ErrExternalIDConflict; nothing is written then: neither a record nor an
@@ -223,6 +226,14 @@ func signInHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.
 					},
 				}); err != nil {
 					return nil, fmt.Errorf("recording the change of the principal's groups: %w", err)
+				}
+				// A session keeps the roles of its sign-in, and roles come
+				// from groups: every session of the principal ends, so that
+				// none keeps the roles of the groups before (ST-14). The
+				// sign-in's own session, if any, comes after, and the event
+				// above records the revocations, as a deactivation's does.
+				if err := q.RevokeSessionsForPrincipal(ctx, authndb.RevokeSessionsForPrincipalParams{PrincipalID: held.ID, RevokedAt: &now}); err != nil {
+					return nil, fmt.Errorf("revoking the sessions of the groups before: %w", err)
 				}
 			}
 			return fromDBModel(row), nil
