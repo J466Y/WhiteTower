@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Version 0.1.5, with [threat model v0.1.7](threat-model.md) |
+| **Status** | Version 0.1.5, with [threat model v0.1.8](threat-model.md) |
 | **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings), 2026-10-22 (the review of RFC-0001: ST-35, ST-38, ST-40, ST-49, ST-51 and ST-86), 2026-10-23 (the review of RFC-0002: ST-77, ST-79 and ST-82), 2026-10-27 (evidence bundles, plan P1-02: ST-87; the erasure of a person, plan P1-03: ST-88) and 2026-11-04 (SCIM and sign-in share one principal, plan P1-03: ST-21 and ST-88; the ingestion of module events, plan P1-02: ST-10) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 8 |
 

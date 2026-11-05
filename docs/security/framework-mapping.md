@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Version 0.2, with [threat model v0.1.7](threat-model.md) |
+| **Status** | Version 0.2, with [threat model v0.1.8](threat-model.md) |
 | **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-27 (ISO/IEC 42001, the GDPR, and the evidence of each article and control: the maintainer's decision), 2026-11-03 (the events of people's principals and sessions: [plan P1-03](../plans/phase-1/P1-03-human-identity-and-access.md#progress-notes)) and 2026-11-04 (the finding of a repeated sequence number: [plan P1-02](../plans/phase-1/P1-02-audit-log.md#progress-notes)) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 7; requirement NFR-22 |
 
