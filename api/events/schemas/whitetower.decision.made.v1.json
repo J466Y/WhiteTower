@@ -31,7 +31,7 @@
       "$ref": "common.schema.json#/$defs/action"
     },
     "resource": {
-      "description": "What the action applies to (section 6.3). A resource ID that is empty or longer than 512 characters, which makes the request invalid, is recorded as the SHA-256 of its UTF-8 bytes, in id_sha256 rather than id (section 8.3).",
+      "description": "What the action applies to (section 6.3). A tool's or a model's ID is its key in the catalog, or, for tooling that the catalog does not list, its name as the agent sees it, with reference_sha256 (section 8.3). A resource ID that is empty or longer than 512 characters, which makes the request invalid, is recorded as the SHA-256 of its UTF-8 bytes, in id_sha256 rather than id (section 8.3).",
       "oneOf": [
         {
           "$ref": "common.schema.json#/$defs/resource"
@@ -71,8 +71,45 @@
       }
     },
     "bundle_version": {
-      "description": "The version of the bundle that decided (section 6.6): always with policy.permit, policy.forbid, policy.no_permit and error.evaluation, never with the gate's reasons, and optional with error.timeout, error.unknown_agent and error.invalid_request.",
+      "description": "The version of the bundle that decided (section 6.6): always with policy.permit, policy.forbid, policy.no_permit, error.evaluation and the reasons of the catalog check, never with the gate's reasons, and optional with error.timeout, error.unknown_agent and error.invalid_request.",
       "$ref": "common.schema.json#/$defs/version"
+    },
+    "origin": {
+      "description": "Who runs the tool, for a tool resource: the agent, or its model provider (section 4.10).",
+      "$ref": "common.schema.json#/$defs/origin"
+    },
+    "rules": {
+      "description": "The usage rules that decided, each by its policy's ID and its rule's ID, as the @rule annotations of the forbidding statements give them (section 6.11). Only with policy.forbid.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "policy_id",
+          "rule_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "policy_id": {
+            "$ref": "common.schema.json#/$defs/uuid"
+          },
+          "rule_id": {
+            "description": "The rule's ID, unique within its policy.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "reference_sha256": {
+      "description": "For a tool or a model that the catalog does not list: the SHA-256 of the UTF-8 bytes of the string form of its reference, in lowercase hexadecimal (sections 4.10 and 8.3). The resource's ID is then its name as the agent sees it.",
+      "$ref": "common.schema.json#/$defs/sha256"
+    },
+    "block_id": {
+      "description": "The ID of the block that denied, with catalog.blocked only (EP-16).",
+      "$ref": "common.schema.json#/$defs/uuid"
     },
     "state_version": {
       "$ref": "common.schema.json#/$defs/stateVersion"
@@ -109,7 +146,7 @@
           }
         },
         "hmac_sha256": {
-          "description": "The hashed mode: the HMAC-SHA-256, in lowercase hexadecimal, of the canonical JSON (section 1) of the arguments object as the tool receives it, with the deployment's key that key_id names.",
+          "description": "The hashed mode: the HMAC-SHA-256, in lowercase hexadecimal, of the canonical JSON of the arguments object as the tool receives it, with the deployment's key that key_id names. The canonical JSON is that of section 4.10, which writes integers exactly. Arguments without one, because of a number that is not finite as a double, a member name that repeats or a string with a lone surrogate, are recorded by their names alone (section 8.3).",
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         },
@@ -184,7 +221,13 @@
               "policy.permit",
               "policy.forbid",
               "policy.no_permit",
-              "error.evaluation"
+              "error.evaluation",
+              "catalog.blocked",
+              "catalog.unknown",
+              "catalog.not_approved",
+              "catalog.not_enabled",
+              "catalog.definition_changed",
+              "catalog.digest_mismatch"
             ]
           }
         }
@@ -193,6 +236,92 @@
         "required": [
           "bundle_version"
         ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "const": "catalog.blocked"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "block_id"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "block_id"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "not": {
+              "const": "policy.forbid"
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "rules"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "resource": {
+            "properties": {
+              "type": {
+                "not": {
+                  "const": "tool"
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "origin"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "resource": {
+            "properties": {
+              "type": {
+                "not": {
+                  "enum": [
+                    "tool",
+                    "model"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "reference_sha256"
+          ]
+        }
       }
     },
     {

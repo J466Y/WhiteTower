@@ -217,7 +217,7 @@
   "$defs": {
     "eventType": { "type": "string", "pattern": "^whitetower\\.[a-z_]+\\.[a-z_]+\\.v[1-9][0-9]*$" },
     "action": {
-      "enum": ["agent.start", "input.receive", "model.invoke", "model.result", "tool.invoke", "tool.result", "output.emit", "agent.stop"]
+      "enum": ["agent.start", "input.receive", "tool.expose", "model.invoke", "model.result", "tool.invoke", "tool.result", "output.emit", "agent.stop"]
     },
     "enforcementPoint": {
       "type": "object",
@@ -226,11 +226,15 @@
       "properties": {
         "name": { "const": "enforcement-point" },
         "interventionPoints": {
-          "description": "Actions of the decision profile the enforcement point evaluates. tool.invoke and model.invoke are required.",
+          "description": "Actions of the decision profile the enforcement point evaluates. tool.expose, tool.invoke and model.invoke, which it must evaluate, are required (section 6.3).",
           "type": "array",
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/action" },
-          "allOf": [{ "contains": { "const": "tool.invoke" } }, { "contains": { "const": "model.invoke" } }]
+          "allOf": [
+            { "contains": { "const": "tool.expose" } },
+            { "contains": { "const": "tool.invoke" } },
+            { "contains": { "const": "model.invoke" } }
+          ]
         },
         "haltModes": {
           "type": "array",

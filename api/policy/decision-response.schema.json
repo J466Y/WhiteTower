@@ -25,6 +25,12 @@
             "gate.lifecycle",
             "gate.no_bundle",
             "gate.evidence_full",
+            "catalog.blocked",
+            "catalog.unknown",
+            "catalog.not_approved",
+            "catalog.not_enabled",
+            "catalog.definition_changed",
+            "catalog.digest_mismatch",
             "error.evaluation",
             "error.timeout",
             "error.unknown_agent",
@@ -38,7 +44,7 @@
           "uniqueItems": true
         },
         "bundle_version": {
-          "description": "The version of the bundle that decided (section 6.6): always with policy.permit, policy.forbid, policy.no_permit and error.evaluation, never with the gate's reasons, and optional with error.timeout, error.unknown_agent and error.invalid_request.",
+          "description": "The version of the bundle that decided (section 6.6): always with policy.permit, policy.forbid, policy.no_permit, error.evaluation and the reasons of the catalog check, never with the gate's reasons, and optional with error.timeout, error.unknown_agent and error.invalid_request.",
           "type": "integer",
           "minimum": 1
         },
@@ -57,7 +63,21 @@
       "else": { "properties": { "context": { "properties": { "reason": { "not": { "const": "policy.permit" } } } } } }
     },
     {
-      "if": { "properties": { "context": { "properties": { "reason": { "enum": ["policy.permit", "policy.forbid", "policy.no_permit", "error.evaluation"] } } } } },
+      "if": {
+        "properties": {
+          "context": {
+            "properties": {
+              "reason": {
+                "enum": [
+                  "policy.permit", "policy.forbid", "policy.no_permit", "error.evaluation",
+                  "catalog.blocked", "catalog.unknown", "catalog.not_approved", "catalog.not_enabled",
+                  "catalog.definition_changed", "catalog.digest_mismatch"
+                ]
+              }
+            }
+          }
+        }
+      },
       "then": { "properties": { "context": { "required": ["bundle_version"] } } }
     },
     {

@@ -14,8 +14,9 @@
     "action": "tool.invoke",
     "resource": {
       "type": "tool",
-      "id": "send_email"
+      "id": "agent/send_email"
     },
+    "origin": "agent",
     "environment": "production",
     "policies": [
       "0192f1c2-7a3b-7c4d-8e5f-000000000101"

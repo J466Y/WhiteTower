@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	modulev1alpha1 "github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1"
+	"github.com/J466Y/WhiteTower/pkg/moduleapi/whitetower/module/v1alpha1/modulev1alpha1connect"
 	"github.com/J466Y/WhiteTower/test/conformance/kit"
 	"github.com/J466Y/WhiteTower/test/conformance/profile"
 	"github.com/J466Y/WhiteTower/test/conformance/stubep"
@@ -44,6 +46,41 @@ func TestTheFakeCoreReturnsTheProductionEnvironment(t *testing.T) {
 	}
 	if got, want := resp.Msg.GetEnvironment(), modulev1alpha1.Environment_ENVIRONMENT_PRODUCTION; got != want {
 		t.Errorf("the registration returned %v, want %v", got, want)
+	}
+}
+
+// TestTheFakeCoreServesTheToolingReports calls the two methods of tooling
+// reports over the module API: the fake core serves them, rather than
+// answering UNIMPLEMENTED, which an enforcement point would take for a core
+// without them (contract, section 4.6).
+func TestTheFakeCoreServesTheToolingReports(t *testing.T) {
+	server := httptest.NewUnstartedServer(kit.NewCore(nil).Handler())
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	t.Cleanup(server.Close)
+	registry := modulev1alpha1connect.NewRegistryServiceClient(server.Client(), server.URL)
+
+	report, err := registry.ReportTooling(t.Context(), connect.NewRequest(&modulev1alpha1.ReportToolingRequest{
+		AgentId: agentID,
+		Tools: []*modulev1alpha1.ReportedTool{{
+			Kind: modulev1alpha1.ToolKind_TOOL_KIND_FUNCTION, Origin: modulev1alpha1.Origin_ORIGIN_AGENT,
+			Name: "read_invoice", DefinitionSha256: strings.Repeat("0", 64),
+		}},
+	}))
+	if err != nil {
+		t.Fatalf("ReportTooling: %v", err)
+	}
+	if missing := report.Msg.GetMissingDefinitions(); len(missing) != 0 {
+		t.Errorf("the fake core asks for the definitions %v", missing)
+	}
+	definitions, err := registry.ReportDefinitions(t.Context(), connect.NewRequest(&modulev1alpha1.ReportDefinitionsRequest{
+		Definitions: []*modulev1alpha1.ToolDefinition{{Name: "read_invoice", InputSchema: `{"type":"object"}`}},
+	}))
+	if err != nil {
+		t.Fatalf("ReportDefinitions: %v", err)
+	}
+	if refused := definitions.Msg.GetRefusedDefinitions(); len(refused) != 0 {
+		t.Errorf("the fake core refuses the definitions %v", refused)
 	}
 }
 
