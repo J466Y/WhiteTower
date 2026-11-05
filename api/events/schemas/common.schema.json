@@ -30,6 +30,7 @@
       "enum": [
         "agent.start",
         "input.receive",
+        "tool.expose",
         "model.invoke",
         "model.result",
         "tool.invoke",
@@ -79,10 +80,23 @@
         "gate.lifecycle",
         "gate.no_bundle",
         "gate.evidence_full",
+        "catalog.blocked",
+        "catalog.unknown",
+        "catalog.not_approved",
+        "catalog.not_enabled",
+        "catalog.definition_changed",
+        "catalog.digest_mismatch",
         "error.evaluation",
         "error.timeout",
         "error.unknown_agent",
         "error.invalid_request"
+      ]
+    },
+    "origin": {
+      "description": "Who runs a tool (section 4.10): the agent's process, or an MCP server that the agent connects to (agent), or the model provider, during a model call (provider).",
+      "enum": [
+        "agent",
+        "provider"
       ]
     },
     "bundleRejection": {
@@ -163,7 +177,7 @@
       }
     },
     "quarantineMechanism": {
-      "description": "What enforces a network quarantine (section 5.8): an open value, a lowercase name of letters, digits and dashes, of at most 63 characters, in the form of a slug. The known values are the deny rules of the CNIs that KIL-10 names: cilium, calico, antrea, and admin-network-policy for a CNI that implements AdminNetworkPolicy. Another mechanism names itself the same way.",
+      "description": "What enforces a network quarantine (section 5.8): an open value, a lowercase name of letters, digits and dashes, of at most 63 characters, in the form of a slug. The known values are the deny rules of the CNIs that ASM-05 names: cilium, calico, antrea, and admin-network-policy for a CNI that implements AdminNetworkPolicy. Another mechanism names itself the same way.",
       "examples": [
         "cilium",
         "calico",

@@ -234,6 +234,18 @@ func (c *Core) DeregisterInstance(context.Context, *connect.Request[modulev1alph
 	return connect.NewResponse(&modulev1alpha1.DeregisterInstanceResponse{}), nil
 }
 
+// ReportTooling accepts every tooling report, and asks for no definition.
+// Plan P1-07 gives it the behavior that the scenarios of tooling need.
+func (c *Core) ReportTooling(context.Context, *connect.Request[modulev1alpha1.ReportToolingRequest]) (*connect.Response[modulev1alpha1.ReportToolingResponse], error) {
+	return connect.NewResponse(&modulev1alpha1.ReportToolingResponse{}), nil
+}
+
+// ReportDefinitions accepts every definition, and refuses none. Plan P1-07
+// gives it the behavior that the scenarios of tooling need.
+func (c *Core) ReportDefinitions(context.Context, *connect.Request[modulev1alpha1.ReportDefinitionsRequest]) (*connect.Response[modulev1alpha1.ReportDefinitionsResponse], error) {
+	return connect.NewResponse(&modulev1alpha1.ReportDefinitionsResponse{}), nil
+}
+
 // Watch streams the snapshot, once released, then changes and renewals.
 func (c *Core) Watch(ctx context.Context, _ *connect.Request[modulev1alpha1.WatchRequest], stream *connect.ServerStream[modulev1alpha1.WatchResponse]) error {
 	ch := make(chan *modulev1alpha1.WatchResponse, 64)

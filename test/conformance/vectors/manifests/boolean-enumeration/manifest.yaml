@@ -17,7 +17,7 @@ spec:
   agents: bound
   capabilities:
     - name: enforcement-point
-      interventionPoints: [tool.invoke, model.invoke]
+      interventionPoints: [tool.expose, tool.invoke, model.invoke]
       haltModes: [block]
       haltLayers: [gate_closed]
     - name: policy-engine

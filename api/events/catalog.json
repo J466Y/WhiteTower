@@ -14,7 +14,7 @@
     },
     {
       "type": "whitetower.action.executed.v1",
-      "summary": "A governed call that was allowed has finished.",
+      "summary": "A governed call that was allowed has finished, or a model's response reports a call that its provider ran (EP-18).",
       "emitters": [
         "enforcement-point"
       ],

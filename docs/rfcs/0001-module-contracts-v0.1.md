@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Accepted provisionally on 2026-10-23 ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)): the specification at commit `a284a2d`, after the maintainer's review (see [Review record](#review-record)). Its changes to `api/` follow before the tag `contracts/v0.1.0` |
+| **Status** | Accepted provisionally on 2026-10-23 ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)): the specification at commit `a284a2d`, after the maintainer's review (see [Review record](#review-record)). Its changes to `api/`, the vectors and the conformance kit followed in eight parts, the last merged on 2026-11-05; the tag `contracts/v0.1.0` waits for RFC-0002's changes to `api/` (P0-03 step 12) |
 | **Authors** | @J466Y |
 | **Review period** | 2026-10-21 to 2026-10-22: the maintainer's provisional review, with no external reviewer. A review of at least two weeks, with an external reviewer, follows before the contracts leave alpha (`v1beta1`) |
 | **Related** | Plan [P0-03](../plans/phase-0/P0-03-module-contracts.md); MOD-01 to MOD-05, MOD-08, POL-03, POL-05, POL-06, KIL-01 to KIL-04, KIL-07, KIL-10, AUD-02, NFR-20; [ADR-0004](../adr/0004-api-and-contract-formats.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md), [ADR-0010](../adr/0010-built-in-agent-token-issuer.md), [ADR-0011](../adr/0011-own-python-enforcement-point.md) |
@@ -25,7 +25,7 @@ The normative text is [module-contract-v0.1.md](../contracts/module-contract-v0.
 4. **Decisions shaped as AuthZEN evaluations**, with eight actions matching the intervention points agents have, a gate checked before policies, and the combining algorithm `wt-deny-overrides-v1`. **`v1alpha1` is Cedar only**, evaluated inside the enforcement point or beside it: the review found the Rego wrapper failing open and decision points unspecified, so both wait for Phase 2. Any evaluation error denies, which is stricter than Cedar.
 5. **Signed bundles**: an RFC 8785 canonical manifest, a detached JWS with Ed25519, and seven ordered verification steps with rejection reasons. No rollback.
 6. **Evidence as CloudEvents 1.0**, with a per-source sequence (`wtseq`) to detect gaps, at-least-once delivery, and data minimization: no argument values, prompts or outputs.
-7. **Conformance first**: 48 language-neutral vectors that pass on `cedar-go` and on `cedarpy`, a kit that plays the core over the network, and a catalog of 24 scenarios tied to numbered obligations.
+7. **Conformance first**: 186 language-neutral vectors that pass on two independent stacks, Go with `cedar-go` and Python with `cedarpy`, a kit that plays the core over the network, and a catalog of 24 scenarios tied to numbered obligations.
 8. **The environment of a decision comes from the core.** Registration returns the environment recorded for the module's credential, `production` or `non_production`, and an enforcement point puts it in the subject of every decision that evaluates policies. Without one, it allows nothing (MAN-5, I-7).
 
 The contracts were mapped onto Microsoft AGT, OPA, Cedar and engines with native AuthZEN ([engine-mappings.md](../contracts/engine-mappings.md)). The review found two gaps that the mapping had missed, in the Rego wrapper and in decision points; with both out of `v1alpha1`, no gap is blocking.
@@ -117,6 +117,6 @@ The maintainer alone reviewed this RFC, with no external reviewer, under the pro
 | 38. This RFC and the governance documents lagged behind the specification | Minor | A | The provisional review and part 6 |
 | 39. The manifest's version pattern accepted versions that SemVer forbids | Minor | A | Part 4, in the schema only |
 
-The editorial corrections went into part 6, except two. The one of CORE-4 was not needed, since point 26 rewrote CORE-4. Appendix A's references to the valid bundle and to ep-python's manifest, and the counts of vectors in section 9.1 and in item 7 above, follow the vectors that the coding agents regenerate.
+The editorial corrections went into part 6, except two. The one of CORE-4 was not needed, since point 26 rewrote CORE-4. Appendix A's references to the valid bundle and to ep-python's manifest, and the counts of vectors in section 9.1 and in item 7 above, were updated on 2026-11-05, once the coding agents had regenerated the vectors.
 
-The changes that the corrections bring to `api/`, the vectors, the conformance kit and the core are parts for the coding agents ([AGENTS.md](../../AGENTS.md), work queue), and land before `contracts/v0.1.0` is tagged, as GOVERNANCE.md's rule 6 says.
+The changes that the corrections bring to `api/`, the vectors, the conformance kit and the core were eight parts for the coding agents ([AGENTS.md](../../AGENTS.md), work queue), #77, #79, #81, #88, #85, #84 with #86, #92 and #107, merged before `contracts/v0.1.0` is tagged, as GOVERNANCE.md's rule 6 says.
