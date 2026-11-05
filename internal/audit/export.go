@@ -7,8 +7,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -38,6 +36,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/platform/jobs"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/metrics"
+	"github.com/J466Y/WhiteTower/internal/platform/tlsclient"
 	"github.com/J466Y/WhiteTower/internal/version"
 )
 
@@ -259,7 +258,8 @@ func (s *JSONLSink) Close() error { return s.writer.Close() }
 type OTLPSinkOptions struct {
 	// Endpoint is the base URL of the receiver (such as http://collector:4318).
 	Endpoint string
-	// CAFile is an optional path to PEM certificate authorities for https.
+	// CAFile is an optional PEM file with the certificate authorities that
+	// the sink trusts for https, in place of the system's.
 	CAFile string
 	// Timeout bounds how long export HTTP requests may take.
 	Timeout time.Duration
@@ -287,24 +287,12 @@ func NewOTLPSink(opts OTLPSinkOptions) (*OTLPSink, error) {
 		timeout = 10 * time.Second
 	}
 
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	if opts.CAFile != "" {
-		caCert, err := os.ReadFile(filepath.Clean(opts.CAFile)) //nolint:gosec // G304: the operator chooses the CA file
-		if err != nil {
-			return nil, fmt.Errorf("read otlp ca file: %w", err)
-		}
-		pool, err := x509.SystemCertPool()
-		if err != nil {
-			pool = x509.NewCertPool()
-		}
-		if !pool.AppendCertsFromPEM(caCert) {
-			return nil, errors.New("failed to parse otlp ca certificate")
-		}
-		transport.TLSClientConfig = &tls.Config{
-			RootCAs:    pool,
-			MinVersion: tls.VersionTLS12,
-		}
+	tlsConfig, err := tlsclient.Config(opts.CAFile)
+	if err != nil {
+		return nil, fmt.Errorf("otlp ca file: %w", err)
 	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
 
 	return &OTLPSink{
 		name: "otlp",
