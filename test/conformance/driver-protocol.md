@@ -12,12 +12,14 @@ The kit starts the harness with these environment variables:
 | `WT_CONFORMANCE_CA_FILE` | PEM file with the fake core's certificate authority, the module's trust anchor |
 | `WT_CONFORMANCE_BUNDLE_KEYS_FILE` | JWK Set file (RFC 7517) with the bundle keys to trust: `OKP` keys on the `Ed25519` curve (RFC 8037), each with its `kid`, as section 7.3 of the specification recommends. The kit passes `vectors/bundles/trusted-keys.json` |
 | `WT_CONFORMANCE_AGENT_ID` | For an enforcement point inside an agent: the agent it serves |
-| `WT_CONFORMANCE_ENVIRONMENT` | The environment of the module's credential: `production` or `non_production` |
 | `WT_CONFORMANCE_DRIVER_ADDR` | Where the harness listens for the driver, for example `127.0.0.1:18090` |
+| `WT_CONFORMANCE_EVIDENCE_CAPACITY` | Set for scenario S-11 only: how many events the module's evidence buffer holds, a small number, so that the kit can fill it. The harness gives the module a buffer of that capacity. A module that cannot take it says so in its conformance report, and S-11 is reported as not run, never as passed |
 
 Credentials for the fake token endpoint are added with it, in plan P1-07.
 
-The module runs with its default settings. Scenario S-17 sends lease renewals a minute before and after the kit's clock, beyond the largest tolerance the contract lets a module configure: 30 seconds, and 5 by default (section 5.3).
+The harness sets no environment. The module takes the environment of its decisions from its registration, as section 6.2 and I-7 say: the fake core returns `production` today, and plan P1-07 has it return each environment in turn, for S-25.
+
+The module runs with its default settings, but for the capacity of its evidence buffer in S-11. Scenario S-17 sends lease renewals a minute before and after the kit's clock, beyond the largest tolerance the contract lets a module configure: 30 seconds, and 5 by default (section 5.3).
 
 ## Endpoints
 
@@ -25,7 +27,7 @@ All bodies are JSON.
 
 ### `POST /v1/decide`
 
-Runs one decision through the module's normal path: gate, policies, evidence. The body is an AuthZEN evaluation request of the profile **without its subject**, which the module builds from its own state and credential. `time` may be omitted; the module then uses its clock.
+Runs one decision through the module's normal path: gate, policies, evidence. The body is an AuthZEN evaluation request of the profile **without its subject**, which the module builds from the governance state and the environment that its registration returned (section 6.2, I-7), never from the body or its configuration. `time` may be omitted; the module then uses its clock.
 
 ```json
 {

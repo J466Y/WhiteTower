@@ -7,7 +7,7 @@
   "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
   "datacontenttype": "application/json",
   "wtseq": "1045",
-  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-b7ad6b7169203331-01",
   "data": {
     "decision_id": "0192f1d0-3c5a-7e21-8a4b-1c2d3e4f5061",
     "action": "tool.invoke",

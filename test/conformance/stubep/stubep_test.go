@@ -27,21 +27,24 @@ import (
 // These tests hand the stub the messages of a watch stream one by one, as its
 // session does, so that they can send what the kit's fake core does not send
 // yet: versions below the one applied, values out of range and malformed
-// snapshots. The tests of refusals run the stub's session against the kit's
-// fake core, wrapped so that it refuses registrations and ends watches with
-// the codes it cannot send yet.
+// snapshots. Each starts from a registration that returned an environment, as
+// the session applies it. The tests of refusals run the stub's session against
+// the kit's fake core, wrapped so that it refuses registrations, returns the
+// environments it does not return yet, and ends watches with the codes it
+// cannot send yet.
 
 const agentID = "0192f1c2-7a3b-7c4d-8e5f-000000000001"
 
-// environment is the stub's environment in these tests, as in the kit's.
-const environment = "production"
+// environment is the one that the stub's registration returns in these tests,
+// as the kit's fake core returns it.
+const environment = modulev1alpha1.Environment_ENVIRONMENT_PRODUCTION
 
 // TestTheVersionAppliedNeverGoesBack checks section 5.2: the stub ignores a
 // change or a snapshot below the version it applied, so an older message
 // never undoes a halt, and a fresh renewal raises that version but never
 // lowers it.
 func TestTheVersionAppliedNeverGoesBack(t *testing.T) {
-	e := New(Config{AgentID: agentID, Environment: environment})
+	e := registered(t, Config{AgentID: agentID}, environment)
 	running, halted := agentState(durationpb.New(time.Minute)), haltedAgentState()
 
 	feed(t, e, snapshot(5, halted), renewal(5, timestamppb.Now()))
@@ -79,7 +82,7 @@ func TestTheVersionAppliedNeverGoesBack(t *testing.T) {
 // version at 0, so the stub neither resumes past a snapshot it never applied
 // nor ignores that snapshot when it arrives at a lower version.
 func TestARenewalBeforeAnySnapshotLeavesTheVersionApplied(t *testing.T) {
-	e := New(Config{AgentID: agentID, Environment: environment})
+	e := registered(t, Config{AgentID: agentID}, environment)
 
 	feed(t, e, renewal(9, timestamppb.Now()))
 	expectApplied(t, e, 0)
@@ -116,7 +119,7 @@ func TestOnlyAFreshRenewalRenewsTheLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			e := New(Config{AgentID: agentID, Environment: environment, RenewalTolerance: tc.tolerance})
+			e := registered(t, Config{AgentID: agentID, RenewalTolerance: tc.tolerance}, environment)
 			var serverTime *timestamppb.Timestamp
 			if !tc.noTime {
 				serverTime = timestamppb.New(time.Now().Add(tc.offset))
@@ -151,7 +154,7 @@ func TestTheStubBoundsTheLeaseTTL(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			e := New(Config{AgentID: agentID, Environment: environment})
+			e := registered(t, Config{AgentID: agentID}, environment)
 			feed(t, e, snapshot(1, agentState(durationpb.New(time.Minute))), renewal(1, timestamppb.Now()))
 			inForce := leaseDeadline(e)
 
@@ -178,7 +181,7 @@ func TestTheStubBoundsTheLeaseTTL(t *testing.T) {
 // reconnects, and leaves the state as it was. At start there is none, and the
 // gate stays closed with gate.no_state.
 func TestASnapshotWithoutTheFleetStateIsRefused(t *testing.T) {
-	e := New(Config{AgentID: agentID, Environment: environment})
+	e := registered(t, Config{AgentID: agentID}, environment)
 	running, halted := agentState(durationpb.New(time.Minute)), haltedAgentState()
 
 	malformed := snapshot(3, running)
@@ -225,7 +228,7 @@ func TestTheStubDeactivatesItsBundleWhenTheStateNamesNone(t *testing.T) {
 	}
 	server := httptest.NewServer(core.Handler())
 	t.Cleanup(server.Close)
-	e := New(Config{AgentID: agentID, Environment: environment, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()})
+	e := registered(t, Config{AgentID: agentID, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()}, environment)
 	naming := func(ref *modulev1alpha1.BundleRef) *modulev1alpha1.AgentState {
 		state := agentState(durationpb.New(time.Minute))
 		state.Bundle = ref
@@ -299,7 +302,7 @@ func TestTheStubAcknowledgesEachBundleVectorWithItsReason(t *testing.T) {
 			}
 			server := httptest.NewServer(core.Handler())
 			t.Cleanup(server.Close)
-			e := New(Config{AgentID: agentID, Environment: environment, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()})
+			e := registered(t, Config{AgentID: agentID, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()}, environment)
 			e.active = bundle.Ref{Version: c.ActiveVersion, ManifestSHA256: c.ActiveSHA256}
 
 			state := agentState(durationpb.New(time.Minute))
@@ -331,7 +334,7 @@ func TestAnAgentThatLeavesTheScopeLosesItsStateAndItsLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			e := New(Config{AgentID: agentID, Environment: environment})
+			e := registered(t, Config{AgentID: agentID}, environment)
 			feed(t, e, snapshot(1, agentState(durationpb.New(time.Minute))), renewal(1, timestamppb.Now()))
 			expectReason(t, e, profile.ReasonNoBundle)
 
@@ -392,26 +395,30 @@ func TestARefusalEndsTheLeaseAtOnce(t *testing.T) {
 }
 
 // TestTheStubsGateTakesItsEnvironment checks row 5 of section 5.4 and EP-6
-// through the stub, which takes its environment from its configuration:
+// through the stub, which takes its environment from its registration (I-7):
 // validated and ready open the gate only in non-production, and active in
 // either environment. Without a bundle, a gate that the lifecycle state
 // leaves open closes with gate.no_bundle.
 func TestTheStubsGateTakesItsEnvironment(t *testing.T) {
+	const (
+		production    = modulev1alpha1.Environment_ENVIRONMENT_PRODUCTION
+		nonProduction = modulev1alpha1.Environment_ENVIRONMENT_NON_PRODUCTION
+	)
 	cases := []struct {
 		state       modulev1alpha1.LifecycleState
-		environment string
+		environment modulev1alpha1.Environment
 		want        string
 	}{
-		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_VALIDATED, "production", profile.ReasonLifecycle},
-		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_VALIDATED, "non_production", profile.ReasonNoBundle},
-		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_READY, "production", profile.ReasonLifecycle},
-		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_READY, "non_production", profile.ReasonNoBundle},
-		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_ACTIVE, "production", profile.ReasonNoBundle},
-		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_ACTIVE, "non_production", profile.ReasonNoBundle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_VALIDATED, production, profile.ReasonLifecycle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_VALIDATED, nonProduction, profile.ReasonNoBundle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_READY, production, profile.ReasonLifecycle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_READY, nonProduction, profile.ReasonNoBundle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_ACTIVE, production, profile.ReasonNoBundle},
+		{modulev1alpha1.LifecycleState_LIFECYCLE_STATE_ACTIVE, nonProduction, profile.ReasonNoBundle},
 	}
 	for _, tc := range cases {
-		t.Run(lifecycleName(tc.state)+" in "+tc.environment, func(t *testing.T) {
-			e := New(Config{AgentID: agentID, Environment: tc.environment})
+		t.Run(lifecycleName(tc.state)+" in "+tc.environment.String(), func(t *testing.T) {
+			e := registered(t, Config{AgentID: agentID}, tc.environment)
 			state := agentState(durationpb.New(time.Minute))
 			state.LifecycleState = tc.state
 			feed(t, e, snapshot(1, state), renewal(1, timestamppb.Now()))
@@ -420,11 +427,110 @@ func TestTheStubsGateTakesItsEnvironment(t *testing.T) {
 	}
 }
 
+// TestTheSubjectTakesTheEnvironmentOfTheRegistration checks section 6.2 and
+// I-7: the subject that the stub builds for a decision carries the
+// environment that its last registration returned.
+func TestTheSubjectTakesTheEnvironmentOfTheRegistration(t *testing.T) {
+	cases := []struct {
+		environment modulev1alpha1.Environment
+		want        string
+	}{
+		{modulev1alpha1.Environment_ENVIRONMENT_PRODUCTION, "production"},
+		{modulev1alpha1.Environment_ENVIRONMENT_NON_PRODUCTION, "non_production"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.environment.String(), func(t *testing.T) {
+			e := registered(t, Config{AgentID: agentID}, tc.environment)
+			feed(t, e, snapshot(1, agentState(durationpb.New(time.Minute))), renewal(1, timestamppb.Now()))
+			e.mu.RLock()
+			req, err := e.requestLocked(callWith(`{"time": "2026-09-29T10:00:00.000Z"}`))
+			e.mu.RUnlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got struct {
+				Subject profile.Subject `json:"subject"`
+			}
+			if err := json.Unmarshal(req, &got); err != nil {
+				t.Fatal(err)
+			}
+			if got.Subject.Properties.Environment != tc.want {
+				t.Errorf("the subject's environment is %q, want %q", got.Subject.Properties.Environment, tc.want)
+			}
+		})
+	}
+}
+
+// unknownEnvironments are the environments that a registration may return and
+// that the stub treats as refusing it (I-7): none, and a value that the stub
+// does not know.
+var unknownEnvironments = []struct {
+	name        string
+	environment modulev1alpha1.Environment
+}{
+	{"no environment", modulev1alpha1.Environment_ENVIRONMENT_UNSPECIFIED},
+	{"an environment that the stub does not know", modulev1alpha1.Environment(3)},
+}
+
+// TestARegistrationWithoutAKnownEnvironmentAllowsNothing checks I-7: a
+// registration that returns no environment, or one that the stub does not
+// know, is refused. The stub ends its lease at once and keeps no environment,
+// so that even a fresh renewal opens nothing, until a registration returns an
+// environment that it knows.
+func TestARegistrationWithoutAKnownEnvironmentAllowsNothing(t *testing.T) {
+	for _, tc := range unknownEnvironments {
+		t.Run(tc.name, func(t *testing.T) {
+			e := stubWithBundle(t, agentState(durationpb.New(time.Minute)))
+			expectReason(t, e, profile.ReasonPermit)
+
+			if err := e.register(&modulev1alpha1.RegisterInstanceResponse{Environment: tc.environment}); !errors.Is(err, errUnknownEnvironment) {
+				t.Fatalf("register returned %v, want %v", err, errUnknownEnvironment)
+			}
+			expectReason(t, e, profile.ReasonLeaseExpired)
+			feed(t, e, renewal(2, timestamppb.Now()))
+			expectReason(t, e, profile.ReasonLifecycle)
+
+			if err := e.register(&modulev1alpha1.RegisterInstanceResponse{Environment: environment}); err != nil {
+				t.Fatal(err)
+			}
+			expectReason(t, e, profile.ReasonPermit)
+		})
+	}
+}
+
+// TestARegistrationWithoutAKnownEnvironmentIsRefused checks I-7 through the
+// stub's session, against the kit's fake core: a registration that returns no
+// environment, or one that the stub does not know, counts as refused. The stub
+// ends its lease at once, opens no watch and registers again with backoff, and
+// once a registration returns an environment that it knows, the renewal that
+// follows renews its lease.
+func TestARegistrationWithoutAKnownEnvironmentIsRefused(t *testing.T) {
+	for _, tc := range unknownEnvironments {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+			defer cancel()
+			core, e := startRefusingCore(ctx, t)
+			core.answer(ctx, t, accept)
+			waitForReason(ctx, t, e, profile.ReasonNoBundle)
+
+			core.end(ctx, t, connect.CodeUnavailable)
+			core.acceptWith(ctx, t, tc.environment)
+			waitForReason(ctx, t, e, profile.ReasonLeaseExpired)
+			// A stub that took the registration would watch, and get the
+			// core's snapshot and renewal, rather than register again.
+			core.answer(ctx, t, connect.CodeUnavailable)
+
+			core.answer(ctx, t, accept)
+			waitForReason(ctx, t, e, profile.ReasonNoBundle)
+		})
+	}
+}
+
 // TestTheStubChecksTheBodyAsItIsWritten checks that the stub passes the body
 // of a decide call to the profile as it is written, with the subject that the
-// stub builds from its state and configuration (section 6.2): a body outside
-// the profile is denied with error.invalid_request, a number keeps its
-// digits, and a subject in the body counts for nothing.
+// stub builds from its state and its registration (section 6.2): a body
+// outside the profile is denied with error.invalid_request, its time included,
+// a number keeps its digits, and a subject in the body counts for nothing.
 func TestTheStubChecksTheBodyAsItIsWritten(t *testing.T) {
 	e := stubWithBundle(t, agentState(durationpb.New(time.Minute)))
 	cases := []struct {
@@ -434,6 +540,8 @@ func TestTheStubChecksTheBodyAsItIsWritten(t *testing.T) {
 	}{
 		{name: "a call that the bundle permits", body: callWith(`{"time": "2026-09-29T10:00:00.000Z"}`), want: profile.ReasonPermit},
 		{name: "a call without its time, which the stub's clock gives", body: callWith(`{}`), want: profile.ReasonPermit},
+		// A stub that replaced the body's time with its clock would allow it.
+		{name: "a time without milliseconds, outside the profile", body: callWith(`{"time": "2026-09-29T10:00:00Z"}`), want: profile.ReasonInvalidRequest},
 		{name: "an argument of 2^63 - 1", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"amount": 9223372036854775807}}`), want: profile.ReasonPermit},
 		{name: "an argument written with a fraction", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"amount": 2.0}}`), want: profile.ReasonInvalidRequest},
 		{name: "on_behalf_of empty", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "on_behalf_of": ""}`), want: profile.ReasonInvalidRequest},
@@ -486,9 +594,21 @@ func stubWithBundle(t *testing.T, state *modulev1alpha1.AgentState) *EP {
 	}
 	server := httptest.NewServer(core.Handler())
 	t.Cleanup(server.Close)
-	e := New(Config{AgentID: agentID, Environment: environment, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()})
+	e := registered(t, Config{AgentID: agentID, Trusted: keys, CoreURL: server.URL, HTTPClient: server.Client()}, environment)
 	state.Bundle = &modulev1alpha1.BundleRef{Version: ref.Version, ManifestSha256: ref.ManifestSHA256, SizeBytes: ref.SizeBytes}
 	feed(t, e, snapshot(1, state), renewal(1, timestamppb.Now()))
+	return e
+}
+
+// registered returns a stub configured as given, whose registration returned
+// the environment given, as its session applies a registration before it
+// watches.
+func registered(t *testing.T, cfg Config, env modulev1alpha1.Environment) *EP {
+	t.Helper()
+	e := New(cfg)
+	if err := e.register(&modulev1alpha1.RegisterInstanceResponse{Environment: env}); err != nil {
+		t.Fatal(err)
+	}
 	return e
 }
 
@@ -639,13 +759,21 @@ func renewal(version uint64, serverTime *timestamppb.Timestamp) *modulev1alpha1.
 // accept is the answer that accepts a registration (refusingCore.answer).
 const accept connect.Code = 0
 
+// registrationAnswer is the test's answer to a registration: a refusal with
+// its code, or, with the code accept, an acceptance that returns the
+// environment given.
+type registrationAnswer struct {
+	code        connect.Code
+	environment modulev1alpha1.Environment
+}
+
 // refusingCore is the kit's fake core with the refusals it cannot script
-// yet, which plan P1-07.2 adds to it for S-12: the test answers each
-// registration in turn, accepting it or refusing it with a code, and ends the
-// open watch with a code.
+// yet, which plan P1-07.2 adds to it for S-12 and S-25: the test answers each
+// registration in turn, accepting it with an environment or refusing it with
+// a code, and ends the open watch with a code.
 type refusingCore struct {
 	*kit.Core
-	answers chan connect.Code
+	answers chan registrationAnswer
 	ends    chan connect.Code
 }
 
@@ -655,7 +783,7 @@ type refusingCore struct {
 // snapshot and a renewal at once.
 func startRefusingCore(ctx context.Context, t *testing.T) (*refusingCore, *EP) {
 	t.Helper()
-	core := &refusingCore{Core: kit.NewCore(nil), answers: make(chan connect.Code), ends: make(chan connect.Code)}
+	core := &refusingCore{Core: kit.NewCore(nil), answers: make(chan registrationAnswer), ends: make(chan connect.Code)}
 	core.SetAgent(agentState(durationpb.New(time.Minute)))
 	core.Release()
 	mux := http.NewServeMux()
@@ -666,7 +794,7 @@ func startRefusingCore(ctx context.Context, t *testing.T) (*refusingCore, *EP) {
 	server.StartTLS()
 	t.Cleanup(server.Close)
 
-	e := New(Config{AgentID: agentID, Environment: environment, CoreURL: server.URL, HTTPClient: server.Client()})
+	e := New(Config{AgentID: agentID, CoreURL: server.URL, HTTPClient: server.Client()})
 	ctx, cancel := context.WithCancel(ctx)
 	stopped := make(chan struct{})
 	go func() {
@@ -681,16 +809,20 @@ func startRefusingCore(ctx context.Context, t *testing.T) (*refusingCore, *EP) {
 }
 
 // RegisterInstance waits for the test's answer, then accepts the
-// registration or refuses it.
+// registration, with the answer's environment, or refuses it.
 func (c *refusingCore) RegisterInstance(ctx context.Context, req *connect.Request[modulev1alpha1.RegisterInstanceRequest]) (*connect.Response[modulev1alpha1.RegisterInstanceResponse], error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case code := <-c.answers:
-		if code != accept {
-			return nil, connect.NewError(code, errors.New("refused by the test"))
+	case a := <-c.answers:
+		if a.code != accept {
+			return nil, connect.NewError(a.code, errors.New("refused by the test"))
 		}
-		return c.Core.RegisterInstance(ctx, req)
+		resp, err := c.Core.RegisterInstance(ctx, req)
+		if err == nil {
+			resp.Msg.Environment = a.environment
+		}
+		return resp, err
 	}
 }
 
@@ -710,12 +842,25 @@ func (c *refusingCore) Watch(ctx context.Context, req *connect.Request[modulev1a
 	}
 }
 
-// answer gives the stub's next registration its answer. It returns once the
-// registration has it, so the stub has handled every earlier answer.
+// answer gives the stub's next registration its answer: accept, with the
+// environment of these tests, or a refusal with the code given.
 func (c *refusingCore) answer(ctx context.Context, t *testing.T, code connect.Code) {
 	t.Helper()
+	c.reply(ctx, t, registrationAnswer{code: code, environment: environment})
+}
+
+// acceptWith accepts the stub's next registration with the environment given.
+func (c *refusingCore) acceptWith(ctx context.Context, t *testing.T, env modulev1alpha1.Environment) {
+	t.Helper()
+	c.reply(ctx, t, registrationAnswer{code: accept, environment: env})
+}
+
+// reply gives the stub's next registration the answer given. It returns once
+// the registration has it, so the stub has handled every earlier answer.
+func (c *refusingCore) reply(ctx context.Context, t *testing.T, a registrationAnswer) {
+	t.Helper()
 	select {
-	case c.answers <- code:
+	case c.answers <- a:
 	case <-ctx.Done():
 		t.Fatalf("the stub did not register again: %v", ctx.Err())
 	}

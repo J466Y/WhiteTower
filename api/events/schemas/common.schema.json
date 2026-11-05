@@ -152,7 +152,7 @@
           ]
         },
         "after_ms": {
-          "description": "Milliseconds from the moment the process that reports received the halt to the outcome, on its monotonic clock. For a halt it found at start, the time since it applied the state that carried the halt (section 5.5).",
+          "description": "Milliseconds to the outcome, on the monotonic clock of the process that reports. In instance.halted, from the moment that process received the halt, or, for a halt it found at start, since it applied the state that carried the halt (section 5.5). In lease.expired, from the moment the lease ran out (section 5.3).",
           "type": "integer",
           "minimum": 0
         },
@@ -161,6 +161,16 @@
           "maxLength": 500
         }
       }
+    },
+    "quarantineMechanism": {
+      "description": "What enforces a network quarantine (section 5.8): an open value, a lowercase name of letters, digits and dashes, of at most 63 characters, in the form of a slug. The known values are the deny rules of the CNIs that KIL-10 names: cilium, calico, antrea, and admin-network-policy for a CNI that implements AdminNetworkPolicy. Another mechanism names itself the same way.",
+      "examples": [
+        "cilium",
+        "calico",
+        "antrea",
+        "admin-network-policy"
+      ],
+      "$ref": "#/$defs/slug"
     },
     "actor": {
       "description": "Who did it, by pseudonymous principal ID. Never a name or an email address.",
