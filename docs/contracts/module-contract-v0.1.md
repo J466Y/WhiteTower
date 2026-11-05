@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted provisionally in [RFC-0001](../rfcs/0001-module-contracts-v0.1.md) on 2026-10-23, with the tooling of agents from [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md), accepted provisionally on 2026-10-26. Contract version `v1alpha1`, a draft until `contracts/v0.1.0` is tagged (section 10) |
-| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)), 2026-10-22 and 2026-10-23 (changes to what the conformance vectors expect need an RFC, and the corrections from the review of RFC-0001, which [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) list) and 2026-10-26 (the MCP servers, tools and models of agents, from [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): sections 4.10, 5.10, 6.9 to 6.11 and 7.7, and the sections they change) and 2026-10-28 (a bundle manifest that is not I-JSON, in sections 1 and 7.4, the maintainer's decision from the review of code part 6, which P0-03's progress notes record) and 2026-10-29 (the hashed mode of arguments beyond I-JSON, the maintainer's decision, and what decision and lease events record, from the review of code part 7: sections 1, 5.3, 8.3 and 8.5) |
+| **Date** | 2026-09-29; updated 2026-09-30 (fresh lease renewals, from the [threat model](../security/threat-model.md)), 2026-10-02 (how message sizes are measured, from P1-01), 2026-10-09 (the core's request IDs in its events, from P1-02), 2026-10-20 (where halts apply, four clarifications of the watch stream, and the environment that registration returns, from the [design of the halt path](../plans/phase-1/P1-08-kill-switch.md#progress-notes)), 2026-10-21 (a conformance scenario for every module obligation, from [P0-03](../plans/phase-0/P0-03-module-contracts.md#progress-notes)), 2026-10-22 and 2026-10-23 (changes to what the conformance vectors expect need an RFC, and the corrections from the review of RFC-0001, which [P0-03's progress notes](../plans/phase-0/P0-03-module-contracts.md#progress-notes) list) and 2026-10-26 (the MCP servers, tools and models of agents, from [RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md): sections 4.10, 5.10, 6.9 to 6.11 and 7.7, and the sections they change) and 2026-10-28 (a bundle manifest that is not I-JSON, in sections 1 and 7.4, the maintainer's decision from the review of code part 6, which P0-03's progress notes record) and 2026-10-29 (the hashed mode of arguments beyond I-JSON, the maintainer's decision, and what decision and lease events record, from the review of code part 7: sections 1, 5.3, 8.3 and 8.5) and 2026-11-05 (the end of RFC-0001's code parts: how YAML 1.1's types are read and where YAML parsers differ, in section 3.1; the mechanism of a network quarantine, in RC-5; the evidence buffer of S-11; the counts of vectors in section 9.1; and appendix A's references) |
 | **Plan** | [P0-03](../plans/phase-0/P0-03-module-contracts.md) |
 | **Machine-readable parts** | [`api/proto/whitetower/module/v1alpha1/`](../../api/proto/whitetower/module/v1alpha1/), [`api/manifest/`](../../api/manifest/README.md), [`api/events/`](../../api/events/README.md), [`api/policy/`](../../api/policy/README.md) |
 | **Conformance** | [`test/conformance/`](../../test/conformance/README.md) |
@@ -52,6 +52,8 @@ The charter's eight module types all have a place: the policy engine is `policy-
 A manifest is a YAML or JSON document with `apiVersion: whitetower/v1alpha1` and `kind: ModuleManifest`, validated by [`module-manifest.schema.json`](../../api/manifest/module-manifest.schema.json). [Examples](../../api/manifest/examples/) exist for the mock module, the Python enforcement point and the network quarantine module.
 
 A JSON manifest is used as it is, and JSON manifests are RECOMMENDED. A YAML manifest is read under the YAML 1.2 Core schema, and MAN-1 also refuses in it anchors, aliases, merge keys and explicit tags, and any unquoted scalar that would not be a plain string under both YAML 1.1 and YAML 1.2, unless it is `true`, `false`, `null` or a plain decimal number: `yes`, `no`, `on`, `off`, `y` and `n`, octal, binary and sexagesimal forms, numbers with underscores or exponents, and dates. The core checks the document's tree of nodes rather than trusting its decoder.
+
+YAML 1.1's types are those of its type repository (yaml.org/type), except that a float has one decimal point, as YAML 1.1's parsers read it, so that a version such as `0.1.0` stays a string. MAN-1 does not name the syntax on which YAML parsers differ: some refuse the escape `\/`, the `%YAML` directive, or a tab after a colon or inside an unquoted scalar, all of which YAML 1.2 allows, and YAML 1.1's parsers read NEL, LS and PS as line breaks, where YAML 1.2 reads them as content. A manifest that uses them can be refused by one core and accepted by another, or, with a NEL inside quotes, hashed differently, which fails its registration (MAN-2). A JSON manifest avoids them all.
 
 | Field | Meaning |
 | --- | --- |
@@ -453,7 +455,7 @@ When no halt covers the agent any more, the gate reopens only if every other con
 - **RC-2.** Never lift a layer without a current state from the core showing the agent running: not after a restart, not while disconnected or on a silent stream (I-9), and never on a message below the version applied (section 5.2).
 - **RC-3.** When the lease expires, keep every layer in place, apply no new one, and emit `whitetower.lease.expired.v1`. A module MAY offer, off by default, to apply its layer to every agent in scope when its lease expires. It reports that layer in `whitetower.lease.expired.v1`, whose `effect` is then `all_quarantined`, and its lift in `whitetower.quarantine.lifted.v1`.
 - **RC-4.** Acknowledge each halt per agent with the layer, its outcome and the number of workloads isolated. Report `done` only once the layer is in place, and `not_applicable` when the agent has no workloads the module controls.
-- **RC-5.** Emit the module's events when a layer is applied or lifted.
+- **RC-5.** Emit the module's events when a layer is applied or lifted. Both events name the mechanism that enforces the layer, an open value in the form of a slug, so that another mechanism needs no change to the contract. The known values are the deny rules of the CNIs that ASM-05 names: `cilium`, `calico`, `antrea`, and `admin-network-policy` for a CNI that implements AdminNetworkPolicy.
 - **RC-6.** Report, through heartbeats, the agents that have workloads the module controls.
 - **RC-7.** A layer MUST leave the core's machine listener and token endpoint reachable from the workloads it isolates, so that their enforcement points can acknowledge the halt, deliver their evidence and learn of the release. It SHOULD block DNS by default ([threat model](../security/threat-model.md), DC-7); where the platform's rules can tell names apart, an option may allow the core's name only.
 
@@ -1018,11 +1020,14 @@ Language-neutral files in [`test/conformance/vectors/`](../../test/conformance/v
 
 | Vectors | Cases | What they check |
 | --- | --- | --- |
-| [`combination.json`](../../test/conformance/vectors/combination.json) | 20 | Rules 1 to 4 of the combining algorithm, subject attributes and tags, time, tool arguments, determining policies, invalid requests, and whether each policy passes the validator |
-| [`fail-closed.json`](../../test/conformance/vectors/fail-closed.json) | 13 | Every gate condition, and the order of reasons |
-| [`bundles/`](../../test/conformance/vectors/bundles/README.md) | 15 | Every verification step, with signed bundles |
+| [`combination.json`](../../test/conformance/vectors/combination.json) | 39 | Rules 1 to 4 of the combining algorithm, subject attributes and tags, the environment, time, tool arguments, determining policies, invalid requests, and whether each policy passes the validator |
+| [`fail-closed.json`](../../test/conformance/vectors/fail-closed.json) | 18 | Every gate condition, with the environment of the registration, and the order of reasons |
+| [`hashed-arguments.json`](../../test/conformance/vectors/hashed-arguments.json) | 4 | The hashed mode of a decision's arguments (section 8.3) |
+| [`bundles/`](../../test/conformance/vectors/bundles/README.md) | 50 | Every verification step, with signed bundles |
+| [`manifests/`](../../test/conformance/vectors/manifests/README.md) | 8 | Manifests in YAML that MAN-1 accepts, with their canonical JSON and its SHA-256 (MAN-2), and manifests that it refuses (sections 1 and 3.1) |
+| [`manifests/documents.json`](../../test/conformance/vectors/manifests/documents.json) | 67 | Shorter YAML documents: at least one refusal for each rule of MAN-1 and of I-JSON, and documents accepted with their canonical JSON |
 
-They pass on two independent stacks: Go with `cedar-go` 1.8.0 (`go test ./test/conformance`), and Python with `cedarpy` 4.12.1 and `cryptography` ([`check_vectors.py`](../../test/conformance/python/check_vectors.py)).
+They pass on two independent stacks: Go with `cedar-go` 1.8.0 (`go test ./test/conformance/...`), and Python with `cedarpy` 4.12.1, `cryptography`, PyYAML and `jsonschema` ([`check_vectors.py`](../../test/conformance/python/check_vectors.py)).
 
 Step 12 of [P0-03](../plans/phase-0/P0-03-module-contracts.md) adds the vectors of RFC-0002, which both stacks must pass, and their rows join this table with their counts:
 
@@ -1053,7 +1058,7 @@ The kit plays the core for a module under test: a fake core that speaks the modu
 | S-08 A release reopens only with a valid lease and bundle | EP-5 | Designed |
 | S-09 The bundle vectors are rejected with the right reasons, and the previous bundle stays active. The fake core's `GetBundleKeys` also lists the untrusted key that signs the `unknown-key` vector, and the module must still reject that vector with `unknown_key`. When the driver reloads the module's bundle keys without the key that signed the active bundle, the module verifies its bundle again and closes its gate with `gate.no_bundle` | EP-7, EP-11 | Designed |
 | S-10 Events validate against the catalog, with a gapless `wtseq`, and survive a restart. Every allowed call that finishes yields `whitetower.action.executed.v1`. The fake core holds a `Publish` response, and no later event of that source may arrive meanwhile; it fails a call with `RESOURCE_EXHAUSTED`, then one with `UNAVAILABLE`, and the same events must come first after each. After the driver replaces the module's buffer, a new source starts at 1, and two instances of the module write distinct sources. The kit restarts the module while the fake core is unreachable, and the denials it records meanwhile must validate. When the driver stops the module, the kit reports one that deregisters before it has delivered its buffer, without failing it | EP-8, I-5, I-12, section 8.2 | Designed |
-| S-11 A full evidence buffer closes the gate, and the module reports `HEALTH_UNHEALTHY` while it is full | EP-8, section 4.9 | Designed |
+| S-11 A full evidence buffer closes the gate, and the module reports `HEALTH_UNHEALTHY` while it is full. The driver gives the module a buffer of `WT_CONFORMANCE_EVIDENCE_CAPACITY` events, so that the kit can fill it; a module that cannot take that setting is reported as not run, never as passed | EP-8, section 4.9 | Designed |
 | S-12 Reconnection uses jittered backoff bounded by the lease, resets after a renewal, and resumes from the last version applied, even when a renewal passed versions that carried nothing for the stream. The module reconnects after a stream cut in the middle of a message, the first one included. When it resumes, it applies a change that carries an agent state older than the version it resumed from, and a snapshot just past that version, which replaces its state. A reconnection within the lease keeps deciding on the last state applied. The kit also black-holes the core, through a TCP proxy that drops traffic without closing the connection, and then refuses connections for over two minutes: the module finds the silent stream and reconnects on a new connection, and its retries stay within the cap of I-4. The fake core also refuses a registration with `PERMISSION_DENIED` and then accepts it, and ends an established stream with `PERMISSION_DENIED` and then accepts the next: the module ends its leases at once, allows nothing meanwhile, and is back within the cap of I-4. A stream body that ends without an end-of-stream message is a cut, and the module resumes. Of the backoff, the kit checks that no wait exceeds the smaller of 30 seconds and a third of the TTL, plus slack; that after a renewal the next wait is within 0.5 seconds, plus slack, with only a warning while that first step is a SHOULD; and that waits vary, as jitter makes them | EP-9, I-4, I-9, sections 4.6 and 5.2 | Designed |
 | S-13 Unknown fields and values never open anything. A halt that carries an unknown field also closes the gate and is acknowledged, in the encoding the module uses (binary protobuf or JSON); the kit's fake core scripts it in P1-07.2. For a runtime-control module, an unknown field in a halt never lifts or narrows its layer | EP-10, RC-2 | Designed |
 | S-14 A runtime-control module never lifts a layer without a current state | RC-2, RC-3 | Designed |
@@ -1144,7 +1149,7 @@ Examples use the Connect protocol (version 1) with JSON. Field names are the pro
 ```json
 {
   "module": "ep-python",
-  "manifestSha256": "9f2c4be1d0a8f3e6c7b5a4d3e2f1c0b9a8d7e6f5c4b3a2918f7e6d5c4b3a2f10",
+  "manifestSha256": "0e84b01b12edde377a877b0d07adef73300fb6166480da2753204d1f4688c870",
   "moduleVersion": "0.1.0",
   "instanceKey": "5b0e3c8a-2f71-4d96-a3b4-9c1e7f20d815",
   "contractVersions": ["v1alpha1"],
@@ -1197,7 +1202,7 @@ Then the stream's messages, in order: a snapshot in one part, a renewal, and a h
       "version": "915",
       "slug": "invoice-triage",
       "lifecycleState": "LIFECYCLE_STATE_ACTIVE",
-      "bundle": { "version": "42", "manifestSha256": "d330970434583a6fe6908fb8a6111422c0fc01c789581480af3c43c6632a625e", "sizeBytes": "4241" },
+      "bundle": { "version": "42", "manifestSha256": "87188a2a375d9b901158767c6b6f68e6ff820c537e555eeb5e2e4a1df76ed522", "sizeBytes": "4506" },
       "leaseTtl": "30s",
       "haltMode": "HALT_MODE_INTERRUPT",
       "attributes": {
@@ -1223,7 +1228,7 @@ Then the stream's messages, in order: a snapshot in one part, a renewal, and a h
       "slug": "invoice-triage",
       "lifecycleState": "LIFECYCLE_STATE_SUSPENDED",
       "halts": [{ "haltId": "0192f1c3-0d4e-7a10-9b2c-000000000040", "scope": "HALT_SCOPE_AGENT", "issuedAt": "2026-09-29T10:16:40.502Z" }],
-      "bundle": { "version": "42", "manifestSha256": "d330970434583a6fe6908fb8a6111422c0fc01c789581480af3c43c6632a625e", "sizeBytes": "4241" },
+      "bundle": { "version": "42", "manifestSha256": "87188a2a375d9b901158767c6b6f68e6ff820c537e555eeb5e2e4a1df76ed522", "sizeBytes": "4506" },
       "leaseTtl": "30s",
       "haltMode": "HALT_MODE_INTERRUPT",
       "attributes": { "kind": "in_house", "riskTier": "high", "dataCategories": ["customer data"], "labels": { "team": "finance" }, "ownerId": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1" }
@@ -1283,13 +1288,17 @@ The response is `{}`. A network quarantine module reports `HALT_LAYER_NETWORK_QU
 {
   "bundle": {
     "manifest": "eyJhZ2VudF9pZCI6IjAxOTJmMWMyLTdhM2ItN2M0ZC04ZTVmLTAwMDAwMDAwMDAwMSIs…",
-    "signature": "eyJhbGciOiJFZERTQSIsImtpZCI6Img4OE1LRjRYdGk5eDhEaW9raUp1S0xPcHMtbXMxZldPVUw4ZVpVTTVaSFEiLCJ0eXAiOiJ3aGl0ZXRvd2VyLWJ1bmRsZStqd3MifQ..mxj9S_TCa7sOIWNrMOhkNgqZegtb8ssrNOsV7_Mnhnrnkz8g-XB2Hup0SKbnoXJ4aQtnNqjIbrJ1K_PgCGHACA",
+    "signature": "eyJhbGciOiJFZERTQSIsImtpZCI6Img4OE1LRjRYdGk5eDhEaW9raUp1S0xPcHMtbXMxZldPVUw4ZVpVTTVaSFEiLCJ0eXAiOiJ3aGl0ZXRvd2VyLWJ1bmRsZStqd3MifQ..YKy-W1Y8NutGNARaRuU05o1us5dNKYVROmfRtCdUh8jxjxR94uPJr9GfB_NPpj0pof5CyreT1np3tN87s7D1CQ",
     "files": [
+      { "path": "schema.cedarschema", "content": "Ly8gQ2VkYXIgc2NoZW1hIG9mIHRoZSBXaGl0…" },
+      { "path": "policies/global/0192f1c2-7a3b-7c4d-8e5f-000000000101.cedar", "content": "QGlkKCJnbG9iYWwtbm8tZXh0ZXJuYWwtZW1h…" },
       { "path": "policies/agent/0192f1c2-7a3b-7c4d-8e5f-000000000202.cedar", "content": "QGlkKCJpbnZvaWNlLXRyaWFnZS10b29scyIp…" }
     ]
   }
 }
 ```
+
+The bundle is the vectors' `valid` bundle (section 9.1), each file shortened, which the snapshot's reference above names. The `manifestSha256` that `RegisterInstance` presents is that of the [ep-python example](../../api/manifest/examples/ep-python.yaml), as its manifest vector gives it.
 
 **`PolicyService.GetBundleKeys`**
 

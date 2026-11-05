@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/` are done (2026-11-05), and so are step 12's protobuf and its schemas of events, manifests and decision responses (pull request 2); the reviewer's pull request on appendix A and the counts of vectors, step 12's other schemas and its vectors (pull request 3), and the tag remain (see [progress notes](#progress-notes)) |
+| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/` are done, and its review is closed (2026-11-05); so are step 12's protobuf and its schemas of events, manifests and decision responses (pull request 2). Step 12's other schemas and its vectors (pull request 3), and the tag, remain (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
@@ -940,6 +940,29 @@ Details the list of 2026-10-23 does not name:
 - **What no test observes.** The descriptions and `examples` change nothing that a schema accepts. Nor does any test see that the two examples' span IDs differ. The golden file of indexed examples did not change, since what the audit log indexes of these events comes from their envelope and fixed facts. S-01 and S-17 pass with a fake core that returns `ENVIRONMENT_NON_PRODUCTION`, since the fixture's agent is active: `TestTheFakeCoreReturnsTheProductionEnvironment` sees it.
 
 The counts of vectors do not change. The runs of S-25 with each environment, and of S-11, stay with P1-07.2.
+
+### 2026-11-05: the review of code part 8, and the end of RFC-0001's code parts
+
+The review found code part 8 complete (#107), and CI passed. Apart from the agent's eleven break experiments, the reviewer's own, a stub that kept the environment of an earlier registration after a refused one, failed `TestARegistrationWithoutAKnownEnvironmentAllowsNothing`. The review accepts the part's two readings: `quarantine.lifted` requires `mechanism` too, since point 33 says "the quarantine events" and P1-15 step 5 names the mechanism in both; and the evidence buffer's capacity counts events, as row 7 of section 5.4 does.
+
+RFC-0001's eight code parts are merged: #77, #79, #81, #88, #85, #84 with #86, #92 and #107. The reviewer's pull request that closes the review brings the specification and RFC-0001 up to them:
+
+| What | Where |
+| --- | --- |
+| The counts of vectors, 186 in all, which both stacks pass: 39 combination, 18 fail-closed, 4 of the hashed mode, 50 bundles, 8 manifests and the 67 documents of `documents.json`. Section 9.1 names the files that code parts 5 and 7 added, and the Python stack's PyYAML and `jsonschema` | Section 9.1; RFC-0001, item 7 and its record |
+| The valid bundle, `87188a2a…` of 4506 bytes, with its signature and its three files, and ep-python's manifest hash, `0e84b01b…`, in `RegisterInstance`. A sentence says which vectors give them | Appendix A |
+| How YAML 1.1's types are read: a float has one decimal point, so that the version `0.1.0` stays a string. MAN-1 does not name the syntax on which YAML parsers differ, each by refusing it: the escape `\/`, the `%YAML` directive, tabs, and NEL, LS and PS. The section says what a manifest that uses it risks, and that a JSON manifest avoids it all | Section 3.1 |
+| The mechanism that both quarantine events name, an open value, and its four known values | RC-5, section 5.8 |
+| The evidence buffer's capacity that the driver gives for S-11, and a module that cannot take it reported as not run | S-11, section 9.3 |
+
+Details:
+
+- **MAN-1 and the parsers.** Naming that syntax in MAN-1 would make every reader refuse it, and would change both reference readers and the manifest vectors, for syntax that no manifest needs. The section states the risk instead, which changes no outcome. The two reference readers agree on every vector and document. A third parser could keep a NEL inside quotes, as YAML 1.2 does, where both fold it into a space: the manifest's hash would then differ, and its registration fails closed (MAN-2).
+- **Sections 5.7 and 5.8.** The note of code part 8 names both, but enforcement points emit no quarantine event, so RC-5 alone names the mechanism.
+- **ASM-05.** The four CNIs are those that ASM-05 names. The description of `quarantineMechanism` in `common.schema.json` says KIL-10: step 12, which edits that file, corrects it.
+- **What step 12 changes again.** The manifest's schema will require `tool.expose` of an enforcement point, so ep-python's manifest changes, and each bundle copies the Cedar schema, which RFC-0002 extends; step 12 also adds the vector files that section 9.1 lists. The reviewer's pull request after step 12 updates appendix A's references and the counts again, with appendix A's examples of `ReportTooling`, `ReportDefinitions` and the blocks record (2026-10-26). The example of `whitetower.bundle.activated.v1` still names the valid bundle as it was before code part 3, `d3309704…`: step 12's pull request 3, which regenerates the bundle vectors, gives it the valid bundle's reference.
+
+What remains of P0-03 is step 12 and the tag.
 
 ### 2026-11-05: step 12, pull request 2: RFC-0002 in the protobuf and the schemas
 
