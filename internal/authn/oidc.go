@@ -269,6 +269,15 @@ func (s *OIDCService) Discover(ctx context.Context) error {
 			&oidc.IssuerMismatchError{Provided: s.opts.Issuer, Discovered: disc.Issuer})
 	}
 
+	// The console sends browsers to the end session endpoint itself, from its
+	// own origin. One that it may not use leaves the sign-out the core's own,
+	// as before discovery, and never refuses the provider.
+	endSession, err := usableEndSession(disc.EndSessionEndpoint, s.opts.Issuer)
+	if err != nil {
+		s.logger.Warn("not using the identity provider's end session endpoint: a sign-out ends the core's session only",
+			"end_session_endpoint", logging.Sanitize(disc.EndSessionEndpoint), "reason", err.Error())
+	}
+
 	cliID := s.opts.CLIClientID
 	if cliID == "" {
 		cliID = "wtctl"
@@ -291,9 +300,38 @@ func (s *OIDCService) Discover(ctx context.Context) error {
 			SupportedSigningAlgs: s.opts.AllowedAlgorithms,
 			Now:                  s.opts.Clock.Now,
 		}),
-		endSessionURL: disc.EndSessionEndpoint,
+		endSessionURL: endSession,
 	})
 	return nil
+}
+
+// usableEndSession returns the end session endpoint of a discovery document
+// when browsers may be sent there: an absolute URL with a host, whose scheme
+// is https, or http when the issuer's is too, as only development allows
+// (T-13). A document without one has none. Any other endpoint, such as a
+// javascript: or data: URL, a relative one or plain HTTP for an https issuer,
+// is an error that says why, and the endpoint is none.
+func usableEndSession(endpoint, issuer string) (string, error) {
+	if endpoint == "" {
+		return "", nil
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", errors.New("it is not a URL")
+	}
+	iss, issErr := url.Parse(issuer)
+	switch {
+	case u.Host == "":
+		return "", errors.New("it is not an absolute URL with a host")
+	case u.Scheme == "https":
+		return endpoint, nil
+	case u.Scheme == "http" && issErr == nil && iss.Scheme == "http":
+		return endpoint, nil
+	case u.Scheme == "http":
+		return "", errors.New("it is plain HTTP, and the issuer is not")
+	default:
+		return "", errors.New("its scheme is neither https nor http")
+	}
 }
 
 // Run discovers the identity provider, and retries until an attempt succeeds

@@ -118,6 +118,47 @@ describe("App", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it.each(["/", "http://127.0.0.1:8180/realms/whitetower/protocol/openid-connect/logout"])(
+    "goes to %s, a page of its own origin or of the web",
+    async (page) => {
+      stubServer({
+        "GET /api/v1/version": version,
+        "GET /api/v1/me": signedIn,
+        "POST /auth/logout": () => json({ redirect_url: page }),
+      });
+      const navigate = vi.fn();
+      render(<App navigate={navigate} />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+      await waitFor(() => expect(navigate).toHaveBeenCalledWith(page));
+    },
+  );
+
+  it.each([
+    "javascript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "//evil.example/",
+    "/\\evil.example/",
+    "logout",
+  ])("refuses to go to %s, which is no page the server may name", async (page) => {
+    stubServer({
+      "GET /api/v1/version": version,
+      "GET /api/v1/me": signedIn,
+      "POST /auth/logout": () => json({ redirect_url: page }),
+    });
+    const navigate = vi.fn();
+    render(<App navigate={navigate} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "Signing out failed. Try again.",
+    );
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it("offers to sign out in Spanish to a browser that prefers it", async () => {
     vi.spyOn(navigator, "languages", "get").mockReturnValue(["es-ES", "en"]);
     stubServer({ "GET /api/v1/version": version, "GET /api/v1/me": signedIn });

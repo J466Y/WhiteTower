@@ -29,6 +29,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
+	"github.com/J466Y/WhiteTower/internal/platform/logging"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 )
 
@@ -1187,6 +1188,60 @@ func TestTheBrowsersEndpointsMayLeaveTheIssuersOrigin(t *testing.T) {
 		t.Errorf("login redirects to %q, want the document's authorization endpoint", loc)
 	}
 	checkEndSessionRedirect(t, svc.EndSessionURL(), "https://login.example.test/logout", opts.ClientID)
+}
+
+// The console sends browsers to the provider's end session endpoint from its
+// own origin, so the server keeps the endpoint only when it is an absolute
+// https URL, or http when the issuer is plain HTTP too, as only development
+// allows. Any other endpoint, a javascript: or data: URL, a relative one, one
+// without a scheme or plain HTTP for an https issuer, leaves the sign-out the
+// core's own: discovery still succeeds, and logs once, sanitized, why.
+func TestOnlyAnHTTPSEndSessionEndpointIsKept(t *testing.T) {
+	const notUsed = "not using the identity provider's end session endpoint: a sign-out ends the core's session only"
+	for _, tt := range []struct {
+		name     string
+		endpoint string // "" for the http issuer's own endpoint
+		kept     bool
+	}{
+		{"https", "https://login.example.test/logout", true},
+		{"http for an http issuer", "", true},
+		{"http for an https issuer", "http://login.example.test/logout", false},
+		{"javascript:", "javascript:alert(1)", false},
+		{"javascript: with a forged log line", "javascript:alert(1)\n" + `{"level":"INFO","msg":"forged"}`, false},
+		{"data:", "data:text/html,<script>alert(1)</script>", false},
+		{"a relative URL", "/protocol/openid-connect/logout", false},
+		{"no scheme", "//login.example.test/logout", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			idp := newMockIDP(t)
+			opts := backChannelOptions(idp, clocktest.New(testEpoch))
+			endpoint := tt.endpoint
+			if endpoint == "" {
+				opts.Issuer, opts.DiscoveryURL = idp.server.URL, ""
+				endpoint = idp.server.URL + "/logout"
+			}
+			idp.discovery = idp.backChannelDocument(opts.Issuer)
+			idp.discovery["end_session_endpoint"] = endpoint
+			logs := &logBuffer{}
+			opts.Logger = slog.New(slog.NewJSONHandler(logs, nil))
+			svc := newService(t, opts, nil, nil)
+
+			records := logs.records(t, notUsed)
+			if tt.kept {
+				checkEndSessionRedirect(t, svc.EndSessionURL(), endpoint, opts.ClientID)
+				if len(records) != 0 {
+					t.Errorf("logged %v, want nothing", records)
+				}
+				return
+			}
+			if got := svc.EndSessionURL(); got != "" {
+				t.Errorf("the end session URL is %q, want none", got)
+			}
+			if len(records) != 1 || records[0]["end_session_endpoint"] != logging.Sanitize(endpoint) {
+				t.Errorf("logged %v, want one record with the endpoint, sanitized", records)
+			}
+		})
+	}
 }
 
 // discover returns the error of a first discovery by a new service of opts.
