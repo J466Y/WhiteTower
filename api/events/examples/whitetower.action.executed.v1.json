@@ -13,8 +13,9 @@
     "action": "tool.invoke",
     "resource": {
       "type": "tool",
-      "id": "read_invoice"
+      "id": "agent/read_invoice"
     },
+    "origin": "agent",
     "outcome": "succeeded",
     "duration_ms": 184
   }

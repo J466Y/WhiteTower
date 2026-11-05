@@ -1,10 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Action executed",
-  "description": "The outcome of an allowed call.",
+  "description": "The outcome of an allowed call, or of a provider-run call that a model's response reports (EP-18).",
   "type": "object",
   "required": [
-    "decision_id",
     "action",
     "resource",
     "outcome",
@@ -13,7 +12,7 @@
   "additionalProperties": false,
   "properties": {
     "decision_id": {
-      "description": "The id of the decision.made event that allowed the call.",
+      "description": "The id of the decision.made event that allowed the call. Required, except with origin provider: no decision precedes a provider-run call that the provider did not submit for approval (EP-18).",
       "type": "string",
       "minLength": 1,
       "maxLength": 128
@@ -22,7 +21,16 @@
       "$ref": "common.schema.json#/$defs/action"
     },
     "resource": {
+      "description": "What the call applied to (section 6.3). A tool's or a model's ID is its key in the catalog, or, for tooling that the catalog does not list, its name as the agent sees it, with reference_sha256 (section 8.3).",
       "$ref": "common.schema.json#/$defs/resource"
+    },
+    "origin": {
+      "description": "Who ran the tool, for a tool resource: the agent, or its model provider (section 4.10).",
+      "$ref": "common.schema.json#/$defs/origin"
+    },
+    "reference_sha256": {
+      "description": "For a tool or a model that the catalog does not list: the SHA-256 of the UTF-8 bytes of the string form of its reference, in lowercase hexadecimal (sections 4.10 and 8.3).",
+      "$ref": "common.schema.json#/$defs/sha256"
     },
     "outcome": {
       "enum": [
@@ -40,5 +48,71 @@
       "type": "string",
       "maxLength": 200
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "origin"
+        ],
+        "properties": {
+          "origin": {
+            "const": "provider"
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "decision_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "resource": {
+            "properties": {
+              "type": {
+                "not": {
+                  "const": "tool"
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "origin"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "resource": {
+            "properties": {
+              "type": {
+                "not": {
+                  "enum": [
+                    "tool",
+                    "model"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "reference_sha256"
+          ]
+        }
+      }
+    }
+  ]
 }

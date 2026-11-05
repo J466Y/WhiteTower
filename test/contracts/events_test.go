@@ -14,7 +14,8 @@ import (
 // (EP-8); whether the event requires the environment that the registration
 // returned, which exists whenever policies were evaluated (I-7); and whether a
 // decision carries the version of the bundle that decided: always, never or
-// either (section 6.6).
+// either (section 6.6). The catalog is part of the bundle, so the reasons of
+// the catalog check carry its version (EP-16).
 var reasonRules = []struct {
 	reason        string
 	recorded      bool
@@ -35,7 +36,17 @@ var reasonRules = []struct {
 	{"gate.lifecycle", true, false, "never"},
 	{"gate.no_bundle", true, false, "never"},
 	{"gate.evidence_full", false, false, "never"},
+	{"catalog.blocked", true, false, "always"},
+	{"catalog.unknown", true, false, "always"},
+	{"catalog.not_approved", true, false, "always"},
+	{"catalog.not_enabled", true, false, "always"},
+	{"catalog.definition_changed", true, false, "always"},
+	{"catalog.digest_mismatch", true, false, "always"},
 }
+
+// blockID is the ID of a block, which a denial with catalog.blocked names
+// (EP-16).
+const blockID = "0192f1c4-2b6e-7d11-8c3a-000000000077"
 
 // bundleVersionAllowed reports whether a decision whose reason has the rule
 // given may carry a bundle version, when present is true, or leave it out.
@@ -75,8 +86,9 @@ func exampleEvent(t *testing.T, eventType string) map[string]any {
 
 // TestTheDecisionEventTiesItsEnvironmentAndBundleVersionToItsReason gives the
 // example of decision.made each reason, with and without an environment and a
-// bundle version (I-7, section 6.6). It refuses gate.evidence_full whatever
-// the other members, since that denial is never recorded (EP-8).
+// bundle version (I-7, section 6.6), and the block that denied with
+// catalog.blocked. It refuses gate.evidence_full whatever the other members,
+// since that denial is never recorded (EP-8).
 func TestTheDecisionEventTiesItsEnvironmentAndBundleVersionToItsReason(t *testing.T) {
 	sch := compile(t, api+"/events/schemas/whitetower.decision.made.v1.json")
 	for _, rule := range reasonRules {
@@ -95,6 +107,9 @@ func TestTheDecisionEventTiesItsEnvironmentAndBundleVersionToItsReason(t *testin
 					data["decision"] = "deny"
 					if rule.reason == "policy.permit" {
 						data["decision"] = "allow"
+					}
+					if rule.reason == "catalog.blocked" {
+						data["block_id"] = blockID
 					}
 					if !environment {
 						delete(data, "environment")
@@ -243,6 +258,115 @@ func TestTheEventSchemasFollowSections5And8(t *testing.T) {
 			if err == nil {
 				err = validate(t, compile(t, api+"/events/schemas/"+tc.example+".json"), event["data"])
 			}
+			switch {
+			case tc.valid && err != nil:
+				t.Errorf("refused: %v", err)
+			case !tc.valid && err == nil:
+				t.Error("accepted")
+			}
+		})
+	}
+}
+
+// TestTheEventsOfEnforcementPointsNameTheirTooling changes the data of the
+// examples of decision.made and action.executed, and checks it against their
+// schemas: the members that RFC-0002 adds to them (sections 6.9 to 6.11, 8.3
+// and 8.5), each refusal next to what the rule accepts.
+func TestTheEventsOfEnforcementPointsNameTheirTooling(t *testing.T) {
+	hash := strings.Repeat("0123456789abcdef", 4)
+	// set replaces members of the data, and removes those whose value is nil.
+	set := func(members map[string]any) func(map[string]any) {
+		return func(data map[string]any) {
+			for name, value := range members {
+				if value == nil {
+					delete(data, name)
+				} else {
+					data[name] = value
+				}
+			}
+		}
+	}
+	// A usage rule of the forbidding policy of the example, on a tool of an
+	// MCP server: the arguments of the agent's own tools, which the example
+	// names, are not for global policies (section 6.11).
+	rule := func(id string) map[string]any {
+		return map[string]any{"policy_id": "0192f1c2-7a3b-7c4d-8e5f-000000000101", "rule_id": id}
+	}
+	push := map[string]any{"type": "tool", "id": "github/push_files"}
+	model := map[string]any{"type": "model", "id": "openai/gpt-4o"}
+	agent := map[string]any{"type": "agent", "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001"}
+	unlisted := map[string]any{"type": "tool", "id": "create_issue"}
+	const (
+		decision = "whitetower.decision.made.v1"
+		executed = "whitetower.action.executed.v1"
+	)
+	cases := []struct {
+		name    string
+		example string
+		edit    func(map[string]any)
+		valid   bool
+	}{
+		// The action that offers a tool to a model (section 6.10).
+		{"an exposure", decision, set(map[string]any{"action": "tool.expose"}), true},
+
+		// The usage rules that decided, by policy and rule (section 6.11).
+		{"a denial by a usage rule", decision, set(map[string]any{"resource": push, "rules": []any{rule("no-push-to-main")}}), true},
+		{"a denial by two usage rules", decision, set(map[string]any{"resource": push, "rules": []any{rule("no-push-to-main"), rule("no-force-push")}}), true},
+		{"the same usage rule twice", decision, set(map[string]any{"resource": push, "rules": []any{rule("no-push-to-main"), rule("no-push-to-main")}}), false},
+		{"no usage rules", decision, set(map[string]any{"resource": push, "rules": []any{}}), false},
+		{"a usage rule whose ID has 128 characters", decision, set(map[string]any{"resource": push, "rules": []any{rule(strings.Repeat("r", 128))}}), true},
+		{"a usage rule whose ID has 129 characters", decision, set(map[string]any{"resource": push, "rules": []any{rule(strings.Repeat("r", 129))}}), false},
+		{"a usage rule without its ID", decision, set(map[string]any{"resource": push, "rules": []any{map[string]any{"policy_id": "0192f1c2-7a3b-7c4d-8e5f-000000000101"}}}), false},
+		{"a usage rule without its policy", decision, set(map[string]any{"resource": push, "rules": []any{map[string]any{"rule_id": "no-push-to-main"}}}), false},
+		{"a usage rule with a policy that is not a UUID", decision, set(map[string]any{"resource": push, "rules": []any{map[string]any{"policy_id": "github-rules", "rule_id": "no-push-to-main"}}}), false},
+		{"an allow that names a usage rule", decision, set(map[string]any{"resource": push, "decision": "allow", "reason": "policy.permit", "rules": []any{rule("no-push-to-main")}}), false},
+		{"an evaluation error that names a usage rule", decision, set(map[string]any{"resource": push, "reason": "error.evaluation", "rules": []any{rule("no-push-to-main")}}), false},
+
+		// A denial by a block names the block (EP-16).
+		{"a denial by a block, with its ID", decision, set(map[string]any{"reason": "catalog.blocked", "policies": []any{}, "block_id": blockID}), true},
+		{"a denial by a block, without its ID", decision, set(map[string]any{"reason": "catalog.blocked", "policies": []any{}}), false},
+		{"a denial by a block whose ID is not a UUID", decision, set(map[string]any{"reason": "catalog.blocked", "policies": []any{}, "block_id": "github"}), false},
+		{"a denial by policy that names a block", decision, set(map[string]any{"block_id": blockID}), false},
+
+		// The resource's origin, for a tool only (section 4.10).
+		{"a decision on a provider-run tool", decision, set(map[string]any{"origin": "provider"}), true},
+		{"a decision on a tool without its origin", decision, set(map[string]any{"origin": nil}), true},
+		{"an origin that is neither", decision, set(map[string]any{"origin": "core"}), false},
+		{"a decision on a model", decision, set(map[string]any{"action": "model.invoke", "resource": model, "origin": nil}), true},
+		{"a decision on a model with an origin", decision, set(map[string]any{"action": "model.invoke", "resource": model}), false},
+		{"a decision on a tool recorded by its ID's SHA-256, with its origin", decision, set(map[string]any{"resource": map[string]any{"type": "tool", "id_sha256": hash}}), true},
+
+		// Tooling that the catalog does not list: its name as the agent sees
+		// it, and the SHA-256 of its reference (section 8.3).
+		{"an unknown tool with its reference's SHA-256", decision, set(map[string]any{"reason": "catalog.unknown", "policies": []any{}, "resource": unlisted, "reference_sha256": hash}), true},
+		{"an unknown tool without a reference", decision, set(map[string]any{"reason": "catalog.unknown", "policies": []any{}, "resource": unlisted}), true},
+		{"an unknown model with its reference's SHA-256", decision, set(map[string]any{"action": "model.invoke", "reason": "catalog.unknown", "policies": []any{}, "resource": model, "origin": nil, "reference_sha256": hash}), true},
+		{"a reference's SHA-256 in uppercase", decision, set(map[string]any{"reference_sha256": strings.ToUpper(hash)}), false},
+		{"a reference's SHA-256 for an agent action", decision, set(map[string]any{"action": "agent.start", "resource": agent, "origin": nil, "reference_sha256": hash}), false},
+		{"a reference in clear", decision, set(map[string]any{"reference": "https://api.githubcopilot.com/mcp/"}), false},
+
+		// A provider-run call that a model's response reports needs no
+		// decision (EP-18); every other call names the decision that allowed
+		// it.
+		{"a provider-run call that no decision preceded", executed, set(map[string]any{"origin": "provider", "decision_id": nil}), true},
+		{"a provider-run call that a decision allowed", executed, set(map[string]any{"origin": "provider"}), true},
+		{"an agent's call without its decision", executed, set(map[string]any{"decision_id": nil}), false},
+		{"a call without an origin or a decision", executed, set(map[string]any{"origin": nil, "decision_id": nil}), false},
+		{"a call without an origin, with its decision", executed, set(map[string]any{"origin": nil}), true},
+		{"a model call with an origin", executed, set(map[string]any{"action": "model.invoke", "resource": model}), false},
+		{"a model call without an origin or a decision", executed, set(map[string]any{"action": "model.invoke", "resource": model, "origin": nil, "decision_id": nil}), false},
+		{"an unlisted provider-run tool with its reference's SHA-256", executed, set(map[string]any{"origin": "provider", "decision_id": nil, "resource": unlisted, "reference_sha256": hash}), true},
+		{"a reference's SHA-256 for an agent action that ran", executed, set(map[string]any{"action": "agent.start", "resource": agent, "origin": nil, "reference_sha256": hash}), false},
+	}
+	schemas := map[string]*jsonschema.Schema{
+		decision: compile(t, api+"/events/schemas/"+decision+".json"),
+		executed: compile(t, api+"/events/schemas/"+executed+".json"),
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			data := exampleEvent(t, tc.example)["data"].(map[string]any)
+			tc.edit(data)
+			err := validate(t, schemas[tc.example], data)
 			switch {
 			case tc.valid && err != nil:
 				t.Errorf("refused: %v", err)
