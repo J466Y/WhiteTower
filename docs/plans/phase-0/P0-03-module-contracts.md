@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/` are done (2026-11-05); the reviewer's pull request on appendix A and the counts of vectors, step 12's protobuf, schemas and vectors, and the tag remain (see [progress notes](#progress-notes)) |
+| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/` are done (2026-11-05), and so are step 12's protobuf and its schemas of events, manifests and decision responses (pull request 2); the reviewer's pull request on appendix A and the counts of vectors, step 12's other schemas and its vectors (pull request 3), and the tag remain (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
@@ -239,8 +239,8 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | Pull request | Content | Status |
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
-| 2. Protobuf, schemas and examples | `api/proto`, `api/policy`, `api/manifest`, `api/events`, and the kit's fake core | Not started |
-| 3. Vectors on both stacks | The new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier | Not started |
+| 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. Split into parts before it starts | Not started |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -940,3 +940,66 @@ Details the list of 2026-10-23 does not name:
 - **What no test observes.** The descriptions and `examples` change nothing that a schema accepts. Nor does any test see that the two examples' span IDs differ. The golden file of indexed examples did not change, since what the audit log indexes of these events comes from their envelope and fixed facts. S-01 and S-17 pass with a fake core that returns `ENVIRONMENT_NON_PRODUCTION`, since the fixture's agent is active: `TestTheFakeCoreReturnsTheProductionEnvironment` sees it.
 
 The counts of vectors do not change. The runs of S-25 with each environment, and of S-11, stay with P1-07.2.
+
+### 2026-11-05: step 12, pull request 2: RFC-0002 in the protobuf and the schemas
+
+Step 12's second pull request carries RFC-0002, as the specification of pull request 1 states it, into the module API's protobuf, the kit's fake core, and the schemas of events, manifests and decision responses. It regenerates the manifest vectors, whose test only rewrites files, so the endpoint security let it through, and no other vectors.
+
+**The split.** Four items of `api/policy` that the table of 2026-10-19 put in this pull request move to pull request 3, with the code and the vectors that read them:
+
+| Item of step 12 | Pull request | Why |
+| --- | --- | --- |
+| The protobuf: `ReportTooling`, `ReportDefinitions` and the blocks record | 2 | As planned |
+| The kit's fake core | 2 | As planned: it embeds no unimplemented handler |
+| `api/events` | 2 | As planned |
+| `api/manifest` | 2 | As planned. The examples change with the schema, and so do the manifest vectors made from them |
+| The `catalog.*` reasons of the decision response | 2 | As planned: they are the reasons that decision events record, and nothing evaluates them yet |
+| The decision request's schema: `tool.expose`, `builtin`, the properties and context fields, per-tool argument records | 3 | The Go profile and the Python checker check every request against it, and the combination vectors use it: per-tool records and the tool properties that become required refuse today's vectors. It changes with the profile, the checker and the rewritten vectors |
+| The Cedar schema | 3 | Every bundle vector carries a copy, so a change regenerates them, which needs the endpoint security's exception. Pull request 3 regenerates them anyway, for the catalog file, so the exception opens once. The combination vectors' validator reads it too |
+| The bundle manifest's `catalog`, and its integers bounded at 2^53 - 1 | 3 | With V4 in both verifiers, as the note of 2026-10-28 plans for the bound: `TestTheManifestSchemaAgreesWithStepV4` ties the schema to V4, which refuses `catalog` until pull request 3 teaches it the member |
+| The catalog file's schema, `whitetower.catalog.v1` | 3 | V7 is its only reader, and the bundle vectors with a catalog file its tests. Two of its members wait for the reviewer (below). Keeping it out also keeps this pull request near 800 lines |
+| The vectors, on both stacks, and the reference bundle verifier | 3 | As planned |
+
+Pull request 3 is more than one part of about 800 lines, so it is split into parts before it starts. It also takes a correction from the reviewer: the example of `bundle.activated` names the valid bundle as it was before code part 3 (`d3309704…`), and the part that regenerates the bundle vectors gives it the valid bundle's reference.
+
+| What | Change |
+| --- | --- |
+| `registry.proto` | `ReportTooling` and `ReportDefinitions` (section 4.10). A report carries the agent's servers (`ReportedServer`: reference, transport, origin, the name and version announced, display form), tools (`ReportedTool`: kind, origin, `server_index`, provider and type, name, `definition_sha256`) and models (`ReportedModel`: provider, endpoint, name, digest), each with its limit. Its response lists `missing_definitions`, and counts in `left_out` the new servers, tools, models, definitions and digests that CORE-13 left out. A `ToolDefinition` carries the members that the hash covers: `name`, `title` and `description` as strings, the schemas and the annotations as JSON text. `ReportDefinitionsResponse.refused_definitions` lists the hashes, as the core recomputed them, of the definitions refused. `HEALTH_DEGRADED` also covers a report that leaves something out (EP-13), which code part 7 left for this step |
+| `governance.proto` | `Block` (`block_id`, `kind`, `covered_sha256`, `issued_at`) and `BlockKind`, whose unknown values, unspecified included, deny every tool and model call (EP-15). `SnapshotPart.blocks`, in the first part; `StateChange.blocks` and `removed_block_ids` (section 5.10). `StateAcknowledgement` says that a block is acknowledged at once (EP-15) |
+| `pkg/moduleapi` | Regenerated with `buf generate` |
+| The kit's fake core | `ReportTooling` accepts every report and asks for no definition; `ReportDefinitions` refuses none. P1-07 gives them the behavior its scenarios need |
+| `common.schema.json` | `tool.expose` among the actions, the six `catalog.*` reasons, and `origin`. The description of `quarantineMechanism` cites ASM-05, which names the CNIs, as the reviewer asked |
+| `whitetower.decision.made.v1` | `bundle_version` is required with the `catalog.*` reasons too (EP-16). New optional members: `origin`, for a tool resource only; `rules`, the usage rules that decided, each as `policy_id` and `rule_id`, with `policy.forbid` only; `reference_sha256`, for a tool or a model resource only; `block_id`, required with `catalog.blocked` and refused with any other reason. The description of `hmac_sha256` says that its canonical JSON is section 4.10's (the maintainer's decision of 2026-10-29) |
+| `whitetower.action.executed.v1` | `origin`, for a tool resource only, and `reference_sha256`, for a tool or a model. `decision_id` is required unless the origin is `provider` (EP-18). The catalog's summary covers provider-run calls |
+| Event examples | The resources of `decision.made` and `action.executed` are keys, `agent/send_email` and `agent/read_invoice`, with origin `agent`. The golden file of indexed examples did not change: what the audit log indexes of them is their action, outcome and reason |
+| `module-manifest.schema.json` | `tool.expose` among the actions, and required with `tool.invoke` and `model.invoke` among an enforcement point's intervention points (section 6.3). `ep-python.yaml`, `mock-module.yaml` and the nine invalid manifests that declare an enforcement point gain it, so that each still fails for its own rule alone |
+| Manifest vectors | Regenerated: ep-python, mock-module and the five variants made from them. No outcome changes. ep-python's manifest hash is now `12fe48e1ed7b710b22155b4f2a6dd2347f40965926c1d8baba32693bafc912b1`, for appendix A |
+| `decision-response.schema.json` | The six `catalog.*` reasons, which carry `bundle_version` (section 6.6) |
+| Tests | The shared table of reasons gains the catalog's, so that the decision event and the response require their bundle version. `TestTheEventsOfEnforcementPointsNameTheirTooling` checks each new member and rule both ways. `TestTheManifestSchemaRequiresTheActionsAnEnforcementPointMustEvaluate` removes each of the three from each example. `TestTheFakeCoreServesTheToolingReports` calls both methods over the module API, and `TestStubsAreUnimplemented`, in `internal/api/moduleapi`, covers them |
+
+Both stacks pass every vector: the checker still counts 186.
+
+Details the specification does not name:
+
+- **Definitions member by member.** Step 12 asks for schemas and annotations as JSON text. Title and description travel as strings, since MCP gives them no other type; a server whose `tools/list` gives one another type cannot have that definition sent, so its tool stays denied. `title` and `description` are `optional`, since an empty string and an absent member hash differently; empty JSON text means an absent member.
+- **The response of `ReportDefinitions`** lists refused definitions by the hash that the core recomputed, which the instance can compare with its own.
+- **Where the new members apply.** `block_id` names the block that denied, so it goes with `catalog.blocked` alone. `rules` name forbidding statements, so they go with `policy.forbid` alone. `origin` is a tool's (section 4.10), and `reference_sha256` names a tool's or a model's reference.
+- **`reference_sha256` stays optional with `catalog.unknown`.** A URL that `url_host` cannot read makes no reference (section 4.10), and its calls are `catalog.unknown`: such a denial has no hash to carry.
+- **`decision_id`.** A provider-run call that the provider submitted for approval has a decision (EP-18), so the schema allows `decision_id` with origin `provider`, and requires it otherwise, the origin's absence included.
+- **The environment** is not required with the catalog's reasons, since the rule of code part 7 ties it to the decisions that evaluated policies, and the catalog check comes before them.
+- **What no test observes.** The protobuf's comments and its new messages: no test sends a report, a definition or a block, which P1-07 does. Nor the place of `tool.expose` in the enumerations, `left_out`, or the descriptions.
+
+For the specification, which is the reviewer's:
+
+- **A function's parameters.** Section 4.10 hashes "its name and the JSON Schema of its parameters", but does not name the member that holds the schema in the hashed object. `inputSchema`, as for an MCP tool, seems meant: `ToolDefinition` carries both in `input_schema`. The definition-hash vectors of pull request 3 need it.
+- **A rule's ID.** Section 6.11 gives it no syntax or bound. The event's schema bounds `rule_id` at 128 characters, as `key_id`, so P1-16's form must keep within it, unless the specification says otherwise.
+- **A snapshot's blocks.** Section 5.10 does not say whether they replace the instance's set when the first part arrives, as halts may apply at once, or when the snapshot is complete, as the rest of the state does. Applying the new blocks at once and dropping the others at the end denies more. Nor does it say what a change that both adds and removes one ID does; the design of the halt path nets them, so the core never sends one.
+- **The catalog file** (section 7.7), for pull request 3. A built-in tool's reference is its provider and its type, so its entry needs both, which the example does not show. And the argument types are spelled as in the example's `String`; the others, presumably `Long`, `Bool`, `Set<String>` and `Set<Long>`, are not named.
+- **A tool's required properties.** Section 6.3 marks only `kind` as required, while the Cedar schema of RFC-0002, section 7.6, requires `origin`, `name`, `read_only`, `destructive` and `open_world` too. Pull request 3's request schema follows the reading that denies more, all six, unless the reviewer decides otherwise.
+- **Appendix A** takes ep-python's new hash, `12fe48e1…`, and the examples of `ReportTooling`, `ReportDefinitions` and the blocks record.
+
+**An argument name with a lone surrogate** cannot be written in an event, which is I-JSON (the review of code part 7). A proposal, for the maintainer's decision:
+
+- **A** (recommended): record it in `names_sha256`, as the SHA-256 of the UTF-8 bytes of the name with each lone surrogate replaced by U+FFFD, which Go's decoder already does. Every stack records the same hash, a trace of the argument stays, and no schema changes; only the description of `names_sha256` grows.
+- **B:** leave the name out. Simplest, but the evidence loses that the argument existed.
+- **C:** a new member that counts the names left out. Exact, but a schema change for a rare input.
