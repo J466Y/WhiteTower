@@ -188,7 +188,8 @@ The scopes leave out `groups`, which the server asks for by default. Keycloak de
        "roles": ["admin"]
      }
      ```
-   - The audit log records nothing of the sign-in yet: the first sign-in creates the principal, and each sign-in updates its groups and its last sign-in time, without an audit event. The events of people and sessions are planned (requirement AUD-01). A sign-in that fails leaves its cause in the server's log.
+   - The audit log records the sign-in (requirement AUD-01): `whitetower.principal.created.v1` for the first one, with the person's groups, `whitetower.session.created.v1` with the session's roles, and `whitetower.principal.groups_changed.v1` when a later sign-in brings other groups. The events name the person by the principal's ID only.
+   - A sign-in that the server refuses changes nothing, so it records no audit event. The server logs one line, `refusing a sign-in`, with the method (`oidc` from a browser, `token_exchange` from the CLI, `breakglass`), the reason, such as `inactive`, `invalid_token` or `no_external_id`, and the principal's ID when there is one. The metric `whitetower_auth_sign_ins_total` counts every sign-in by method and result: `success`, the reason of a refusal, or `error` when the server or the identity provider failed, which the log says too.
 
 ---
 
@@ -213,7 +214,13 @@ A person who signed in before SCIM provisioned them already has a principal with
 
 SCIM supports one filter, `userName eq "value"`, which finds the user that SCIM created, or took over, with that `userName`. Any other filter, such as `emails.value eq` or `externalId eq`, is refused (`400`, `invalidFilter`). SCIM reaches people only: never a service account or the break-glass custodian.
 
-Choose the claim before people sign in: changing `auth.oidc.external_id_claim` afterwards is not supported yet. The principal of a person who signed in before holds the old value, so their sign-in finds no principal by the new one, finds theirs by its issuer and subject, and is refused (`403`); the server logs `refusing a sign-in` with the principal's ID and the claim's name, and no value of the token.
+SCIM compares userNames without regard to case, as RFC 7643 says: the filter finds `alice@example.com` when asked for `Alice@Example.com`, and a user whose `userName` differs from another's only in case is refused (`409`, `uniqueness`). A user keeps the `userName` as SCIM gave it. Which letters have a case beyond ASCII depends on the database's locale.
+
+A user created with `active: false` is created inactive, in the same transaction: if White Tower cannot record the deactivation, nothing is created and the answer is `500`. When the creation takes over the principal of a person who signed in before, it deactivates that principal, and ends their sessions and API tokens.
+
+A `PATCH` applies `active` only, and checks `externalId`, as above. It ignores every other attribute, such as `userName`, `displayName`, `name` and `emails`, without refusing them: Microsoft Entra ID sends them at every synchronization, and a refusal would stop it. A sign-in updates the person's name and email address from the ID token.
+
+Choose the claim before people sign in: changing `auth.oidc.external_id_claim` afterwards is not supported yet. The principal of a person who signed in before holds the old value, so their sign-in finds no principal by the new one, finds theirs by its issuer and subject, and is refused (`403`); the server logs `refusing a sign-in` with the reason `external_id_conflict`, the principal's ID and the claim's name, and no value of the token.
 
 When upgrading from a version without external IDs, the principals that people signed in as have none until their next sign-in, which gives them theirs. If SCIM provisions such a person before they sign in again, it creates a second principal, which their sign-ins find from then on. No release of White Tower came before external IDs, so this concerns development and evaluation data only.
 

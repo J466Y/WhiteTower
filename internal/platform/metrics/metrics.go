@@ -304,6 +304,32 @@ func NewOIDC(reg prometheus.Registerer) *OIDC {
 // Discovered records that the replica has discovered the identity provider.
 func (m *OIDC) Discovered() { m.discovered.Set(1) }
 
+// SignIns holds the metrics of people's sign-ins, through OpenID Connect and
+// break-glass.
+type SignIns struct {
+	total *prometheus.CounterVec
+}
+
+// NewSignIns registers the metrics of sign-ins with reg.
+func NewSignIns(reg prometheus.Registerer) *SignIns {
+	m := &SignIns{
+		total: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace,
+			Subsystem: "auth",
+			Name:      "sign_ins_total",
+			Help: "Sign-ins that ended, by method (oidc from a browser, token_exchange from the CLI, breakglass) " +
+				"and result: success; error, when the server or the identity provider failed; or the reason of " +
+				"a refusal, which the log gives too, with the principal's ID when there is one.",
+		}, []string{"method", "result"}),
+	}
+	reg.MustRegister(m.total)
+	return m
+}
+
+// Ended counts a sign-in through method that ended with result. Both are
+// the server's own words, never a value that a client chose.
+func (m *SignIns) Ended(method, result string) { m.total.WithLabelValues(method, result).Inc() }
+
 // Audit holds the metrics of the audit log's sealer, on the replica that
 // runs it.
 type Audit struct {

@@ -1041,6 +1041,104 @@ func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorManagesAToken(t *tes
 	}
 }
 
+// Security test ST-19: every service account, with its roles, is listed only
+// to a holder of identity.tokens.manage, an administrator, whose API token
+// needs that permission in its scopes too; anyone else, a break-glass session
+// included, lists only the service accounts they are responsible for. A
+// failure to read an account's roles fails the list rather than leaving
+// them out
+func TestEveryServiceAccountIsListedOnlyToAHolderOfIdentityTokensManage(t *testing.T) {
+	ctx := context.Background()
+	d := dbtest.New(t)
+	database := d.Open(t)
+	clk := clocktest.New(time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC))
+	cat, err := audit.LoadCatalog(events.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := audit.NewWriter(cat, clk)
+	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer())
+	principalStore := authn.NewPrincipalStore(database, clk, writer, authn.NewSessionStore(database, clk, writer, authn.SessionOptions{}), tokenStore)
+
+	human := func(subject string, roles ...string) auth.Principal {
+		t.Helper()
+		p, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: subject, ExternalID: subject, DisplayName: subject}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return auth.Principal{ID: p.ID.String(), Kind: auth.Human, Roles: roles}
+	}
+	uma, otto, ada := human("sub-uma", "user"), human("sub-otto", "owner"), human("sub-ada", "admin")
+	bot := func(responsible auth.Principal) string {
+		t.Helper()
+		sa, err := principalStore.CreateServiceAccount(ctx, "bot", nil, responsible.Roles, responsible)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sa.ID.String()
+	}
+	umasBot, ottosBot := bot(uma), bot(otto)
+	adasToken := func(scopes ...authz.Permission) auth.Principal {
+		p := ada
+		p.Scopes = []string{string(authz.PermissionIdentityMeRead)}
+		for _, s := range scopes {
+			p.Scopes = append(p.Scopes, string(s))
+		}
+		return p
+	}
+	custodian := auth.Principal{
+		ID: authn.BreakglassPrincipalID.String(), Kind: auth.Human, Roles: []string{string(authz.RoleOperator)},
+		Scopes: append([]string{}, authn.BreakglassScopes...), IsBreakglass: true,
+	}
+
+	logs := &bytes.Buffer{}
+	opts := options(logs)
+	opts.Tokens = tokenStore
+	opts.Principals = principalStore
+	opts.Authorizer = authz.NewAuthorizer()
+	list := func(caller auth.Principal) result {
+		o := opts
+		o.Authenticator = fixedAuthenticator{caller}
+		return call(Handler(o), http.MethodGet, "/api/v1/service-accounts", "", nil, nil)
+	}
+	for _, tt := range []struct {
+		name   string
+		caller auth.Principal
+		want   map[string][]string // the service accounts listed, with their roles
+	}{
+		{"a person responsible for one", uma, map[string][]string{umasBot: {"user"}}},
+		{"another person responsible for one", otto, map[string][]string{ottosBot: {"owner"}}},
+		{"an administrator", ada, map[string][]string{umasBot: {"user"}, ottosBot: {"owner"}}},
+		{"an administrator's token without identity.tokens.manage", adasToken(), map[string][]string{}},
+		{"an administrator's token with identity.tokens.manage", adasToken(authz.PermissionIdentityTokensManage), map[string][]string{umasBot: {"user"}, ottosBot: {"owner"}}},
+		{"a break-glass session", custodian, map[string][]string{}},
+	} {
+		t.Run("as "+tt.name, func(t *testing.T) {
+			res := list(tt.caller)
+			var listed []gen.ServiceAccount
+			if res.status != http.StatusOK || json.Unmarshal(res.body, &listed) != nil {
+				t.Fatalf("status %d, body %s, want the list", res.status, res.body)
+			}
+			got := map[string][]string{}
+			for _, sa := range listed {
+				got[sa.Id.String()] = sa.Roles
+			}
+			if fmt.Sprint(got) != fmt.Sprint(tt.want) {
+				t.Errorf("listed %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	// The runtime role can no longer read role bindings.
+	if _, err := d.Superuser(t).Exec(ctx, "REVOKE SELECT ON whitetower.role_bindings FROM whitetower_runtime"); err != nil {
+		t.Fatal(err)
+	}
+	problemOf(t, list(ada), problem.Internal)
+	if !strings.Contains(logs.String(), "reading the roles of service account") {
+		t.Errorf("the log does not say what failed: %s", logs)
+	}
+}
+
 type mockTokenExchanger struct {
 	token *authn.CreatedToken
 	err   error

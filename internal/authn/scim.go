@@ -393,13 +393,14 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A create that another one of the same userName or externalId
-	// overtook is a collision too.
+	// overtook is a collision too. A user created with active false is
+	// created inactive, in the same transaction.
 	created, err := s.principals.ProvisionHuman(ctx, Identity{
 		Subject:     req.UserName,
 		ExternalID:  req.ExternalID,
 		DisplayName: displayName,
 		Email:       email,
-	})
+	}, req.Active == nil || *req.Active)
 	if errors.Is(err, ErrPrincipalExists) {
 		s.writeUserExists(w, req.UserName)
 		return
@@ -414,16 +415,6 @@ func (s *SCIMService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("creating human principal via SCIM", "error", err, "userName", logging.Sanitize(safeUserName))
 		s.writeError(w, http.StatusInternalServerError, "", "Internal server error")
 		return
-	}
-
-	if req.Active != nil && !*req.Active {
-		if err := s.principals.Deactivate(ctx, created.ID, SCIMPrincipal, "SCIM initial provisioning as inactive"); err != nil {
-			s.logger.Error("deactivating principal after initial creation", "error", err, "id", created.ID)
-		}
-		// Refetch
-		if updated, err := s.principals.GetByID(ctx, created.ID); err == nil {
-			created = updated
-		}
 	}
 
 	w.Header().Set("Content-Type", SCIMContentType)
@@ -546,7 +537,11 @@ func (s *SCIMService) handlePatchUser(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	// Process patch operations, specifically inspecting active status modifications.
+	// Only active applies. Every other attribute, such as the userName, the
+	// name and the email addresses, which Entra ID sends at every
+	// synchronization, is ignored rather than refused, which would break that
+	// synchronization: a sign-in updates the name and the email address (the
+	// maintainer's decision 4 of 2026-11-05, plan P1-03).
 	for _, op := range patchReq.Operations {
 		opName := strings.ToLower(op.Op)
 		if opName != "replace" && opName != "add" {

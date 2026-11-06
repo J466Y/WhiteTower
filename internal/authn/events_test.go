@@ -848,7 +848,7 @@ func TestASCIMProvisioningIsRecordedAsSCIMs(t *testing.T) {
 	if code := create(); code != http.StatusConflict {
 		t.Errorf("the same userName again: got %d, want 409", code)
 	}
-	_, err = principalStore.ProvisionHuman(ctx, authn.Identity{Issuer: "scim", Subject: "kim@example.test", ExternalID: "idp-kim-2", DisplayName: "Kim Canary"})
+	_, err = principalStore.ProvisionHuman(ctx, authn.Identity{Issuer: "scim", Subject: "kim@example.test", ExternalID: "idp-kim-2", DisplayName: "Kim Canary"}, true)
 	if !errors.Is(err, authn.ErrPrincipalExists) {
 		t.Errorf("the store's creation of a principal that exists: %v, want ErrPrincipalExists", err)
 	}
@@ -859,4 +859,55 @@ func TestASCIMProvisioningIsRecordedAsSCIMs(t *testing.T) {
 		t.Errorf("SCIM recorded %d sign-ins, want none", n)
 	}
 	checkNoneHolds(t, database, "Kim Canary", "kim@example.test", "idp-kim")
+}
+
+// The creation of a service account records, in its transaction, the
+// account, the person who created it and answers for it, and the roles bound
+// to it, sorted, with no name or email address (AUD-01, NFR-20). A creation
+// that is refused, or whose event cannot be recorded, leaves no service
+// account and no event.
+func TestAServiceAccountsCreationIsRecordedWithItsRoles(t *testing.T) {
+	ctx := context.Background()
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+	const serviceAccountCreated = "whitetower.service_account.created.v1"
+	email := "lena@example.test"
+	lena, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "sub-lena", ExternalID: "sub-lena", DisplayName: "Lena Canary", Email: &email}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responsible := auth.Principal{ID: lena.ID.String(), Kind: auth.Human, Roles: []string{"owner", "auditor"}}
+
+	botEmail := "nightly-export@example.test"
+	sa, err := principalStore.CreateServiceAccount(ctx, "Nightly export", &botEmail, []string{"owner", "auditor"}, responsible)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded := eventsOf(t, database, serviceAccountCreated)
+	if len(recorded) != 1 {
+		t.Fatalf("%d creations of service accounts recorded, want 1", len(recorded))
+	}
+	checkEvent(t, recorded[0], "human", lena.ID.String(), map[string]any{
+		"principal_id": sa.ID, "responsible_principal_id": lena.ID, "roles": []string{"auditor", "owner"},
+	})
+	for _, v := range []string{"Nightly export", botEmail, "Lena Canary", email} {
+		if strings.Contains(recorded[0].canonical, v) {
+			t.Errorf("the event holds %q: %s", v, recorded[0].canonical)
+		}
+	}
+
+	if _, err := principalStore.CreateServiceAccount(ctx, "Escalator", nil, []string{"admin"}, responsible); !errors.Is(err, authn.ErrRoleNotHeld) {
+		t.Errorf("a role the person does not hold: %v, want ErrRoleNotHeld", err)
+	}
+	refusing := authn.NewPrincipalStore(database, clk, refusingWriter(t, clk, serviceAccountCreated), sessionStore, tokenStore)
+	if _, err := refusing.CreateServiceAccount(ctx, "Unrecorded", nil, []string{"owner"}, responsible); err == nil {
+		t.Error("a creation that cannot be recorded succeeded")
+	}
+	accounts, err := principalStore.ListServiceAccounts(ctx, &lena.ID)
+	if err != nil || len(accounts) != 1 || accounts[0].ID != sa.ID {
+		t.Errorf("the service accounts after the refusals: %v, %v, want the first alone", accounts, err)
+	}
+	if n := len(eventsOf(t, database, serviceAccountCreated)); n != 1 {
+		t.Errorf("%d creations of service accounts recorded, want 1", n)
+	}
 }

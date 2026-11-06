@@ -57,6 +57,14 @@ WHERE id = $1;
 SELECT * FROM whitetower.principals
 WHERE issuer = $1 AND subject = $2 AND kind = 'human';
 
+-- name: GetPrincipalBySCIMUserName :one
+-- The principal that SCIM provisioned, or adopted, with the userName: SCIM's
+-- issuer, and the userName as subject, compared without regard to case
+-- (RFC 7643, section 4.1.1), as the unique index principals_scim_user_name
+-- compares it.
+SELECT * FROM whitetower.principals
+WHERE kind = 'human' AND issuer = 'scim' AND lower(subject) = lower(sqlc.arg(user_name));
+
 -- name: UpdatePrincipalStatus :exec
 UPDATE whitetower.principals
 SET status = $2,
