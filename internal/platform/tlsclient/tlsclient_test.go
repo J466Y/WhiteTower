@@ -2,6 +2,7 @@ package tlsclient
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
@@ -34,13 +35,26 @@ func get(t *testing.T, caFile, url string) error {
 func TestAClientTrustsTheAuthoritiesOfItsCAFileOnly(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	t.Cleanup(srv.Close)
+	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
 	caFile := filepath.Join(t.TempDir(), "ca.pem")
-	if err := os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw}), 0o600); err != nil {
+	if err := os.WriteFile(caFile, caPEM, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	if err := get(t, caFile, srv.URL); err != nil {
 		t.Errorf("with the CA file: %v", err)
+	}
+	// The request passes with the system's authorities in the pool too, since
+	// the test server's certificate chains to none of them: only the pool shows
+	// that the file's are the only ones.
+	cfg, err := Config(caFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fileOnly := x509.NewCertPool()
+	fileOnly.AppendCertsFromPEM(caPEM)
+	if !cfg.RootCAs.Equal(fileOnly) {
+		t.Error("with the CA file, the client trusts other authorities than the file's")
 	}
 	// The system does not know the test server's authority.
 	if err := get(t, "", srv.URL); err == nil || !strings.Contains(err.Error(), "certificate") {

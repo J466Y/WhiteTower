@@ -112,7 +112,7 @@ The contracts in `api/` are the source of truth ([ADR-0004](adr/0004-api-and-con
 | `api/openapi/openapi.yaml` | `internal/api/rest/gen` (Go server), `pkg/apiclient` (Go client), `web/src/api/schema.gen.ts` (console types) |
 | `api/proto/**` | `pkg/moduleapi` (Go messages and ConnectRPC services) |
 
-Commit the generated code with the contract change. Never edit it by hand: CI regenerates it and fails on any difference.
+Commit the generated code with the contract change. Never edit it by hand: CI regenerates it and fails on any difference, and on any generated file that is not committed.
 
 The server serves the OpenAPI document at `/api/v1/openapi.json`. The API's errors, and the conventions for lists and updates, are in the [errors reference](reference/api-errors.md).
 
