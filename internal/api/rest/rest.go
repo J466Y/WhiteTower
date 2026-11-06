@@ -331,10 +331,13 @@ func (s Server) CreateServiceAccount(ctx context.Context, request gen.CreateServ
 	}, nil
 }
 
-// ListServiceAccounts returns service accounts.
+// ListServiceAccounts returns the service accounts that the caller is
+// responsible for and, with the permission identity.tokens.manage, every
+// service account, whose tokens that permission manages: an API token needs
+// it in its scopes too (decision 5 of 2026-11-05, plan P1-03; HUM-07, ST-19).
 func (s Server) ListServiceAccounts(ctx context.Context, _ gen.ListServiceAccountsRequestObject) (gen.ListServiceAccountsResponseObject, error) {
-	if s.principals == nil {
-		return nil, problem.New(problem.Internal, "principals store not initialized")
+	if s.principals == nil || s.tokens == nil {
+		return nil, problem.New(problem.Internal, "principals or tokens store not initialized")
 	}
 	p := auth.PrincipalFrom(ctx)
 	if p == nil {
@@ -347,7 +350,7 @@ func (s Server) ListServiceAccounts(ctx context.Context, _ gen.ListServiceAccoun
 	}
 
 	var filter *uuid.UUID
-	if !slices.Contains(p.Roles, "admin") {
+	if !s.tokens.MayManageAnyToken(ctx, *p) {
 		filter = &callerID
 	}
 
@@ -358,7 +361,10 @@ func (s Server) ListServiceAccounts(ctx context.Context, _ gen.ListServiceAccoun
 
 	res := make(gen.ListServiceAccounts200JSONResponse, len(sas))
 	for i, sa := range sas {
-		roles, _ := s.principals.GetRoles(ctx, sa.ID)
+		roles, err := s.principals.GetRoles(ctx, sa.ID)
+		if err != nil {
+			return nil, fmt.Errorf("reading the roles of service account %s: %w", sa.ID, err)
+		}
 		var respID uuid.UUID
 		if sa.ResponsiblePrincipalID != nil {
 			respID = *sa.ResponsiblePrincipalID

@@ -24,6 +24,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
+	"github.com/J466Y/WhiteTower/internal/platform/metrics"
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 )
 
@@ -102,6 +103,9 @@ type BreakglassOptions struct {
 	Clock              clock.Clock
 	Logger             *slog.Logger
 	Limiter            *ratelimit.Limiter
+	// SignIns counts break-glass sign-ins, by result. None: they are
+	// logged, and not counted.
+	SignIns *metrics.SignIns
 }
 
 // BreakglassService manages emergency break-glass authentication and session issuance (plan P1-03, step 9; ST-20).
@@ -111,6 +115,7 @@ type BreakglassService struct {
 	sessions *SessionStore
 	writer   *audit.Writer
 	logger   *slog.Logger
+	signIns  signIns
 }
 
 // NewBreakglassService creates an initialized BreakglassService.
@@ -136,6 +141,7 @@ func NewBreakglassService(
 		sessions: sessions,
 		writer:   writer,
 		logger:   opts.Logger,
+		signIns:  signIns{logger: opts.Logger, metrics: opts.SignIns},
 	}
 }
 
@@ -151,9 +157,13 @@ func (s *BreakglassService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rate limiting (ST-20, ST-22).
+	// Rate limiting (ST-20, ST-22). Each refusal from here on logs one line,
+	// never with the credential, and every end of the sign-in is counted by
+	// its result.
+	ctx := r.Context()
 	ip := breakglassClientIP(r)
 	if ok, wait := s.opts.Limiter.Allow(ip, s.opts.Clock.Now()); !ok {
+		s.signIns.refused(ctx, "breakglass", refusedRateLimited, nil)
 		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds()+1)))
 		http.Error(w, "too many break-glass attempts; retry later", http.StatusTooManyRequests)
 		return
@@ -166,6 +176,7 @@ func (s *BreakglassService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Credential string `json:"credential"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			s.signIns.refused(ctx, "breakglass", refusedInvalidRequest, nil, "error", "the body is not JSON with a credential")
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -176,12 +187,14 @@ func (s *BreakglassService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	candidate = strings.TrimSpace(candidate)
 	if candidate == "" {
+		s.signIns.refused(ctx, "breakglass", refusedInvalidRequest, nil, "error", "no credential")
 		http.Error(w, "credential is required", http.StatusBadRequest)
 		return
 	}
 
 	if s.opts.CredentialHashFile == "" {
 		s.logger.Error("break-glass enabled but credential_hash_file is empty")
+		s.signIns.ended("breakglass", resultError)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -189,16 +202,17 @@ func (s *BreakglassService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hashData, err := os.ReadFile(s.opts.CredentialHashFile)
 	if err != nil {
 		s.logger.Error("reading break-glass credential hash file", "error", err)
+		s.signIns.ended("breakglass", resultError)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if !VerifyCredential(string(hashData), candidate) {
+		s.signIns.refused(ctx, "breakglass", refusedInvalidCredential, nil)
 		http.Error(w, "invalid break-glass credential", http.StatusUnauthorized)
 		return
 	}
 
-	ctx := r.Context()
 	now := s.opts.Clock.Now().UTC()
 	var session *Session
 
@@ -242,9 +256,11 @@ func (s *BreakglassService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("establishing break-glass session", "error", err)
+		s.signIns.ended("breakglass", resultError)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	s.signIns.ended("breakglass", resultSuccess)
 
 	// Security test ST-20: Each use logs an alert.
 	s.logger.ErrorContext(ctx, "SECURITY ALERT: break-glass emergency credential used",

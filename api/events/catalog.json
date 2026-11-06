@@ -316,6 +316,16 @@
       "example": "examples/whitetower.token.revoked.v1.json"
     },
     {
+      "type": "whitetower.service_account.created.v1",
+      "summary": "A person created a service account and bound it roles that they hold (HUM-02, HUM-07).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.service_account.created.v1.json",
+      "example": "examples/whitetower.service_account.created.v1.json"
+    },
+    {
       "type": "whitetower.breakglass.used.v1",
       "summary": "An emergency break-glass login was executed (HUM-06, KIL-08, ST-20).",
       "emitters": [

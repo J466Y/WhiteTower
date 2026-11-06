@@ -100,7 +100,10 @@ type OIDCOptions struct {
 	Logger            *slog.Logger
 	Limiter           *ratelimit.Limiter
 	Metrics           *metrics.OIDC
-	Tokens            *TokenStore
+	// SignIns counts the sign-ins through the callback and the CLI's
+	// exchange, by result. None: they are logged, and not counted.
+	SignIns *metrics.SignIns
+	Tokens  *TokenStore
 }
 
 type oidcState struct {
@@ -136,6 +139,7 @@ type OIDCService struct {
 	stateKey      []byte
 	postLogoutURL string
 	logger        *slog.Logger
+	signIns       signIns
 	// provider is what discovery found, nil until it succeeds. A request
 	// reads it once, so that a discovery that ends meanwhile changes nothing
 	// halfway through the request.
@@ -222,6 +226,7 @@ func NewOIDCService(opts OIDCOptions, principals *PrincipalStore, sessions *Sess
 		stateKey:      bytes.Clone(opts.StateKey),
 		postLogoutURL: postLogoutURL,
 		logger:        opts.Logger,
+		signIns:       signIns{logger: opts.Logger, metrics: opts.SignIns},
 	}, nil
 }
 
@@ -375,6 +380,9 @@ func (s *OIDCService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/auth")
 	switch {
 	case (path == "/login" || path == "/callback") && provider == nil:
+		if path == "/callback" {
+			s.signIns.ended("oidc", resultError)
+		}
 		w.Header().Set("Retry-After", strconv.Itoa(int(SignInRetryAfter.Seconds())))
 		http.Error(w, "sign-in is unavailable: the server has not reached the identity provider yet; retry later", http.StatusServiceUnavailable)
 	case path == "/login":
@@ -471,29 +479,35 @@ func (s *OIDCService) handleLogin(w http.ResponseWriter, r *http.Request, provid
 }
 
 // handleCallback validates the authorization code and ID token, provisions the principal,
-// resolves effective roles, and issues the session cookie (ST-16).
+// resolves effective roles, and issues the session cookie (ST-16). Each
+// refusal logs one line, with its reason, and every end of the sign-in is
+// counted by its result.
 func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, provider *discovered) {
+	ctx := r.Context()
 	cookie, err := r.Cookie(stateCookieName)
 	if err != nil {
+		s.signIns.refused(ctx, "oidc", refusedInvalidRequest, nil, "error", "no state cookie")
 		http.Error(w, "missing OIDC state cookie", http.StatusBadRequest)
 		return
 	}
 
 	state, err := s.decodeStateCookie(cookie.Value)
 	if err != nil {
+		s.signIns.refused(ctx, "oidc", refusedInvalidRequest, nil, "error", err)
 		http.Error(w, fmt.Sprintf("invalid OIDC state cookie: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	queryState := r.URL.Query().Get("state")
 	if queryState == "" || subtle.ConstantTimeCompare([]byte(queryState), []byte(state.State)) != 1 {
+		s.signIns.refused(ctx, "oidc", refusedInvalidRequest, nil, "error", "the state is not the sign-in's")
 		http.Error(w, "state mismatch", http.StatusBadRequest)
 		return
 	}
 
 	if idpErr := r.URL.Query().Get("error"); idpErr != "" {
 		desc := r.URL.Query().Get("error_description")
-		s.logger.Warn("IdP returned authentication error", "error", logging.Sanitize(idpErr), "description", logging.Sanitize(desc))
+		s.signIns.refused(ctx, "oidc", refusedByProvider, nil, "error", logging.Sanitize(idpErr), "description", logging.Sanitize(desc))
 		if desc != "" {
 			http.Error(w, fmt.Sprintf("authentication failed: %s (%s)", logging.Sanitize(idpErr), logging.Sanitize(desc)), http.StatusUnauthorized)
 		} else {
@@ -504,11 +518,11 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
+		s.signIns.refused(ctx, "oidc", refusedInvalidRequest, nil, "error", "no authorization code")
 		http.Error(w, "missing authorization code", http.StatusBadRequest)
 		return
 	}
 
-	ctx := r.Context()
 	token, err := provider.oauthConfig.Exchange(
 		// oauth2 takes its HTTP client from the context: the provider's.
 		oidc.ClientContext(ctx, s.client),
@@ -519,12 +533,15 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 		// The error can name the provider's back channel, which browsers
 		// must not learn: only the log holds it.
 		s.logger.Error("exchanging code for token", "error", err)
+		s.signIns.ended("oidc", resultError)
 		http.Error(w, "token exchange failed", http.StatusBadGateway)
 		return
 	}
 
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok || rawIDToken == "" {
+		s.logger.Error("the identity provider's token response holds no ID token")
+		s.signIns.ended("oidc", resultError)
 		http.Error(w, "missing id_token in token response", http.StatusBadGateway)
 		return
 	}
@@ -533,24 +550,28 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 	// a replayed nonce or an unexpected algorithm are refused.
 	idToken, err := provider.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		// Fetching the signing keys can fail on the back channel too.
-		s.logger.Warn("verifying id_token failed", "error", err)
+		// Fetching the signing keys can fail on the back channel too. The
+		// error can quote the token's issuer or audience, which whoever made
+		// the token chose.
+		s.signIns.refused(ctx, "oidc", refusedInvalidToken, nil, "error", logging.Sanitize(err.Error()))
 		http.Error(w, "id token verification failed", http.StatusBadRequest)
 		return
 	}
 
 	if idToken.Nonce != state.Nonce {
-		s.logger.Warn("nonce mismatch", "expected", state.Nonce, "actual", logging.Sanitize(idToken.Nonce))
+		s.signIns.refused(ctx, "oidc", refusedInvalidToken, nil, "error", "the ID token's nonce is not the sign-in's")
 		http.Error(w, "id token nonce mismatch", http.StatusBadRequest)
 		return
 	}
 
 	id, err := s.identityOf(idToken)
 	if errors.Is(err, ErrNoExternalID) {
+		s.refuseWithoutExternalID(ctx, "oidc")
 		http.Error(w, signInRefused, http.StatusForbidden)
 		return
 	}
 	if err != nil {
+		s.signIns.refused(ctx, "oidc", refusedInvalidToken, nil, "error", err)
 		http.Error(w, "reading id token claims failed", http.StatusBadRequest)
 		return
 	}
@@ -570,17 +591,20 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 	})
 	switch {
 	case errors.Is(err, ErrPrincipalInactive):
+		s.signIns.refused(ctx, "oidc", refusedInactive, refusedPrincipalID(err))
 		http.Error(w, "account is deactivated", http.StatusForbidden)
 		return
 	case errors.Is(err, ErrExternalIDConflict):
-		s.logger.Warn("refusing a sign-in", "error", err, "claim", s.opts.ExternalIDClaim)
+		s.refuseExternalIDConflict(ctx, "oidc", err)
 		http.Error(w, signInRefused, http.StatusForbidden)
 		return
 	case err != nil:
 		s.logger.Error("signing in", "error", err)
+		s.signIns.ended("oidc", resultError)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	s.signIns.ended("oidc", resultSuccess)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     stateCookieName,
@@ -697,17 +721,22 @@ func clientIP(r *http.Request) string {
 
 // ExchangeIDToken validates an ID token obtained by the CLI, provisions the principal,
 // resolves effective roles, and returns a 12-hour API token (plan P1-03, step 7; HUM-06, API-04).
+// Each refusal logs one line, with its reason, and every end of the exchange
+// is counted by its result.
 func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*CreatedToken, error) {
 	if s.tokens == nil {
+		s.signIns.ended("token_exchange", resultError)
 		return nil, errors.New("token store not configured")
 	}
 	provider := s.provider.Load()
 	if provider == nil {
+		s.signIns.ended("token_exchange", resultError)
 		return nil, ErrProviderUnavailable
 	}
 
 	rawIDToken = strings.TrimSpace(rawIDToken)
 	if rawIDToken == "" {
+		s.signIns.refused(ctx, "token_exchange", refusedInvalidRequest, nil, "error", "no ID token")
 		return nil, fmt.Errorf("%w: empty id token", ErrInvalidToken)
 	}
 
@@ -722,12 +751,18 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 	}
 	if err != nil {
 		// Fetching the signing keys can fail on the provider's back channel,
-		// whose address no client may learn: only the log holds the cause.
-		s.logger.Warn("verifying exchange id_token failed", "error", err)
+		// whose address no client may learn: only the log holds the cause,
+		// sanitized, as it can quote the token's claims.
+		s.signIns.refused(ctx, "token_exchange", refusedInvalidToken, nil, "error", logging.Sanitize(err.Error()))
 		return nil, fmt.Errorf("%w: the ID token does not verify", ErrInvalidToken)
 	}
 
 	id, err := s.identityOf(idToken)
+	if errors.Is(err, ErrNoExternalID) {
+		s.refuseWithoutExternalID(ctx, "token_exchange")
+	} else if err != nil {
+		s.signIns.refused(ctx, "token_exchange", refusedInvalidToken, nil, "error", err)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("reading id token claims: %w", err)
 	}
@@ -750,13 +785,35 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 		created, err = s.tokens.createWithLifetimeTx(ctx, tx, p.ID, "wtctl", authz.PermissionsList(effectiveRoles), 12*time.Hour, actor)
 		return err
 	})
-	if errors.Is(err, ErrExternalIDConflict) {
-		s.logger.Warn("refusing a token exchange", "error", err, "claim", s.opts.ExternalIDClaim)
+	switch {
+	case errors.Is(err, ErrPrincipalInactive):
+		s.signIns.refused(ctx, "token_exchange", refusedInactive, refusedPrincipalID(err))
+	case errors.Is(err, ErrExternalIDConflict):
+		s.refuseExternalIDConflict(ctx, "token_exchange", err)
+	case err != nil:
+		// The API logs what it answers as an internal error.
+		s.signIns.ended("token_exchange", resultError)
 	}
 	if err != nil {
 		return nil, err
 	}
+	s.signIns.ended("token_exchange", resultSuccess)
 	return created, nil
+}
+
+// refuseWithoutExternalID logs and counts a sign-in through method whose ID
+// token carries no external ID in its configured claim. The log names the
+// claim, never its value.
+func (s *OIDCService) refuseWithoutExternalID(ctx context.Context, method string) {
+	s.signIns.refused(ctx, method, refusedNoExternalID, nil, "claim", s.opts.ExternalIDClaim)
+}
+
+// refuseExternalIDConflict logs and counts a sign-in through method that err
+// refuses because the principal with its issuer and subject holds another
+// external ID, as after the configured claim changed. The log names the
+// principal and the claim, and no value of the ID token.
+func (s *OIDCService) refuseExternalIDConflict(ctx context.Context, method string, err error) {
+	s.signIns.refused(ctx, method, refusedExternalIDConflict, refusedPrincipalID(err), "claim", s.opts.ExternalIDClaim)
 }
 
 // identityOf returns what a verified ID token says of the person: the
@@ -764,8 +821,7 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 // name, the email address and the groups of the groups claim. The name falls
 // back to the preferred username, the email address and the subject, in that
 // order. An external ID claim that is missing, is not a string or is no
-// external ID is ErrNoExternalID, and is logged by its name, never with its
-// value.
+// external ID is ErrNoExternalID.
 func (s *OIDCService) identityOf(idToken *oidc.IDToken) (Identity, error) {
 	var claims idTokenClaims
 	if err := idToken.Claims(&claims); err != nil {
@@ -778,8 +834,6 @@ func (s *OIDCService) identityOf(idToken *oidc.IDToken) (Identity, error) {
 
 	externalID, ok := rawClaims[s.opts.ExternalIDClaim].(string)
 	if !ok || checkExternalID(externalID) != nil {
-		s.logger.Warn("refusing a sign-in: the ID token's external ID claim is missing, not a string, blank or too long",
-			"claim", s.opts.ExternalIDClaim)
 		return Identity{}, ErrNoExternalID
 	}
 

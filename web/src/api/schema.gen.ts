@@ -143,7 +143,10 @@ export interface paths {
         };
         /**
          * List service accounts
-         * @description Lists service accounts owned by the calling principal or all service accounts for administrators.
+         * @description Lists the service accounts that the caller is responsible for and,
+         *     with the permission `identity.tokens.manage`, every service account:
+         *     an API token needs that permission in its scopes too. An
+         *     administrator lists the service accounts to manage their tokens.
          */
         get: operations["listServiceAccounts"];
         put?: never;

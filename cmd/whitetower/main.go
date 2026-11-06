@@ -199,6 +199,8 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, cfg.Auth.OIDC.RoleMapping)
 
 	registry := metrics.NewRegistry(v)
+	// Every way of signing in counts its sign-ins in the same metric.
+	signIns := metrics.NewSignIns(registry)
 
 	var oidcSvc *authn.OIDCService
 	// The public API exchanges ID tokens only when OIDC is on. A nil
@@ -234,6 +236,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			Logger:            logger,
 			Limiter:           ratelimit.New(cfg.API.RateLimit, cfg.API.RateBurst),
 			Metrics:           metrics.NewOIDC(registry),
+			SignIns:           signIns,
 			Tokens:            tokenStore,
 		}, principalStore, sessionStore)
 		if err != nil {
@@ -249,6 +252,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			CredentialHashFile: cfg.Auth.Breakglass.CredentialHashFile,
 			Clock:              clock.System,
 			Logger:             logger,
+			SignIns:            signIns,
 		}, database, sessionStore, writer)
 	}
 

@@ -2411,7 +2411,10 @@ type ClientInterface interface {
 
 	// ListServiceAccounts List service accounts
 	//
-	// Lists service accounts owned by the calling principal or all service accounts for administrators.
+	// Lists the service accounts that the caller is responsible for and,
+	// with the permission `identity.tokens.manage`, every service account:
+	// an API token needs that permission in its scopes too. An
+	// administrator lists the service accounts to manage their tokens.
 	//
 	// Corresponds with GET /service-accounts (the `ListServiceAccounts` operationId).
 	ListServiceAccounts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3463,7 +3466,10 @@ func (c *Client) SignOffReview(ctx context.Context, id ReviewId, params *SignOff
 
 // ListServiceAccounts List service accounts
 //
-// Lists service accounts owned by the calling principal or all service accounts for administrators.
+// Lists the service accounts that the caller is responsible for and,
+// with the permission `identity.tokens.manage`, every service account:
+// an API token needs that permission in its scopes too. An
+// administrator lists the service accounts to manage their tokens.
 //
 // Corresponds with GET /service-accounts (the `ListServiceAccounts` operationId).
 func (c *Client) ListServiceAccounts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6812,7 +6818,10 @@ type ClientWithResponsesInterface interface {
 
 	// ListServiceAccountsWithResponse List service accounts
 	//
-	// Lists service accounts owned by the calling principal or all service accounts for administrators.
+	// Lists the service accounts that the caller is responsible for and,
+	// with the permission `identity.tokens.manage`, every service account:
+	// an API token needs that permission in its scopes too. An
+	// administrator lists the service accounts to manage their tokens.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -9816,7 +9825,10 @@ func (c *ClientWithResponses) SignOffReviewWithResponse(ctx context.Context, id 
 
 // ListServiceAccountsWithResponse List service accounts
 //
-// Lists service accounts owned by the calling principal or all service accounts for administrators.
+// Lists the service accounts that the caller is responsible for and,
+// with the permission `identity.tokens.manage`, every service account:
+// an API token needs that permission in its scopes too. An
+// administrator lists the service accounts to manage their tokens.
 //
 // Returns a wrapper object for the known response body format(s).
 //

@@ -188,6 +188,13 @@
     "outcome": "success",
     "reason": ""
   },
+  "whitetower.service_account.created.v1": {
+    "action": "service_account.created",
+    "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+    "actor_type": "human",
+    "outcome": "success",
+    "reason": ""
+  },
   "whitetower.session.created.v1": {
     "action": "session.created",
     "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",

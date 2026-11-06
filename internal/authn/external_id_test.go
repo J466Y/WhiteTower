@@ -61,11 +61,11 @@ func createSCIMUser(scim func(method, target, body string) *httptest.ResponseRec
 		`","userName":"`+userName+`","displayName":"Ruth Canary","emails":[{"value":"ruth@example.test","primary":true}]}`)
 }
 
-// decodeSCIMUser decodes the user of rec, which must have the status given.
-func decodeSCIMUser(t *testing.T, rec *httptest.ResponseRecorder, status int) scimUser {
+// decodeSCIMUser decodes the user that rec created, which must be a 201.
+func decodeSCIMUser(t *testing.T, rec *httptest.ResponseRecorder) scimUser {
 	t.Helper()
-	if rec.Code != status {
-		t.Fatalf("got %d %q, want %d", rec.Code, rec.Body.String(), status)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("got %d %q, want 201", rec.Code, rec.Body.String())
 	}
 	var user scimUser
 	if err := json.Unmarshal(rec.Body.Bytes(), &user); err != nil {
@@ -117,7 +117,7 @@ func TestSCIMAndSignInShareOnePrincipal(t *testing.T) {
 				return c
 			}
 
-			user := decodeSCIMUser(t, createSCIMUser(scim, "idp-ruth", "ruth@example.test"), http.StatusCreated)
+			user := decodeSCIMUser(t, createSCIMUser(scim, "idp-ruth", "ruth@example.test"))
 			if user.ExternalID != "idp-ruth" {
 				t.Errorf("the user's externalId is %q, want idp-ruth", user.ExternalID)
 			}
@@ -180,7 +180,7 @@ func TestSCIMAdoptsThePrincipalOfAPersonWhoSignedInFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := decodeSCIMUser(t, createSCIMUser(scim, "idp-ruth", "ruth.canary@example.test"), http.StatusCreated)
+	user := decodeSCIMUser(t, createSCIMUser(scim, "idp-ruth", "ruth.canary@example.test"))
 	if user.ID != signedIn.ID.String() || user.UserName != "ruth.canary@example.test" || !user.Active {
 		t.Fatalf("SCIM's user %+v, want the principal %s that the sign-in created, with SCIM's userName", user, signedIn.ID)
 	}
@@ -272,13 +272,13 @@ func TestASignInWithoutAnExternalIDIsRefused(t *testing.T) {
 	if n := len(eventsOf(t, database, principalCreated)); n != 0 {
 		t.Errorf("%d creations recorded, want none", n)
 	}
-	refusals := logs.records(t, "refusing a sign-in: the ID token's external ID claim is missing, not a string, blank or too long")
+	refusals := logs.records(t, "refusing a sign-in")
 	if len(refusals) != 12 {
 		t.Errorf("%d refusals logged, want one per sign-in", len(refusals))
 	}
 	for _, r := range refusals {
-		if r["claim"] != "oid" {
-			t.Errorf("a refusal logs the claim %v, want oid", r["claim"])
+		if r["claim"] != "oid" || r["reason"] != "no_external_id" {
+			t.Errorf("a refusal logs %v, want the reason no_external_id and the claim oid", r)
 		}
 	}
 	if logged := logs.buf.String(); strings.Contains(logged, "usr-sam-canary") || strings.Contains(logged, "idp-sam") || strings.Contains(logged, "Sam Canary") {
@@ -296,7 +296,7 @@ func TestTheStoreRefusesAPersonWithoutAnExternalID(t *testing.T) {
 		if _, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-una", ExternalID: externalID, DisplayName: "Una Canary"}, nil); !errors.Is(err, authn.ErrInvalidExternalID) {
 			t.Errorf("a sign-in with the external ID %q: %v, want ErrInvalidExternalID", externalID, err)
 		}
-		if _, err := principalStore.ProvisionHuman(ctx, authn.Identity{Subject: "una@example.test", ExternalID: externalID, DisplayName: "Una Canary"}); !errors.Is(err, authn.ErrInvalidExternalID) {
+		if _, err := principalStore.ProvisionHuman(ctx, authn.Identity{Subject: "una@example.test", ExternalID: externalID, DisplayName: "Una Canary"}, true); !errors.Is(err, authn.ErrInvalidExternalID) {
 			t.Errorf("a provisioning with the external ID %q: %v, want ErrInvalidExternalID", externalID, err)
 		}
 	}
@@ -338,13 +338,13 @@ func TestASignInOfAPrincipalWithAnotherExternalIDIsRefused(t *testing.T) {
 	if n := len(eventsOf(t, database, groupsChanged)); n != 0 {
 		t.Errorf("%d changes of groups recorded, want none", n)
 	}
-	refusals := append(logs.records(t, "refusing a sign-in"), logs.records(t, "refusing a token exchange")...)
-	if len(refusals) != 2 {
-		t.Fatalf("%d refusals logged, want 2", len(refusals))
+	refusals := logs.records(t, "refusing a sign-in")
+	if len(refusals) != 2 || refusals[0]["method"] != "oidc" || refusals[1]["method"] != "token_exchange" {
+		t.Fatalf("refusals logged: %v, want the callback's and the exchange's", refusals)
 	}
 	for _, r := range refusals {
-		if r["claim"] != "oid" || !strings.Contains(r["error"].(string), before.ID.String()) {
-			t.Errorf("a refusal logs %v, want the claim's name and the principal's ID", r)
+		if r["claim"] != "oid" || r["principal_id"] != before.ID.String() || r["reason"] != "external_id_conflict" {
+			t.Errorf("a refusal logs %v, want the reason, the claim's name and the principal's ID", r)
 		}
 	}
 	if logged := logs.buf.String(); strings.Contains(logged, "usr-tom") || strings.Contains(logged, "idp-tom") || strings.Contains(logged, "Tom Canary") {
@@ -363,7 +363,7 @@ func TestSCIMRefusesExternalIDsThatWouldNotReachThePerson(t *testing.T) {
 	clk := clocktest.New(testEpoch)
 	_, principalStore, _, database := setupAuthn(t, clk)
 	scim := scimClient(t, principalStore)
-	user := decodeSCIMUser(t, createSCIMUser(scim, "idp-ruth", "ruth@example.test"), http.StatusCreated)
+	user := decodeSCIMUser(t, createSCIMUser(scim, "idp-ruth", "ruth@example.test"))
 	tooLong := strings.Repeat("x", authn.MaxExternalIDLength+1)
 
 	for name, tt := range map[string]struct {
@@ -417,53 +417,65 @@ func TestSCIMRefusesExternalIDsThatWouldNotReachThePerson(t *testing.T) {
 }
 
 // Two SCIM creations with one userName at once create one user, when the
-// second would adopt the principal that a person signed in as: the
-// adoption's userName meets the creation's, which commits first, and the
-// adoption is refused as a userName that exists, with nothing recorded. The
-// audit log holds the creation at its event until the adoption waits.
-func TestASCIMAdoptionThatACreationOvertookIsRefused(t *testing.T) {
-	ctx := context.Background()
-	clk := clocktest.New(testEpoch)
-	d := dbtest.New(t)
-	cat, err := audit.LoadCatalog(events.Files)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writer := audit.NewWriter(cat, clk)
-	pool := d.Open(t)
-	principals := authn.NewPrincipalStore(pool, clk, writer, authn.NewSessionStore(pool, clk, writer, authn.SessionOptions{}), authn.NewTokenStore(pool, clk, writer, authz.NewAuthorizer()))
-	signedIn, err := principals.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-vic", ExternalID: "idp-vic", DisplayName: "Vic Canary"}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+// second would adopt the principal that a person signed in as, or create
+// another, with the userName in another case too: the second's userName meets
+// the creation's, which commits first, and the second is refused as a
+// userName that exists, with nothing recorded. The audit log holds the
+// creation at its event until the second waits.
+func TestASCIMProvisioningThatACreationOvertookIsRefused(t *testing.T) {
+	for _, tt := range []struct{ name, userName, externalID string }{
+		{"an adoption with the userName", "vic@example.test", "idp-vic"},
+		{"an adoption with the userName in another case", "VIC@Example.TEST", "idp-vic"},
+		{"a creation with the userName in another case", "Vic@example.test", "idp-new"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			clk := clocktest.New(testEpoch)
+			d := dbtest.New(t)
+			cat, err := audit.LoadCatalog(events.Files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writer := audit.NewWriter(cat, clk)
+			pool := d.Open(t)
+			principals := authn.NewPrincipalStore(pool, clk, writer, authn.NewSessionStore(pool, clk, writer, authn.SessionOptions{}), authn.NewTokenStore(pool, clk, writer, authz.NewAuthorizer()))
+			signedIn, err := principals.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-vic", ExternalID: "idp-vic", DisplayName: "Vic Canary"}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	hold, err := d.Superuser(t).Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := hold.Exec(ctx, "LOCK TABLE whitetower.audit_events IN EXCLUSIVE MODE"); err != nil {
-		t.Fatal(err)
-	}
-	created, adopted := make(chan error, 1), make(chan error, 1)
-	provision := func(externalID string, result chan<- error) {
-		_, err := principals.ProvisionHuman(ctx, authn.Identity{Subject: "vic@example.test", ExternalID: externalID, DisplayName: "Vic Canary"})
-		result <- err
-	}
-	go provision("idp-other", created)
-	awaitLockWaits(t, pool, 1)
-	go provision("idp-vic", adopted)
-	awaitLockWaits(t, pool, 2)
-	if err := hold.Rollback(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if errCreated, errAdopted := <-created, <-adopted; errCreated != nil || !errors.Is(errAdopted, authn.ErrPrincipalExists) {
-		t.Fatalf("the creation: %v; the adoption: %v, want ErrPrincipalExists", errCreated, errAdopted)
-	}
-	still, err := principals.GetByID(ctx, signedIn.ID)
-	if err != nil || *still.Issuer != "https://idp.example.com" || *still.Subject != "usr-vic" {
-		t.Errorf("the principal of the sign-in: %+v, %v, want it unchanged", still, err)
-	}
-	if n := len(eventsOf(t, pool, principalAdopted)); n != 0 {
-		t.Errorf("%d adoptions recorded, want none", n)
+			hold, err := d.Superuser(t).Begin(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := hold.Exec(ctx, "LOCK TABLE whitetower.audit_events IN EXCLUSIVE MODE"); err != nil {
+				t.Fatal(err)
+			}
+			created, second := make(chan error, 1), make(chan error, 1)
+			provision := func(userName, externalID string, result chan<- error) {
+				_, err := principals.ProvisionHuman(ctx, authn.Identity{Subject: userName, ExternalID: externalID, DisplayName: "Vic Canary"}, true)
+				result <- err
+			}
+			go provision("vic@example.test", "idp-other", created)
+			awaitLockWaits(t, pool, 1)
+			go provision(tt.userName, tt.externalID, second)
+			awaitLockWaits(t, pool, 2)
+			if err := hold.Rollback(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if errCreated, errSecond := <-created, <-second; errCreated != nil || !errors.Is(errSecond, authn.ErrPrincipalExists) {
+				t.Fatalf("the creation: %v; the second: %v, want ErrPrincipalExists", errCreated, errSecond)
+			}
+			still, err := principals.GetByID(ctx, signedIn.ID)
+			if err != nil || *still.Issuer != "https://idp.example.com" || *still.Subject != "usr-vic" {
+				t.Errorf("the principal of the sign-in: %+v, %v, want it unchanged", still, err)
+			}
+			if n := len(eventsOf(t, pool, principalAdopted)); n != 0 {
+				t.Errorf("%d adoptions recorded, want none", n)
+			}
+			if n := countPrincipals(t, pool); n != 2 {
+				t.Errorf("%d principals, want the sign-in's and the creation's", n)
+			}
+		})
 	}
 }

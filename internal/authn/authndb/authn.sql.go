@@ -419,6 +419,39 @@ func (q *Queries) GetPrincipalByID(ctx context.Context, id uuid.UUID) (Whitetowe
 	return i, err
 }
 
+const getPrincipalBySCIMUserName = `-- name: GetPrincipalBySCIMUserName :one
+SELECT id, kind, issuer, subject, display_name, email, status, status_changed_at, status_reason, idp_groups, last_login_at, responsible_principal_id, created_at, updated_at, version, external_id FROM whitetower.principals
+WHERE kind = 'human' AND issuer = 'scim' AND lower(subject) = lower($1)
+`
+
+// The principal that SCIM provisioned, or adopted, with the userName: SCIM's
+// issuer, and the userName as subject, compared without regard to case
+// (RFC 7643, section 4.1.1), as the unique index principals_scim_user_name
+// compares it.
+func (q *Queries) GetPrincipalBySCIMUserName(ctx context.Context, userName string) (WhitetowerPrincipal, error) {
+	row := q.db.QueryRow(ctx, getPrincipalBySCIMUserName, userName)
+	var i WhitetowerPrincipal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.Email,
+		&i.Status,
+		&i.StatusChangedAt,
+		&i.StatusReason,
+		&i.IdpGroups,
+		&i.LastLoginAt,
+		&i.ResponsiblePrincipalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+		&i.ExternalID,
+	)
+	return i, err
+}
+
 const getSessionByHash = `-- name: GetSessionByHash :one
 SELECT id_hash, principal_id, method, roles, csrf_token_hash, created_at, last_seen_at, idle_expires_at, absolute_expires_at, revoked_at FROM whitetower.sessions
 WHERE id_hash = $1

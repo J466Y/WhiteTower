@@ -3,6 +3,7 @@ package authn_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
@@ -523,4 +525,135 @@ func TestSCIMRefusesTheFiltersItDoesNotSupport(t *testing.T) {
 			t.Errorf("the filter %s: %+v, want the user", filter, found)
 		}
 	}
+}
+
+// SCIM compares userNames without regard to case, as RFC 7643 says (section
+// 4.1.1): the filter finds a user whatever the case of the userName it is
+// given, and a userName that differs from a user's only in case is one that
+// exists, refused through the handler, whether it would create a principal or
+// adopt one, through the store and in the database, with nothing created or
+// recorded. A user keeps the userName as SCIM gave it.
+func TestSCIMComparesUserNamesWithoutRegardToCase(t *testing.T) {
+	ctx := context.Background()
+	clk := clocktest.New(testEpoch)
+	_, principalStore, _, database := setupAuthn(t, clk)
+	scim := scimClient(t, principalStore)
+	const userName = "Ruth.Canary@Example.test"
+	user := decodeSCIMUser(t, createSCIMUser(scim, "idp-ruth", userName))
+	if user.UserName != userName {
+		t.Errorf("the userName %q, want %q as SCIM gave it", user.UserName, userName)
+	}
+	for _, asked := range []string{userName, "ruth.canary@example.test", "RUTH.CANARY@EXAMPLE.TEST"} {
+		found := decodeSCIMList(t, scim(http.MethodGet, "/scim/v2/Users?filter="+url.QueryEscape(`userName eq "`+asked+`"`), ""))
+		if found.TotalResults != 1 || len(found.Resources) != 1 || found.Resources[0].ID != user.ID || found.Resources[0].UserName != userName {
+			t.Errorf("the filter on %q: %+v, want the user, with its userName as given", asked, found)
+		}
+	}
+
+	// A person who signed in first, whom SCIM would adopt under the userName.
+	if _, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-una", ExternalID: "idp-una", DisplayName: "Una Canary"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	created := len(eventsOf(t, database, principalCreated))
+	checkSCIMError(t, createSCIMUser(scim, "idp-new", "ruth.canary@example.test"), http.StatusConflict, "uniqueness", "userName")
+	checkSCIMError(t, createSCIMUser(scim, "idp-una", "RUTH.CANARY@example.test"), http.StatusConflict, "uniqueness", "userName")
+	if _, err := principalStore.ProvisionHuman(ctx, authn.Identity{Subject: "ruth.CANARY@example.test", ExternalID: "idp-vic", DisplayName: "Vic Canary"}, true); !errors.Is(err, authn.ErrPrincipalExists) {
+		t.Errorf("the store's creation of the userName in another case: %v, want ErrPrincipalExists", err)
+	}
+	_, err := database.Exec(ctx, `INSERT INTO whitetower.principals (id, kind, issuer, subject, display_name) VALUES ($1, 'human', 'scim', 'RUTH.CANARY@EXAMPLE.TEST', 'Ruth')`, uuid.New())
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); !ok || pgErr.Code != "23505" || pgErr.ConstraintName != "principals_scim_user_name" {
+		t.Errorf("the database's insert of the userName in another case: %v, want a unique violation of principals_scim_user_name", err)
+	}
+
+	var scimUsers int
+	if err := database.QueryRow(ctx, "SELECT count(*) FROM whitetower.principals WHERE issuer = 'scim'").Scan(&scimUsers); err != nil || scimUsers != 1 {
+		t.Errorf("%d users of SCIM, %v, want one", scimUsers, err)
+	}
+	if n := len(eventsOf(t, database, principalCreated)); n != created {
+		t.Errorf("%d creations recorded, want %d", n, created)
+	}
+	if n := len(eventsOf(t, database, principalAdopted)); n != 0 {
+		t.Errorf("%d adoptions recorded, want none", n)
+	}
+}
+
+// Security test ST-21: a user that SCIM creates with active false is created
+// inactive, in the transaction that creates it; a person who signed in first
+// is adopted and deactivated in that transaction, which revokes their session.
+// When the deactivation cannot be recorded, nothing is created, so that SCIM
+// never leaves a user active against its request
+func TestSCIMCreatesAUserInactiveInOneTransaction(t *testing.T) {
+	ctx := context.Background()
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+	const deactivated = "whitetower.principal.deactivated.v1"
+	inactive := func(externalID, userName string) string {
+		return `{"externalId":"` + externalID + `","userName":"` + userName + `","active":false}`
+	}
+	// recordedFor returns the events of the type given about the principal id.
+	recordedFor := func(typ, id string) []recorded {
+		var found []recorded
+		for _, e := range eventsOf(t, database, typ) {
+			if e.data["principal_id"] == id {
+				found = append(found, e)
+			}
+		}
+		return found
+	}
+	checkInactive := func(t *testing.T, user scimUser, record string) {
+		t.Helper()
+		if user.Active {
+			t.Error("SCIM answered with an active user")
+		}
+		p, err := principalStore.GetByID(ctx, uuid.MustParse(user.ID))
+		if err != nil || p.Status != "inactive" {
+			t.Errorf("the principal: %+v, %v, want it inactive", p, err)
+		}
+		if n := len(recordedFor(record, user.ID)); n != 1 {
+			t.Errorf("%d %s recorded, want 1", n, record)
+		}
+		events := recordedFor(deactivated, user.ID)
+		if len(events) != 1 {
+			t.Fatalf("%d deactivations recorded, want 1", len(events))
+		}
+		checkEvent(t, events[0], "service_account", authn.SCIMPrincipalID.String(), map[string]any{"reason": "SCIM initial provisioning as inactive"})
+	}
+	scim := scimClient(t, principalStore)
+
+	t.Run("a new user", func(t *testing.T) {
+		checkInactive(t, decodeSCIMUser(t, scim(http.MethodPost, "/scim/v2/Users", inactive("idp-wes", "wes@example.test"))), principalCreated)
+	})
+
+	t.Run("a person who signed in first", func(t *testing.T) {
+		xia, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-xia", ExternalID: "idp-xia", DisplayName: "Xia Canary"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		session, err := sessionStore.Create(ctx, xia.ID, "oidc", []string{"owner"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		user := decodeSCIMUser(t, scim(http.MethodPost, "/scim/v2/Users", inactive("idp-xia", "xia@example.test")))
+		if user.ID != xia.ID.String() {
+			t.Fatalf("SCIM created %s, want it to adopt %s", user.ID, xia.ID)
+		}
+		checkInactive(t, user, principalAdopted)
+		if _, err := sessionStore.Get(ctx, session.Token); err == nil {
+			t.Error("the person's session is still valid")
+		}
+	})
+
+	t.Run("the deactivation cannot be recorded", func(t *testing.T) {
+		refusing := authn.NewPrincipalStore(database, clk, refusingWriter(t, clk, deactivated), sessionStore, tokenStore)
+		created := len(eventsOf(t, database, principalCreated))
+		if rec := scimClient(t, refusing)(http.MethodPost, "/scim/v2/Users", inactive("idp-yan", "yan@example.test")); rec.Code != http.StatusInternalServerError {
+			t.Errorf("got %d %q, want 500", rec.Code, rec.Body.String())
+		}
+		if p, err := principalStore.GetBySCIMUserName(ctx, "yan@example.test"); !errors.Is(err, authn.ErrPrincipalNotFound) {
+			t.Errorf("the user: %+v, %v, want none", p, err)
+		}
+		if n := len(eventsOf(t, database, principalCreated)); n != created {
+			t.Errorf("%d creations recorded, want %d", n, created)
+		}
+	})
 }

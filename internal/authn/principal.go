@@ -25,7 +25,8 @@ import (
 var ErrPrincipalNotFound = errors.New("principal not found")
 
 // ErrPrincipalExists is returned when SCIM would create a principal with the
-// issuer and subject of one that exists.
+// issuer and subject of one that exists, or with a userName that differs from
+// one SCIM gave only in case.
 var ErrPrincipalExists = errors.New("a principal with this issuer and subject exists")
 
 var (
@@ -149,8 +150,8 @@ type Identity struct {
 // of groups, or its token.
 // An inactive principal is refused with ErrPrincipalInactive, and a principal
 // with the issuer and subject but another external ID with
-// ErrExternalIDConflict; nothing is written then: neither a record nor an
-// event.
+// ErrExternalIDConflict, each in an error that names the principal; nothing
+// is written then: neither a record nor an event.
 func (ps *PrincipalStore) SignIn(ctx context.Context, method string, id Identity, then func(ctx context.Context, tx *db.Tx, p *Principal) error) (*Principal, error) {
 	if id.Issuer == "" || id.Subject == "" || id.DisplayName == "" {
 		return nil, errors.New("issuer, subject, and displayName are required")
@@ -169,7 +170,7 @@ func (ps *PrincipalStore) SignIn(ctx context.Context, method string, id Identity
 			return err
 		}
 		if p.Status != "active" {
-			return ErrPrincipalInactive
+			return &refusedPrincipal{id: p.ID, err: ErrPrincipalInactive}
 		}
 		if then != nil {
 			if err := then(ctx, tx, p); err != nil {
@@ -275,7 +276,7 @@ func lockAtSignIn(ctx context.Context, q *authndb.Queries, id Identity) (authndb
 	// A sign-in of the same person that linked the principal while this
 	// lock waited for it leaves the principal with this external ID.
 	if err == nil && held.ExternalID != nil && *held.ExternalID != id.ExternalID {
-		return held, fmt.Errorf("%w: principal %s", ErrExternalIDConflict, held.ID)
+		return held, &refusedPrincipal{id: held.ID, err: ErrExternalIDConflict}
 	}
 	return held, err
 }
@@ -303,10 +304,15 @@ func externalID(id Identity) *string {
 //     whitetower.principal.adopted.v1. Its ID, status, groups and last login
 //     stay as they are.
 //
-// A principal with the userName exists already: ErrPrincipalExists. One that
-// SCIM manages has the external ID: ErrExternalIDExists. Nothing is written
-// then. SCIM is never a sign-in, so it gives no principal a last login.
-func (ps *PrincipalStore) ProvisionHuman(ctx context.Context, id Identity) (*Principal, error) {
+// When active is false, the same transaction then deactivates the principal,
+// as Deactivate does, so that SCIM never answers with a user that is active
+// against its request, and never leaves one so.
+//
+// A principal with the userName exists already, compared without regard to
+// case, as RFC 7643 compares userNames: ErrPrincipalExists. One that SCIM
+// manages has the external ID: ErrExternalIDExists. Nothing is written then.
+// SCIM is never a sign-in, so it gives no principal a last login.
+func (ps *PrincipalStore) ProvisionHuman(ctx context.Context, id Identity, active bool) (*Principal, error) {
 	id.Issuer = scimIssuer
 	if id.Subject == "" || id.DisplayName == "" {
 		return nil, errors.New("userName and displayName are required")
@@ -322,36 +328,25 @@ func (ps *PrincipalStore) ProvisionHuman(ctx context.Context, id Identity) (*Pri
 	var provisioned *Principal
 	err = ps.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := authndb.New(tx)
-		_, err := q.GetHumanPrincipalByIdentity(ctx, authndb.GetHumanPrincipalByIdentityParams{Issuer: &id.Issuer, Subject: &id.Subject})
+		_, err := q.GetPrincipalBySCIMUserName(ctx, id.Subject)
 		if err == nil {
 			return ErrPrincipalExists
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("reading the principal with the userName: %w", err)
 		}
-		for attempt := 1; ; attempt++ {
-			held, err := q.LockHumanPrincipalByExternalID(ctx, &id.ExternalID)
-			switch {
-			case err == nil && held.Issuer != nil && *held.Issuer == scimIssuer:
-				return ErrExternalIDExists
-			case err == nil:
-				provisioned, err = adoptHuman(ctx, tx, ps.writer, now, held.ID, id)
-				return err
-			case !errors.Is(err, pgx.ErrNoRows):
-				return fmt.Errorf("locking principal: %w", err)
-			case attempt > 1:
-				// The creation met a principal with the userName, which
-				// another transaction created since the check above.
-				return ErrPrincipalExists
-			}
-			provisioned, err = createHuman(ctx, tx, ps.writer, now, newID, "scim", id, nil)
-			if !errors.Is(err, ErrPrincipalExists) {
-				return err
-			}
-			// Another transaction created a principal with the userName or
-			// the external ID since the lock found none, and has committed:
-			// the next lock tells which.
+		if provisioned, err = provisionHuman(ctx, tx, ps.writer, now, newID, id); err != nil || active {
+			return err
 		}
+		if err := ps.deactivateTx(ctx, tx, provisioned.ID, SCIMPrincipal, "SCIM initial provisioning as inactive"); err != nil {
+			return err
+		}
+		row, err := q.GetPrincipalByID(ctx, provisioned.ID)
+		if err != nil {
+			return fmt.Errorf("reading the principal provisioned inactive: %w", err)
+		}
+		provisioned = fromDBModel(row)
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -359,10 +354,39 @@ func (ps *PrincipalStore) ProvisionHuman(ctx context.Context, id Identity) (*Pri
 	return provisioned, nil
 }
 
+// provisionHuman creates the principal of id in tx, with newID, or adopts the
+// one with its external ID that a sign-in created, as ProvisionHuman says.
+func provisionHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.Time, newID uuid.UUID, id Identity) (*Principal, error) {
+	q := authndb.New(tx)
+	for attempt := 1; ; attempt++ {
+		held, err := q.LockHumanPrincipalByExternalID(ctx, &id.ExternalID)
+		switch {
+		case err == nil && held.Issuer != nil && *held.Issuer == scimIssuer:
+			return nil, ErrExternalIDExists
+		case err == nil:
+			return adoptHuman(ctx, tx, writer, now, held.ID, id)
+		case !errors.Is(err, pgx.ErrNoRows):
+			return nil, fmt.Errorf("locking principal: %w", err)
+		case attempt > 1:
+			// The creation met a principal with the userName, which
+			// another transaction created since ProvisionHuman checked.
+			return nil, ErrPrincipalExists
+		}
+		created, err := createHuman(ctx, tx, writer, now, newID, "scim", id, nil)
+		if !errors.Is(err, ErrPrincipalExists) {
+			return created, err
+		}
+		// Another transaction created a principal with the userName or the
+		// external ID since the lock found none, and has committed: the next
+		// lock tells which.
+	}
+}
+
 // adoptHuman gives the principal with the ID given, which a sign-in created,
 // SCIM's issuer and the userName, name and email address of id, in tx, and
 // records the adoption. Another transaction created a principal with the
-// userName since ProvisionHuman checked: ErrPrincipalExists.
+// userName, compared without regard to case, since ProvisionHuman checked:
+// ErrPrincipalExists.
 func adoptHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.Time, principalID uuid.UUID, id Identity) (*Principal, error) {
 	row, err := authndb.New(tx).AdoptHumanPrincipal(ctx, authndb.AdoptHumanPrincipalParams{
 		ID:          principalID,
@@ -373,7 +397,8 @@ func adoptHuman(ctx context.Context, tx *db.Tx, writer *audit.Writer, now time.T
 		UpdatedAt:   now,
 	})
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "principals_idp_identity" {
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" &&
+		(pgErr.ConstraintName == "principals_idp_identity" || pgErr.ConstraintName == "principals_scim_user_name") {
 		return nil, ErrPrincipalExists
 	}
 	if err != nil {
@@ -500,9 +525,17 @@ func (ps *PrincipalStore) GetPerson(ctx context.Context, id uuid.UUID) (*Princip
 }
 
 // GetBySCIMUserName returns the principal that SCIM provisioned, or adopted,
-// with the userName given.
+// with the userName given, compared without regard to case, as RFC 7643
+// compares userNames.
 func (ps *PrincipalStore) GetBySCIMUserName(ctx context.Context, userName string) (*Principal, error) {
-	return ps.GetByIdentity(ctx, scimIssuer, userName)
+	row, err := authndb.New(ps.database).GetPrincipalBySCIMUserName(ctx, userName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPrincipalNotFound
+		}
+		return nil, fmt.Errorf("querying principal by SCIM userName: %w", err)
+	}
+	return fromDBModel(row), nil
 }
 
 // GetByEmail returns the human principal matching the given email address.
@@ -545,72 +578,78 @@ func (ps *PrincipalStore) ListPeople(ctx context.Context, limit, offset int32) (
 // and records an audited whitetower.principal.deactivated.v1 event (HUM-05, ST-14, ST-21).
 func (ps *PrincipalStore) Deactivate(ctx context.Context, id uuid.UUID, actor auth.Principal, reason string) error {
 	return ps.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
-		q := authndb.New(tx)
-		p, err := q.GetPrincipalByID(ctx, id)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrPrincipalNotFound
-			}
-			return fmt.Errorf("reading principal: %w", err)
-		}
-		if p.Status == "inactive" {
-			return nil
-		}
-
-		now := ps.clk.Now().UTC()
-		if err := q.UpdatePrincipalStatus(ctx, authndb.UpdatePrincipalStatusParams{
-			ID:              id,
-			Status:          "inactive",
-			StatusChangedAt: &now,
-			StatusReason:    &reason,
-		}); err != nil {
-			return fmt.Errorf("updating principal status: %w", err)
-		}
-
-		// Revoke all sessions within the transaction.
-		if err := ps.sessionStore.RevokeAllForPrincipalTx(ctx, tx, id); err != nil {
-			return fmt.Errorf("revoking sessions for deactivated principal: %w", err)
-		}
-
-		// Revoke all API tokens within the transaction (ST-19).
-		if ps.tokenStore != nil {
-			if err := ps.tokenStore.RevokeAllForPrincipalTx(ctx, tx, id); err != nil {
-				return fmt.Errorf("revoking api tokens for deactivated principal: %w", err)
-			}
-		}
-
-		// Record audit event in the same transaction.
-		var actorType string
-		switch actor.Kind {
-		case auth.ServiceAccount:
-			actorType = "service_account"
-		case "":
-			actorType = "system"
-		default:
-			actorType = "human"
-		}
-
-		actorPayload := map[string]any{
-			"type": actorType,
-		}
-		if actor.ID != "" {
-			actorPayload["id"] = actor.ID
-		}
-
-		if err := ps.writer.Record(ctx, tx, audit.Event{
-			Type:    "whitetower.principal.deactivated.v1",
-			Subject: id.String(),
-			Data: map[string]any{
-				"principal_id": id.String(),
-				"actor":        actorPayload,
-				"reason":       reason,
-			},
-		}); err != nil {
-			return fmt.Errorf("recording deactivation audit event: %w", err)
-		}
-
-		return nil
+		return ps.deactivateTx(ctx, tx, id, actor, reason)
 	})
+}
+
+// deactivateTx is Deactivate in tx, for a provisioning that deactivates the
+// principal it creates in its own transaction.
+func (ps *PrincipalStore) deactivateTx(ctx context.Context, tx *db.Tx, id uuid.UUID, actor auth.Principal, reason string) error {
+	q := authndb.New(tx)
+	p, err := q.GetPrincipalByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrPrincipalNotFound
+		}
+		return fmt.Errorf("reading principal: %w", err)
+	}
+	if p.Status == "inactive" {
+		return nil
+	}
+
+	now := ps.clk.Now().UTC()
+	if err := q.UpdatePrincipalStatus(ctx, authndb.UpdatePrincipalStatusParams{
+		ID:              id,
+		Status:          "inactive",
+		StatusChangedAt: &now,
+		StatusReason:    &reason,
+	}); err != nil {
+		return fmt.Errorf("updating principal status: %w", err)
+	}
+
+	// Revoke all sessions within the transaction.
+	if err := ps.sessionStore.RevokeAllForPrincipalTx(ctx, tx, id); err != nil {
+		return fmt.Errorf("revoking sessions for deactivated principal: %w", err)
+	}
+
+	// Revoke all API tokens within the transaction (ST-19).
+	if ps.tokenStore != nil {
+		if err := ps.tokenStore.RevokeAllForPrincipalTx(ctx, tx, id); err != nil {
+			return fmt.Errorf("revoking api tokens for deactivated principal: %w", err)
+		}
+	}
+
+	// Record audit event in the same transaction.
+	var actorType string
+	switch actor.Kind {
+	case auth.ServiceAccount:
+		actorType = "service_account"
+	case "":
+		actorType = "system"
+	default:
+		actorType = "human"
+	}
+
+	actorPayload := map[string]any{
+		"type": actorType,
+	}
+	if actor.ID != "" {
+		actorPayload["id"] = actor.ID
+	}
+
+	if err := ps.writer.Record(ctx, tx, audit.Event{
+		Type:    "whitetower.principal.deactivated.v1",
+		Subject: id.String(),
+		Data: map[string]any{
+			"principal_id": id.String(),
+			"actor":        actorPayload,
+			"reason":       reason,
+		},
+	}); err != nil {
+		return fmt.Errorf("recording deactivation audit event: %w", err)
+	}
+
+	return nil
 }
 
 // Reactivate sets a principal's status back to active and records an audited event (HUM-05).
@@ -696,7 +735,9 @@ func fromDBModel(r authndb.WhitetowerPrincipal) *Principal {
 // creates for their own automation, and binds it the roles given. Each must
 // be one that the responsible principal holds: a service account acts for its
 // responsible principal, never with more (plan P1-03, step 6), and nobody
-// gets a role through it that they do not hold (HUM-02, DC-4).
+// gets a role through it that they do not hold (HUM-02, DC-4). In the same
+// transaction it records whitetower.service_account.created.v1, with the
+// roles bound (AUD-01).
 func (ps *PrincipalStore) CreateServiceAccount(
 	ctx context.Context,
 	displayName string,
@@ -776,6 +817,23 @@ func (ps *PrincipalStore) CreateServiceAccount(
 			}); err != nil {
 				return fmt.Errorf("adding role binding %q: %w", rStr, err)
 			}
+		}
+
+		// The roles bound, sorted, and never null: the bindings' unique index
+		// has refused a role given twice.
+		bound := append([]string{}, roles...)
+		slices.Sort(bound)
+		if err := ps.writer.Record(ctx, tx, audit.Event{
+			Type:    "whitetower.service_account.created.v1",
+			Subject: newID.String(),
+			Data: map[string]any{
+				"principal_id":             newID.String(),
+				"actor":                    map[string]any{"type": "human", "id": responsiblePrincipalID.String()},
+				"responsible_principal_id": responsiblePrincipalID.String(),
+				"roles":                    bound,
+			},
+		}); err != nil {
+			return fmt.Errorf("recording the service account's creation: %w", err)
 		}
 
 		created = fromDBModel(row)
