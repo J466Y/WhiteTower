@@ -550,8 +550,10 @@ func (s *OIDCService) handleCallback(w http.ResponseWriter, r *http.Request, pro
 	// a replayed nonce or an unexpected algorithm are refused.
 	idToken, err := provider.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		// Fetching the signing keys can fail on the back channel too.
-		s.signIns.refused(ctx, "oidc", refusedInvalidToken, nil, "error", err)
+		// Fetching the signing keys can fail on the back channel too. The
+		// error can quote the token's issuer or audience, which whoever made
+		// the token chose.
+		s.signIns.refused(ctx, "oidc", refusedInvalidToken, nil, "error", logging.Sanitize(err.Error()))
 		http.Error(w, "id token verification failed", http.StatusBadRequest)
 		return
 	}
@@ -749,8 +751,9 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 	}
 	if err != nil {
 		// Fetching the signing keys can fail on the provider's back channel,
-		// whose address no client may learn: only the log holds the cause.
-		s.signIns.refused(ctx, "token_exchange", refusedInvalidToken, nil, "error", err)
+		// whose address no client may learn: only the log holds the cause,
+		// sanitized, as it can quote the token's claims.
+		s.signIns.refused(ctx, "token_exchange", refusedInvalidToken, nil, "error", logging.Sanitize(err.Error()))
 		return nil, fmt.Errorf("%w: the ID token does not verify", ErrInvalidToken)
 	}
 
