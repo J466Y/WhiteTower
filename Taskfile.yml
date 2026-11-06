@@ -60,10 +60,23 @@ tasks:
       - "{{.GO_TOOL}} sqlc generate"
 
   verify:gen:
-    desc: Fail if the generated code is not up to date (used by CI)
+    desc: Fail if the generated code is not up to date, or not committed (used by CI)
+    vars:
+      # Every directory that `task gen` writes.
+      GENERATED: internal/api/rest/gen pkg/apiclient pkg/moduleapi web/src/api internal/platform/db/gen internal/audit/auditdb internal/authn/authndb internal/inventory/inventorydb internal/govstate/govstatedb
     cmds:
       - task: gen
-      - git diff --exit-code -- internal/api/rest/gen pkg/apiclient pkg/moduleapi web/src/api internal/platform/db/gen internal/audit/auditdb internal/authn/authndb internal/inventory/inventorydb internal/govstate/govstatedb
+      # git diff sees tracked files only, so the untracked ones, such as the
+      # code of a new query file, are listed apart. Ignored files do not count.
+      - |
+        stale=$(git diff --name-only -- {{.GENERATED}})
+        untracked=$(git ls-files --others --exclude-standard -- {{.GENERATED}})
+        if [ -z "$stale$untracked" ]; then exit 0; fi
+        git diff -- {{.GENERATED}}
+        if [ -n "$stale" ]; then printf 'Stale, changed by task gen:\n%s\n' "$stale"; fi
+        if [ -n "$untracked" ]; then printf 'Untracked, not committed:\n%s\n' "$untracked"; fi
+        echo "The generated code is not up to date, or not committed: run task gen, and commit the result."
+        exit 1
 
   build:
     desc: Build the console and the binaries into bin/ (the console is embedded in whitetower)
