@@ -240,7 +240,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
-| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In four parts, 3a to 3d, which the note of the review of pull request 2, of 2026-11-05, lists | Not started |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | Not started |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -1054,3 +1054,45 @@ The review found pull request 2 complete, and CI passed. `buf generate` changes 
 | 3d | The request schema, the Go profile and the Python checker; the rewritten combination vectors; `catalog-check.json`, `exposure.json` and `usage-rules.json` | No |
 
 The reviewer's pull request after 3d updates the counts of section 9.1 and appendix A's bundle reference, which 3c changes. Then the tag, `contracts/v0.1.0`, is the maintainer's.
+
+### 2026-11-06: part 3a in two parts, and the specification's answers
+
+The agent of part 3a stopped before writing code, with a split and ten questions. Part 3a would take about 1,200 changed lines, vector data aside:
+
+- `gowebpki/jcs` rounds integers beyond 2^53 - 1, and also refuses any integer of more than 309 digits, so the Go stack needs a strict JSON reader and writer of its own.
+- The names-alone case of the hashed mode needs a tree that keeps repeated names, lone surrogates and the text of numbers, and refuses them only where it writes.
+
+Part 3a becomes two parts, each after the one before, and 3b reuses the `url_host` of 3a-2:
+
+| Part | What | Size |
+| --- | --- | --- |
+| 3a-1 | <ul><li>Section 4.10's canonical JSON with exact integers, on both stacks.</li><li>Definition hashes, in a new `tooling.json`.</li><li>The new cases of `hashed-arguments.json`, the lone surrogates of section 8.3, and the checker's `canonical_json`.</li><li>The descriptions of `names_sha256` and `id_sha256`, and the comments of `SnapshotPart`.</li></ul> | About 600 lines |
+| 3a-2 | <ul><li>`url_host`'s reading, normalized URLs, references and their string forms.</li><li>Redaction with the deployment's rules, in `tooling.json`.</li></ul> | About 750 lines |
+
+**The maintainer's decision of 2026-11-06.** Section 4.10 leaves a definition without a hash for a number that is not finite, a repeated member name or a lone surrogate, but a `tools/list` message holds more than the members that the hash covers.
+
+- Only those members count, at any depth within them, so what a tool carries beside them, such as `_meta` or `icons`, never takes its hash away.
+- A member name that repeats in the JSON-RPC message itself or in its `result` leaves every tool of the message without a hash. An enforcement point and the agent's SDK could otherwise read different lists of tools, so the model could see a definition other than the one approved.
+- The alternatives: the hashed members alone, which leaves a repeated `tools` or `result` unsettled; and anything in the whole message, which makes one malformed `_meta` take every tool of the server.
+
+**The specification's answers** to the other questions:
+
+| Question | Answer | Where |
+| --- | --- | --- |
+| An integer of more than 309 digits | Written exactly, whatever its size, since the rule exists so that such numbers never make a tool unusable. "Not finite as a double" applies to a number with a fraction or an exponent, such as `1e400`. `1e-400` is written `0`, as RFC 8785 writes its double | Sections 4.10 and 8.3 |
+| A `null` within a hashed member | It stays: only the listed members are left out when `null` | Section 4.10 |
+| The names alone of the hashed mode | The names of the arguments object's members, each once; vectors compare them as a set | Section 8.3 |
+| A port with leading zeros | Its decimal value, as WHATWG reads it: `:0080` is the default port of `http`, and `:08080` is written `:8080` | Section 4.10, step 3 |
+| A `%` in a path that two hexadecimal digits do not follow | RFC 3986 does not allow it there, so it is encoded as `%25` | Section 4.10, step 4 |
+| An A-label that does not decode | One that does not decode as IDNA says: its Punycode gives a label that is not all ASCII, that UTS #46 maps to itself, and that encodes back to the same A-label. `xn--gd-`, whose Punycode gives `gd`, cannot be read. Go's `x/net/idna` and Python's `idna` refuse it; Node accepts it, as the check file says. The reading that denies more | Section 6.11, `url_host` step 7 |
+| Which command-line arguments are URLs | Any argument, or value of `--flag=value`, that `url_host` reads, whatever its scheme, so that a database URL loses its password | EP-14 |
+| A URL argument that no deployment prefix matches | Written as given, without its user information, query and fragment: section 4.10 normalizes `http` and `https` URLs only | EP-14 |
+| An argument that starts with a scheme and `//` but that `url_host` cannot read | Replaced with `<redacted>` as a whole, since parsers disagree on where its user information ends | EP-14 |
+| Flags | A flag starts with `-`, and its name runs from after its leading dashes to the first `=`. "In any case" compares ASCII letters only. `--flag=value` redacts its own value, never the next argument. The command is never a flag's value, and a flag given last redacts nothing | EP-14 |
+| The deployment's prefixes | Normalized `http` or `https` URLs that end with `/`, matched as string prefixes of the normalized URL. The segment runs to the next `/` or to the end, and a URL equal to a prefix replaces nothing. Every prefix that matches before any replacement redacts its segment, which leaks least. `<redacted>` is written as it is, after normalization | EP-14; section 7.7 |
+
+For 3a-2:
+
+- `golang.org/x/net/idna`, already an indirect dependency, becomes a direct one. Its options close to WHATWG's accept `a b`, `.a` and `a..b`, so step 7's checks on characters and empty labels run after the conversion, as the specification says.
+- The Python checker gains the `idna` package. Section 9.1 names it in the reviewer's pull request after 3d.
+- Python's standard library cannot read Unicode's White_Space property, so the checker lists its 25 characters itself.
