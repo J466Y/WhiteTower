@@ -240,7 +240,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
-| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | Not started |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | In progress (1 of 5 parts: 3a-1) |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -1096,3 +1096,41 @@ For 3a-2:
 - `golang.org/x/net/idna`, already an indirect dependency, becomes a direct one. Its options close to WHATWG's accept `a b`, `.a` and `a..b`, so step 7's checks on characters and empty labels run after the conversion, as the specification says.
 - The Python checker gains the `idna` package. Section 9.1 names it in the reviewer's pull request after 3d.
 - Python's standard library cannot read Unicode's White_Space property, so the checker lists its 25 characters itself.
+
+### 2026-11-09: step 12, part 3a-1: canonical JSON, definition hashes and the hashed mode
+
+Part 3a-1 brings section 4.10's canonical JSON to both stacks, with the definition hashes and the hashed mode that use it. It regenerates `pkg/moduleapi`, for comments only, and no generated vectors: no bundle vector changes.
+
+| What | Change |
+| --- | --- |
+| `test/conformance/canonical` | A new package: the Go stack's reader and writer of section 4.10's canonical JSON. `Parse` reads JSON text and keeps what canonical JSON cannot write: repeated member names, strings as UTF-16 code units, so that a lone surrogate stays, and the text of every number. `Encode` writes a number without a fraction or an exponent as its exact value, whatever its size, with `-0` as `0`, any other from its value as a double with `gowebpki/jcs`'s `NumberToJSON`, and refuses the rest with `ErrNoCanonicalJSON` |
+| `test/conformance/tooling` | A new package: definition hashes. `MCPDefinitions` takes the members that the hash covers from each tool of a `tools/list` message, and `FunctionDefinition` hashes a function's `name` and `inputSchema` |
+| `tooling.json` | A new vector file, with the 12 cases of definition hashes, D-01 to D-12 (below). Part 3a-2 adds references, string forms, normalized URLs and redaction |
+| `hashed-arguments.json` | Eight new cases, H-05 to H-12 (below), 12 in all. A case gives its arguments as text, in `arguments_text`, where a parsed object cannot hold them, and arguments without a canonical JSON come with `names` and `names_sha256`, compared as sets |
+| `vectors_test.go` | `TestHashedArgumentsVectors` reads every case with `canonical`, in place of `gowebpki/jcs`, and records the names alone of arguments without a canonical JSON. `TestDefinitionVectors` checks `tooling.json` |
+| The Python checker | `canonical_json` writes section 4.10's form: a member name that repeats, a lone surrogate and a number that is not finite raise `NoCanonicalJSON`, and a double that is a whole number is written as RFC 8785 writes it, `1` for `1.0` and `0` for `-0.0`. `read_json` keeps repeated names. The checker computes definition hashes and the names alone, and lifts Python's limit of 4300 digits on integers. It counts 206 vectors |
+| `whitetower.decision.made.v1` | Descriptions only: `id_sha256` and `names_sha256` also record an ID or a name with a lone surrogate, hashed with U+FFFD in place of each (section 8.3), and `hmac_sha256` names the numbers that leave arguments without a canonical JSON, and their names recorded each once |
+| `governance.proto` | Comments only: `SnapshotPart` says that an enforcement point applies the blocks of the first part as soon as it arrives and drops the others only once the snapshot is complete, and `StateChange.removed_block_ids` that an instance keeps a block that a change both adds and removes (section 5.10) |
+
+| Case | What it checks |
+| --- | --- |
+| H-05 | Integers beyond 2^53 - 1, written exactly: 2^64 - 1, 2^53 + 1 and -2^63 - 1 |
+| H-06 | Doubles as RFC 8785 writes them: `1.0`, `-0.0`, `1e3`, `1E20`, `1e21`, `1.5e-7`, and `1e-400` as `0`; and `-0` as `0`. The checker's `canonical_json` failed it before this part |
+| H-07 to H-10 | The names alone, for a member name twice, the same deeper, a lone surrogate in a value and `1e400` |
+| H-11 | A name made of a low and a high surrogate, which are not a pair: two U+FFFD, then the rest of the name, hashed |
+| H-12 | The names alone at the bound of 128 characters: 127 letters and U+1D49C, 131 bytes and 129 UTF-16 code units, stay a name, and 129 letters are hashed |
+| D-01, D-02 | Every member that the hash covers, out of order, beside `_meta`, `icons` and `nextCursor`; covered members that are `null` left out, a `null` within them kept, and an empty title kept |
+| D-03 | Integers of any size, 10^400 among them, and doubles, in a schema |
+| D-04 to D-06 | A number beyond a double, a repeated name and a lone surrogate within the covered members take their tool's hash, and only its own; the same beside them take nothing |
+| D-07 to D-09 | The message: `1e400` as its ID and anything in the result's `_meta` take nothing, while a name repeated in the message or in its result takes every tool's hash |
+| D-10 to D-12 | A function's name and schema, a schema with a repeated name, and a function without a schema |
+
+Details the list does not name:
+
+- **No new dependency.** The Go reader and writer use the standard library, and `gowebpki/jcs` only for the digits of a double, which RFC 8785 takes from ECMAScript. The checker uses the standard library's `json`: it reads integers exactly and keeps lone surrogates, and its `object_pairs_hook` keeps repeated names. The checker's doubles agreed with `NumberToJSON` on 200,000 values, of random bits and whole numbers up to 2^70.
+- **A covered member given twice.** Section 4.10 leaves a definition without a hash for a member name that repeats within the members that the hash covers. A covered member that the tool gives twice, such as `title`, counts too, even when one of its values is `null`: readers can take either value, so the reading that denies more applies (D-05). The review of this part wrote it in section 4.10.
+- **The names alone** are the members of the arguments object, once each, as the specification answered on 2026-11-06. A name longer than 128 characters is hashed there too, as section 8.3 says of every name that an event records, and H-12 counts characters, as JSON Schema's `maxLength` does.
+- **Manifests.** The checker's manifest reader also writes with `canonical_json`. It never meets a whole double, since `ijson_number` makes whole numbers integers, and the manifest vectors still pass. The Go stack's manifest reader and bundle code keep `gowebpki/jcs`, since their input is I-JSON.
+- **What no test observes.** The comments and the descriptions; and the checker's lifted limit on digits, since no vector holds an integer of more than 4300 digits.
+
+For the specification, which is the reviewer's: section 9.1 gains `hashed-arguments.json` with 12 cases and `tooling.json` with its cases, once 3a-2 has added its own.

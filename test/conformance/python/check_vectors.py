@@ -1,12 +1,13 @@
 """Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519, PyYAML for manifests,
-jsonschema for the request schema, and the standard library's hmac for hashed arguments.
+jsonschema for the request schema, and the standard library's json, hashlib and hmac for canonical JSON, definition
+hashes and hashed arguments.
 
 The Go tests in test/conformance check the same vectors with cedar-go, the
-manifest vectors with yaml.v3, and hashed arguments with gowebpki/jcs. Passing
-both shows that the decision profile does not depend on one Cedar
-implementation, nor the reading of manifests on one YAML parser, nor canonical
-JSON on one writer, and gives the Python enforcement point (plan P1-09) a
-reference to start from.
+manifest vectors with yaml.v3, and canonical JSON with the kit's own reader and
+writer. Passing both shows that the decision profile does not depend on one
+Cedar implementation, nor the reading of manifests on one YAML parser, nor
+canonical JSON on one writer, and gives the Python enforcement point (plan
+P1-09) a reference to start from.
 
 Run from the repository root with a Python that has cedarpy, cryptography, PyYAML and jsonschema:
     python test/conformance/python/check_vectors.py
@@ -20,6 +21,7 @@ import copy
 import hashlib
 import hmac
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -542,24 +544,81 @@ def ijson_number(text: str) -> int | float:
     return value
 
 
+class NoCanonicalJSON(Exception):
+    """A value that section 4.10's canonical JSON cannot write: a number with a fraction or an exponent that is not
+    finite as a double, a member name that repeats, or a string with a lone surrogate."""
+
+
+class Members(list):
+    """An object as the pairs of its members, in their order, repeated names included."""
+
+
+def not_json(text: str):
+    raise ValueError(f"{text} is not JSON")
+
+
+def read_json(text: str):
+    """Reads JSON text as section 4.10 needs it, keeping what canonical JSON cannot write: objects as Members, so that
+    a member name can repeat. json.loads already reads a number without a fraction or an exponent as an exact int, and
+    any other as a double, 1e400 as infinity, and keeps a lone surrogate in a string. NaN and Infinity, which it
+    accepts, are not JSON."""
+    return json.loads(text, object_pairs_hook=Members, parse_constant=not_json)
+
+
+def pairs(value: dict | Members) -> list:
+    """The members of an object, read by json.loads alone or by read_json."""
+    return list(value.items()) if isinstance(value, dict) else list(value)
+
+
+def repeats(value: dict | Members) -> bool:
+    """Whether a member name repeats among an object's members, not deeper."""
+    names = [name for name, _ in pairs(value)]
+    return len(set(names)) != len(names)
+
+
+def has_lone_surrogate(text: str) -> bool:
+    """json.loads joins a surrogate pair into one character, so any surrogate left is lone."""
+    return any(0xD800 <= ord(c) <= 0xDFFF for c in text)
+
+
 def canonical_json(value: object) -> str:
-    """RFC 8785: members in the order of their UTF-16 code units, numbers as ECMAScript writes them."""
-    if isinstance(value, dict):
-        members = sorted(value.items(), key=lambda m: m[0].encode("utf-16-be"))
-        return "{" + ",".join(json.dumps(k, ensure_ascii=False) + ":" + canonical_json(v) for k, v in members) + "}"
+    """The canonical JSON of section 4.10: RFC 8785, with members in the order of their UTF-16 code units and numbers
+    as ECMAScript writes them, except that a number written without a fraction or an exponent is written exactly. It
+    raises NoCanonicalJSON for what it cannot write."""
+    if isinstance(value, (dict, Members)):
+        if repeats(value):
+            raise NoCanonicalJSON("a member name repeats")
+        members = sorted(pairs(value), key=lambda m: m[0].encode("utf-16-be", "surrogatepass"))
+        return "{" + ",".join(json_string(k) + ":" + canonical_json(v) for k, v in members) + "}"
     if isinstance(value, list):
         return "[" + ",".join(canonical_json(v) for v in value) + "]"
-    if isinstance(value, float):
+    if isinstance(value, str):
+        return json_string(value)
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise NoCanonicalJSON(f"{value} is not finite as a double")
         return ecmascript_number(value)
-    return json.dumps(value, ensure_ascii=False)
+    return json.dumps(value)
+
+
+def json_string(text: str) -> str:
+    """A string as RFC 8785 writes it, which is what json.dumps writes without ensure_ascii."""
+    if has_lone_surrogate(text):
+        raise NoCanonicalJSON("a string has a lone surrogate")
+    return json.dumps(text, ensure_ascii=False)
 
 
 def ecmascript_number(value: float) -> str:
-    """ECMAScript's Number::toString for a double that is not an integer, from its shortest digits."""
-    sign, digits, exponent = Decimal(repr(value)).as_tuple()
+    """ECMAScript's Number::toString for a double, from its shortest digits, as RFC 8785 writes it: a whole number
+    without a fraction, as 1 for 1.0, and 0 for -0.0."""
+    if value == 0:
+        return "0"
+    sign, digits, exponent = Decimal(repr(value)).normalize().as_tuple()
     digits = "".join(map(str, digits))
     point = len(digits) + exponent
-    if 0 < point <= 21:
+    if len(digits) <= point <= 21:
+        text = digits + "0" * (point - len(digits))
+    elif 0 < point <= 21:
         text = digits[:point] + "." + digits[point:]
     elif -6 < point <= 0:
         text = "0." + "0" * -point + digits
@@ -568,8 +627,72 @@ def ecmascript_number(value: float) -> str:
     return ("-" if sign else "") + text
 
 
+# The members of an MCP tool that its definition hash covers (section 4.10).
+MCP_DEFINITION_MEMBERS = {"name", "title", "description", "inputSchema", "outputSchema", "annotations"}
+
+
+def definition(members: Members) -> dict | None:
+    """A definition as section 4.10 hashes it: the canonical JSON of the members given, those that are null left out,
+    and its SHA-256. None when it has no hash: a name that repeats among the members, even with a null value, or a
+    value that canonical JSON cannot write."""
+    try:
+        if repeats(members):
+            raise NoCanonicalJSON("a member name repeats")
+        text = canonical_json(Members((name, v) for name, v in members if v is not None))
+    except NoCanonicalJSON:
+        return None
+    return {"canonical_json": text, "sha256": hashlib.sha256(text.encode()).hexdigest()}
+
+
+def mcp_definitions(message) -> list | None:
+    """The definition of each tool of a tools/list response, read from the JSON-RPC message itself, or None when a
+    member name repeats in the message or in its result, which leaves every tool without a hash. Only the members that
+    the hash covers count: what a tool carries beside them never takes its hash away."""
+    if repeats(message):
+        return None
+    result = dict(pairs(message))["result"]
+    if repeats(result):
+        return None
+    return [definition(Members(m for m in pairs(tool) if m[0] in MCP_DEFINITION_MEMBERS))
+            for tool in dict(pairs(result))["tools"]]
+
+
+def function_definition(name: str, input_schema) -> dict | None:
+    """The definition of a function, http or other tool: its name and the JSON Schema of its parameters, as the
+    members name and inputSchema, or its name alone when the framework presents no schema."""
+    members = Members([("name", name)])
+    if input_schema is not None:
+        members.append(("inputSchema", input_schema))
+    return definition(members)
+
+
+# The length, in characters, beyond which an event records an argument name as its SHA-256 (section 8.3).
+MAX_NAME_LENGTH = 128
+
+
+def hashed_arguments(key: bytes, arguments) -> dict:
+    """The hashed mode of section 8.3: the HMAC-SHA-256 of the arguments' canonical JSON, with the key given. Arguments
+    without one are recorded by their names alone, each once: a name longer than 128 characters, or with a lone
+    surrogate, which an event cannot write, as the SHA-256 of its UTF-8 bytes with each lone surrogate replaced by
+    U+FFFD."""
+    try:
+        canonical = canonical_json(arguments).encode()
+    except NoCanonicalJSON:
+        names, hashed = set(), set()
+        for name, _ in pairs(arguments):
+            if has_lone_surrogate(name) or len(name) > MAX_NAME_LENGTH:
+                replaced = "".join("\N{REPLACEMENT CHARACTER}" if has_lone_surrogate(c) else c for c in name)
+                hashed.add(hashlib.sha256(replaced.encode()).hexdigest())
+            else:
+                names.add(name)
+        return {"names": sorted(names), "names_sha256": sorted(hashed)}
+    return {"canonical_json": canonical.decode(), "hmac_sha256": hmac.new(key, canonical, hashlib.sha256).hexdigest()}
+
+
 def main() -> int:
     failures = 0
+    # Python converts integers of at most 4300 digits by default. Section 4.10 writes them exactly, whatever their size.
+    sys.set_int_max_str_digits(0)
 
     def check(name: str, got: dict, want: dict) -> None:
         nonlocal failures
@@ -643,16 +766,30 @@ def main() -> int:
         check(f"manifest document {doc['name']}", got, doc["expected"])
 
     # The hashed mode of arguments (section 8.3): the HMAC-SHA-256 of their canonical JSON, which canonical_json
-    # writes, as it does for manifests.
+    # writes, as it does for manifests, or their names alone, compared as sets. Arguments given as text are read with
+    # read_json, which keeps what canonical JSON cannot write.
     hashed = json.loads((VECTORS / "hashed-arguments.json").read_text(encoding="utf-8"))
     key = bytes.fromhex(hashed["key"])
     for case in hashed["cases"]:
-        canonical = canonical_json(case["arguments"]).encode()
-        got = {"canonical_json": canonical.decode(), "hmac_sha256": hmac.new(key, canonical, hashlib.sha256).hexdigest()}
-        check(f"hashed arguments {case['id']}", got, {k: case[k] for k in ("canonical_json", "hmac_sha256")})
+        arguments = read_json(case["arguments_text"]) if "arguments_text" in case else case["arguments"]
+        if "names" in case:
+            want = {"names": sorted(case["names"]), "names_sha256": sorted(case.get("names_sha256", []))}
+        else:
+            want = {k: case[k] for k in ("canonical_json", "hmac_sha256")}
+        check(f"hashed arguments {case['id']}", hashed_arguments(key, arguments), want)
+
+    # Definition hashes (section 4.10), with messages and schemas given as text read with read_json.
+    tooling = json.loads((VECTORS / "tooling.json").read_text(encoding="utf-8"))
+    for case in tooling["definitions"]:
+        if case["kind"] == "mcp":
+            got = mcp_definitions(read_json(case["message_text"]) if "message_text" in case else case["message"])
+        else:
+            schema = read_json(case["input_schema_text"]) if "input_schema_text" in case else case.get("input_schema")
+            got = [function_definition(case["name"], schema)]
+        check(f"definition {case['id']}", {"definitions": got}, {"definitions": case["definitions"]})
 
     total = (len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases)
-             + len(documents) + len(hashed["cases"]))
+             + len(documents) + len(hashed["cases"]) + len(tooling["definitions"]))
     print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML, jsonschema)")
     return 1 if failures else 0
 

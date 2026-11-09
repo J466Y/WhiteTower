@@ -9,18 +9,21 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/cedar-policy/cedar-go"
 	internalast "github.com/cedar-policy/cedar-go/x/exp/ast"
 	"github.com/cedar-policy/cedar-go/x/exp/schema"
 	"github.com/cedar-policy/cedar-go/x/exp/schema/validate"
-	"github.com/gowebpki/jcs"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
+	"github.com/J466Y/WhiteTower/test/conformance/canonical"
 	"github.com/J466Y/WhiteTower/test/conformance/profile"
+	"github.com/J466Y/WhiteTower/test/conformance/tooling"
 )
 
 // policyVector is a policy of a vector.
@@ -332,10 +335,66 @@ func TestFailClosedVectors(t *testing.T) {
 	}
 }
 
+// hashedArguments is what a decision event records of a call's arguments in
+// the hashed mode (section 8.3).
+type hashedArguments struct {
+	CanonicalJSON string   `json:"canonical_json"`
+	HMACSHA256    string   `json:"hmac_sha256"`
+	Names         []string `json:"names"`
+	NamesSHA256   []string `json:"names_sha256"`
+}
+
+// maxNameLength is the length, in characters, beyond which an event records
+// an argument name as its SHA-256 (section 8.3).
+const maxNameLength = 128
+
+// hashArguments computes the hashed mode of a call's arguments, given as JSON
+// text (section 8.3): the HMAC-SHA-256 of their canonical JSON, which section
+// 4.10 writes, with the key given. Arguments without a canonical JSON are
+// recorded by their names alone, each once: a name longer than 128
+// characters, or with a lone surrogate, which an event cannot write, as the
+// SHA-256 of its UTF-8 bytes with each lone surrogate replaced by U+FFFD.
+func hashArguments(t *testing.T, key, text []byte) hashedArguments {
+	t.Helper()
+	v, err := canonical.Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := canonical.Encode(v)
+	if err == nil {
+		mac := hmac.New(sha256.New, key)
+		mac.Write(data)
+		return hashedArguments{CanonicalJSON: string(data), HMACSHA256: hex.EncodeToString(mac.Sum(nil))}
+	}
+	if !errors.Is(err, canonical.ErrNoCanonicalJSON) {
+		t.Fatal(err)
+	}
+	args, ok := v.(canonical.Object)
+	if !ok {
+		t.Fatalf("the arguments are a %T, not an object", v)
+	}
+	var names, hashed []string
+	for _, m := range args {
+		name := m.Name.String()
+		if !m.Name.HasLoneSurrogate() && utf8.RuneCountInString(name) <= maxNameLength {
+			names = append(names, name)
+			continue
+		}
+		sum := sha256.Sum256([]byte(name))
+		hashed = append(hashed, hex.EncodeToString(sum[:]))
+	}
+	return hashedArguments{Names: set(names), NamesSHA256: set(hashed)}
+}
+
+// set returns the distinct strings of s, sorted.
+func set(s []string) []string {
+	slices.Sort(s)
+	return slices.Compact(s)
+}
+
 // TestHashedArgumentsVectors computes the hashed mode of a decision event's
-// arguments (section 8.3): the HMAC-SHA-256, in lowercase hexadecimal, of the
-// canonical JSON of the arguments object, which gowebpki/jcs writes, with the
-// vectors' key.
+// arguments (section 8.3) with the vectors' key, as the HMAC of their
+// canonical JSON or as their names alone.
 func TestHashedArgumentsVectors(t *testing.T) {
 	var file struct {
 		Description string `json:"description"`
@@ -344,10 +403,10 @@ func TestHashedArgumentsVectors(t *testing.T) {
 			ID          string `json:"id"`
 			Description string `json:"description"`
 			// The arguments as the vector writes them, members out of order
-			// and escapes included, for jcs to read.
+			// and escapes included, as a JSON value or as text.
 			Arguments     json.RawMessage `json:"arguments"`
-			CanonicalJSON string          `json:"canonical_json"`
-			HMACSHA256    string          `json:"hmac_sha256"`
+			ArgumentsText string          `json:"arguments_text"`
+			hashedArguments
 		} `json:"cases"`
 	}
 	loadJSON(t, "vectors/hashed-arguments.json", &file)
@@ -360,18 +419,110 @@ func TestHashedArgumentsVectors(t *testing.T) {
 	}
 	for _, c := range file.Cases {
 		t.Run(c.ID, func(t *testing.T) {
-			canonical, err := jcs.Transform(c.Arguments)
-			if err != nil {
-				t.Fatal(err)
+			text := []byte(c.ArgumentsText)
+			if (c.Arguments == nil) == (c.ArgumentsText == "") {
+				t.Fatal("the case gives its arguments both as a value and as text, or neither way")
 			}
-			if string(canonical) != c.CanonicalJSON {
-				t.Errorf("canonical JSON %s, want %s", canonical, c.CanonicalJSON)
+			if c.Arguments != nil {
+				text = c.Arguments
 			}
-			mac := hmac.New(sha256.New, key)
-			mac.Write(canonical)
-			if got := hex.EncodeToString(mac.Sum(nil)); got != c.HMACSHA256 {
-				t.Errorf("HMAC-SHA-256 %s, want %s", got, c.HMACSHA256)
+			want := c.hashedArguments
+			want.Names, want.NamesSHA256 = set(want.Names), set(want.NamesSHA256)
+			if got := hashArguments(t, key, text); !reflect.DeepEqual(got, want) {
+				t.Errorf("got %+v, want %+v", got, want)
 			}
 		})
 	}
+}
+
+// definition is a definition hash as tooling.json gives it.
+type definition struct {
+	CanonicalJSON string `json:"canonical_json"`
+	SHA256        string `json:"sha256"`
+}
+
+// toolingDefinition returns a reference implementation's definition as
+// tooling.json gives it: nil for a definition without a hash.
+func toolingDefinition(def *tooling.Definition) *definition {
+	if def == nil {
+		return nil
+	}
+	return &definition{CanonicalJSON: string(def.CanonicalJSON), SHA256: def.SHA256}
+}
+
+// TestDefinitionVectors computes the definition hashes of tooling.json
+// (section 4.10): those of the tools of a tools/list response, and that of a
+// function, an http or another tool.
+func TestDefinitionVectors(t *testing.T) {
+	var file struct {
+		Description string `json:"description"`
+		Definitions []struct {
+			ID          string `json:"id"`
+			Description string `json:"description"`
+			Kind        string `json:"kind"`
+			// An MCP tool's: the JSON-RPC message, as a JSON value or as
+			// text.
+			Message     json.RawMessage `json:"message"`
+			MessageText string          `json:"message_text"`
+			// A function's: its name, and the JSON Schema of its parameters
+			// as a JSON value or as text, or neither.
+			Name            string          `json:"name"`
+			InputSchema     json.RawMessage `json:"input_schema"`
+			InputSchemaText *string         `json:"input_schema_text"`
+			// Each tool's definition, nil for a tool without a hash; nil as a
+			// whole when the message leaves every tool without one.
+			Definitions *[]*definition `json:"definitions"`
+		} `json:"definitions"`
+	}
+	loadJSON(t, "vectors/tooling.json", &file)
+	if len(file.Definitions) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range file.Definitions {
+		t.Run(c.ID, func(t *testing.T) {
+			var got *[]*definition
+			switch c.Kind {
+			case "mcp":
+				message := c.Message
+				if message == nil {
+					message = []byte(c.MessageText)
+				}
+				defs, err := tooling.MCPDefinitions(message)
+				if err != nil && !errors.Is(err, canonical.ErrNoCanonicalJSON) {
+					t.Fatal(err)
+				}
+				if err == nil {
+					list := []*definition{}
+					for _, def := range defs {
+						list = append(list, toolingDefinition(def))
+					}
+					got = &list
+				}
+			case "function":
+				schema := []byte(c.InputSchema)
+				if c.InputSchemaText != nil {
+					schema = []byte(*c.InputSchemaText)
+				}
+				def, err := tooling.FunctionDefinition(c.Name, schema)
+				if err != nil && !errors.Is(err, canonical.ErrNoCanonicalJSON) {
+					t.Fatal(err)
+				}
+				got = &[]*definition{toolingDefinition(def)}
+			default:
+				t.Fatalf("unknown kind %q", c.Kind)
+			}
+			if !reflect.DeepEqual(got, c.Definitions) {
+				t.Errorf("got %s, want %s", show(got), show(c.Definitions))
+			}
+		})
+	}
+}
+
+// show returns the JSON of a test's value, for its messages.
+func show(v any) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprint(v)
+	}
+	return string(data)
 }
