@@ -240,7 +240,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
-| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | Not started |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | In progress (1 of 5 parts: 3a-1) |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -1099,7 +1099,7 @@ For 3a-2:
 
 ### 2026-11-09: step 12, part 3a-1: canonical JSON, definition hashes and the hashed mode
 
-Part 3a-1 brings section 4.10's canonical JSON to both stacks, with the definition hashes and the hashed mode that use it. It regenerates `pkg/moduleapi`, for comments only, and no vectors: no bundle vector changes.
+Part 3a-1 brings section 4.10's canonical JSON to both stacks, with the definition hashes and the hashed mode that use it. It regenerates `pkg/moduleapi`, for comments only, and no generated vectors: no bundle vector changes.
 
 | What | Change |
 | --- | --- |
@@ -1128,7 +1128,7 @@ Part 3a-1 brings section 4.10's canonical JSON to both stacks, with the definiti
 Details the list does not name:
 
 - **No new dependency.** The Go reader and writer use the standard library, and `gowebpki/jcs` only for the digits of a double, which RFC 8785 takes from ECMAScript. The checker uses the standard library's `json`: it reads integers exactly and keeps lone surrogates, and its `object_pairs_hook` keeps repeated names. The checker's doubles agreed with `NumberToJSON` on 200,000 values, of random bits and whole numbers up to 2^70.
-- **A covered member given twice.** Section 4.10 leaves a definition without a hash for a member name that repeats within the members that the hash covers. A covered member that the tool gives twice, such as `title`, counts too, even when one of its values is `null`: readers can take either value, so the reading that denies more applies (D-05).
+- **A covered member given twice.** Section 4.10 leaves a definition without a hash for a member name that repeats within the members that the hash covers. A covered member that the tool gives twice, such as `title`, counts too, even when one of its values is `null`: readers can take either value, so the reading that denies more applies (D-05). The review of this part wrote it in section 4.10.
 - **The names alone** are the members of the arguments object, once each, as the specification answered on 2026-11-06. A name longer than 128 characters is hashed there too, as section 8.3 says of every name that an event records, and H-12 counts characters, as JSON Schema's `maxLength` does.
 - **Manifests.** The checker's manifest reader also writes with `canonical_json`. It never meets a whole double, since `ijson_number` makes whole numbers integers, and the manifest vectors still pass. The Go stack's manifest reader and bundle code keep `gowebpki/jcs`, since their input is I-JSON.
 - **What no test observes.** The comments and the descriptions; and the checker's lifted limit on digits, since no vector holds an integer of more than 4300 digits.
