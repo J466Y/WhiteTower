@@ -1,0 +1,286 @@
+{
+  "description": "What an enforcement point reports of an agent's tooling (docs/contracts/module-contract-v0.1.md, section 4.10). definitions: definition hashes, each the SHA-256, in lowercase hexadecimal, of the canonical JSON of section 4.10 of the members that the hash covers, those that are absent or null left out (a null within them stays). Section 4.10 writes a number without a fraction or an exponent as its exact value, whatever its size, and any other from its value as a double, as RFC 8785 does. For an MCP tool (kind mcp), the members name, title, description, inputSchema, outputSchema and annotations of each tool of a tools/list response, read from the JSON-RPC message itself: message gives it as a JSON value or, where a parsed object cannot hold it, message_text as its text. For a function, http or other tool (kind function), the members name and inputSchema: name, and input_schema as a JSON value or input_schema_text as its text, absent when the framework presents no schema. definitions gives each tool's canonical_json, whose UTF-8 bytes are hashed, and sha256, in the order of the result's tools, or null for a tool without a hash: a number with a fraction or an exponent that is not finite as a double, a member name that repeats or a string with a lone surrogate, at any depth within the members that the hash covers, leaves its definition without one, and what a tool carries beside them never does. definitions is null as a whole when a member name repeats in the JSON-RPC message itself or in its result, which leaves every tool of the message without a hash.",
+  "definitions": [
+    {
+      "id": "D-01",
+      "description": "Every member that the hash covers, out of order, beside members that it does not cover: the tool's _meta and icons, and the result's nextCursor. The members are sorted at every depth, and the items of arrays kept in their order",
+      "kind": "mcp",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "tools": [
+            {
+              "_meta": {
+                "vendor.example/build": 7
+              },
+              "annotations": {
+                "readOnlyHint": false,
+                "destructiveHint": false,
+                "openWorldHint": true,
+                "title": "Create issue"
+              },
+              "outputSchema": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "number"
+                ]
+              },
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title"
+                ]
+              },
+              "icons": [
+                {
+                  "src": "https://example.com/icon.png",
+                  "mimeType": "image/png"
+                }
+              ],
+              "description": "Create an issue in a repository.",
+              "title": "Create issue",
+              "name": "create_issue"
+            }
+          ],
+          "nextCursor": "page-2"
+        }
+      },
+      "definitions": [
+        {
+          "canonical_json": "{\"annotations\":{\"destructiveHint\":false,\"openWorldHint\":true,\"readOnlyHint\":false,\"title\":\"Create issue\"},\"description\":\"Create an issue in a repository.\",\"inputSchema\":{\"properties\":{\"body\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"}},\"required\":[\"title\"],\"type\":\"object\"},\"name\":\"create_issue\",\"outputSchema\":{\"properties\":{\"number\":{\"type\":\"integer\"}},\"required\":[\"number\"],\"type\":\"object\"},\"title\":\"Create issue\"}",
+          "sha256": "7977c3e7e8edec6f2be17adfda80c2fad110de3dddbe524cdaa36db1acc83116"
+        }
+      ]
+    },
+    {
+      "id": "D-02",
+      "description": "Members that the hash covers left out when they are null, title and outputSchema, while a null within them stays, in annotations and in inputSchema; an empty title stays, since it is not absent; and a tool with its name alone",
+      "kind": "mcp",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "tools": [
+            {
+              "name": "search",
+              "title": null,
+              "description": "Search the index.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "default": null
+                  }
+                }
+              },
+              "outputSchema": null,
+              "annotations": {
+                "title": null
+              }
+            },
+            {
+              "name": "ping",
+              "title": ""
+            }
+          ]
+        }
+      },
+      "definitions": [
+        {
+          "canonical_json": "{\"annotations\":{\"title\":null},\"description\":\"Search the index.\",\"inputSchema\":{\"properties\":{\"query\":{\"default\":null,\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"search\"}",
+          "sha256": "418f036a3e2338994d2c29e35e06c94cb7f6ccd252cd9227f59182533d79a5fd"
+        },
+        {
+          "canonical_json": "{\"name\":\"ping\",\"title\":\"\"}",
+          "sha256": "860afaaeae82d60e78e3cfbcdf9acf0efcd8676ba9b80bb0a550bc28be13268a"
+        }
+      ]
+    },
+    {
+      "id": "D-03",
+      "description": "Numbers. Integers beyond I-JSON's 2^53 - 1, written exactly: 2^64 - 1, which a double rounds to 18446744073709552000, -2^63, 2^53 + 1, which a double rounds to 2^53, and 10^400, of 401 digits, beyond any double; -0 as 0. Numbers with a fraction or an exponent, from their value as a double: 1.0 as 1, -0.0 as 0, 1e3 as 1000, 1E21 as 1e+21, and 1e-400, below the smallest double, as 0",
+      "kind": "mcp",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "tools": [
+            {
+              "name": "transfer",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "integer",
+                    "minimum": -0,
+                    "maximum": 18446744073709551615
+                  },
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9223372036854775808,
+                    "exclusiveMaximum": 9007199254740993
+                  },
+                  "big": {
+                    "type": "integer",
+                    "maximum": 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+                  },
+                  "ratio": {
+                    "type": "number",
+                    "multipleOf": 0.5,
+                    "minimum": -0.0,
+                    "maximum": 1.0,
+                    "default": 1e-400
+                  },
+                  "scale": {
+                    "type": "number",
+                    "minimum": 1e3,
+                    "maximum": 1E21
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "definitions": [
+        {
+          "canonical_json": "{\"inputSchema\":{\"properties\":{\"amount\":{\"maximum\":18446744073709551615,\"minimum\":0,\"type\":\"integer\"},\"big\":{\"maximum\":10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,\"type\":\"integer\"},\"id\":{\"exclusiveMaximum\":9007199254740993,\"minimum\":-9223372036854775808,\"type\":\"integer\"},\"ratio\":{\"default\":0,\"maximum\":1,\"minimum\":0,\"multipleOf\":0.5,\"type\":\"number\"},\"scale\":{\"maximum\":1e+21,\"minimum\":1000,\"type\":\"number\"}},\"type\":\"object\"},\"name\":\"transfer\"}",
+          "sha256": "adcf8cf1add679f82d09608c7c4064540f7ea3a00cb8ea40ede5b67b7c699e17"
+        }
+      ]
+    },
+    {
+      "id": "D-04",
+      "description": "A number with an exponent that is not finite as a double, 1e400, leaves its tool without a hash; the next tool, with 1e308, keeps its own",
+      "kind": "mcp",
+      "message_text": "{\"jsonrpc\":\"2.0\",\"id\":4,\"result\":{\"tools\":[{\"name\":\"huge\",\"inputSchema\":{\"type\":\"number\",\"maximum\":1e400}},{\"name\":\"fine\",\"inputSchema\":{\"type\":\"number\",\"maximum\":1e308}}]}}",
+      "definitions": [
+        null,
+        {
+          "canonical_json": "{\"inputSchema\":{\"maximum\":1e+308,\"type\":\"number\"},\"name\":\"fine\"}",
+          "sha256": "51cc0eea78ae3133db8c30f68bec9123d54efb69c34ff037d9405817d642bb14"
+        }
+      ]
+    },
+    {
+      "id": "D-05",
+      "description": "A member name that repeats within the members that the hash covers leaves its tool without a hash: deep in inputSchema; a covered member given twice; and a covered member given twice, once null, which readers can take either way. A member beside them given twice, _meta, with a name repeated inside it, never takes a hash away",
+      "kind": "mcp",
+      "message_text": "{\"jsonrpc\":\"2.0\",\"id\":5,\"result\":{\"tools\":[{\"name\":\"dup_deep\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"id\":{\"type\":\"integer\"}}}},{\"name\":\"dup_member\",\"description\":\"First.\",\"description\":\"Second.\"},{\"name\":\"dup_null\",\"title\":null,\"title\":\"Shown\"},{\"name\":\"dup_beside\",\"_meta\":{\"a\":1,\"a\":2},\"_meta\":{}}]}}",
+      "definitions": [
+        null,
+        null,
+        null,
+        {
+          "canonical_json": "{\"name\":\"dup_beside\"}",
+          "sha256": "8c0d48aaa745d5a5ad037d8d956db37630d4401051f41adbc70db2f44f96d843"
+        }
+      ]
+    },
+    {
+      "id": "D-06",
+      "description": "A lone surrogate within the members that the hash covers leaves its tool without a hash: in a description, and in a member name of inputSchema. Lone surrogates beside them, in _meta and icons, never take a hash away",
+      "kind": "mcp",
+      "message_text": "{\"jsonrpc\":\"2.0\",\"id\":6,\"result\":{\"tools\":[{\"name\":\"lone\",\"description\":\"Broken \\ud83d text\"},{\"name\":\"lone_beside\",\"_meta\":{\"note\":\"\\ud83d\"},\"icons\":[{\"src\":\"\\udc00\"}]},{\"name\":\"lone_name\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"\\udfff\":{}}}}]}}",
+      "definitions": [
+        null,
+        {
+          "canonical_json": "{\"name\":\"lone_beside\"}",
+          "sha256": "5bd380038a0655ebfa817ddbaf78bd5d4c805fd871356757cf11db11e3292e9e"
+        },
+        null
+      ]
+    },
+    {
+      "id": "D-07",
+      "description": "What the message and its result carry beside the tools never takes a hash away: a number that is not finite as a double in the message's id, and a repeated name, a lone surrogate and such a number in the result's _meta",
+      "kind": "mcp",
+      "message_text": "{\"jsonrpc\":\"2.0\",\"id\":1e400,\"result\":{\"_meta\":{\"trace\":\"\\ud800\",\"trace\":\"x\",\"n\":1e400},\"tools\":[{\"name\":\"kept\",\"inputSchema\":{\"type\":\"object\"}}]}}",
+      "definitions": [
+        {
+          "canonical_json": "{\"inputSchema\":{\"type\":\"object\"},\"name\":\"kept\"}",
+          "sha256": "3e6ac4e8cf3860fd2503d6ce409850d9f0d7597a9c873f1271a972ad60190f85"
+        }
+      ]
+    },
+    {
+      "id": "D-08",
+      "description": "A member name that repeats in the JSON-RPC message itself, here its id, leaves every tool of the message without a hash",
+      "kind": "mcp",
+      "message_text": "{\"jsonrpc\":\"2.0\",\"id\":8,\"id\":9,\"result\":{\"tools\":[{\"name\":\"kept\",\"inputSchema\":{\"type\":\"object\"}}]}}",
+      "definitions": null
+    },
+    {
+      "id": "D-09",
+      "description": "A member name that repeats in the result, here tools, leaves every tool of the message without a hash: an enforcement point and the agent's SDK could read different lists of tools",
+      "kind": "mcp",
+      "message_text": "{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":{\"tools\":[{\"name\":\"kept\",\"inputSchema\":{\"type\":\"object\"}}],\"tools\":[{\"name\":\"other\"}]}}",
+      "definitions": null
+    },
+    {
+      "id": "D-10",
+      "description": "A function's name and the JSON Schema of its parameters, as the members name and inputSchema, with an integer beyond 2^53 - 1 written exactly",
+      "kind": "function",
+      "name": "send_email",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "email"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 18446744073709551615
+          }
+        },
+        "required": [
+          "to"
+        ]
+      },
+      "definitions": [
+        {
+          "canonical_json": "{\"inputSchema\":{\"properties\":{\"count\":{\"maximum\":18446744073709551615,\"type\":\"integer\"},\"to\":{\"format\":\"email\",\"type\":\"string\"}},\"required\":[\"to\"],\"type\":\"object\"},\"name\":\"send_email\"}",
+          "sha256": "aef8f893929cffc1cdb071f46e639baafa14fd6cc3f0f41146fee6ecf9efa30d"
+        }
+      ]
+    },
+    {
+      "id": "D-11",
+      "description": "A function whose schema repeats a member name has no hash",
+      "kind": "function",
+      "name": "send_email",
+      "input_schema_text": "{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"to\":{\"type\":\"integer\"}}}",
+      "definitions": [
+        null
+      ]
+    },
+    {
+      "id": "D-12",
+      "description": "A function for which the framework presents no schema: its name alone",
+      "kind": "function",
+      "name": "now",
+      "definitions": [
+        {
+          "canonical_json": "{\"name\":\"now\"}",
+          "sha256": "0f49b85f67bcfcf5bac3c78d74425d9ad43189480439e109c5516fed5ffaaccd"
+        }
+      ]
+    }
+  ]
+}
