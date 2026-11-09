@@ -306,3 +306,91 @@ func TestASignInEndsOnAnotherReplicaWithTheSameStateKey(t *testing.T) {
 		t.Errorf("a sign-in that ends on a replica with another key: %d, session cookie %q; want it refused", status, session)
 	}
 }
+
+// Security test ST-14: a session keeps the roles of its sign-in, so a replica
+// that runs another role mapping than the one that resolved them refuses the
+// session, as the server does after a change of the mapping and a restart: a
+// replica that still runs the mapping before refuses the sessions of the new
+// one, and the other way round, as it refuses a session that does not exist,
+// while a replica that lists the same mapping in another order accepts them.
+// A break-glass session, whose roles do not come from the mapping, is
+// accepted by every replica
+func TestAReplicaRefusesTheSessionsOfAnotherRoleMapping(t *testing.T) {
+	credential, hash, err := authn.GenerateBreakglassCredential()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashFile := filepath.Join(t.TempDir(), "breakglass-hash")
+	writeSecret(t, hashFile, hash+"\n")
+	d := dbtest.New(t)
+	idp := newSigningProvider(t)
+	idp.up.Store(true)
+	env := append(oidcEnv(t, idp.URL, writeStateKey(t)),
+		"WT_AUTH_BREAKGLASS_ENABLED=true", "WT_AUTH_BREAKGLASS_CREDENTIAL_HASH_FILE="+hashFile)
+	// The person who signs in is in wt-owners, whose members the mapping
+	// after makes users.
+	before := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_ROLE_MAPPING=wt-owners=owner,wt-admins=admin")...)
+	reordered := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_ROLE_MAPPING=wt-admins=admin,wt-owners=owner")...)
+	after := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_ROLE_MAPPING=wt-owners=user,wt-admins=admin")...)
+	for _, s := range []*serving{before, reordered, after} {
+		s.waitForDiscovery(t)
+	}
+
+	signIn := func(s *serving) http.Header {
+		t.Helper()
+		status, session := finishSignIn(t, s.console, startSignIn(t, s.console))
+		if status != http.StatusFound || session == "" {
+			t.Fatalf("a sign-in: %d, session cookie %q", status, session)
+		}
+		return http.Header{"Cookie": {session}}
+	}
+	// refuses checks that s refuses a session with the answer it gives a
+	// session that does not exist, which says nothing of the mapping.
+	type problem struct {
+		Type, Title, Detail, Code string
+		Status                    int
+	}
+	problemOf := func(body string) problem {
+		t.Helper()
+		var p problem
+		if err := json.Unmarshal([]byte(body), &p); err != nil {
+			t.Fatalf("a refusal: %v: %s", err, body)
+		}
+		return p
+	}
+	refuses := func(s *serving, what string, session http.Header) {
+		t.Helper()
+		_, got := call(t, http.StatusUnauthorized, http.MethodGet, s.console+"/api/v1/me", "", session)
+		_, unknown := call(t, http.StatusUnauthorized, http.MethodGet, s.console+"/api/v1/me", "", http.Header{"Cookie": {authn.CookieName + "=unknown"}})
+		if problemOf(got) != problemOf(unknown) {
+			t.Errorf("%s: refused with %s, want the refusal of a session that does not exist, %s", what, got, unknown)
+		}
+	}
+
+	ownerSession := signIn(before)
+	for _, s := range []*serving{before, reordered} {
+		if _, me := get(t, s.console+"/api/v1/me", ownerSession); !strings.Contains(me, `"roles":["owner"]`) {
+			t.Errorf("/me with the session of the mapping before: %s, want the role owner", me)
+		}
+	}
+	refuses(after, "the session of the mapping before, on a replica of the mapping after", ownerSession)
+
+	userSession := signIn(after)
+	if _, me := get(t, after.console+"/api/v1/me", userSession); !strings.Contains(me, `"roles":["user"]`) {
+		t.Errorf("/me with the session of the mapping after: %s, want the role user", me)
+	}
+	refuses(before, "the session of the mapping after, on a replica of the mapping before", userSession)
+	refuses(reordered, "the session of the mapping after, on a replica of the mapping before in another order", userSession)
+
+	header, _ := call(t, http.StatusOK, http.MethodPost, before.console+"/auth/breakglass",
+		`{"credential":"`+credential+`"}`, http.Header{"Content-Type": {"application/json"}})
+	var custodian http.Header
+	for _, c := range (&http.Response{Header: header}).Cookies() {
+		if c.Name == authn.CookieName {
+			custodian = http.Header{"Cookie": {c.Name + "=" + c.Value}}
+		}
+	}
+	if _, me := get(t, after.console+"/api/v1/me", custodian); !strings.Contains(me, `"isBreakglass":true`) {
+		t.Errorf("/me with a break-glass session, on a replica of another mapping: %s", me)
+	}
+}

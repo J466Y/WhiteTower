@@ -192,9 +192,10 @@ func (q *Queries) CreateServiceAccountPrincipal(ctx context.Context, arg CreateS
 const createSession = `-- name: CreateSession :exec
 INSERT INTO whitetower.sessions (
     id_hash, principal_id, method, roles, csrf_token_hash,
-    created_at, last_seen_at, idle_expires_at, absolute_expires_at
+    created_at, last_seen_at, idle_expires_at, absolute_expires_at,
+    role_mapping_sha256
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $6, $7, $8, $9
 )
 `
 
@@ -207,6 +208,7 @@ type CreateSessionParams struct {
 	CreatedAt         time.Time
 	IdleExpiresAt     time.Time
 	AbsoluteExpiresAt time.Time
+	RoleMappingSha256 []byte
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
@@ -219,6 +221,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 		arg.CreatedAt,
 		arg.IdleExpiresAt,
 		arg.AbsoluteExpiresAt,
+		arg.RoleMappingSha256,
 	)
 	return err
 }
@@ -453,7 +456,7 @@ func (q *Queries) GetPrincipalBySCIMUserName(ctx context.Context, userName strin
 }
 
 const getSessionByHash = `-- name: GetSessionByHash :one
-SELECT id_hash, principal_id, method, roles, csrf_token_hash, created_at, last_seen_at, idle_expires_at, absolute_expires_at, revoked_at FROM whitetower.sessions
+SELECT id_hash, principal_id, method, roles, csrf_token_hash, created_at, last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, role_mapping_sha256 FROM whitetower.sessions
 WHERE id_hash = $1
 `
 
@@ -471,6 +474,7 @@ func (q *Queries) GetSessionByHash(ctx context.Context, idHash []byte) (Whitetow
 		&i.IdleExpiresAt,
 		&i.AbsoluteExpiresAt,
 		&i.RevokedAt,
+		&i.RoleMappingSha256,
 	)
 	return i, err
 }
@@ -859,8 +863,10 @@ type RevokeActiveSessionRow struct {
 	Method      string
 }
 
-// Revokes the session only while it is active, as SessionStore.Get judges it,
-// and returns whose it was: no row when nothing was revoked.
+// Revokes the session only while it is neither revoked nor expired, and
+// returns whose it was: no row when nothing was revoked. A session of another
+// role mapping, which SessionStore.Get refuses, counts: a replica that still
+// runs that mapping, or a return to it, would accept the session.
 func (q *Queries) RevokeActiveSession(ctx context.Context, arg RevokeActiveSessionParams) (RevokeActiveSessionRow, error) {
 	row := q.db.QueryRow(ctx, revokeActiveSession, arg.IDHash, arg.RevokedAt)
 	var i RevokeActiveSessionRow

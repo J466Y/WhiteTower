@@ -1,15 +1,19 @@
 package authn
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -38,6 +42,12 @@ const (
 	unprefixedCookieName = "wt_session"
 
 	csrfHMACKey = "whitetower-csrf-token-v1"
+
+	// roleMappingForm names the canonical form of a role mapping, which the
+	// mapping's hash starts with: a later form would hash every mapping apart
+	// from this one's, so that the sessions of this form are refused rather
+	// than misread.
+	roleMappingForm = "whitetower-role-mapping-v1"
 )
 
 var (
@@ -47,7 +57,9 @@ var (
 	// ErrSessionRevoked is returned when a session has been revoked.
 	ErrSessionRevoked = errors.New("session is revoked")
 
-	// ErrSessionExpired is returned when a session has passed its idle or absolute lifetime.
+	// ErrSessionExpired is returned when a session has passed its idle or
+	// absolute lifetime, or when its roles came from another role mapping
+	// than the store's (ST-14).
 	ErrSessionExpired = errors.New("session is expired")
 
 	// ErrPrincipalInactive is returned when a session's principal has been deactivated.
@@ -73,10 +85,19 @@ type Session struct {
 	RevokedAt         *time.Time
 }
 
-// SessionOptions configures session lifecycle timeouts.
+// SessionOptions configures sessions: their lifetimes, and the role mapping
+// that resolves their roles.
 type SessionOptions struct {
 	IdleTimeout      time.Duration
 	AbsoluteLifetime time.Duration
+	// RoleMapping maps IdP groups to the roles of the sessions that the
+	// server creates: auth.oidc.role_mapping, with which the OIDC service
+	// resolves them. A session records the mapping's hash, and Get refuses a
+	// session whose roles came from another mapping, as after a change of the
+	// setting and a restart, so that no session keeps the roles of the
+	// mapping before (ST-14). Break-glass sessions, whose roles do not come
+	// from it, are exempt.
+	RoleMapping map[string]string
 }
 
 // SessionStore handles session persistence in PostgreSQL.
@@ -85,6 +106,8 @@ type SessionStore struct {
 	clk      clock.Clock
 	writer   *audit.Writer
 	opts     SessionOptions
+	// roleMapping is the hash of opts.RoleMapping, which sessions record.
+	roleMapping []byte
 }
 
 // NewSessionStore creates a new SessionStore, which records sign-ins and
@@ -97,11 +120,45 @@ func NewSessionStore(database *db.DB, clk clock.Clock, writer *audit.Writer, opt
 		opts.AbsoluteLifetime = 12 * time.Hour
 	}
 	return &SessionStore{
-		database: database,
-		clk:      clk,
-		writer:   writer,
-		opts:     opts,
+		database:    database,
+		clk:         clk,
+		writer:      writer,
+		opts:        opts,
+		roleMapping: roleMappingSHA256(opts.RoleMapping),
 	}
+}
+
+// roleMappingSHA256 returns the SHA-256 of mapping in a canonical form: the
+// form's name, then each group, in the order of its bytes, followed by its
+// role, every string preceded by its length in eight bytes. The order in
+// which the configuration lists the groups carries no meaning, and the
+// lengths keep the strings apart whatever they hold, where a separator could
+// appear in a name, so two mappings hash the same exactly when they map the
+// same groups to the same roles; a nil mapping and an empty one both map
+// none. ResolveEffectiveRoles also looks a group up without its leading
+// slash, so a few mappings that differ in groups that start with slashes
+// resolve the same roles for every group all the same: they hash apart,
+// which costs their people a sign-in, never a role.
+func roleMappingSHA256(mapping map[string]string) []byte {
+	h := sha256.New()
+	h.Write([]byte(roleMappingForm))
+	for _, group := range slices.Sorted(maps.Keys(mapping)) {
+		for _, s := range []string{group, mapping[group]} {
+			h.Write(binary.BigEndian.AppendUint64(nil, uint64(len(s))))
+			h.Write([]byte(s))
+		}
+	}
+	return h.Sum(nil)
+}
+
+// roleMappingOf returns the hash of the role mapping that a session of method
+// records: the store's, and none for break-glass, whose roles do not come
+// from the mapping.
+func (s *SessionStore) roleMappingOf(method string) []byte {
+	if method == "breakglass" {
+		return nil
+	}
+	return s.roleMapping
 }
 
 // Create generates and stores a new session for principalID with the given method and roles.
@@ -146,6 +203,7 @@ func (s *SessionStore) CreateWithLifetime(
 		CreatedAt:         now,
 		IdleExpiresAt:     idleExpiry,
 		AbsoluteExpiresAt: absoluteExpiry,
+		RoleMappingSha256: s.roleMappingOf(method),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storing session: %w", err)
@@ -204,6 +262,7 @@ func (s *SessionStore) CreateWithLifetimeTx(
 		CreatedAt:         now,
 		IdleExpiresAt:     idleExpiry,
 		AbsoluteExpiresAt: absoluteExpiry,
+		RoleMappingSha256: s.roleMappingOf(method),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storing session: %w", err)
@@ -225,7 +284,12 @@ func (s *SessionStore) CreateWithLifetimeTx(
 }
 
 // Get validates and loads an active session by token. It verifies that the principal
-// is active and slides the idle expiration.
+// is active and slides the idle expiration. A session whose roles came from
+// another role mapping than the store's is refused as an expired one, and
+// neither revoked nor touched: a replica that still runs that mapping, during
+// a rolling restart, accepts it, and so would this one after a return to the
+// mapping. A session that recorded no mapping, as those created before
+// sessions recorded it, counts as one of another mapping (ST-14).
 func (s *SessionStore) Get(ctx context.Context, token string) (*Session, error) {
 	if token == "" {
 		return nil, ErrSessionNotFound
@@ -247,6 +311,9 @@ func (s *SessionStore) Get(ctx context.Context, token string) (*Session, error) 
 		return nil, ErrSessionRevoked
 	}
 	if now.After(row.AbsoluteExpiresAt) || now.After(row.IdleExpiresAt) {
+		return nil, ErrSessionExpired
+	}
+	if row.Method != "breakglass" && !bytes.Equal(row.RoleMappingSha256, s.roleMapping) {
 		return nil, ErrSessionExpired
 	}
 
@@ -301,10 +368,12 @@ func (s *SessionStore) Get(ctx context.Context, token string) (*Session, error) 
 // that someone planted (ST-14). lifetime bounds the session; zero is the
 // store's absolute lifetime.
 //
-// It records, in tx, each held session that it revoked while active, as
-// replaced by the principal who signs in, and the sign-in, unless it is
-// break-glass's: that sign-in's record is whitetower.breakglass.used.v1, which
-// its service writes.
+// It records, in tx, each held session that it revoked while neither revoked
+// nor expired, as replaced by the principal who signs in, and the sign-in,
+// unless it is break-glass's: that sign-in's record is
+// whitetower.breakglass.used.v1, which its service writes. A held session of
+// another role mapping, which Get refuses, is revoked and recorded too, so
+// that neither a replica of that mapping nor a return to it accepts it again.
 func (s *SessionStore) ReplaceTx(
 	ctx context.Context,
 	tx *db.Tx,

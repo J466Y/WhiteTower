@@ -670,12 +670,13 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 
 // Security test ST-14: a sign-in revokes the session that the browser held,
 // under the session cookie's name or the unprefixed one, whoever it belonged
-// to; a sign-in that fails revokes nothing
+// to, one of another role mapping included; a sign-in that fails revokes
+// nothing
 func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 	ctx := context.Background()
 	idp := newMockIDP(t)
 	clk := clocktest.New(testEpoch)
-	sessionStore, principalStore, _, _ := setupAuthn(t, clk)
+	sessionStore, principalStore, _, database := setupAuthn(t, clk)
 
 	const clientID = "whitetower-console"
 	svc := newService(t, authn.OIDCOptions{
@@ -761,6 +762,31 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 		dave := signIn(t, "usr-dave", &http.Cookie{Name: "wt_session", Value: planted.Token})
 		checkRevoked(t, planted.Token)
 		checkValid(t, dave)
+	})
+
+	// This server refuses the session of another role mapping, which a
+	// replica that runs that mapping, or a return to it, would still accept:
+	// the sign-in of the person whose session was refused revokes it, and
+	// records the revocation.
+	t.Run("a session of another role mapping", func(t *testing.T) {
+		gus, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-gus", ExternalID: "usr-gus", DisplayName: "Gus Canary"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		other := storeWithRoleMapping(t, database, clk, map[string]string{"wt-admins": "admin"})
+		held, err := other.Create(ctx, gus.ID, "oidc", []string{"admin"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		recorded := len(eventsOf(t, database, sessionRevoked))
+		again := signIn(t, "usr-gus", &http.Cookie{Name: authn.CookieName, Value: held.Token})
+		if _, err := other.Get(ctx, held.Token); !errors.Is(err, authn.ErrSessionRevoked) {
+			t.Errorf("the session of another mapping that the browser held, with that mapping: got %v, want it revoked", err)
+		}
+		if revoked := eventsOf(t, database, sessionRevoked); len(revoked) != recorded+1 || revoked[recorded].reason != "replaced" {
+			t.Errorf("revocations recorded: %v, want one more, replaced", revoked[recorded:])
+		}
+		checkValid(t, again)
 	})
 
 	t.Run("a sign-in that fails", func(t *testing.T) {

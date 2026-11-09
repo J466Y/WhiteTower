@@ -161,7 +161,7 @@ type OIDC struct {
 	GroupsClaim string `yaml:"groups_claim"`
 	// Claim name in the ID token whose value is the person's external ID, the value that the identity provider sends as externalId through SCIM: sub by default, oid for Microsoft Entra ID. A sign-in finds the principal with this external ID, so that SCIM's deactivation reaches the person who signs in. The claim must be a string that the person cannot change; an ID token without it is refused.
 	ExternalIDClaim string `yaml:"external_id_claim"`
-	// Map from IdP group names to White Tower roles (steering, advisory, owner, user, operator, auditor, admin).
+	// Map from IdP group names to White Tower roles (steering, advisory, owner, user, operator, auditor, admin). A session keeps the roles of its sign-in, and the server refuses a session whose roles came from another mapping, as an expired one: after a change and a restart, everyone signs in again. The order of the groups does not matter. Break-glass sessions, whose roles do not come from the mapping, and API tokens, which take their roles at each request, are not affected. During a rolling restart, a replica that still runs the mapping before refuses the sessions of the replicas that run the new one, and the other way round, until every replica runs the same mapping.
 	RoleMapping map[string]string `yaml:"role_mapping"`
 	// Allowed signature algorithms for ID tokens: RS256, ES256, ES384, ES512, PS256 by default.
 	AllowedAlgorithms []string `yaml:"allowed_algorithms"`
