@@ -659,7 +659,8 @@ type SnapshotPart struct {
 	// True for the first part of a snapshot. The client starts collecting a new
 	// snapshot and keeps its current state until the last part arrives, except
 	// for the halts of each part, which it may apply as soon as the part
-	// arrives.
+	// arrives, and the blocks of the first part, which an enforcement point
+	// applies as soon as it arrives.
 	First bool `protobuf:"varint,1,opt,name=first,proto3" json:"first,omitempty"`
 	// True for the last part. The client then replaces its state atomically.
 	Last bool `protobuf:"varint,2,opt,name=last,proto3" json:"last,omitempty"`
@@ -672,7 +673,11 @@ type SnapshotPart struct {
 	Agents []*AgentState `protobuf:"bytes,4,rep,name=agents,proto3" json:"agents,omitempty"`
 	// The blocks record, in the first part, with the fleet state, and only on
 	// an enforcement point's stream: every active block. A snapshot's blocks
-	// replace the instance's whole set of blocks (contract, section 5.10).
+	// replace the instance's whole set of blocks. The instance applies them as
+	// soon as the first part arrives, beside the blocks it holds, and drops
+	// those that the snapshot does not carry only once the last part has
+	// arrived, so that no block is lifted by a snapshot that never completes
+	// (contract, section 5.10).
 	Blocks        []*Block `protobuf:"bytes,5,rep,name=blocks,proto3" json:"blocks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -759,7 +764,9 @@ type StateChange struct {
 	// block of the same ID that the instance knows (contract, section 5.10).
 	Blocks []*Block `protobuf:"bytes,4,rep,name=blocks,proto3" json:"blocks,omitempty"`
 	// Only on an enforcement point's stream: the IDs of the blocks removed. The
-	// instance ignores an ID it does not know.
+	// instance ignores an ID it does not know. The core never lists the ID of a
+	// block that the same change adds; an instance that receives such a change
+	// keeps the block (contract, section 5.10).
 	RemovedBlockIds []string `protobuf:"bytes,5,rep,name=removed_block_ids,json=removedBlockIds,proto3" json:"removed_block_ids,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache

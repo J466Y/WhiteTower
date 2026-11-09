@@ -6,10 +6,12 @@ Checks that a module implements the module contracts ([specification, section 9]
 
 | Path | Content |
 | --- | --- |
-| [`vectors/`](vectors/) | Language-neutral test vectors: combination semantics, the gate, signed bundles, module manifests, the hashed mode of arguments |
+| [`vectors/`](vectors/) | Language-neutral test vectors: combination semantics, the gate, signed bundles, module manifests, the hashed mode of arguments, and the tooling of agents (`tooling.json`: definition hashes) |
 | [`profile/`](profile/) | Reference implementation of the decision profile on `cedar-go`: the check of requests against the profile, request mapping, combining algorithm, gate |
 | [`bundle/`](bundle/) | Reference implementation of the bundle format: canonical manifests, signatures, verification |
 | [`manifest/`](manifest/) | Reference reader of module manifests written in YAML: MAN-1's refusals, I-JSON, canonical JSON |
+| [`canonical/`](canonical/) | Reference reader and writer of the canonical JSON of section 4.10, which writes integers exactly, whatever their size, and refuses repeated member names, lone surrogates and numbers beyond a double where it writes them |
+| [`tooling/`](tooling/) | Reference implementation of what an enforcement point reports of an agent's tooling (section 4.10): definition hashes |
 | [`kit/`](kit/) | The kit: a fake core that speaks the module API, the driver client, and the scenarios |
 | [`stubep/`](stubep/) | A minimal enforcement point in Go, enough to run the scenarios end to end. Not a product |
 | [`python/check_vectors.py`](python/check_vectors.py) | The vectors checked with Python: `cedarpy`, `cryptography`, PyYAML and `jsonschema` |
@@ -26,15 +28,15 @@ Scenarios S-01, "start closed", and S-17, "stale renewals", run today against th
 ## Running it
 
 ```sh
-go test ./test/conformance/...                 # vectors (Go, cedar-go, yaml.v3, gowebpki/jcs), the stub's own tests, and scenarios S-01 and S-17 against the stub
+go test ./test/conformance/...                 # vectors (Go, cedar-go, yaml.v3, gowebpki/jcs, the kit's canonical JSON), the stub's own tests, and scenarios S-01 and S-17 against the stub
 python test/conformance/python/check_vectors.py  # the same vectors with cedarpy, cryptography, PyYAML and jsonschema
 ```
 
-The Python check needs `cedarpy`, `cryptography`, PyYAML and `jsonschema`; the virtual environment of `hack/spikes/agt` has all four. It reads manifests from PyYAML's events, never its types, since PyYAML reads YAML 1.1. It reads the `$` that ends the request schema's patterns at the end of the string only, as ECMA-262 does, where Python's regular expressions also match it before a final line break.
+The Python check needs `cedarpy`, `cryptography`, PyYAML and `jsonschema`; the virtual environment of `hack/spikes/agt` has all four. It reads manifests from PyYAML's events, never its types, since PyYAML reads YAML 1.1. It reads the `$` that ends the request schema's patterns at the end of the string only, as ECMA-262 does, where Python's regular expressions also match it before a final line break. For the canonical JSON of section 4.10, it reads JSON text with the standard library's `json`, keeping repeated member names, and lifts Python's limit of 4300 digits on integers.
 
 ## Changing the vectors
 
-- `combination.json`, `fail-closed.json` and `hashed-arguments.json` are edited by hand. Both implementations must still pass.
+- `combination.json`, `fail-closed.json`, `hashed-arguments.json` and `tooling.json` are edited by hand. Both implementations must still pass.
 - The bundle vectors are generated, because their signatures must match their bytes: change `bundle_vectors_test.go`, then run `go test ./test/conformance -run TestBundleVectorsAreCurrent -update`.
 - The manifest vectors are generated from the examples of `api/manifest` and the documents of the reader's tests, so that they follow both: after either changes, run `go test ./test/conformance/manifest -run TestManifestVectorsAreCurrent -update`.
 - Vectors are part of the contract: changing their meaning needs an RFC.

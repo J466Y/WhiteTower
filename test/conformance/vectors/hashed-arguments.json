@@ -1,5 +1,5 @@
 {
-  "description": "The hashed mode of a decision event's arguments (docs/contracts/module-contract-v0.1.md, section 8.3): the HMAC-SHA-256, in lowercase hexadecimal, of the canonical JSON (RFC 8785, section 1) of the arguments object as the tool receives it, with a key that the deployment holds. key is that key, in hexadecimal. Each case gives the arguments, their canonical JSON, whose UTF-8 bytes are hashed, and hmac_sha256, the value that the event records with the key's ID. The arguments stay within I-JSON, to which section 1 applies canonical JSON. Strings escape every character beyond printable ASCII, so that invisible ones show. The key is for tests only: it is the SHA-256 of \"White Tower conformance test key: hashed-arguments. Never trust it outside tests.\", so anyone can compute with it. Never configure it anywhere else.",
+  "description": "The hashed mode of a decision event's arguments (docs/contracts/module-contract-v0.1.md, section 8.3): the HMAC-SHA-256, in lowercase hexadecimal, of the canonical JSON of section 4.10 of the arguments object as the tool receives it, with a key that the deployment holds. key is that key, in hexadecimal. Each case gives the arguments, as a JSON value in arguments or, where a parsed object cannot hold them, as their text in arguments_text. Arguments that have a canonical JSON come with it, in canonical_json, whose UTF-8 bytes are hashed, and with hmac_sha256, the value that the event records with the key's ID. Section 4.10 writes a number without a fraction or an exponent as its exact value, whatever its size, and any other from its value as a double, as RFC 8785 does. Arguments without a canonical JSON, because of a number with a fraction or an exponent that is not finite as a double, a member name that repeats or a string with a lone surrogate, at any depth, are recorded by their names alone, each once: names, and names_sha256, the SHA-256 in lowercase hexadecimal of the UTF-8 bytes of each name longer than 128 characters or with a lone surrogate, each lone surrogate replaced by U+FFFD, in place of the name. Both are compared as sets. Strings escape every character beyond printable ASCII, so that invisible ones show. The key is for tests only: it is the SHA-256 of \"White Tower conformance test key: hashed-arguments. Never trust it outside tests.\", so anyone can compute with it. Never configure it anywhere else.",
   "key": "c853a7252e414793526a4d9100cf1c3660377161aab308dcf3f2290af2f94d03",
   "cases": [
     {
@@ -71,6 +71,93 @@
       },
       "canonical_json": "{\"B\":7,\"a\":5,\"aa\":3,\"b\":2,\"\u00e9\":6,\"\ud83d\ude00\":4,\"\uff61\":1}",
       "hmac_sha256": "68b086ce0b981aaef6f69fc8b15a2ce2b7b7a5358644a4207f60ce366081ec5a"
+    },
+    {
+      "id": "H-05",
+      "description": "Integers beyond I-JSON's 2^53 - 1, written exactly, so that every stack computes the same HMAC: 2^64 - 1, the bound of an unsigned 64-bit ID, which a double rounds to 18446744073709552000; 2^53 + 1, which a double rounds to 2^53; and -2^63 - 1, below the signed 64-bit range",
+      "arguments": {
+        "offset": 9007199254740993,
+        "account_id": 18446744073709551615,
+        "floor": -9223372036854775809
+      },
+      "canonical_json": "{\"account_id\":18446744073709551615,\"floor\":-9223372036854775809,\"offset\":9007199254740993}",
+      "hmac_sha256": "b0f117ea762dd0b7ea3205e9281267b5394f77725d9ee89dbdf22b34d3b39081"
+    },
+    {
+      "id": "H-06",
+      "description": "Numbers with a fraction or an exponent, written from their value as a double as RFC 8785 does: a whole one without a fraction (1.0 as 1, 1e3 as 1000, 1E20 in full), -0.0 as 0, 1e21 as 1e+21, 1.5e-7 with an exponent, and 1e-400, below the smallest double, as 0; and -0, without a fraction, as 0",
+      "arguments": {
+        "quantity": 1.0,
+        "balance": -0.0,
+        "limit": 1e3,
+        "nanos": 1E20,
+        "budget": 1e21,
+        "rate": 1.5e-7,
+        "offset": -0,
+        "epsilon": 1e-400,
+        "ratio": 0.1
+      },
+      "canonical_json": "{\"balance\":0,\"budget\":1e+21,\"epsilon\":0,\"limit\":1000,\"nanos\":100000000000000000000,\"offset\":0,\"quantity\":1,\"rate\":1.5e-7,\"ratio\":0.1}",
+      "hmac_sha256": "9c027352530e13d77e2262055eb282c6e3dbf0ac6630a5c360c1494d150aa1bd"
+    },
+    {
+      "id": "H-07",
+      "description": "A member name twice: no canonical JSON, so the names alone, each once",
+      "arguments_text": "{\"limit\":10,\"query\":\"invoices\",\"limit\":20}",
+      "names": [
+        "limit",
+        "query"
+      ]
+    },
+    {
+      "id": "H-08",
+      "description": "A member name twice deeper in the arguments: the names alone, those of the arguments object",
+      "arguments_text": "{\"filter\":{\"status\":\"open\",\"status\":\"closed\"},\"page\":1}",
+      "names": [
+        "filter",
+        "page"
+      ]
+    },
+    {
+      "id": "H-09",
+      "description": "A lone surrogate in a value, within an array: the names alone",
+      "arguments_text": "{\"query\":\"report\",\"tags\":[\"q3\",\"\\ud800\"]}",
+      "names": [
+        "query",
+        "tags"
+      ]
+    },
+    {
+      "id": "H-10",
+      "description": "A number with an exponent that is not finite as a double: the names alone",
+      "arguments_text": "{\"amount\":1e400,\"currency\":\"EUR\"}",
+      "names": [
+        "amount",
+        "currency"
+      ]
+    },
+    {
+      "id": "H-11",
+      "description": "A lone surrogate in an argument name, which an event cannot write: the names alone, that name as the SHA-256 of its UTF-8 bytes with each lone surrogate replaced by U+FFFD. The name is a low surrogate, a high surrogate and id: the two surrogates are not a pair, so each becomes U+FFFD, and the bytes hashed are ef bf bd ef bf bd 69 64",
+      "arguments_text": "{\"\\udc00\\ud800id\":1,\"ok\":true}",
+      "names": [
+        "ok"
+      ],
+      "names_sha256": [
+        "f8f04db15b4e89455726e4679ff5ef4bbac67bd705e33a7cc5763d9abaaf8cfe"
+      ]
+    },
+    {
+      "id": "H-12",
+      "description": "The names alone, after a member name twice, at the bound of 128 characters: a name of 127 letters and U+1D49C, 128 characters but 131 bytes in UTF-8 and 129 code units in UTF-16, is recorded as it is, and a name of 129 letters as its SHA-256",
+      "arguments_text": "{\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\ud835\\udc9c\":1,\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\":2,\"page\":1,\"page\":2}",
+      "names": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+        "page"
+      ],
+      "names_sha256": [
+        "75c76be2aed2772327536dc2fa8759d16cbe7dc9c535954d7d1e05a11bdd3fc6"
+      ]
     }
   ]
 }
