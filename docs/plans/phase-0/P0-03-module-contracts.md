@@ -1174,3 +1174,25 @@ Three findings for the reviewer, with options in the pull request's description:
 - **Long hosts in Python.** The `idna` package refuses a domain, or a label, longer than 1024 characters, where Go and the specification have no limit. A reference holds at most 2 KiB, so a host can be longer; P1-09 and part 3b meet it.
 
 For the specification, which is the reviewer's: section 9.1 gains `tooling.json` with 71 cases.
+
+### 2026-11-10: the review of part 3a-2
+
+The review checked the part against the specification, and its references, normalized URLs and redactions on both stacks. It found that EP-14's rules, which both stacks follow, report credentials that a command line passes as named values or as headers: `docker run -e GITHUB_TOKEN=ghp_x`, `env DATABASE_URL=postgres://u:pw@db/app` and `--header "Authorization: Bearer abc"` kept the token, the password and the bearer token in the local server's reference, which the core stores and shows to reviewers. EP-14 already says to never report a credential; its rules on reading a command line missed these forms.
+
+The maintainer's decision of 2026-11-10, on the agent's second finding:
+
+- **Hosts that UTS #46 reads differently.** `url_host` cannot read a host that holds, as written or within an A-label, `ß`, `ς`, the zero width non-joiner or joiner, or `ẞ`: versions of UTS #46, and its transitional and non-transitional processing, read them differently, so an enforcement point could read one host while the agent's client reaches another, and an allowlist of hosts would let the call through. Every other host is written in A-labels, as before, so that hosts that look alike never compare alike. The alternatives: a minimum version of Unicode alone, which leaves clients in transitional processing, such as Python's standard codec, reaching other hosts; and no version, with a warning only.
+
+What the review settled in the specification, which is the reviewer's:
+
+| Question | Answer |
+| --- | --- |
+| Redacting again with nested prefixes (the agent's first finding) | Section 4.10, step 4: a segment that is exactly `<redacted>` stays as it is, so that redacting a reference again changes nothing, with any prefixes, in URLs and in command lines (the agent's option A) |
+| Long hosts (the agent's third finding) | `url_host` cannot read a host longer than 253 characters, or with a label longer than 63, in A-labels: the bounds of DNS, which no host that resolves exceeds. The stacks then agree, the `idna` package's limit of 1024 included |
+| The version of Unicode | UTS #46 of Unicode 15.0 or later. `ẞ`, the one character whose mapping the agent saw change since, cannot be read, so Go 1.26, on Unicode 15.0, reads every host as Go 1.27 and Python do; a version that does not know a character cannot read a host that holds it, which denies |
+| Credentials in named values and headers (the review's finding) | EP-14: an argument written `name=value`, with a name of ASCII letters, digits, `_`, `.` and `-`, is read as `--flag=value` is; an argument or a value written as a header, `Name: rest`, becomes `Name: <redacted>` when its name is a secret's. A URL is never a header or a named value |
+| The agent's readings | Confirmed and written in EP-14: a URL in a command line keeps what `url_host` ignores around it; a flag's name follows all its leading dashes; the deployment's flags match exactly, case included; an argument redacted as a flag's value still counts as a flag; an empty segment after a prefix is replaced |
+
+For the part, before it merges: the vectors and both stacks follow these answers, with cases for each: hosts with each of the five characters, as written and in an A-label; hosts and labels at the bounds of DNS and beyond; a reference with `<redacted>` segments redacted again, with EP-14's two prefixes, and a fuzz property that redacting twice changes nothing; named values and headers, secret and not, as arguments and as values of `--flag=value`; and an empty segment after a prefix.
+
+For P1-16, which shows the catalog: a server's display form is what an enforcement point reports, and can hold a host that looks like another. Where the console shows it, it also shows the reference, whose host is in A-labels.
