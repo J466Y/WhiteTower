@@ -50,9 +50,16 @@ var scheme = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://`)
 // It refuses an A-label whose Punycode gives an ASCII label, or a label that
 // UTS #46 does not map to itself, and its decoder refuses a delimiter with
 // nothing before it, as in xn---bbk: the A-labels it reads encode back to
-// themselves, as step 7 asks.
+// themselves, as step 7 asks. Its tables are those of Go's version of
+// Unicode, 15.0 from Go 1.26, as step 7 allows.
 var lookup = idna.New(idna.MapForLookup(), idna.Transitional(false), idna.StrictDomainName(false),
 	idna.CheckHyphens(false), idna.CheckJoiners(true), idna.BidiRule())
+
+// readDifferently are the characters that versions of UTS #46, or its
+// transitional and non-transitional processing, read differently: ß, ς, the
+// zero width non-joiner and joiner, and ẞ. A host that holds one, as written
+// or within an A-label, cannot be read (step 7).
+const readDifferently = "\u00df\u03c2\u200c\u200d\u1e9e"
 
 // cannotRead returns an error that wraps ErrCannotRead and says why.
 func cannotRead(why string) error {
@@ -177,8 +184,8 @@ var ipv4Part = regexp.MustCompile(`^(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|
 func readHost(name string) (string, error) {
 	// 7. A % cannot be read; the rest is converted to A-labels, in
 	// lowercase, without one trailing dot. The conversion accepts empty
-	// labels and characters that hosts cannot have, so they are checked once
-	// it is done.
+	// labels, characters that hosts cannot have and labels of any length, so
+	// they are checked once it is done.
 	if strings.Contains(name, "%") {
 		return "", cannotRead("a % in the host")
 	}
@@ -186,11 +193,24 @@ func readHost(name string) (string, error) {
 	if err != nil {
 		return "", cannotRead("a host that IDNA cannot convert")
 	}
+	// The characters that UTS #46 reads differently, as written, and within
+	// the U-labels of the conversion, which hold those of the A-labels
+	// given. ẞ is checked as written, since Unicode 15.0 maps it to ss.
+	ulabels, err := idna.Punycode.ToUnicode(host)
+	if err != nil || strings.ContainsAny(name, readDifferently) || strings.ContainsAny(ulabels, readDifferently) {
+		return "", cannotRead("a character that versions of UTS #46 read differently")
+	}
 	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if len(host) > 253 {
+		return "", cannotRead("a host longer than 253 characters")
+	}
 	labels := strings.Split(host, ".")
 	for _, label := range labels {
 		if label == "" {
 			return "", cannotRead("an empty label")
+		}
+		if len(label) > 63 {
+			return "", cannotRead("a label longer than 63 characters")
 		}
 		if strings.Trim(label, "abcdefghijklmnopqrstuvwxyz0123456789-_") != "" {
 			return "", cannotRead("a character that a host cannot have")
@@ -249,10 +269,10 @@ func unreserved(c byte) bool {
 	return 'A' <= c && c <= 'Z' || 'a' <= c && c <= 'z' || '0' <= c && c <= '9' || strings.IndexByte("-._~", c) >= 0
 }
 
-// inPath reports whether c can be written in a path as it is (RFC 3986,
-// section 3.3): an unreserved character, a sub-delimiter, :, @ or /.
-func inPath(c byte) bool {
-	return unreserved(c) || strings.IndexByte("!$&'()*+,;=:@/", c) >= 0
+// inSegment reports whether c can be written in a path segment as it is
+// (RFC 3986, section 3.3): an unreserved character, a sub-delimiter, : or @.
+func inSegment(c byte) bool {
+	return unreserved(c) || strings.IndexByte("!$&'()*+,;=:@", c) >= 0
 }
 
 // isHex reports whether c is a hexadecimal digit.
@@ -264,21 +284,34 @@ func isHex(c byte) bool {
 // RFC 3986 does not allow in a path, and each % that two hexadecimal digits do
 // not follow; then it writes the hexadecimal digits of every percent-encoded
 // octet in uppercase, and decodes those of unreserved characters (RFC 3986,
-// section 6.2.2).
+// section 6.2.2). A segment that is exactly <redacted> stays as it is, so that
+// redacting a reference again changes nothing.
 func normalizePercentEncoding(path string) string {
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		if segment != Redacted {
+			segments[i] = normalizeSegment(segment)
+		}
+	}
+	return strings.Join(segments, "/")
+}
+
+// normalizeSegment normalizes the percent-encoding of a path segment, as
+// normalizePercentEncoding says.
+func normalizeSegment(segment string) string {
 	var b strings.Builder
-	for i := 0; i < len(path); i++ {
-		c := path[i]
+	for i := 0; i < len(segment); i++ {
+		c := segment[i]
 		switch {
-		case c == '%' && i+2 < len(path) && isHex(path[i+1]) && isHex(path[i+2]):
-			octet, _ := strconv.ParseUint(path[i+1:i+3], 16, 8)
+		case c == '%' && i+2 < len(segment) && isHex(segment[i+1]) && isHex(segment[i+2]):
+			octet, _ := strconv.ParseUint(segment[i+1:i+3], 16, 8)
 			if unreserved(byte(octet)) {
 				b.WriteByte(byte(octet))
 			} else {
 				fmt.Fprintf(&b, "%%%02X", octet)
 			}
 			i += 2
-		case inPath(c):
+		case inSegment(c):
 			b.WriteByte(c)
 		default:
 			fmt.Fprintf(&b, "%%%02X", c)

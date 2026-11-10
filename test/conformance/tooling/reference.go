@@ -2,6 +2,7 @@ package tooling
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -75,42 +76,80 @@ func redactPrefixes(normalized string, prefixes []string) string {
 	return b.String()
 }
 
+// namedValue is a name of ASCII letters, digits, _, . and -, not starting
+// with -, followed by =: an argument such as GITHUB_TOKEN=ghp_x (EP-14).
+var namedValue = regexp.MustCompile(`^[A-Za-z0-9_.][A-Za-z0-9_.-]*=`)
+
+// header is a name of ASCII letters, digits and -, followed by :, as an HTTP
+// header is written: an argument or a value such as Authorization: Bearer abc
+// (EP-14). The name does not start with -: an argument that does is a flag,
+// and were it also a header, -key:=x would become -key: <redacted>, a flag
+// without = that, redacted again, would redact the argument after it.
+var header = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9-]*):`)
+
 // RedactCommand returns a command and its arguments redacted as EP-14 says,
-// with the deployment's rules. The argument that follows a flag whose value
-// is a secret becomes <redacted>, and so does the value of such a flag written
-// --flag=value, which never redacts the argument after it. Every other
-// argument, and the value of every other --flag=value, is written as
-// redactURL says.
+// with the deployment's rules. The argument that follows a flag whose name is
+// a secret's becomes <redacted>, as redactArgument says every other does.
 func RedactCommand(command []string, rules Rules) []string {
 	redacted := make([]string, len(command))
 	for i, arg := range command {
-		flag, value, joined := strings.Cut(arg, "=")
-		switch {
-		case i > 0 && !strings.Contains(command[i-1], "=") && secretFlag(command[i-1], rules):
+		if i > 0 && redactsNext(command[i-1], rules) {
 			redacted[i] = Redacted
-		case joined && secretFlag(flag, rules):
-			redacted[i] = flag + "=" + Redacted
-		case joined && strings.HasPrefix(flag, "-"):
-			redacted[i] = flag + "=" + redactURL(value, rules)
-		default:
-			redacted[i] = redactURL(arg, rules)
+		} else {
+			redacted[i] = redactArgument(arg, rules)
 		}
 	}
 	return redacted
 }
 
-// secretFlag reports whether an argument, up to its first =, is a flag whose
-// value is a secret. A flag starts with -, and its name follows its leading
-// dashes. The name is a secret's when it contains one of EP-14's words,
-// comparing ASCII letters without regard to case and every other character
-// exactly, so that no Unicode case mapping changes what matches, or when it
-// is one of the deployment's flags, matched exactly.
-func secretFlag(flag string, rules Rules) bool {
-	name, ok := strings.CutPrefix(flag, "-")
-	if !ok {
-		return false
+// redactsNext reports whether an argument is a flag whose name is a secret's,
+// written without =, so that the argument after it is its value. A flag
+// starts with -, and its name follows its leading dashes, however many. The
+// argument is read as given, even when it is itself redacted as the value of
+// the flag before it.
+func redactsNext(arg string, rules Rules) bool {
+	return strings.HasPrefix(arg, "-") && !strings.Contains(arg, "=") && secretName(strings.TrimLeft(arg, "-"), rules)
+}
+
+// redactArgument writes an argument as EP-14 says. A URL or a header is
+// written as redactValue says. A flag written --flag=value, or a named value,
+// name=value, keeps its name, and its value becomes <redacted> when the name
+// is a secret's; any other value is written as redactValue says. A named
+// value or a flag written so never redacts the argument after it.
+func redactArgument(arg string, rules Rules) string {
+	if isURL(arg) || header.MatchString(arg) {
+		return redactValue(arg, rules)
 	}
-	name = strings.TrimLeft(name, "-")
+	name, value, joined := strings.Cut(arg, "=")
+	if !joined || (!strings.HasPrefix(name, "-") && !namedValue.MatchString(arg)) {
+		return arg
+	}
+	if secretName(strings.TrimLeft(name, "-"), rules) {
+		return name + "=" + Redacted
+	}
+	return name + "=" + redactValue(value, rules)
+}
+
+// redactValue writes an argument, or a value, as EP-14's rules on URLs and
+// headers say. A URL is written as redactURL says, and is never a header. A
+// header whose name is a secret's is written as its name, :, a space and
+// <redacted>. Any other is written as given.
+func redactValue(value string, rules Rules) string {
+	if isURL(value) {
+		return redactURL(value, rules)
+	}
+	if m := header.FindStringSubmatch(value); m != nil && secretName(m[1], rules) {
+		return m[1] + ": " + Redacted
+	}
+	return value
+}
+
+// secretName reports whether the name of a flag, a named value or a header is
+// a secret's: it contains one of EP-14's words, comparing ASCII letters
+// without regard to case and every other character exactly, so that no
+// Unicode case mapping changes what matches, or it is one of the deployment's
+// flags, matched exactly, case included.
+func secretName(name string, rules Rules) bool {
 	lower := strings.Map(func(r rune) rune {
 		if 'A' <= r && r <= 'Z' {
 			return r + 'a' - 'A'
@@ -125,20 +164,22 @@ func secretFlag(flag string, rules Rules) bool {
 	return slices.Contains(rules.Flags, name)
 }
 
-// redactURL writes an argument of a command line, or the value of
-// --flag=value, as EP-14 says. One that url_host reads, whatever its scheme,
-// is a URL: it is written normalized, with its secret segments redacted, when
-// one of the deployment's prefixes matches it, and otherwise as given, without
-// its user information, query and fragment. One that starts with a scheme and
-// // but that url_host cannot read becomes <redacted>, since parsers disagree
-// on where its user information ends. Any other is written as given.
+// isURL reports whether an argument or a value starts with a scheme and //,
+// once what url_host ignores at its start is left out.
+func isURL(value string) bool {
+	return scheme.MatchString(strings.TrimLeftFunc(value, ignored))
+}
+
+// redactURL writes a URL of a command line as EP-14 says. One that url_host
+// reads, whatever its scheme, is written normalized, with its secret segments
+// redacted, when one of the deployment's prefixes matches it, and otherwise as
+// given, without its user information, query and fragment. One that url_host
+// cannot read becomes <redacted>, since parsers disagree on where its user
+// information ends.
 func redactURL(arg string, rules Rules) string {
 	u, err := ReadURL(arg)
 	if err != nil {
-		if scheme.MatchString(strings.TrimLeftFunc(arg, ignored)) {
-			return Redacted
-		}
-		return arg
+		return Redacted
 	}
 	if normalized, err := u.Normalized(); err == nil {
 		for _, prefix := range rules.URLPrefixes {

@@ -722,7 +722,11 @@ WHITE_SPACE = frozenset("\t\n\v\f\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004
 PORT = re.compile(r"[0-9]{1,5}")
 NUMBER = re.compile(r"[0-9]+|0x[0-9a-f]*")
 IPV4_PART = re.compile(r"[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]")
-HOST_LABEL = re.compile(r"[a-z0-9_-]+")
+# A label of a host in A-labels, within the bounds of DNS.
+HOST_LABEL = re.compile(r"[a-z0-9_-]{1,63}")
+# The characters that versions of UTS #46, or its transitional and non-transitional processing, read differently: the
+# sharp s, the final sigma, the zero width non-joiner and joiner, and the capital sharp s (section 6.11, step 7).
+READ_DIFFERENTLY = frozenset(map(chr, (0xDF, 0x3C2, 0x200C, 0x200D, 0x1E9E)))
 
 
 def read_url(value: str) -> URL:
@@ -800,26 +804,30 @@ def u_label(label: str) -> str:
 def read_host(name: str) -> str:
     """A host that is not an IPv6 address: steps 7 and 8. Hosts are converted to A-labels as WHATWG's "domain to ASCII"
     does without strictness: the idna package's uts46_remap, without the STD3 rules, then Punycode, rather than
-    idna.encode, which applies IDNA 2008 and refuses underscores. uts46_remap checks neither joiners nor Bidi, so they
-    are checked on each label, Bidi on every label of a domain that has a right-to-left one, as UTS #46 says."""
+    idna.encode, which applies IDNA 2008 and refuses underscores. uts46_remap does not check Bidi, so it is checked on
+    every label of a domain that has a right-to-left one, as UTS #46 says. Joiners need no check in context: a host
+    that holds one cannot be read."""
     # 7. A % cannot be read; the rest is converted to A-labels, in lowercase, without one trailing dot.
     if "%" in name:
         raise CannotRead("a % in the host")
     try:
         labels = [u_label(label) for label in idna.uts46_remap(name, std3_rules=False).split(".")]
+        # The characters that UTS #46 reads differently, as written, and within the labels converted, which hold
+        # those of the A-labels given. U+1E9E is checked as written, since Unicode 15.0 maps it to ss.
+        if READ_DIFFERENTLY.intersection(name) or any(READ_DIFFERENTLY.intersection(label) for label in labels):
+            raise CannotRead("a character that versions of UTS #46 read differently")
         rtl = any(unicodedata.bidirectional(c) in ("R", "AL", "AN") for label in labels for c in label)
         for label in filter(None, labels):
             idna.check_initial_combiner(label)
-            if not all(idna.valid_contextj(label, i) for i, c in enumerate(label) if c in "\u200c\u200d") \
-                    or rtl and not idna.check_bidi(label, check_ltr=True):
-                raise CannotRead("a joiner or a Bidi rule")
+            if rtl:
+                idna.check_bidi(label, check_ltr=True)
     except (idna.IDNAError, UnicodeError, ValueError) as e:
         raise CannotRead(f"a host that IDNA cannot convert: {e}") from None
     host = ".".join(label if label.isascii() else "xn--" + label.encode("punycode").decode("ascii")
                     for label in labels).lower().removesuffix(".")
     labels = host.split(".")
-    if not all(HOST_LABEL.fullmatch(label) for label in labels):
-        raise CannotRead("an empty label, or a character that a host cannot have")
+    if len(host) > 253 or not all(HOST_LABEL.fullmatch(label) for label in labels):
+        raise CannotRead("an empty label, a character that a host cannot have, or beyond the bounds of DNS")
     # 8. A host whose last label is a number is an IPv4 address of four decimal numbers.
     if NUMBER.fullmatch(labels[-1]) and not (len(labels) == 4 and all(IPV4_PART.fullmatch(p) for p in labels)):
         raise CannotRead("an IPv4 address that is not four decimal numbers")
@@ -828,8 +836,10 @@ def read_host(name: str) -> str:
 
 DEFAULT_PORTS = {"http": 80, "https": 443}
 UNRESERVED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
-# What RFC 3986 allows in a path as it is (section 3.3): unreserved characters, sub-delimiters, :, @ and /.
-IN_PATH = UNRESERVED | frozenset("!$&'()*+,;=:@/")
+# What RFC 3986 allows in a path segment as it is (section 3.3): unreserved characters, sub-delimiters, : and @.
+IN_SEGMENT = UNRESERVED | frozenset("!$&'()*+,;=:@")
+# What is not: one character to percent-encode, or a percent-encoded octet.
+NOT_IN_SEGMENT = re.compile(r"%([0-9A-Fa-f]{2})|([^" + re.escape("".join(sorted(IN_SEGMENT))) + "])")
 
 
 def normalized(url: URL) -> str:
@@ -847,13 +857,14 @@ def normalized(url: URL) -> str:
 def normalize_percent_encoding(path: str) -> str:
     """Percent-encodes, as UTF-8, each character that RFC 3986 does not allow in a path, and each % that two
     hexadecimal digits do not follow; then writes the hexadecimal digits of every percent-encoded octet in uppercase,
-    and decodes those of unreserved characters (RFC 3986, section 6.2.2)."""
+    and decodes those of unreserved characters (RFC 3986, section 6.2.2). A segment that is exactly <redacted> stays as
+    it is, so that redacting a reference again changes nothing."""
     def triplet(m: re.Match) -> str:
         if m.group(1):
             c = chr(int(m.group(1), 16))
             return c if c in UNRESERVED else f"%{m.group(1).upper()}"
         return "".join(f"%{b:02X}" for b in m.group(2).encode("utf-8"))
-    return re.sub(r"%([0-9A-Fa-f]{2})|([^" + re.escape("".join(sorted(IN_PATH))) + "])", triplet, path)
+    return "/".join(s if s == REDACTED else NOT_IN_SEGMENT.sub(triplet, s) for s in path.split("/"))
 
 
 def remove_dot_segments(path: str) -> str:
@@ -906,24 +917,37 @@ def redact_prefixes(url: str, prefixes: list[str]) -> str:
     return out + url[last:]
 
 
-def secret_flag(flag: str, rules: dict) -> bool:
-    """Whether an argument, up to its first =, is a flag whose value is a secret: a name, after the flag's leading
-    dashes, that contains one of EP-14's words, comparing ASCII letters without regard to case, or that is one of the
-    deployment's flags, matched exactly."""
-    if not flag.startswith("-"):
-        return False
-    name = flag.lstrip("-")
+# A named value: a name of ASCII letters, digits, _, . and -, not starting with -, then = (EP-14).
+NAMED_VALUE = re.compile(r"[A-Za-z0-9_.][A-Za-z0-9_.-]*=")
+# A header: a name of ASCII letters, digits and -, then :, as an HTTP header is written (EP-14). The name does not start
+# with -: an argument that does is a flag, and redacted as a header it could become a flag that redacts the next one.
+HEADER = re.compile(r"([A-Za-z0-9][A-Za-z0-9-]*):")
+
+
+def secret_name(name: str, rules: dict) -> bool:
+    """Whether the name of a flag, a named value or a header is a secret's: it contains one of EP-14's words, comparing
+    ASCII letters without regard to case, or it is one of the deployment's flags, matched exactly, case included."""
     return any(w in name.translate(ASCII_LOWER) for w in SECRET_WORDS) or name in rules.get("flags", [])
 
 
+def redacts_next(arg: str, rules: dict) -> bool:
+    """Whether an argument, read as given, is a flag written without = whose name, after all its leading dashes, is a
+    secret's, so that the argument after it is its value."""
+    return arg.startswith("-") and "=" not in arg and secret_name(arg.lstrip("-"), rules)
+
+
+def is_url(value: str) -> bool:
+    """Whether an argument or a value starts with a scheme and //, once what url_host ignores at its start is left out."""
+    return SCHEME.match(value.lstrip(IGNORED)) is not None
+
+
 def redact_url(arg: str, rules: dict) -> str:
-    """An argument of a command line, or the value of --flag=value, as EP-14 writes it: a URL that url_host reads,
-    normalized and redacted when a deployment prefix matches it, and otherwise as given without its user information,
-    query and fragment; <redacted> for one that starts with a scheme and // but that url_host cannot read."""
+    """A URL of a command line as EP-14 writes it: normalized and redacted when a deployment prefix matches it, and
+    otherwise as given without its user information, query and fragment; <redacted> when url_host cannot read it."""
     try:
         url = read_url(arg)
     except CannotRead:
-        return REDACTED if SCHEME.match(arg.lstrip(IGNORED)) else arg
+        return REDACTED
     prefixes = rules.get("url_prefixes", [])
     try:
         n = normalized(url)
@@ -932,21 +956,32 @@ def redact_url(arg: str, rules: dict) -> str:
     return redact_prefixes(n, prefixes) if any(n.startswith(p) for p in prefixes) else url.bare
 
 
+def redact_value(value: str, rules: dict) -> str:
+    """An argument or a value as EP-14's rules on URLs and headers write it: a URL as redact_url says, never a header;
+    a header whose name is a secret's as its name, :, a space and <redacted>; any other as given."""
+    if is_url(value):
+        return redact_url(value, rules)
+    if (m := HEADER.match(value)) is not None and secret_name(m.group(1), rules):
+        return f"{m.group(1)}: {REDACTED}"
+    return value
+
+
+def redact_argument(arg: str, rules: dict) -> str:
+    """An argument as EP-14 writes it: a URL or a header as redact_value says; a flag written --flag=value, or a named
+    value, with <redacted> as its value when its name is a secret's, and otherwise with its value as redact_value says."""
+    if is_url(arg) or HEADER.match(arg):
+        return redact_value(arg, rules)
+    name, joined, value = arg.partition("=")
+    if not joined or not (name.startswith("-") or NAMED_VALUE.match(arg)):
+        return arg
+    return f"{name}={REDACTED if secret_name(name.lstrip('-'), rules) else redact_value(value, rules)}"
+
+
 def redact_command(command: list[str], rules: dict) -> list[str]:
-    """A command and its arguments redacted as EP-14 says: the argument after a flag whose value is a secret, and the
-    value of such a flag written --flag=value, become <redacted>; every other argument goes through redact_url."""
-    out = []
-    for i, arg in enumerate(command):
-        flag, joined, value = arg.partition("=")
-        if i > 0 and "=" not in command[i - 1] and secret_flag(command[i - 1], rules):
-            out.append(REDACTED)
-        elif joined and secret_flag(flag, rules):
-            out.append(f"{flag}={REDACTED}")
-        elif joined and flag.startswith("-"):
-            out.append(f"{flag}={redact_url(value, rules)}")
-        else:
-            out.append(redact_url(arg, rules))
-    return out
+    """A command and its arguments redacted as EP-14 says: the argument after a flag whose name is a secret's becomes
+    <redacted>, and every other is written as redact_argument says."""
+    return [REDACTED if i > 0 and redacts_next(command[i - 1], rules) else redact_argument(arg, rules)
+            for i, arg in enumerate(command)]
 
 
 def reference(entry: dict, rules: dict) -> str:

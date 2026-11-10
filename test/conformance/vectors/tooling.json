@@ -496,7 +496,7 @@
     },
     {
       "id": "U-31",
-      "description": "url_host cannot read a joiner that its context does not allow",
+      "description": "url_host cannot read a zero width non-joiner, here also out of the context that IDNA allows",
       "url": "http://a\u200cb.com/",
       "host": null,
       "normalized": null
@@ -514,6 +514,118 @@
       "url": "http://xn---bbk.com/",
       "host": null,
       "normalized": null
+    },
+    {
+      "id": "U-34",
+      "description": "url_host cannot read a host that holds the sharp s, which transitional processing maps to ss: fass.de for one client, xn--fa-hia.de for another",
+      "url": "https://fa\u00df.de/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-35",
+      "description": "Nor the sharp s within an A-label",
+      "url": "https://xn--fa-hia.de/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-36",
+      "description": "Nor the final sigma, which transitional processing maps to the sigma",
+      "url": "https://\u03b1\u03c2.gr/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-37",
+      "description": "Nor the final sigma within an A-label",
+      "url": "https://xn--mxa8a.gr/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-38",
+      "description": "Nor the zero width non-joiner, even in a context that IDNA allows",
+      "url": "https://\u0628\u200c\u0628.example/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-39",
+      "description": "Nor the zero width non-joiner within an A-label",
+      "url": "https://xn--ngba799q.example/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-40",
+      "description": "Nor the zero width joiner, even after a virama, where IDNA allows it",
+      "url": "https://\u0915\u094d\u200d\u0937.example/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-41",
+      "description": "Nor the zero width joiner within an A-label",
+      "url": "https://xn--11b2ezcw70k.example/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-42",
+      "description": "Nor the capital sharp s, which Unicode 15.0 maps to ss and later versions to the sharp s",
+      "url": "https://\u1e9e.de/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-43",
+      "description": "Nor the capital sharp s within an A-label",
+      "url": "https://xn--kkg.de/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-44",
+      "description": "A host of 253 characters, with labels of 63, is within the bounds of DNS",
+      "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/",
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "normalized": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/"
+    },
+    {
+      "id": "U-45",
+      "description": "The bound counts the host without its trailing dot",
+      "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd./",
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "normalized": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/"
+    },
+    {
+      "id": "U-46",
+      "description": "url_host cannot read a host of 254 characters",
+      "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-47",
+      "description": "Nor a label of 64 characters",
+      "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-48",
+      "description": "Nor a label of 58 characters that is 64 in A-labels: the bounds count A-labels",
+      "url": "https://\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc\u00fc.de/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-49",
+      "description": "A segment that is exactly <redacted> stays as it is in a normalized URL, and any other is percent-encoded",
+      "url": "https://a.example/s/<redacted>/<redacted>x/<Redacted>",
+      "host": "a.example",
+      "normalized": "https://a.example/s/<redacted>/%3Credacted%3Ex/%3CRedacted%3E"
     }
   ],
   "references": [
@@ -896,6 +1008,119 @@
       },
       "reference": null,
       "reference_sha256": null
+    },
+    {
+      "id": "R-27",
+      "description": "A reference already redacted with EP-14's two prefixes, redacted again, as the core does (CORE-11), is unchanged",
+      "entry": {
+        "kind": "remote_server",
+        "url": "https://a.example/s/<redacted>/<redacted>"
+      },
+      "rules": {
+        "url_prefixes": [
+          "https://a.example/s/",
+          "https://a.example/s/x/"
+        ],
+        "flags": []
+      },
+      "reference": "https://a.example/s/<redacted>/<redacted>",
+      "reference_sha256": "fa850839a4a8141190689f7d41c082ea32bf7b3831e7268fd6acc5aace142846"
+    },
+    {
+      "id": "R-28",
+      "description": "An empty segment after a prefix is replaced",
+      "entry": {
+        "kind": "remote_server",
+        "url": "https://a.example/s//x"
+      },
+      "rules": {
+        "url_prefixes": [
+          "https://a.example/s/"
+        ],
+        "flags": []
+      },
+      "reference": "https://a.example/s/<redacted>/x",
+      "reference_sha256": "4c2e977423ca4ac0abb8158c2530068b139debb5d9d36d720ddfb74b4ca7ca93"
+    },
+    {
+      "id": "R-29",
+      "description": "Named values: the value of one whose name is a secret's is redacted, and any other value is written as the rules on URLs and headers say",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "docker",
+          "run",
+          "-i",
+          "--rm",
+          "-e",
+          "GITHUB_TOKEN=ghp_x",
+          "-e",
+          "DATABASE_URL=postgres://u:pw@db/app",
+          "-e",
+          "LOG_LEVEL=debug",
+          "ghcr.io/github/github-mcp-server"
+        ]
+      },
+      "reference": "stdio:[\"docker\",\"run\",\"-i\",\"--rm\",\"-e\",\"GITHUB_TOKEN=<redacted>\",\"-e\",\"DATABASE_URL=postgres://db/app\",\"-e\",\"LOG_LEVEL=debug\",\"ghcr.io/github/github-mcp-server\"]",
+      "reference_sha256": "ce991707738188f13560bff187b750b485ee8cc38a90d89dfe94e6c70ccfd8dc"
+    },
+    {
+      "id": "R-30",
+      "description": "Headers as arguments: one whose name is a secret's, with or without a space after its colon, and the value of a named value, are redacted; any other header stays",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "mcp-proxy",
+          "--header",
+          "Authorization: Bearer abc",
+          "-H",
+          "X-Api-Key:k",
+          "--header",
+          "Note: x",
+          "HEADERS=Cookie: a=b"
+        ]
+      },
+      "reference": "stdio:[\"mcp-proxy\",\"--header\",\"Authorization: <redacted>\",\"-H\",\"X-Api-Key: <redacted>\",\"--header\",\"Note: x\",\"HEADERS=Cookie: <redacted>\"]",
+      "reference_sha256": "cb855ce3cf01c667a9fc0b1a161d5fe4ae427023ff5496cad4ebf26cd4cdaf04"
+    },
+    {
+      "id": "R-31",
+      "description": "Headers as values of --flag=value; and a URL is never a header, though its scheme holds key",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "mcp-proxy",
+          "--header=Authorization: Bearer x",
+          "--header=Accept: application/json",
+          "keycloak://admin:pw@kc.internal/realms/x",
+          "--issuer=keycloak://admin:pw@kc.internal/realms/x"
+        ]
+      },
+      "reference": "stdio:[\"mcp-proxy\",\"--header=Authorization: <redacted>\",\"--header=Accept: application/json\",\"keycloak://kc.internal/realms/x\",\"--issuer=keycloak://kc.internal/realms/x\"]",
+      "reference_sha256": "c5463ddcff338009161b2e61abc321fb37bf61854b5a5cef998f9fa42e66b333"
+    },
+    {
+      "id": "R-32",
+      "description": "The deployment's flags name named values and headers too, matched exactly, and a flag's name follows all its leading dashes",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "srv",
+          "pat=ghp_y",
+          "PAT=kept",
+          "pat: ghp_z",
+          "---pat",
+          "ghp_w"
+        ]
+      },
+      "rules": {
+        "url_prefixes": [],
+        "flags": [
+          "pat"
+        ]
+      },
+      "reference": "stdio:[\"srv\",\"pat=<redacted>\",\"PAT=kept\",\"pat: <redacted>\",\"---pat\",\"<redacted>\"]",
+      "reference_sha256": "e4b6aa446ab55682ee441cf8b35936f63dea79bfe6b6b2bffd5432c7d5036607"
     }
   ]
 }
