@@ -1,15 +1,16 @@
 """Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519, PyYAML for manifests,
-jsonschema for the request schema, and the standard library's json, hashlib and hmac for canonical JSON, definition
-hashes and hashed arguments.
+jsonschema for the request schema, idna for the hosts of URLs, and the standard library's json, hashlib and hmac for
+canonical JSON, definition hashes and hashed arguments.
 
 The Go tests in test/conformance check the same vectors with cedar-go, the
-manifest vectors with yaml.v3, and canonical JSON with the kit's own reader and
-writer. Passing both shows that the decision profile does not depend on one
-Cedar implementation, nor the reading of manifests on one YAML parser, nor
-canonical JSON on one writer, and gives the Python enforcement point (plan
-P1-09) a reference to start from.
+manifest vectors with yaml.v3, canonical JSON with the kit's own reader and
+writer, and hosts with golang.org/x/net/idna. Passing both shows that the
+decision profile does not depend on one Cedar implementation, nor the reading
+of manifests on one YAML parser, nor canonical JSON on one writer, nor the
+reading of URLs on one IDNA library, and gives the Python enforcement point
+(plan P1-09) a reference to start from.
 
-Run from the repository root with a Python that has cedarpy, cryptography, PyYAML and jsonschema:
+Run from the repository root with a Python that has cedarpy, cryptography, PyYAML, jsonschema and idna:
     python test/conformance/python/check_vectors.py
 """
 
@@ -20,15 +21,19 @@ import calendar
 import copy
 import hashlib
 import hmac
+import ipaddress
 import json
 import math
 import re
 import sys
+import unicodedata
 from pathlib import Path
+from typing import NamedTuple
 
 import cedarpy
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+import idna
 import jsonschema
 import yaml
 from decimal import Decimal
@@ -689,6 +694,332 @@ def hashed_arguments(key: bytes, arguments) -> dict:
     return {"canonical_json": canonical.decode(), "hmac_sha256": hmac.new(key, canonical, hashlib.sha256).hexdigest()}
 
 
+class CannotRead(Exception):
+    """A value that the url_host transform cannot read (section 6.11)."""
+
+
+class NoReference(Exception):
+    """A URL that makes no reference: one that url_host cannot read, whose scheme is not http or https, or with a
+    backslash in its path (section 4.10)."""
+
+
+class URL(NamedTuple):
+    """A URL as url_host reads it: its scheme, port digits and path as given, the host that url_host reads, and bare,
+    the value as given without its user information, query and fragment, as EP-14 writes a URL of a command line."""
+    scheme: str
+    host: str
+    port: str
+    path: str
+    bare: str
+
+
+# What url_host ignores at the start and at the end of a value: spaces and C0 control characters.
+IGNORED = "".join(map(chr, range(0x21)))
+SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
+# Unicode's White_Space property, which the standard library cannot read.
+WHITE_SPACE = frozenset("\t\n\v\f\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+                        "\u2028\u2029\u202f\u205f\u3000")
+PORT = re.compile(r"[0-9]{1,5}")
+NUMBER = re.compile(r"[0-9]+|0x[0-9a-f]*")
+IPV4_PART = re.compile(r"[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]")
+# A label of a host in A-labels, within the bounds of DNS.
+HOST_LABEL = re.compile(r"[a-z0-9_-]{1,63}")
+# The characters that versions of UTS #46, or its transitional and non-transitional processing, read differently: the
+# sharp s, the final sigma, the zero width non-joiner and joiner, and the capital sharp s (section 6.11, step 7).
+READ_DIFFERENTLY = frozenset(map(chr, (0xDF, 0x3C2, 0x200C, 0x200D, 0x1E9E)))
+
+
+def read_url(value: str) -> URL:
+    """Reads a value as url_host does, step by step (section 6.11), or raises CannotRead. A string with a lone
+    surrogate, which UTF-8 cannot hold, cannot be read either."""
+    if has_lone_surrogate(value):
+        raise CannotRead("the value is not Unicode")
+    # 1. Leading and trailing spaces and C0 control characters are ignored, and a control character anywhere else
+    # cannot be read.
+    start, end = len(value) - len(value.lstrip(IGNORED)), len(value.rstrip(IGNORED))
+    text = value[start:max(start, end)]
+    if any(c < " " or c == "\x7f" for c in text):
+        raise CannotRead("a control character")
+    # 2. A scheme and //.
+    if (m := SCHEME.match(text)) is None:
+        raise CannotRead("no scheme followed by //")
+    rest = text[m.end():]
+    # 3. The authority runs to the first /, ? or #.
+    authority = re.match(r"[^/?#]*", rest).group()
+    if any(c == "\\" or c in WHITE_SPACE for c in authority):
+        raise CannotRead("a backslash or whitespace in the authority")
+    # 4. The host follows the last @ of the authority.
+    host_port = authority[authority.rfind("@") + 1:]
+    host, port = read_host_port(host_port)
+    path, cut, _ = re.match(r"([^?#]*)([?#]?)(.*)", rest[len(authority):], re.DOTALL).groups()
+    bare = value[:start] + m.group() + host_port + path + ("" if cut else value[max(start, end):])
+    return URL(m.group()[:-3], host, port, path, bare)
+
+
+def read_host_port(host_port: str) -> tuple[str, str]:
+    """The host and the port that follow the user information: steps 5 to 8."""
+    if host_port.startswith("["):
+        address, bracket, after = host_port[1:].partition("]")
+        if not bracket:
+            raise CannotRead("an IPv6 address without its closing bracket")
+        host = read_ipv6(address)
+        if after and not after.startswith(":"):
+            raise CannotRead("text after an IPv6 address")
+        has_port, port = after.startswith(":"), after[1:]
+    else:
+        name, colon, port = host_port.partition(":")
+        host, has_port = read_host(name), bool(colon)
+    # 5. A port is 1 to 5 digits, and at most 65535.
+    if has_port and not (PORT.fullmatch(port) and int(port) <= 65535):
+        raise CannotRead("a port that is not 1 to 5 digits, at most 65535")
+    return host, port
+
+
+def read_ipv6(address: str) -> str:
+    """An IPv6 address, given without its brackets: step 6."""
+    if "%" in address or "." in address:
+        raise CannotRead("an IPv6 address with a zone ID or a dotted part")
+    try:
+        addr = ipaddress.IPv6Address(address)
+    except ValueError:
+        raise CannotRead("not an IPv6 address") from None
+    if addr.ipv4_mapped is not None:
+        raise CannotRead("an IPv6 address in the IPv4-mapped range")
+    # compressed writes an IPv6 address as section 4 of RFC 5952 says.
+    return f"[{addr.compressed}]"
+
+
+def u_label(label: str) -> str:
+    """A label of a host that UTS #46 has mapped, with an A-label decoded: one that does not decode as IDNA says, to a
+    label that is not all ASCII, that UTS #46 maps to itself, and that encodes back to the same A-label, raises."""
+    if not label.startswith("xn--"):
+        return label
+    decoded = label[4:].encode("ascii").decode("punycode")
+    if decoded.isascii() or idna.uts46_remap(decoded, std3_rules=False) != decoded \
+            or "xn--" + decoded.encode("punycode").decode("ascii") != label:
+        raise CannotRead("an A-label that does not decode")
+    return decoded
+
+
+def read_host(name: str) -> str:
+    """A host that is not an IPv6 address: steps 7 and 8. Hosts are converted to A-labels as WHATWG's "domain to ASCII"
+    does without strictness: the idna package's uts46_remap, without the STD3 rules, then Punycode, rather than
+    idna.encode, which applies IDNA 2008 and refuses underscores. uts46_remap does not check Bidi, so it is checked on
+    every label of a domain that has a right-to-left one, as UTS #46 says. Joiners need no check in context: a host
+    that holds one cannot be read."""
+    # 7. A % cannot be read; the rest is converted to A-labels, in lowercase, without one trailing dot.
+    if "%" in name:
+        raise CannotRead("a % in the host")
+    # The bound of DNS applies as written too, so that a host padded with characters that UTS #46 ignores is refused
+    # before it is converted, and the idna package's limit of 1024 characters is never met.
+    if len(name.removesuffix(".")) > 253:
+        raise CannotRead("a host longer than 253 characters as written")
+    try:
+        labels = [u_label(label) for label in idna.uts46_remap(name, std3_rules=False).split(".")]
+        # The characters that UTS #46 reads differently, as written, and within the labels converted, which hold
+        # those of the A-labels given. U+1E9E is checked as written, since Unicode 15.0 maps it to ss.
+        if READ_DIFFERENTLY.intersection(name) or any(READ_DIFFERENTLY.intersection(label) for label in labels):
+            raise CannotRead("a character that versions of UTS #46 read differently")
+        rtl = any(unicodedata.bidirectional(c) in ("R", "AL", "AN") for label in labels for c in label)
+        for label in filter(None, labels):
+            idna.check_initial_combiner(label)
+            if rtl:
+                idna.check_bidi(label, check_ltr=True)
+    except (idna.IDNAError, UnicodeError, ValueError) as e:
+        raise CannotRead(f"a host that IDNA cannot convert: {e}") from None
+    host = ".".join(label if label.isascii() else "xn--" + label.encode("punycode").decode("ascii")
+                    for label in labels).lower().removesuffix(".")
+    labels = host.split(".")
+    if len(host) > 253 or not all(HOST_LABEL.fullmatch(label) for label in labels):
+        raise CannotRead("an empty label, a character that a host cannot have, or beyond the bounds of DNS")
+    # 8. A host whose last label is a number is an IPv4 address of four decimal numbers.
+    if NUMBER.fullmatch(labels[-1]) and not (len(labels) == 4 and all(IPV4_PART.fullmatch(p) for p in labels)):
+        raise CannotRead("an IPv4 address that is not four decimal numbers")
+    return host
+
+
+DEFAULT_PORTS = {"http": 80, "https": 443}
+UNRESERVED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+# What RFC 3986 allows in a path segment as it is (section 3.3): unreserved characters, sub-delimiters, : and @.
+IN_SEGMENT = UNRESERVED | frozenset("!$&'()*+,;=:@")
+# What is not: one character to percent-encode, or a percent-encoded octet.
+NOT_IN_SEGMENT = re.compile(r"%([0-9A-Fa-f]{2})|([^" + re.escape("".join(sorted(IN_SEGMENT))) + "])")
+
+
+def normalized(url: URL) -> str:
+    """A URL normalized as section 4.10 says, or NoReference for a scheme other than http and https, or a backslash in
+    the path."""
+    scheme = url.scheme.lower()
+    if scheme not in DEFAULT_PORTS:
+        raise NoReference(f"the scheme {url.scheme} is not http or https")
+    if "\\" in url.path:
+        raise NoReference("a backslash in the path")
+    port = "" if not url.port or int(url.port) == DEFAULT_PORTS[scheme] else f":{int(url.port)}"
+    return f"{scheme}://{url.host}{port}{remove_dot_segments(normalize_percent_encoding(url.path)) or '/'}"
+
+
+def normalize_percent_encoding(path: str) -> str:
+    """Percent-encodes, as UTF-8, each character that RFC 3986 does not allow in a path, and each % that two
+    hexadecimal digits do not follow; then writes the hexadecimal digits of every percent-encoded octet in uppercase,
+    and decodes those of unreserved characters (RFC 3986, section 6.2.2). A segment that is exactly <redacted> stays as
+    it is, so that redacting a reference again changes nothing."""
+    def triplet(m: re.Match) -> str:
+        if m.group(1):
+            c = chr(int(m.group(1), 16))
+            return c if c in UNRESERVED else f"%{m.group(1).upper()}"
+        return "".join(f"%{b:02X}" for b in m.group(2).encode("utf-8"))
+    return "/".join(s if s == REDACTED else NOT_IN_SEGMENT.sub(triplet, s) for s in path.split("/"))
+
+
+def remove_dot_segments(path: str) -> str:
+    """Removes the dot segments of a path as RFC 3986 says, in section 5.2.4."""
+    output: list[str] = []
+    while path:
+        if path.startswith(("../", "./")):
+            path = path.partition("/")[2]
+        elif path.startswith("/./") or path == "/.":
+            path = "/" + path[3:]
+        elif path.startswith("/../") or path == "/..":
+            path = "/" + path[4:]
+            output = output[:-1]
+        elif path in (".", ".."):
+            path = ""
+        else:
+            segment = re.match(r"/?[^/]*", path).group()
+            output.append(segment)
+            path = path[len(segment):]
+    return "".join(output)
+
+
+REDACTED = "<redacted>"
+# The flags whose names contain one of these words, in any case, have secrets as values (EP-14).
+SECRET_WORDS = ("token", "secret", "password", "passwd", "key", "auth", "credential", "cookie")
+# ASCII letters in lowercase, every other character as it is: str.lower would map the Kelvin sign to k.
+ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+
+
+def normalized_url(value: str, rules: dict) -> str:
+    """A remote server's URL, or a model's endpoint, normalized as section 4.10 says, with the path segment that
+    follows each of the deployment's prefixes redacted (EP-14), or NoReference."""
+    try:
+        url = read_url(value)
+    except CannotRead as e:
+        raise NoReference(str(e)) from None
+    return redact_prefixes(normalized(url), rules.get("url_prefixes", []))
+
+
+def redact_prefixes(url: str, prefixes: list[str]) -> str:
+    """Replaces with <redacted> the path segment, up to the next / or to the end, that follows each prefix that a
+    normalized URL starts with, every prefix matched before any replacement. A URL equal to a prefix keeps it whole."""
+    out, last = "", 0
+    for start in sorted({len(p) for p in prefixes if len(url) > len(p) and url.startswith(p)}):
+        if start < last:
+            continue
+        end = url.find("/", start)
+        end = len(url) if end < 0 else end
+        out, last = out + url[last:start] + REDACTED, end
+    return out + url[last:]
+
+
+# A named value: a name of ASCII letters, digits, _, . and -, not starting with -, then = (EP-14).
+NAMED_VALUE = re.compile(r"([A-Za-z0-9_.][A-Za-z0-9_.-]*)=")
+# A header: a name of ASCII letters, digits and -, not starting with -, then : and the spaces after it, as an HTTP
+# header is written (EP-14).
+HEADER = re.compile(r"([A-Za-z0-9][A-Za-z0-9-]*): *")
+
+
+def secret_name(name: str, rules: dict) -> bool:
+    """Whether the name of a flag, a named value or a header is a secret's: it contains one of EP-14's words, comparing
+    ASCII letters without regard to case, or it is one of the deployment's flags, matched exactly, case included."""
+    return any(w in name.translate(ASCII_LOWER) for w in SECRET_WORDS) or name in rules.get("flags", [])
+
+
+def redacts_next(arg: str, rules: dict) -> bool:
+    """Whether an argument, read as given, is a flag written without = whose name, after all its leading dashes, is a
+    secret's, so that the argument after it is its value."""
+    return arg.startswith("-") and "=" not in arg and secret_name(arg.lstrip("-"), rules)
+
+
+def is_url(value: str) -> bool:
+    """Whether an argument or a value starts with a scheme and //, once what url_host ignores at its start is left out."""
+    return SCHEME.match(value.lstrip(IGNORED)) is not None
+
+
+def redact_url(arg: str, rules: dict) -> str:
+    """A URL of a command line as EP-14 writes it: normalized and redacted when a deployment prefix matches it, and
+    otherwise as given without its user information, query and fragment; <redacted> when url_host cannot read it."""
+    try:
+        url = read_url(arg)
+    except CannotRead:
+        return REDACTED
+    prefixes = rules.get("url_prefixes", [])
+    try:
+        n = normalized(url)
+    except NoReference:
+        return url.bare
+    return redact_prefixes(n, prefixes) if any(n.startswith(p) for p in prefixes) else url.bare
+
+
+def redact_value(value: str, rules: dict) -> str:
+    """An argument that is not a flag, or a value, as EP-14 writes it: a URL as redact_url says; then a named value,
+    whose value becomes <redacted> when its name is a secret's; then a header, written as its name, :, a space and
+    <redacted> when its name is a secret's, and otherwise keeping its name, the : and the spaces after it; and otherwise
+    as given. The value of a named value, and the rest of a header, whose name is not a secret's, are values in turn,
+    read in a loop, so that no nesting meets Python's limit on recursion."""
+    out = ""
+    while True:
+        if is_url(value):
+            return out + redact_url(value, rules)
+        for pattern, redacted in ((NAMED_VALUE, "{}=" + REDACTED), (HEADER, "{}: " + REDACTED)):
+            if (m := pattern.match(value)) is not None:
+                if secret_name(m.group(1), rules):
+                    return out + redacted.format(m.group(1))
+                out, value = out + m.group(), value[m.end():]
+                break
+        else:
+            return out + value
+
+
+def redact_argument(arg: str, rules: dict) -> str:
+    """An argument as EP-14 writes it: a flag written --flag=value with <redacted> as its value when its name is a
+    secret's, and otherwise with its value as redact_value says; any other flag as given; and an argument that is not a
+    flag as redact_value says."""
+    if not arg.startswith("-"):
+        return redact_value(arg, rules)
+    flag, joined, value = arg.partition("=")
+    if not joined:
+        return arg
+    return f"{flag}={REDACTED if secret_name(flag.lstrip('-'), rules) else redact_value(value, rules)}"
+
+
+def redact_command(command: list[str], rules: dict) -> list[str]:
+    """A command and its arguments redacted as EP-14 says: the argument after a flag whose name is a secret's becomes
+    <redacted>, and every other is written as redact_argument says."""
+    return [REDACTED if i > 0 and redacts_next(command[i - 1], rules) else redact_argument(arg, rules)
+            for i, arg in enumerate(command)]
+
+
+def reference(entry: dict, rules: dict) -> str:
+    """The reference of an entry, as its string form (section 4.10), or NoReference."""
+    kind = entry["kind"]
+    if kind == "remote_server":
+        return normalized_url(entry["url"], rules)
+    if kind == "connector":
+        return f"connector:{entry['provider']}/{entry['connector_id']}"
+    if kind == "local_server":
+        return "stdio:" + canonical_json(redact_command(entry["command"], rules))
+    if kind == "mcp_tool":
+        return canonical_json({"name": entry["name"], "server": reference(entry["server"], rules)})
+    if kind == "tool":
+        return canonical_json({"name": entry["name"]})
+    if kind == "builtin_tool":
+        return canonical_json({"provider": entry["provider"], "type": entry["type"]})
+    if kind == "model":
+        endpoint = normalized_url(entry["endpoint"], rules)
+        return canonical_json({"endpoint": endpoint, "name": entry["name"], "provider": entry["provider"]})
+    raise ValueError(f"unknown kind {kind}")
+
+
 def main() -> int:
     failures = 0
     # Python converts integers of at most 4300 digits by default. Section 4.10 writes them exactly, whatever their size.
@@ -788,9 +1119,31 @@ def main() -> int:
             got = [function_definition(case["name"], schema)]
         check(f"definition {case['id']}", {"definitions": got}, {"definitions": case["definitions"]})
 
+    # URLs as url_host reads them (section 6.11), normalized as section 4.10 says.
+    for case in tooling["urls"]:
+        try:
+            url = read_url(case["url"])
+            try:
+                got = {"host": url.host, "normalized": normalized(url)}
+            except NoReference:
+                got = {"host": url.host, "normalized": None}
+        except CannotRead:
+            got = {"host": None, "normalized": None}
+        check(f"url {case['id']}", got, {k: case[k] for k in ("host", "normalized")})
+
+    # References as their string forms, after the redaction of EP-14 with the deployment's rules (section 4.10).
+    for case in tooling["references"]:
+        try:
+            ref = reference(case["entry"], case.get("rules", {}))
+            got = {"reference": ref, "reference_sha256": hashlib.sha256(ref.encode()).hexdigest()}
+        except NoReference:
+            got = {"reference": None, "reference_sha256": None}
+        check(f"reference {case['id']}", got, {k: case[k] for k in ("reference", "reference_sha256")})
+
     total = (len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases)
-             + len(documents) + len(hashed["cases"]) + len(tooling["definitions"]))
-    print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML, jsonschema)")
+             + len(documents) + len(hashed["cases"]) + len(tooling["definitions"]) + len(tooling["urls"])
+             + len(tooling["references"]))
+    print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML, jsonschema, idna)")
     return 1 if failures else 0
 
 
