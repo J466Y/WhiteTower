@@ -146,6 +146,21 @@ Added on 2026-10-27 ([progress notes](#progress-notes)). People have a right to 
 
 **Done when:** after an erasure, a canary name, email, subject and external ID appear in no table and in no API response; an active principal and a service account are refused; an erased principal cannot be reactivated, and the same person logging in again gets a new principal (ST-88).
 
+### 14. Emergency revocation (HUM-10)
+
+Added on 2026-11-10 ([progress notes](#progress-notes), decision 9). White Tower assumes that its deployment may be compromised and its users rogue. An identity provider that was compromised and then fixed, with the same issuer and claims, changes no setting, so the hash that sessions record (decision 7) refuses nothing: the sessions created meanwhile last up to 12 hours, and the API tokens created with them up to 90 days. Deactivating people one by one needs to know who they are.
+
+- **Operation.** The platform administrator, or the break-glass custodian, ends every session and every API token at once, giving a reason. A token's scopes cannot grant it: it checks the role, or the break-glass session, as the authorizer does for the operations a token must never reach. The OpenAPI operation comes first.
+- **What it ends,** in one transaction, with the time from `clock.Clock`:
+  - every session, the caller's included, unless the caller's is a break-glass session: an administrator signs in again, since the session that asks could come from the compromised provider;
+  - every API token, of people and of service accounts, the CLI's tokens included.
+
+  Principals stay active, and their role bindings stay. The SCIM token and the modules' credentials (plan P1-05) are not sessions or tokens of this kind: the runbook says to rotate the SCIM token, and P1-05 to rotate the modules' credentials, if they could have leaked.
+- **Audited.** It records a new core event type, with its actor, the reason and how many sessions and tokens it ended, and every step of AGENTS.md's checklist. It raises the critical alert that a break-glass use raises.
+- **If the provider is still compromised**, a new sign-in through it gets a new session. The runbook says to turn OIDC off first, which decision 7 makes refuse every session that the provider created, then to revoke, to fix the provider, and to turn OIDC on again.
+
+**Done when:** after a revocation, every session and API token created before it is refused, a CLI token and a service account's token included, and a break-glass session that ran it stays; any other role, and a token whatever its scopes, is refused (ST-89).
+
 ## Acceptance criteria
 
 - Login and logout work against Keycloak and against at least one commercial IdP (Entra ID or Okta), or the latter is scheduled as the first pilot task if no tenant is available.
@@ -153,7 +168,8 @@ Added on 2026-10-27 ([progress notes](#progress-notes)). People have a right to 
 - The security tests of step 12 pass.
 - Deactivating a principal revokes their sessions immediately.
 - An erasure leaves the person's name, email and IdP subject nowhere in White Tower, and keeps the history consistent (HUM-09).
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-03-human-identity-and-access) pass: ST-13 to ST-22, and ST-88.
+- An emergency revocation ends every session and API token at once, but a break-glass session that runs it (HUM-10).
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-03-human-identity-and-access) pass: ST-13 to ST-22, ST-88 and ST-89.
 
 ## Risks and open questions
 
@@ -182,6 +198,7 @@ The plan landed in six pull requests. The first built the authorization engine a
 | 5. CLI token exchange and break-glass | 7, 9, ST-20 | Done (PR #40) |
 | 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Done (PR #41) |
 | 7. Erasure of a person | 13, ST-88 | To do |
+| 8. Emergency revocation | 14, ST-89 | To do |
 
 ### 2026-10-14: roles, permissions and authorization engine
 
@@ -672,3 +689,17 @@ The maintainer's decision of 2026-11-10:
    - `groups_claim` and `role_mapping` alone, where a change of identity provider or of the claim of identity leaves the sessions open for up to 12 hours, with no operation today that ends every session.
 
 The work queue's row "P1-03 fix: the session's hash covers the sign-in configuration" takes it.
+
+### 2026-11-10: the review of the sign-in configuration's fix, and the maintainer's decisions 8 and 9
+
+The reviewer found the fix that makes the session's hash cover the sign-in configuration complete. Its agent named one gap, and the review a second, both about what outlives a sign-in that should no longer count:
+
+- **The CLI's tokens.** The CLI's exchange turns an ID token into an API token of 12 hours, which is no session and records no hash: after a change of the issuer, or of another setting that decision 7 covers, it keeps working until it expires.
+- **A provider fixed without a change of configuration.** A compromised identity provider that is fixed with the same issuer and claims changes no setting, so no hash refuses anything: the sessions created meanwhile last up to 12 hours, and the API tokens created with them up to 90 days. Today people can only be deactivated one by one.
+
+The maintainer's decisions of 2026-11-10:
+
+8. **The CLI's tokens record the sign-in configuration (ST-14).** A token that the exchange creates records the hash of the configuration that accepted its ID token, with `cli_client_id`, the client that the exchange accepts, in place of `client_id`, and the authenticator refuses it when the hash is not the current one, as it refuses a session. A change of `cli_client_id` ends the CLI's tokens and no browser session; a change of `client_id` ends the sessions and no CLI token. The tokens that people create themselves, and those of service accounts, record none: decision 9 covers them. The alternative: leaving them to expire within 12 hours.
+9. **Emergency revocation (HUM-10, ST-89).** The platform administrator, or the break-glass custodian, ends at once every session and every API token, of people and of service accounts, the caller's session included unless it is a break-glass session, and the audit log records it: step 14. The cost: everyone signs in again, and the integrations' tokens are created again. The alternatives: ending the sessions and the CLI's tokens only, which leaves a token of 90 days that an intruder created; and the procedure of deactivating the people concerned, who can be anyone after a compromise of the provider.
+
+The requirements gain HUM-10, with its row in the permission matrix, and HUM-06 and ST-20 say that break-glass can run it; the security test catalog gains ST-89. The work queue's rows "P1-03 fix: the CLI's tokens record the sign-in configuration" and "P1-03 pull request 8: emergency revocation" take them.
