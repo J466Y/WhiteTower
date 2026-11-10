@@ -1,5 +1,5 @@
 {
-  "description": "What an enforcement point reports of an agent's tooling (docs/contracts/module-contract-v0.1.md, section 4.10). definitions: definition hashes, each the SHA-256, in lowercase hexadecimal, of the canonical JSON of section 4.10 of the members that the hash covers, those that are absent or null left out (a null within them stays). Section 4.10 writes a number without a fraction or an exponent as its exact value, whatever its size, and any other from its value as a double, as RFC 8785 does. For an MCP tool (kind mcp), the members name, title, description, inputSchema, outputSchema and annotations of each tool of a tools/list response, read from the JSON-RPC message itself: message gives it as a JSON value or, where a parsed object cannot hold it, message_text as its text. For a function, http or other tool (kind function), the members name and inputSchema: name, and input_schema as a JSON value or input_schema_text as its text, absent when the framework presents no schema. definitions gives each tool's canonical_json, whose UTF-8 bytes are hashed, and sha256, in the order of the result's tools, or null for a tool without a hash: a number with a fraction or an exponent that is not finite as a double, a member name that repeats or a string with a lone surrogate, at any depth within the members that the hash covers, leaves its definition without one, and what a tool carries beside them never does. definitions is null as a whole when a member name repeats in the JSON-RPC message itself or in its result, which leaves every tool of the message without a hash.",
+  "description": "What an enforcement point reports of an agent's tooling (docs/contracts/module-contract-v0.1.md, section 4.10). definitions: definition hashes, each the SHA-256, in lowercase hexadecimal, of the canonical JSON of section 4.10 of the members that the hash covers, those that are absent or null left out (a null within them stays). Section 4.10 writes a number without a fraction or an exponent as its exact value, whatever its size, and any other from its value as a double, as RFC 8785 does. For an MCP tool (kind mcp), the members name, title, description, inputSchema, outputSchema and annotations of each tool of a tools/list response, read from the JSON-RPC message itself: message gives it as a JSON value or, where a parsed object cannot hold it, message_text as its text. For a function, http or other tool (kind function), the members name and inputSchema: name, and input_schema as a JSON value or input_schema_text as its text, absent when the framework presents no schema. definitions gives each tool's canonical_json, whose UTF-8 bytes are hashed, and sha256, in the order of the result's tools, or null for a tool without a hash: a number with a fraction or an exponent that is not finite as a double, a member name that repeats or a string with a lone surrogate, at any depth within the members that the hash covers, leaves its definition without one, and what a tool carries beside them never does. definitions is null as a whole when a member name repeats in the JSON-RPC message itself or in its result, which leaves every tool of the message without a hash. urls: URLs as the url_host transform reads them (section 6.11), and normalized as section 4.10 says. Each gives url, the value; host, the host that url_host reads, or null when it cannot read the value; and normalized, the URL normalized, or null when it makes no reference: when url_host cannot read it, its scheme is not http or https, or its path has a backslash. references: references, as their string forms (section 4.10), after the redaction of EP-14. Each gives entry, an MCP server, a tool or a model; rules, the deployment's redaction rules that the catalog file carries (section 7.7), absent when there are none, as before a bundle is active; and reference, the string form, whose UTF-8 bytes reference_sha256 hashes, or null for an entry that makes no reference. An entry's kind is remote_server (url), connector (provider and connector_id), local_server (command: the array of its command and arguments, as configured), mcp_tool (server, an entry of one of the three kinds before, and name), tool (a function, http or other tool: name), builtin_tool (provider and type) or model (provider, endpoint and name).",
   "definitions": [
     {
       "id": "D-01",
@@ -281,6 +281,621 @@
           "sha256": "0f49b85f67bcfcf5bac3c78d74425d9ad43189480439e109c5516fed5ffaaccd"
         }
       ]
+    }
+  ],
+  "urls": [
+    {
+      "id": "U-01",
+      "description": "The example of section 4.10: the scheme and the host in lowercase, the default port left out, an unreserved character decoded and dot segments removed, and the trailing slash kept",
+      "url": "HTTPS://API.Example.COM:443/mcp/./tools/../%7euser/",
+      "host": "api.example.com",
+      "normalized": "https://api.example.com/mcp/~user/"
+    },
+    {
+      "id": "U-02",
+      "description": "An empty path is written /, and the query and the fragment are removed",
+      "url": "https://example.com?tenant=acme#top",
+      "host": "example.com",
+      "normalized": "https://example.com/"
+    },
+    {
+      "id": "U-03",
+      "description": "User information, query and fragment are removed",
+      "url": "https://user:token@git.example.com/repo.git?ref=main#readme",
+      "host": "git.example.com",
+      "normalized": "https://git.example.com/repo.git"
+    },
+    {
+      "id": "U-04",
+      "description": "The host follows the last @ of the authority, as every parser reads it",
+      "url": "http://good.com@evil.com/x",
+      "host": "evil.com",
+      "normalized": "http://evil.com/x"
+    },
+    {
+      "id": "U-05",
+      "description": "A port with leading zeros is its decimal value: :0080 is the default port of http",
+      "url": "http://example.com:0080/",
+      "host": "example.com",
+      "normalized": "http://example.com/"
+    },
+    {
+      "id": "U-06",
+      "description": "A port other than the default is written in decimal without leading zeros",
+      "url": "https://example.com:08080/x",
+      "host": "example.com",
+      "normalized": "https://example.com:8080/x"
+    },
+    {
+      "id": "U-07",
+      "description": "443 is not the default port of http, nor 80 that of https",
+      "url": "http://example.com:443/",
+      "host": "example.com",
+      "normalized": "http://example.com:443/"
+    },
+    {
+      "id": "U-08",
+      "description": "80 is not the default port of https",
+      "url": "https://example.com:80/",
+      "host": "example.com",
+      "normalized": "https://example.com:80/"
+    },
+    {
+      "id": "U-09",
+      "description": "Characters that RFC 3986 does not allow in a path are percent-encoded as UTF-8, and so is a % that two hexadecimal digits do not follow",
+      "url": "https://example.com/a b/Caf\u00e9/%zz/50%",
+      "host": "example.com",
+      "normalized": "https://example.com/a%20b/Caf%C3%A9/%25zz/50%25"
+    },
+    {
+      "id": "U-10",
+      "description": "Percent-encoding normalized: hexadecimal digits in uppercase, unreserved characters decoded, and the encoded / kept encoded",
+      "url": "https://example.com/%7e%7E%41%2f%2F%e2%82%ac",
+      "host": "example.com",
+      "normalized": "https://example.com/~~A%2F%2F%E2%82%AC"
+    },
+    {
+      "id": "U-11",
+      "description": "What RFC 3986 allows in a path stays as it is, and the rest of ASCII is percent-encoded",
+      "url": "https://example.com/!$&'()*+,;=:@-._~/[]{}|^`\"<>",
+      "host": "example.com",
+      "normalized": "https://example.com/!$&'()*+,;=:@-._~/%5B%5D%7B%7D%7C%5E%60%22%3C%3E"
+    },
+    {
+      "id": "U-12",
+      "description": "Dot segments are removed once percent-encoding is normalized, so %2e%2E is a dot segment",
+      "url": "https://example.com/a/%2e%2E/b/./c/..",
+      "host": "example.com",
+      "normalized": "https://example.com/b/"
+    },
+    {
+      "id": "U-13",
+      "description": "A .. above the root is dropped, and empty segments stay",
+      "url": "https://example.com/../a//b/",
+      "host": "example.com",
+      "normalized": "https://example.com/a//b/"
+    },
+    {
+      "id": "U-14",
+      "description": "A path without a trailing slash stays without one",
+      "url": "https://api.openai.com/v1",
+      "host": "api.openai.com",
+      "normalized": "https://api.openai.com/v1"
+    },
+    {
+      "id": "U-15",
+      "description": "A path with a trailing slash keeps it",
+      "url": "https://api.openai.com/v1/",
+      "host": "api.openai.com",
+      "normalized": "https://api.openai.com/v1/"
+    },
+    {
+      "id": "U-16",
+      "description": "The host converted to A-labels, in lowercase, without its trailing dot",
+      "url": "https://M\u00fcnchen.DE./mcp",
+      "host": "xn--mnchen-3ya.de",
+      "normalized": "https://xn--mnchen-3ya.de/mcp"
+    },
+    {
+      "id": "U-17",
+      "description": "Underscores pass: no STD3 rules",
+      "url": "http://my_service.internal:8080/mcp",
+      "host": "my_service.internal",
+      "normalized": "http://my_service.internal:8080/mcp"
+    },
+    {
+      "id": "U-18",
+      "description": "An IPv6 address written as RFC 5952 says",
+      "url": "http://[2001:DB8:0:0:1:0:0:1]:8080/",
+      "host": "[2001:db8::1:0:0:1]",
+      "normalized": "http://[2001:db8::1:0:0:1]:8080/"
+    },
+    {
+      "id": "U-19",
+      "description": "Leading and trailing spaces and C0 control characters are ignored",
+      "url": " \u0001http://127.0.0.1:5000/health\n",
+      "host": "127.0.0.1",
+      "normalized": "http://127.0.0.1:5000/health"
+    },
+    {
+      "id": "U-20",
+      "description": "A right-to-left label passes the Bidi rule",
+      "url": "https://\u05d0\u05d1.example/",
+      "host": "xn--4dbc.example",
+      "normalized": "https://xn--4dbc.example/"
+    },
+    {
+      "id": "U-21",
+      "description": "A scheme other than http and https makes no reference, though url_host reads its host",
+      "url": "wss://example.com/socket",
+      "host": "example.com",
+      "normalized": null
+    },
+    {
+      "id": "U-22",
+      "description": "A backslash in the path makes no reference",
+      "url": "https://example.com/path/\\windows\\file",
+      "host": "example.com",
+      "normalized": null
+    },
+    {
+      "id": "U-23",
+      "description": "A backslash in the query is removed with it",
+      "url": "https://example.com/path?q=a\\b",
+      "host": "example.com",
+      "normalized": "https://example.com/path"
+    },
+    {
+      "id": "U-24",
+      "description": "url_host cannot read a backslash in the authority, where parsers read different hosts",
+      "url": "http://evil.com\\@good.com/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-25",
+      "description": "url_host cannot read a URL without a scheme and //",
+      "url": "example.com/mcp",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-26",
+      "description": "url_host cannot read an IPv4 address that is not four decimal numbers",
+      "url": "http://127.1/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-27",
+      "description": "url_host cannot read an IPv6 address in the IPv4-mapped range",
+      "url": "http://[::ffff:7f00:1]/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-28",
+      "description": "url_host cannot read a colon after the host with no port",
+      "url": "https://example.com:/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-29",
+      "description": "url_host cannot read a % in the host",
+      "url": "http://%67ood.com/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-30",
+      "description": "url_host cannot read an A-label whose Punycode gives an ASCII label",
+      "url": "http://xn--gd-.com/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-31",
+      "description": "url_host cannot read a joiner that its context does not allow",
+      "url": "http://a\u200cb.com/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-32",
+      "description": "url_host cannot read a label that breaks the Bidi rule",
+      "url": "http://a\u05d0.com/",
+      "host": null,
+      "normalized": null
+    },
+    {
+      "id": "U-33",
+      "description": "url_host cannot read an A-label that does not encode back to itself: the Punycode -bbk decodes to what bbk decodes to, and xn--bbk.com can be read",
+      "url": "http://xn---bbk.com/",
+      "host": null,
+      "normalized": null
+    }
+  ],
+  "references": [
+    {
+      "id": "R-01",
+      "description": "A remote server's reference is its normalized URL",
+      "entry": {
+        "kind": "remote_server",
+        "url": "https://api.githubcopilot.com/mcp/"
+      },
+      "reference": "https://api.githubcopilot.com/mcp/",
+      "reference_sha256": "ca602dd499edea084d35bd6584aea648dec2778e67b48e10ab008ae0c1d06284"
+    },
+    {
+      "id": "R-02",
+      "description": "Configurations that differ only in user information, query and fragment share one reference",
+      "entry": {
+        "kind": "remote_server",
+        "url": "HTTPS://user:pw@API.githubcopilot.com:443/mcp/?tenant=acme#x"
+      },
+      "reference": "https://api.githubcopilot.com/mcp/",
+      "reference_sha256": "ca602dd499edea084d35bd6584aea648dec2778e67b48e10ab008ae0c1d06284"
+    },
+    {
+      "id": "R-03",
+      "description": "A deployment prefix replaces the path segment that follows it",
+      "entry": {
+        "kind": "remote_server",
+        "url": "https://mcp.example.net/s/SECRET123/mcp"
+      },
+      "rules": {
+        "url_prefixes": [
+          "https://mcp.example.net/s/"
+        ],
+        "flags": []
+      },
+      "reference": "https://mcp.example.net/s/<redacted>/mcp",
+      "reference_sha256": "6eabedc4935f5d4c3f30324d16bc346a538985a80df8fc9aa47ceff1d9de1471"
+    },
+    {
+      "id": "R-04",
+      "description": "A prefix matches the normalized URL",
+      "entry": {
+        "kind": "remote_server",
+        "url": "HTTPS://MCP.example.net:443/s/./SECRET"
+      },
+      "rules": {
+        "url_prefixes": [
+          "https://mcp.example.net/s/"
+        ],
+        "flags": []
+      },
+      "reference": "https://mcp.example.net/s/<redacted>",
+      "reference_sha256": "4c6165568d28a5b95f68e9abc89e9b12ea539d470ae959a610bfbcc787bc2de5"
+    },
+    {
+      "id": "R-05",
+      "description": "A URL equal to a prefix replaces nothing",
+      "entry": {
+        "kind": "remote_server",
+        "url": "https://mcp.example.net/s/"
+      },
+      "rules": {
+        "url_prefixes": [
+          "https://mcp.example.net/s/"
+        ],
+        "flags": []
+      },
+      "reference": "https://mcp.example.net/s/",
+      "reference_sha256": "0c13fb8e07819de04ae7e6e8841875b463a2a968a1bb339ba796641ac043a3e0"
+    },
+    {
+      "id": "R-06",
+      "description": "Every prefix that matches before any replacement replaces its segment, the example of EP-14",
+      "entry": {
+        "kind": "remote_server",
+        "url": "https://a.example/s/x/SECRET"
+      },
+      "rules": {
+        "url_prefixes": [
+          "https://a.example/s/",
+          "https://a.example/s/x/"
+        ],
+        "flags": []
+      },
+      "reference": "https://a.example/s/<redacted>/<redacted>",
+      "reference_sha256": "fa850839a4a8141190689f7d41c082ea32bf7b3831e7268fd6acc5aace142846"
+    },
+    {
+      "id": "R-07",
+      "description": "A remote server whose URL makes no reference is not reported",
+      "entry": {
+        "kind": "remote_server",
+        "url": "ws://example.com/mcp"
+      },
+      "reference": null,
+      "reference_sha256": null
+    },
+    {
+      "id": "R-08",
+      "description": "A server that the model provider hosts and names by an ID",
+      "entry": {
+        "kind": "connector",
+        "provider": "openai",
+        "connector_id": "connector_dropbox"
+      },
+      "reference": "connector:openai/connector_dropbox",
+      "reference_sha256": "648f62bc157d7e4a38498d656406bda14ef2f402e2f2a6970055578110f560eb"
+    },
+    {
+      "id": "R-09",
+      "description": "A local server: stdio: and the canonical JSON of its command and arguments",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          "/srv/projects"
+        ]
+      },
+      "reference": "stdio:[\"npx\",\"-y\",\"@modelcontextprotocol/server-filesystem\",\"/srv/projects\"]",
+      "reference_sha256": "06eb1a472edccc432aedadcd01977762f148e0a1d74290e72d7c970c1ea9f54a"
+    },
+    {
+      "id": "R-10",
+      "description": "Canonical JSON escapes backslashes and quotes, and writes other characters as they are",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "C:\\Program Files\\srv.exe",
+          "--root",
+          "/home/jos\u00e9/\"data\""
+        ]
+      },
+      "reference": "stdio:[\"C:\\\\Program Files\\\\srv.exe\",\"--root\",\"/home/jos\u00e9/\\\"data\\\"\"]",
+      "reference_sha256": "c10e3d8a238bbef2df480a7ff7a0c78f426cecf63cf0c347eee1b8a5ace68cf7"
+    },
+    {
+      "id": "R-11",
+      "description": "The value after a flag whose name contains one of EP-14's words, in any case, and the value of such a flag written --flag=value",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "mcp-server",
+          "--api-key",
+          "sk-123",
+          "--token=abc",
+          "--verbose",
+          "-p",
+          "8080",
+          "--Auth-Header",
+          "Bearer x"
+        ]
+      },
+      "reference": "stdio:[\"mcp-server\",\"--api-key\",\"<redacted>\",\"--token=<redacted>\",\"--verbose\",\"-p\",\"8080\",\"--Auth-Header\",\"<redacted>\"]",
+      "reference_sha256": "909cf86f59f2531c93d97e1fe8e46cf2405275640740e0a951f3c9c63f176f99"
+    },
+    {
+      "id": "R-12",
+      "description": "One dash and two alike; --flag=value never redacts the argument after it; a flag given last redacts nothing; and only ASCII letters compare without regard to case, so the Kelvin sign is not a K",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "server",
+          "-password",
+          "hunter2",
+          "--secret=s3",
+          "positional",
+          "--TO\u212aEN",
+          "kept",
+          "--cookie"
+        ]
+      },
+      "reference": "stdio:[\"server\",\"-password\",\"<redacted>\",\"--secret=<redacted>\",\"positional\",\"--TO\u212aEN\",\"kept\",\"--cookie\"]",
+      "reference_sha256": "9121cdf3ec7dfe87a31a6c18efac08b01929d77a1d5471518195ddce924e39fc"
+    },
+    {
+      "id": "R-13",
+      "description": "An argument that follows a secret flag is redacted, and is a flag itself",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "srv",
+          "--token",
+          "--password",
+          "pw"
+        ]
+      },
+      "reference": "stdio:[\"srv\",\"--token\",\"<redacted>\",\"<redacted>\"]",
+      "reference_sha256": "61ed17e3a8c9f6e0bcf2dd1eaa08bac257fa95bb1603ab12ecee6871008b3585"
+    },
+    {
+      "id": "R-14",
+      "description": "URLs in a command line, whatever their scheme, lose their user information, query and fragment, and are otherwise written as given",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "uvx",
+          "mcp-server-postgres",
+          "postgresql://user:pw@db.internal:5432/app?sslmode=require",
+          "--url=HTTPS://u:p@API.Example.com:443/v1/./x?key=k#f"
+        ]
+      },
+      "reference": "stdio:[\"uvx\",\"mcp-server-postgres\",\"postgresql://db.internal:5432/app\",\"--url=HTTPS://API.Example.com:443/v1/./x\"]",
+      "reference_sha256": "f8e41aa1c6fdda202d552fbc2cb77989eaeaf24b45da4580cc4109030e5bb1e9"
+    },
+    {
+      "id": "R-15",
+      "description": "A URL in a command line is written as given, what url_host ignores around it included",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "srv",
+          " postgresql://user:pw@db/app "
+        ]
+      },
+      "reference": "stdio:[\"srv\",\" postgresql://db/app \"]",
+      "reference_sha256": "ea3df97f7a36dbc8209055003fca368e2d2f414e0bdf43325e012a7872321e69"
+    },
+    {
+      "id": "R-16",
+      "description": "An argument or a value that starts with a scheme and // but that url_host cannot read is replaced as a whole",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "srv",
+          "http://evil.com\\@good.com/x",
+          "--endpoint=https://a b@c/"
+        ]
+      },
+      "reference": "stdio:[\"srv\",\"<redacted>\",\"--endpoint=<redacted>\"]",
+      "reference_sha256": "9b22f05fddc90ca4c115e8ebf95b4bfc94d777973fafdcd39b838382c5f56eda"
+    },
+    {
+      "id": "R-17",
+      "description": "The deployment's rules in a command line: a URL that a prefix matches is written normalized and redacted, and the deployment's flags are matched exactly, without their leading dashes",
+      "entry": {
+        "kind": "local_server",
+        "command": [
+          "mcp-remote",
+          "https://user@MCP.example.net/s/SECRET/sse?x=1",
+          "--pat",
+          "ghp_x",
+          "--pat=ghp_y",
+          "--PAT",
+          "kept",
+          "--path",
+          "/tmp"
+        ]
+      },
+      "rules": {
+        "url_prefixes": [
+          "https://mcp.example.net/s/"
+        ],
+        "flags": [
+          "pat"
+        ]
+      },
+      "reference": "stdio:[\"mcp-remote\",\"https://mcp.example.net/s/<redacted>/sse\",\"--pat\",\"<redacted>\",\"--pat=<redacted>\",\"--PAT\",\"kept\",\"--path\",\"/tmp\"]",
+      "reference_sha256": "642840a30caedef7abffdafa1edb43f531b4777333df21c6f8f349ccef13caba"
+    },
+    {
+      "id": "R-18",
+      "description": "An MCP tool: its server's reference and its name, the example of section 4.10",
+      "entry": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "create_issue"
+      },
+      "reference": "{\"name\":\"create_issue\",\"server\":\"https://api.githubcopilot.com/mcp/\"}",
+      "reference_sha256": "6598e1ecfcf6c42b8a35d3d8ea93bff1b44cd1c1d109b8e9464c1079165d4d54"
+    },
+    {
+      "id": "R-19",
+      "description": "A tool of a local server",
+      "entry": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "local_server",
+          "command": [
+            "npx",
+            "-y",
+            "@modelcontextprotocol/server-github"
+          ]
+        },
+        "name": "create_issue"
+      },
+      "reference": "{\"name\":\"create_issue\",\"server\":\"stdio:[\\\"npx\\\",\\\"-y\\\",\\\"@modelcontextprotocol/server-github\\\"]\"}",
+      "reference_sha256": "937a647b44d26f6a5397e1226f0859badb090e40860f5133f8749f65cd4f90d4"
+    },
+    {
+      "id": "R-20",
+      "description": "A tool of a server that makes no reference has none",
+      "entry": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "mcp.example.com/mcp"
+        },
+        "name": "search"
+      },
+      "reference": null,
+      "reference_sha256": null
+    },
+    {
+      "id": "R-21",
+      "description": "The agent's own tool: its name alone",
+      "entry": {
+        "kind": "tool",
+        "name": "send_email"
+      },
+      "reference": "{\"name\":\"send_email\"}",
+      "reference_sha256": "6d0893badcfaba13ed9c219bad4b1dca3542a8513d0f0833259eb8d11b7020d3"
+    },
+    {
+      "id": "R-22",
+      "description": "A built-in tool: its provider and its type",
+      "entry": {
+        "kind": "builtin_tool",
+        "provider": "openai",
+        "type": "web_search"
+      },
+      "reference": "{\"provider\":\"openai\",\"type\":\"web_search\"}",
+      "reference_sha256": "ef40d907e12a5561b9c863fb3d0ae9b0f88c15a941ad7338a9c2492fa0ee98cb"
+    },
+    {
+      "id": "R-23",
+      "description": "A self-hosted model: the example of section 4.10, with the endpoint normalized",
+      "entry": {
+        "kind": "model",
+        "provider": "ollama",
+        "endpoint": "http://GPU-01.internal:11434",
+        "name": "llama3.1:8b"
+      },
+      "reference": "{\"endpoint\":\"http://gpu-01.internal:11434/\",\"name\":\"llama3.1:8b\",\"provider\":\"ollama\"}",
+      "reference_sha256": "21e3dade3b94e44fc4387d76150524e620a6613820fa7266863c9188a95275c1"
+    },
+    {
+      "id": "R-24",
+      "description": "A model of its provider's default endpoint, which the reference carries",
+      "entry": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-4o"
+      },
+      "reference": "{\"endpoint\":\"https://api.openai.com/v1\",\"name\":\"gpt-4o\",\"provider\":\"openai\"}",
+      "reference_sha256": "552ee0c1121a25da5906e043255dfd351d0660140642ebf0faf7b5ad579dcac5"
+    },
+    {
+      "id": "R-25",
+      "description": "A deployment prefix applies to a model's endpoint",
+      "entry": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://gateway.example.net/k/SECRET/v1",
+        "name": "gpt-4o"
+      },
+      "rules": {
+        "url_prefixes": [
+          "https://gateway.example.net/k/"
+        ],
+        "flags": []
+      },
+      "reference": "{\"endpoint\":\"https://gateway.example.net/k/<redacted>/v1\",\"name\":\"gpt-4o\",\"provider\":\"openai\"}",
+      "reference_sha256": "5a86baed57d9b35c2726ea04116f7ef833396e3914f8af3f625faeba50237288"
+    },
+    {
+      "id": "R-26",
+      "description": "A model whose endpoint makes no reference has none",
+      "entry": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "api.openai.com/v1",
+        "name": "gpt-4o"
+      },
+      "reference": null,
+      "reference_sha256": null
     }
   ]
 }

@@ -240,7 +240,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
-| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | In progress (1 of 5 parts: 3a-1) |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | In progress (2 of 5 parts: 3a-1 and 3a-2) |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -1134,3 +1134,43 @@ Details the list does not name:
 - **What no test observes.** The comments and the descriptions; and the checker's lifted limit on digits, since no vector holds an integer of more than 4300 digits.
 
 For the specification, which is the reviewer's: section 9.1 gains `hashed-arguments.json` with 12 cases and `tooling.json` with its cases, once 3a-2 has added its own.
+
+### 2026-11-10: step 12, part 3a-2: references, normalized URLs and redaction
+
+Part 3a-2 brings section 4.10's references, their string forms and normalized URLs to both stacks, with the reading of `url_host` that they use (section 6.11) and the redaction of EP-14 with the deployment's rules. No generated vector changes.
+
+| What | Change |
+| --- | --- |
+| `test/conformance/tooling` | `ReadURL` reads a value as `url_host` does, step by step, and `URL.Normalized` normalizes it. `NormalizedURL` adds the deployment's prefixes, `RedactCommand` redacts a command line as EP-14 reads it, and six functions give the references and their string forms, written with the `canonical` package of part 3a-1 |
+| `tooling.json` | 33 cases of URLs, U-01 to U-33, each with the host that `url_host` reads and the URL normalized, and 26 cases of references, R-01 to R-26, each with the deployment's rules when it has some, the string form and its SHA-256. The file holds 71 cases |
+| `vectors_test.go` | `TestURLVectors` and `TestReferenceVectors`. The three tests of `tooling.json` share one type of the file, which still refuses unknown members |
+| The Python checker | The same reading, normalization, redaction and references, with the `idna` package. It counts 265 vectors |
+| `go.mod` | `golang.org/x/net`, an indirect dependency, becomes a direct one, for its `idna` package |
+
+| Cases | What they check |
+| --- | --- |
+| U-01 to U-08 | The example of section 4.10; an empty path; user information, query and fragment; the last `@`; ports with leading zeros, and each scheme's default |
+| U-09 to U-15 | Paths: characters encoded as UTF-8, a stray `%`, percent-encoding normalized, dot segments after it, empty segments, trailing slashes |
+| U-16 to U-20 | Hosts: A-labels, underscores, IPv6 as RFC 5952 writes it, what `url_host` ignores around a value, a right-to-left label |
+| U-21 to U-23 | Another scheme and a backslash in the path make no reference; a backslash in the query goes with it |
+| U-24 to U-33 | What `url_host` cannot read: a backslash in the authority, no scheme, an IPv4 address of other numbers, the IPv4-mapped range, a colon without a port, a `%` in the host, a joiner out of context, the Bidi rule, and A-labels that decode to ASCII or do not encode back to themselves |
+| R-01 to R-07 | Remote servers: what a reference covers, the deployment's prefixes, the example of EP-14 with two, a URL equal to a prefix, a URL that makes no reference |
+| R-08 to R-17 | A connector, and local servers: canonical JSON, flags, URLs in command lines, URLs that `url_host` cannot read, the deployment's rules |
+| R-18 to R-26 | Tools and models: the examples of section 4.10, a tool of a local server, a prefix on a model's endpoint, and entries that make no reference |
+
+Details the lists do not name:
+
+- **Hosts on each stack.** Go converts hosts with `x/net/idna` options close to WHATWG's: UTS #46 non-transitional, no STD3 rules, no checks on hyphens, joiners and Bidi checked. Python uses the `idna` package's `uts46_remap` without the STD3 rules, then Punycode, and checks joiners, a leading combining mark and Bidi itself, Bidi on every label of a domain with a right-to-left one, as UTS #46 says and Go does. Python checks that an A-label encodes back to itself. Go's decoder refuses a delimiter with nothing before it, as in `xn---bbk`, which decodes to what `xn--bbk` does, and U-33 checks both. On both stacks, step 7's checks on empty labels and characters run after the conversion, which accepts them. Python lists the 25 characters of White_Space.
+- **The check file.** The 80 URLs of `url-and-address-check.json` read as its `check` says, on both stacks, and its 14 IDNA hosts convert alike, `xn--gd-.com` refused as the specification answered on 2026-11-06: no difference from the specification. Its cases are part 3b's, in `arguments.json`, which reads a URL's host with `ReadURL`, and a domain of `email_domain` with steps 7 and 8 (`readHost`).
+- **The stacks agree beyond the vectors.** About 40,000 generated URLs, of which 8,000 can be read, read, normalize and redact alike on Go 1.27 and Python. On Go 1.26, `x/net/idna` uses Unicode 15.0: of 20,000 of them, 156 differ, all for U+1E9E, `ẞ`, which maps to `ss` there and to `ß` from Unicode 15.1 on. No vector holds it, and both Go versions pass every vector.
+- **Readings of EP-14's text.** A URL in a command line is written as given, what `url_host` ignores around it included (R-15). A flag's name follows all its leading dashes. The deployment's flags match exactly, case included (R-17). An argument that follows a secret flag is redacted, and still counts as a flag for the argument after it (R-13).
+- **Fuzz tests.** `FuzzReadURL` checks that a host read has only the characters that hosts may have, and that a normalized URL normalizes to itself. `FuzzRedactCommand` checks that redaction keeps every argument in its place whatever the rules, and that redacting again changes nothing with one valid prefix. With nested prefixes, it does change something: the first finding below.
+- **Size.** About 1,150 changed lines without vector data, more than the 800 of a part, since both stacks need the whole reading. In two parts, it would be `url_host`'s reading and normalized URLs, about 600 lines, then references and redaction, about 550.
+
+Three findings for the reviewer, with options in the pull request's description:
+
+- **Redacting again with nested prefixes.** CORE-11 has the core apply EP-14 again to what a report brings. With EP-14's own example, an enforcement point computes `https://a.example/s/<redacted>/<redacted>`. Normalized again, `<redacted>` becomes `%3Credacted%3E`, the prefix `https://a.example/s/x/` no longer matches, and the core stores `https://a.example/s/<redacted>/%3Credacted%3E`, a reference that no enforcement point computes.
+- **The Unicode version of UTS #46.** Section 6.11 names none, and the stacks differ: Unicode 15.0 or 17.0 in Go, by the Go version, and 18.0 in the `idna` package, with the standard library's 15.1 for normalization and Bidi classes.
+- **Long hosts in Python.** The `idna` package refuses a domain, or a label, longer than 1024 characters, where Go and the specification have no limit. A reference holds at most 2 KiB, so a host can be longer; P1-09 and part 3b meet it.
+
+For the specification, which is the reviewer's: section 9.1 gains `tooling.json` with 71 cases.

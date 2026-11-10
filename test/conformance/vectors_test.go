@@ -441,6 +441,59 @@ type definition struct {
 	SHA256        string `json:"sha256"`
 }
 
+// toolingFile is tooling.json: definition hashes, URLs and references.
+type toolingFile struct {
+	Description string `json:"description"`
+	Definitions []struct {
+		ID          string `json:"id"`
+		Description string `json:"description"`
+		Kind        string `json:"kind"`
+		// An MCP tool's: the JSON-RPC message, as a JSON value or as text.
+		Message     json.RawMessage `json:"message"`
+		MessageText string          `json:"message_text"`
+		// A function's: its name, and the JSON Schema of its parameters as
+		// a JSON value or as text, or neither.
+		Name            string          `json:"name"`
+		InputSchema     json.RawMessage `json:"input_schema"`
+		InputSchemaText *string         `json:"input_schema_text"`
+		// Each tool's definition, nil for a tool without a hash; nil as a
+		// whole when the message leaves every tool without one.
+		Definitions *[]*definition `json:"definitions"`
+	} `json:"definitions"`
+	URLs []struct {
+		ID          string `json:"id"`
+		Description string `json:"description"`
+		URL         string `json:"url"`
+		// The host that url_host reads, and the URL normalized; nil when
+		// url_host cannot read it, or when it makes no reference.
+		Host       *string `json:"host"`
+		Normalized *string `json:"normalized"`
+	} `json:"urls"`
+	References []struct {
+		ID          string         `json:"id"`
+		Description string         `json:"description"`
+		Entry       referenceEntry `json:"entry"`
+		Rules       tooling.Rules  `json:"rules"`
+		// nil for an entry that makes no reference.
+		Reference       *string `json:"reference"`
+		ReferenceSHA256 *string `json:"reference_sha256"`
+	} `json:"references"`
+}
+
+// referenceEntry is an MCP server, a tool or a model, as tooling.json gives
+// it.
+type referenceEntry struct {
+	Kind        string          `json:"kind"`
+	URL         string          `json:"url"`
+	Provider    string          `json:"provider"`
+	ConnectorID string          `json:"connector_id"`
+	Command     []string        `json:"command"`
+	Server      *referenceEntry `json:"server"`
+	Name        string          `json:"name"`
+	Type        string          `json:"type"`
+	Endpoint    string          `json:"endpoint"`
+}
+
 // toolingDefinition returns a reference implementation's definition as
 // tooling.json gives it: nil for a definition without a hash.
 func toolingDefinition(def *tooling.Definition) *definition {
@@ -454,26 +507,7 @@ func toolingDefinition(def *tooling.Definition) *definition {
 // (section 4.10): those of the tools of a tools/list response, and that of a
 // function, an http or another tool.
 func TestDefinitionVectors(t *testing.T) {
-	var file struct {
-		Description string `json:"description"`
-		Definitions []struct {
-			ID          string `json:"id"`
-			Description string `json:"description"`
-			Kind        string `json:"kind"`
-			// An MCP tool's: the JSON-RPC message, as a JSON value or as
-			// text.
-			Message     json.RawMessage `json:"message"`
-			MessageText string          `json:"message_text"`
-			// A function's: its name, and the JSON Schema of its parameters
-			// as a JSON value or as text, or neither.
-			Name            string          `json:"name"`
-			InputSchema     json.RawMessage `json:"input_schema"`
-			InputSchemaText *string         `json:"input_schema_text"`
-			// Each tool's definition, nil for a tool without a hash; nil as a
-			// whole when the message leaves every tool without one.
-			Definitions *[]*definition `json:"definitions"`
-		} `json:"definitions"`
-	}
+	var file toolingFile
 	loadJSON(t, "vectors/tooling.json", &file)
 	if len(file.Definitions) == 0 {
 		t.Fatal("no cases")
@@ -513,6 +547,98 @@ func TestDefinitionVectors(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, c.Definitions) {
 				t.Errorf("got %s, want %s", show(got), show(c.Definitions))
+			}
+		})
+	}
+}
+
+// TestURLVectors reads the URLs of tooling.json as url_host does (section
+// 6.11), and normalizes them as section 4.10 says.
+func TestURLVectors(t *testing.T) {
+	var file toolingFile
+	loadJSON(t, "vectors/tooling.json", &file)
+	if len(file.URLs) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range file.URLs {
+		t.Run(c.ID, func(t *testing.T) {
+			var host, normalized *string
+			u, err := tooling.ReadURL(c.URL)
+			switch {
+			case errors.Is(err, tooling.ErrCannotRead):
+			case err != nil:
+				t.Fatal(err)
+			default:
+				host = &u.Host
+				n, err := u.Normalized()
+				if err != nil && !errors.Is(err, tooling.ErrNoReference) {
+					t.Fatal(err)
+				}
+				if err == nil {
+					normalized = &n
+				}
+			}
+			if !reflect.DeepEqual(host, c.Host) || !reflect.DeepEqual(normalized, c.Normalized) {
+				t.Errorf("got host %s, normalized %s; want %s, %s", show(host), show(normalized), show(c.Host), show(c.Normalized))
+			}
+		})
+	}
+}
+
+// reference computes an entry's reference with the reference implementation,
+// as its string form.
+func reference(t *testing.T, e referenceEntry, rules tooling.Rules) (string, error) {
+	t.Helper()
+	switch e.Kind {
+	case "remote_server":
+		return tooling.NormalizedURL(e.URL, rules)
+	case "connector":
+		return tooling.ConnectorReference(e.Provider, e.ConnectorID), nil
+	case "local_server":
+		return tooling.LocalServerReference(e.Command, rules), nil
+	case "mcp_tool":
+		if e.Server == nil {
+			t.Fatal("an MCP tool without its server")
+		}
+		server, err := reference(t, *e.Server, rules)
+		if err != nil {
+			return "", err
+		}
+		return tooling.MCPToolReference(server, e.Name), nil
+	case "tool":
+		return tooling.ToolReference(e.Name), nil
+	case "builtin_tool":
+		return tooling.BuiltinToolReference(e.Provider, e.Type), nil
+	case "model":
+		return tooling.ModelReference(e.Provider, e.Endpoint, e.Name, rules)
+	}
+	t.Fatalf("unknown kind %q", e.Kind)
+	return "", nil
+}
+
+// TestReferenceVectors computes the references of tooling.json, as their
+// string forms and the SHA-256 that blocks and events name them by, after the
+// redaction of EP-14 with the deployment's rules (section 4.10).
+func TestReferenceVectors(t *testing.T) {
+	var file toolingFile
+	loadJSON(t, "vectors/tooling.json", &file)
+	if len(file.References) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range file.References {
+		t.Run(c.ID, func(t *testing.T) {
+			var ref, sum *string
+			got, err := reference(t, c.Entry, c.Rules)
+			if err != nil && !errors.Is(err, tooling.ErrNoReference) {
+				t.Fatal(err)
+			}
+			if err == nil {
+				digest := sha256.Sum256([]byte(got))
+				hexDigest := hex.EncodeToString(digest[:])
+				ref, sum = &got, &hexDigest
+			}
+			if !reflect.DeepEqual(ref, c.Reference) || !reflect.DeepEqual(sum, c.ReferenceSHA256) {
+				t.Errorf("got %s (%s), want %s (%s)", show(ref), show(sum), show(c.Reference), show(c.ReferenceSHA256))
 			}
 		})
 	}
