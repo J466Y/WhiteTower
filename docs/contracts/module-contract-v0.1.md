@@ -772,7 +772,7 @@ Legitimate values that these rules refuse are rare: a URL without a scheme, a qu
   - Arguments that are absent are an empty object. Arguments that are not a JSON object deny the call, whatever the tool declares.
   - A declared argument whose value is `null` does not fit its type, since a tool can read `null` otherwise than an absent argument: `filter: null` can mean no filter. Frameworks that send `null` for an optional parameter, as OpenAI's strict mode does, have those calls denied until they leave it out.
   - A path that goes through a value that is not an object, a string, an array or `null` where an object should be, denies the call: some tools parse a JSON string, or take an array's first element.
-  - A member name that repeats in the arguments, or in any object that a declared path goes through, denies the call, since parsers keep the first value or the last.
+  - A member name that repeats in the arguments object itself, whatever the tool declares, or in any object that a declared path goes through, denies the call, since parsers keep the first value or the last. A repeat elsewhere reaches no rule.
   - A declared string, or an element of a declared set, with a lone surrogate denies the call: Cedar strings cannot hold one, and parsers replace it or refuse it.
 
 **Usage rules.** A usage rule forbids a pattern of use of one or more tools, and is enforced on every call: a tool with a rule is offered to a model only when each of its calls will be decided (section 6.10). Rules live in ordinary policies, global or agent-specific, which are approved like any other policy text, and the core generates their Cedar statements:
