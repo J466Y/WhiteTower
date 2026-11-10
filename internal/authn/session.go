@@ -43,11 +43,13 @@ const (
 
 	csrfHMACKey = "whitetower-csrf-token-v1"
 
-	// roleMappingForm names the canonical form of a role mapping, which the
-	// mapping's hash starts with: a later form would hash every mapping apart
-	// from this one's, so that the sessions of this form are refused rather
-	// than misread.
-	roleMappingForm = "whitetower-role-mapping-v1"
+	// signInConfigurationForm names the canonical form of a sign-in
+	// configuration, which the configuration's hash starts with: a later form
+	// would hash every configuration apart from this one's, so that the
+	// sessions of this form are refused rather than misread, as are those of
+	// the former form, whitetower-role-mapping-v1, which hashed the role
+	// mapping alone.
+	signInConfigurationForm = "whitetower-sign-in-configuration-v1"
 )
 
 var (
@@ -58,8 +60,8 @@ var (
 	ErrSessionRevoked = errors.New("session is revoked")
 
 	// ErrSessionExpired is returned when a session has passed its idle or
-	// absolute lifetime, or when its roles came from another role mapping
-	// than the store's (ST-14).
+	// absolute lifetime, or when another sign-in configuration than the
+	// store's created it (ST-14).
 	ErrSessionExpired = errors.New("session is expired")
 
 	// ErrPrincipalInactive is returned when a session's principal has been deactivated.
@@ -85,18 +87,45 @@ type Session struct {
 	RevokedAt         *time.Time
 }
 
-// SessionOptions configures sessions: their lifetimes, and the role mapping
-// that resolves their roles.
+// SessionOptions configures sessions: their lifetimes, and the sign-in
+// configuration that creates them.
 type SessionOptions struct {
 	IdleTimeout      time.Duration
 	AbsoluteLifetime time.Duration
-	// RoleMapping maps IdP groups to the roles of the sessions that the
-	// server creates: auth.oidc.role_mapping, with which the OIDC service
-	// resolves them. A session records the mapping's hash, and Get refuses a
-	// session whose roles came from another mapping, as after a change of the
-	// setting and a restart, so that no session keeps the roles of the
-	// mapping before (ST-14). Break-glass sessions, whose roles do not come
-	// from it, are exempt.
+	// SignInConfiguration is the configuration with which the OIDC service
+	// accepts ID tokens, finds the person and resolves the roles of the
+	// sessions that the server creates. A session records its hash, and Get
+	// refuses a session that another configuration created, as after a
+	// change of one of its settings and a restart, so that no session
+	// outlives the configuration that created it (ST-14). Break-glass
+	// sessions, whose roles come from none of its settings, are exempt.
+	SignInConfiguration SignInConfiguration
+}
+
+// SignInConfiguration holds the settings of auth.oidc that decide which ID
+// tokens the server accepts, which person a sign-in is and what roles it
+// gives. The settings of transport and routine, such as the discovery URL,
+// the CA file, the client secret, the state key, the redirect URL, the scopes
+// and the CLI's client ID, whose exchange creates API tokens and no session,
+// are not among them: rotating them must sign no one out.
+type SignInConfiguration struct {
+	// Issuer is auth.oidc.issuer, the identity provider whose ID tokens the
+	// server accepts: empty when OIDC is off, and only break-glass sessions
+	// are created.
+	Issuer string
+	// ClientID is auth.oidc.client_id, the audience of those ID tokens.
+	ClientID string
+	// AllowedAlgorithms is auth.oidc.allowed_algorithms, the algorithms that
+	// may sign them. The verifier reads them as a set.
+	AllowedAlgorithms []string
+	// ExternalIDClaim is auth.oidc.external_id_claim, the claim that says
+	// which person a sign-in is.
+	ExternalIDClaim string
+	// GroupsClaim is auth.oidc.groups_claim, the claim of the person's
+	// groups.
+	GroupsClaim string
+	// RoleMapping is auth.oidc.role_mapping, which maps those groups to
+	// roles.
 	RoleMapping map[string]string
 }
 
@@ -106,8 +135,9 @@ type SessionStore struct {
 	clk      clock.Clock
 	writer   *audit.Writer
 	opts     SessionOptions
-	// roleMapping is the hash of opts.RoleMapping, which sessions record.
-	roleMapping []byte
+	// signInConfiguration is the hash of opts.SignInConfiguration, which
+	// sessions record.
+	signInConfiguration []byte
 }
 
 // NewSessionStore creates a new SessionStore, which records sign-ins and
@@ -120,45 +150,66 @@ func NewSessionStore(database *db.DB, clk clock.Clock, writer *audit.Writer, opt
 		opts.AbsoluteLifetime = 12 * time.Hour
 	}
 	return &SessionStore{
-		database:    database,
-		clk:         clk,
-		writer:      writer,
-		opts:        opts,
-		roleMapping: roleMappingSHA256(opts.RoleMapping),
+		database:            database,
+		clk:                 clk,
+		writer:              writer,
+		opts:                opts,
+		signInConfiguration: signInConfigurationSHA256(opts.SignInConfiguration),
 	}
 }
 
-// roleMappingSHA256 returns the SHA-256 of mapping in a canonical form: the
-// form's name, then each group, in the order of its bytes, followed by its
-// role, every string preceded by its length in eight bytes. The order in
-// which the configuration lists the groups carries no meaning, and the
-// lengths keep the strings apart whatever they hold, where a separator could
-// appear in a name, so two mappings hash the same exactly when they map the
-// same groups to the same roles; a nil mapping and an empty one both map
-// none. ResolveEffectiveRoles also looks a group up without its leading
-// slash, so a few mappings that differ in groups that start with slashes
-// resolve the same roles for every group all the same: they hash apart,
-// which costs their people a sign-in, never a role.
-func roleMappingSHA256(mapping map[string]string) []byte {
+// signInConfigurationSHA256 returns the SHA-256 of c in a canonical form: the
+// form's name; the issuer; the client ID; the allowed algorithms, in the
+// order of their bytes and each once; the external ID claim; the groups
+// claim; then each group of the role mapping, in the order of its bytes,
+// followed by its role. Every string is preceded by its length, and each list
+// by its number of items, in eight bytes, so that no string passes for part
+// of another or of the next setting, whatever it holds.
+//
+// Two configurations thus hash the same exactly when their settings are the
+// same, but for what carries no meaning: the order of the algorithms, and an
+// algorithm listed twice, since the verifier reads them as a set; the order
+// of the groups, which the map has already lost; and nil or empty for a list
+// or the mapping. An empty setting hashes apart from any that is set, even
+// when the OIDC service gives it a default, such as sub for the external ID
+// claim: the configuration writes the defaults, so an empty setting is one
+// that was emptied, and the cost is a sign-in, never a role. Likewise,
+// ResolveEffectiveRoles looks a group up without its leading slash too, so a
+// few mappings that differ in groups that start with slashes resolve the same
+// roles for every group, and hash apart all the same.
+func signInConfigurationSHA256(c SignInConfiguration) []byte {
 	h := sha256.New()
-	h.Write([]byte(roleMappingForm))
-	for _, group := range slices.Sorted(maps.Keys(mapping)) {
-		for _, s := range []string{group, mapping[group]} {
-			h.Write(binary.BigEndian.AppendUint64(nil, uint64(len(s))))
-			h.Write([]byte(s))
-		}
+	writeCount := func(n uint64) { h.Write(binary.BigEndian.AppendUint64(nil, n)) }
+	writeString := func(s string) {
+		writeCount(uint64(len(s)))
+		h.Write([]byte(s))
+	}
+	writeString(signInConfigurationForm)
+	writeString(c.Issuer)
+	writeString(c.ClientID)
+	algorithms := slices.Compact(slices.Sorted(slices.Values(c.AllowedAlgorithms)))
+	writeCount(uint64(len(algorithms)))
+	for _, algorithm := range algorithms {
+		writeString(algorithm)
+	}
+	writeString(c.ExternalIDClaim)
+	writeString(c.GroupsClaim)
+	writeCount(uint64(len(c.RoleMapping)))
+	for _, group := range slices.Sorted(maps.Keys(c.RoleMapping)) {
+		writeString(group)
+		writeString(c.RoleMapping[group])
 	}
 	return h.Sum(nil)
 }
 
-// roleMappingOf returns the hash of the role mapping that a session of method
-// records: the store's, and none for break-glass, whose roles do not come
-// from the mapping.
-func (s *SessionStore) roleMappingOf(method string) []byte {
+// signInConfigurationOf returns the hash of the sign-in configuration that a
+// session of method records: the store's, and none for break-glass, whose
+// roles come from none of its settings.
+func (s *SessionStore) signInConfigurationOf(method string) []byte {
 	if method == "breakglass" {
 		return nil
 	}
-	return s.roleMapping
+	return s.signInConfiguration
 }
 
 // Create generates and stores a new session for principalID with the given method and roles.
@@ -195,15 +246,15 @@ func (s *SessionStore) CreateWithLifetime(
 
 	q := authndb.New(s.database)
 	err = q.CreateSession(ctx, authndb.CreateSessionParams{
-		IDHash:            idHash,
-		PrincipalID:       principalID,
-		Method:            method,
-		Roles:             roles,
-		CsrfTokenHash:     csrfHash,
-		CreatedAt:         now,
-		IdleExpiresAt:     idleExpiry,
-		AbsoluteExpiresAt: absoluteExpiry,
-		RoleMappingSha256: s.roleMappingOf(method),
+		IDHash:                    idHash,
+		PrincipalID:               principalID,
+		Method:                    method,
+		Roles:                     roles,
+		CsrfTokenHash:             csrfHash,
+		CreatedAt:                 now,
+		IdleExpiresAt:             idleExpiry,
+		AbsoluteExpiresAt:         absoluteExpiry,
+		SignInConfigurationSha256: s.signInConfigurationOf(method),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storing session: %w", err)
@@ -254,15 +305,15 @@ func (s *SessionStore) CreateWithLifetimeTx(
 
 	q := authndb.New(tx)
 	err = q.CreateSession(ctx, authndb.CreateSessionParams{
-		IDHash:            idHash,
-		PrincipalID:       principalID,
-		Method:            method,
-		Roles:             roles,
-		CsrfTokenHash:     csrfHash,
-		CreatedAt:         now,
-		IdleExpiresAt:     idleExpiry,
-		AbsoluteExpiresAt: absoluteExpiry,
-		RoleMappingSha256: s.roleMappingOf(method),
+		IDHash:                    idHash,
+		PrincipalID:               principalID,
+		Method:                    method,
+		Roles:                     roles,
+		CsrfTokenHash:             csrfHash,
+		CreatedAt:                 now,
+		IdleExpiresAt:             idleExpiry,
+		AbsoluteExpiresAt:         absoluteExpiry,
+		SignInConfigurationSha256: s.signInConfigurationOf(method),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storing session: %w", err)
@@ -284,12 +335,12 @@ func (s *SessionStore) CreateWithLifetimeTx(
 }
 
 // Get validates and loads an active session by token. It verifies that the principal
-// is active and slides the idle expiration. A session whose roles came from
-// another role mapping than the store's is refused as an expired one, and
-// neither revoked nor touched: a replica that still runs that mapping, during
-// a rolling restart, accepts it, and so would this one after a return to the
-// mapping. A session that recorded no mapping, as those created before
-// sessions recorded it, counts as one of another mapping (ST-14).
+// is active and slides the idle expiration. A session that another sign-in
+// configuration than the store's created is refused as an expired one, and
+// neither revoked nor touched: a replica that still runs that configuration,
+// during a rolling restart, accepts it, and so would this one after a return
+// to it. A session that recorded no configuration, as those created before
+// sessions recorded one, counts as one of another configuration (ST-14).
 func (s *SessionStore) Get(ctx context.Context, token string) (*Session, error) {
 	if token == "" {
 		return nil, ErrSessionNotFound
@@ -313,7 +364,7 @@ func (s *SessionStore) Get(ctx context.Context, token string) (*Session, error) 
 	if now.After(row.AbsoluteExpiresAt) || now.After(row.IdleExpiresAt) {
 		return nil, ErrSessionExpired
 	}
-	if row.Method != "breakglass" && !bytes.Equal(row.RoleMappingSha256, s.roleMapping) {
+	if row.Method != "breakglass" && !bytes.Equal(row.SignInConfigurationSha256, s.signInConfiguration) {
 		return nil, ErrSessionExpired
 	}
 
@@ -372,8 +423,9 @@ func (s *SessionStore) Get(ctx context.Context, token string) (*Session, error) 
 // nor expired, as replaced by the principal who signs in, and the sign-in,
 // unless it is break-glass's: that sign-in's record is
 // whitetower.breakglass.used.v1, which its service writes. A held session of
-// another role mapping, which Get refuses, is revoked and recorded too, so
-// that neither a replica of that mapping nor a return to it accepts it again.
+// another sign-in configuration, which Get refuses, is revoked and recorded
+// too, so that neither a replica of that configuration nor a return to it
+// accepts it again.
 func (s *SessionStore) ReplaceTx(
 	ctx context.Context,
 	tx *db.Tx,
