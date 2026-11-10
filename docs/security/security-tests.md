@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Version 0.1.5, with [threat model v0.1.8](threat-model.md) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings), 2026-10-22 (the review of RFC-0001: ST-35, ST-38, ST-40, ST-49, ST-51 and ST-86), 2026-10-23 (the review of RFC-0002: ST-77, ST-79 and ST-82), 2026-10-27 (evidence bundles, plan P1-02: ST-87; the erasure of a person, plan P1-03: ST-88) and 2026-11-04 (SCIM and sign-in share one principal, plan P1-03: ST-21 and ST-88; the ingestion of module events, plan P1-02: ST-10) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings), 2026-10-22 (the review of RFC-0001: ST-35, ST-38, ST-40, ST-49, ST-51 and ST-86), 2026-10-23 (the review of RFC-0002: ST-77, ST-79 and ST-82), 2026-10-27 (evidence bundles, plan P1-02: ST-87; the erasure of a person, plan P1-03: ST-88), 2026-11-04 (SCIM and sign-in share one principal, plan P1-03: ST-21 and ST-88; the ingestion of module events, plan P1-02: ST-10) and 2026-11-10 (sessions after a change of the sign-in configuration, plan P1-03: ST-14) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 8 |
 
 Each test turns an abuse case of the threat model into a check that fails if the control it covers is missing. Each has one owner plan: its acceptance criteria require the test to pass, and it runs in CI from then on. Plan [P1-13](../plans/phase-1/P1-13-security-hardening-and-release.md) runs the whole catalog before the first release.
@@ -40,7 +40,7 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ID | Test | Covers | Kind |
 | --- | --- | --- | --- |
 | ST-13 | State-changing requests without a valid CSRF token are refused | T-02 | integration |
-| ST-14 | Session fixation is impossible; cookie flags are set; idle and absolute expiry apply; sessions are rotated at login and revoked at logout, on deactivation and on role changes | T-01, T-19 | integration |
+| ST-14 | Session fixation is impossible; cookie flags are set; idle and absolute expiry apply; sessions are rotated at login and revoked at logout, on deactivation and on role changes, and refused after a change of the settings that decide which ID tokens are accepted, which person a sign-in is and what roles it gives | T-01, T-19 | integration |
 | ST-15 | Return URLs outside the console's own paths are refused | T-06 | integration |
 | ST-16 | ID tokens with a wrong issuer or audience, an expired one, a replayed nonce or an unexpected algorithm are refused | T-13 | integration |
 | ST-17 | Every role and permission pair of the matrix, including the negatives; no handler bypasses the authorization engine | T-03 | unit |

@@ -660,3 +660,15 @@ The maintainer's decision 6 of 2026-11-05, above (ST-14).
 - **Follow-ups:**
   - The setting reaches four places that `main` wires with the same value: the session store, the OIDC service, the authenticator, for the roles of API tokens, and the inventory. Should the mapping ever become a setting that changes at runtime (plan P1-17 leaves role mappings to P1-03), the session store must take the hash of the mapping in force from the same source.
   - A sign-out with the cookie of a session of another mapping clears the cookie and revokes nothing, as for an expired session: a replica of that mapping, or a return to it, would accept the session until it expires. The console cannot send that sign-out: `/me` refuses the session, so it shows no **Sign out**.
+
+### 2026-11-10: the maintainer's decision 7, on what the session's hash covers
+
+The fix of 2026-11-09 (#119) records in each session the SHA-256 of the role mapping that resolved its roles. Its review found that the mapping is not the only setting that shapes a session: `auth.oidc.groups_claim` names the claim of the ID token that the groups are read from, so a change of it changes the roles of the next sign-in, while the open sessions keep theirs for up to 12 hours, as they did after a change of the mapping before #119. Other settings decide which ID tokens the server accepts and which person a sign-in is, with the same effect on the sessions they created.
+
+The maintainer's decision of 2026-11-10:
+
+7. **What the session's hash covers (ST-14).** White Tower assumes that the environment it is deployed in may be compromised, and that its users may be rogue. So the hash covers every setting that decides which ID tokens the server accepts, which person a sign-in is and what roles it gives: `issuer`, `client_id`, `allowed_algorithms`, `external_id_claim`, `groups_claim` and `role_mapping`. After a change of any of them and a restart, the server refuses every session but break-glass's, as it does now after a change of the mapping: a move away from an identity provider that is compromised, a registration that admitted people it should not have, a claim of identity that a person could change, or an algorithm that is no longer trusted leaves no session that the configuration before created. The settings of transport and routine stay out, since rotating them must sign no one out: `discovery_url`, `ca_file`, `client_secret_file`, `state_key_file`, `redirect_url`, `scopes` and `cli_client_id`, whose exchange creates API tokens, not sessions. The alternatives:
+   - identity and roles without `allowed_algorithms`, where the sessions created from tokens signed with an algorithm that is removed expire on their own, within 12 hours;
+   - `groups_claim` and `role_mapping` alone, where a change of identity provider or of the claim of identity leaves the sessions open for up to 12 hours, with no operation today that ends every session.
+
+The work queue's row "P1-03 fix: the session's hash covers the sign-in configuration" takes it.
