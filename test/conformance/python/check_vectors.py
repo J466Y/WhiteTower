@@ -1,6 +1,6 @@
 """Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519, PyYAML for manifests,
-jsonschema for the request schema, idna for the hosts of URLs, and the standard library's json, hashlib and hmac for
-canonical JSON, definition hashes and hashed arguments.
+jsonschema for the request schema, idna for the hosts of URLs and addresses, and the standard library's json, hashlib
+and hmac for canonical JSON, definition hashes and hashed arguments.
 
 The Go tests in test/conformance check the same vectors with cedar-go, the
 manifest vectors with yaml.v3, canonical JSON with the kit's own reader and
@@ -1020,6 +1020,160 @@ def reference(entry: dict, rules: dict) -> str:
     raise ValueError(f"unknown kind {kind}")
 
 
+def clean_path(value: str) -> str:
+    """The path transform, from the steps of section 6.11 rather than posixpath.normpath, which keeps a leading //."""
+    # 1. A control character cannot be read.
+    if any(c < " " or c == "\x7f" for c in value):
+        raise CannotRead("a control character")
+    # 2. Backslashes become slashes.
+    value = value.replace("\\", "/")
+    absolute = value.startswith("/")
+    # 3. Empty segments and . are dropped, and .. removes the segment before it, unless that segment is a .. kept at
+    # the start; with no segment before it, .. is dropped in an absolute path and kept in a relative one.
+    segments: list[str] = []
+    for segment in value.split("/"):
+        if segment in ("", "."):
+            continue
+        if segment != "..":
+            segments.append(segment)
+        elif segments and segments[-1] != "..":
+            segments.pop()
+        elif not absolute:
+            segments.append(segment)
+    # 4. One leading slash for an absolute path, none for a relative one; an empty result is / or .
+    text = "/".join(segments)
+    return "/" + text if absolute else text or "."
+
+
+# What a display name cannot hold (section 6.11, email_domain, step 2), and what a local part cannot (step 3).
+NOT_IN_NAME = frozenset('"<>@,;:()[]\\')
+NOT_IN_LOCAL_PART = frozenset('"()<>[]\\,;:') | WHITE_SPACE
+
+
+def email_domain(value: str) -> str:
+    """The domain of an address as email_domain reads it, step by step (section 6.11), or CannotRead. Its control
+    characters and whitespace, which the section does not define, are read as those that deny more: Unicode's Cc
+    category, C1 included, and its White_Space property."""
+    # 1. Leading and trailing spaces are ignored, and a control character anywhere cannot be read.
+    if any(unicodedata.category(c) == "Cc" for c in value):
+        raise CannotRead("a control character")
+    # 2. The address, alone or after a name.
+    address = angle_address(value.strip(" "))
+    # 3. Exactly one @, and a local part that is not empty and has none of the characters that parsers read
+    # differently.
+    local, _, domain = address.partition("@")
+    if address.count("@") != 1:
+        raise CannotRead("not exactly one @")
+    if not local or NOT_IN_LOCAL_PART.intersection(local):
+        raise CannotRead("an empty local part, or one with a character it may not have")
+    # 4. The domain, as url_host reads a host. Brackets and colons are characters that a host cannot have, so neither
+    # an IPv6 address nor a domain literal can be read.
+    host = read_host(domain)
+    if NUMBER.fullmatch(host.split(".")[-1]):
+        raise CannotRead("a domain whose last label is a number")
+    return host
+
+
+def angle_address(text: str) -> str:
+    """The address of a value as step 2 of email_domain reads it: the value itself, Display Name <address> or
+    "Quoted Name" <address>. A name that is not empty is followed by a space, as the forms are written."""
+    if text.startswith('"'):
+        name, closed, after = text[1:].partition('"')
+        if not closed or "\\" in name:
+            raise CannotRead("a quoted name without its closing quote, or with a backslash")
+        rest = after.lstrip(" ")
+        if rest == after:
+            raise CannotRead("no space after a quoted name")
+    elif text.endswith(">"):
+        name, opened, _ = text.partition("<")
+        if not opened or NOT_IN_NAME.intersection(name) or name and not name.endswith(" "):
+            raise CannotRead("a display name with a character it may not have, or no space after it")
+        rest = text[len(name):]
+    else:
+        return text
+    if not (rest.startswith("<") and rest.endswith(">")):
+        raise CannotRead("no <address> after a name")
+    return rest[1:-1]
+
+
+# The transforms of section 6.11, each from a string to a string, or CannotRead.
+TRANSFORMS = {
+    "lowercase": lambda value: value.translate(ASCII_LOWER),
+    "path": clean_path,
+    "url_host": lambda value: read_url(value).host,
+    "email_domain": email_domain,
+}
+
+
+class InvalidArgument(Exception):
+    """A call's arguments that EP-19 denies with error.invalid_request (section 6.11): a declared argument whose value
+    does not fit its declared type, or that its transform cannot read."""
+
+
+def tool_record(arguments, declared: list[dict]) -> dict:
+    """A tool's record of context.args as EP-19 fills it: each declared argument that the arguments have, under its
+    name, with its transform applied, and nothing else; a set as its distinct elements in ascending order. A missing
+    argument is left out. It also denies what section 6.11 leaves open, as the reading that denies more: a path
+    through a value that is not an object, the arguments themselves included, a member name that repeats in an object
+    that a path reads, null, and a string with a lone surrogate."""
+    record = {}
+    for arg in declared:
+        value, found = arguments, True
+        for name in arg["path"]:
+            if not isinstance(value, (dict, Members)):
+                raise InvalidArgument("the path goes through a value that is not an object")
+            if repeats(value):
+                raise InvalidArgument("a member name repeats in an object that the path reads")
+            members = dict(pairs(value))
+            if name not in members:
+                found = False
+                break
+            value = members[name]
+        if found:
+            record[arg["name"]] = fit(value, arg["type"], arg.get("transform"))
+    return record
+
+
+def fit(value, declared_type: str, transform: str | None):
+    """A value as its declared type holds it, with the transform applied to each string, or InvalidArgument."""
+    if declared_type == "String":
+        return fit_string(value, transform)
+    if declared_type == "Long":
+        return fit_long(value)
+    if declared_type == "Bool":
+        if type(value) is not bool:
+            raise InvalidArgument("not a boolean")
+        return value
+    if declared_type in ("Set<String>", "Set<Long>"):
+        if type(value) is not list:
+            raise InvalidArgument("not an array")
+        fit_item = fit_long if declared_type == "Set<Long>" else lambda item: fit_string(item, transform)
+        return sorted({fit_item(item) for item in value})
+    raise ValueError(f"the type {declared_type} is not one that section 7.7 names")
+
+
+def fit_string(value, transform: str | None) -> str:
+    """A string with the transform applied, if there is one, or InvalidArgument."""
+    if type(value) is not str:
+        raise InvalidArgument("not a string")
+    if has_lone_surrogate(value):
+        raise InvalidArgument("a string with a lone surrogate")
+    if not transform:
+        return value
+    try:
+        return TRANSFORMS[transform](value)
+    except CannotRead as e:
+        raise InvalidArgument(str(e)) from None
+
+
+def fit_long(value) -> int:
+    """A signed 64-bit integer written without a fraction or an exponent, which json.loads reads as an int, never a
+    bool (section 6.4)."""
+    if type(value) is not int or value not in INT64:
+        raise InvalidArgument("not a signed 64-bit integer without a fraction or an exponent")
+    return value
+
+
 def main() -> int:
     failures = 0
     # Python converts integers of at most 4300 digits by default. Section 4.10 writes them exactly, whatever their size.
@@ -1140,9 +1294,26 @@ def main() -> int:
             got = {"reference": None, "reference_sha256": None}
         check(f"reference {case['id']}", got, {k: case[k] for k in ("reference", "reference_sha256")})
 
+    # The transforms of section 6.11, and tools' records of context.args as EP-19 fills them, compared as canonical
+    # JSON, so that true and 1 differ.
+    arguments = json.loads((VECTORS / "arguments.json").read_text(encoding="utf-8"))
+    for case in arguments["transforms"]:
+        try:
+            got = TRANSFORMS[case["transform"]](case["value"])
+        except CannotRead:
+            got = None
+        check(f"transform {case['id']}", {"result": got}, {"result": case["result"]})
+    for case in arguments["records"]:
+        try:
+            got = canonical_json(tool_record(case["arguments"], case["args"]))
+        except InvalidArgument:
+            got = None
+        want = None if case["record"] is None else canonical_json(case["record"])
+        check(f"record {case['id']}", {"record": got}, {"record": want})
+
     total = (len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases)
              + len(documents) + len(hashed["cases"]) + len(tooling["definitions"]) + len(tooling["urls"])
-             + len(tooling["references"]))
+             + len(tooling["references"]) + len(arguments["transforms"]) + len(arguments["records"]))
     print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML, jsonschema, idna)")
     return 1 if failures else 0
 

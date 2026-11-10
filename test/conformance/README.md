@@ -6,12 +6,12 @@ Checks that a module implements the module contracts ([specification, section 9]
 
 | Path | Content |
 | --- | --- |
-| [`vectors/`](vectors/) | Language-neutral test vectors: combination semantics, the gate, signed bundles, module manifests, the hashed mode of arguments, and the tooling of agents (`tooling.json`: definition hashes, URLs as `url_host` reads and normalizes them, and references after redaction) |
+| [`vectors/`](vectors/) | Language-neutral test vectors: combination semantics, the gate, signed bundles, module manifests, the hashed mode of arguments, the tooling of agents (`tooling.json`: definition hashes, URLs as `url_host` reads and normalizes them, and references after redaction), and the arguments that policies see (`arguments.json`: the four transforms, and tools' records of `context.args`) |
 | [`profile/`](profile/) | Reference implementation of the decision profile on `cedar-go`: the check of requests against the profile, request mapping, combining algorithm, gate |
 | [`bundle/`](bundle/) | Reference implementation of the bundle format: canonical manifests, signatures, verification |
 | [`manifest/`](manifest/) | Reference reader of module manifests written in YAML: MAN-1's refusals, I-JSON, canonical JSON |
 | [`canonical/`](canonical/) | Reference reader and writer of the canonical JSON of section 4.10, which writes integers exactly, whatever their size, and refuses repeated member names, lone surrogates and numbers beyond a double where it writes them |
-| [`tooling/`](tooling/) | Reference implementation of what an enforcement point reports of an agent's tooling (section 4.10): definition hashes; references and their string forms, with the URLs that `url_host` reads (section 6.11) and normalizes; and the redaction of EP-14, with the deployment's rules |
+| [`tooling/`](tooling/) | Reference implementation of what an enforcement point reports of an agent's tooling (section 4.10): definition hashes; references and their string forms, with the URLs that `url_host` reads (section 6.11) and normalizes; and the redaction of EP-14, with the deployment's rules. Also a tool's record of `context.args`, with the transforms of section 6.11 (EP-19) |
 | [`kit/`](kit/) | The kit: a fake core that speaks the module API, the driver client, and the scenarios |
 | [`stubep/`](stubep/) | A minimal enforcement point in Go, enough to run the scenarios end to end. Not a product |
 | [`python/check_vectors.py`](python/check_vectors.py) | The vectors checked with Python: `cedarpy`, `cryptography`, PyYAML, `jsonschema` and `idna` |
@@ -36,7 +36,7 @@ The Python check needs `cedarpy`, `cryptography`, PyYAML, `jsonschema` and `idna
 
 ## Changing the vectors
 
-- `combination.json`, `fail-closed.json`, `hashed-arguments.json` and `tooling.json` are edited by hand. Both implementations must still pass.
+- `combination.json`, `fail-closed.json`, `hashed-arguments.json`, `tooling.json` and `arguments.json` are edited by hand. Both implementations must still pass.
 - The bundle vectors are generated, because their signatures must match their bytes: change `bundle_vectors_test.go`, then run `go test ./test/conformance -run TestBundleVectorsAreCurrent -update`.
 - The manifest vectors are generated from the examples of `api/manifest` and the documents of the reader's tests, so that they follow both: after either changes, run `go test ./test/conformance/manifest -run TestManifestVectorsAreCurrent -update`.
 - Vectors are part of the contract: changing their meaning needs an RFC.

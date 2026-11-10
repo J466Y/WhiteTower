@@ -13,9 +13,9 @@ import (
 	"golang.org/x/net/idna"
 )
 
-// ErrCannotRead is the error of a value that the url_host transform cannot
-// read (section 6.11).
-var ErrCannotRead = errors.New("url_host cannot read the value")
+// ErrCannotRead is the error of a value that a transform cannot read: url_host,
+// path or email_domain (section 6.11).
+var ErrCannotRead = errors.New("the transform cannot read the value")
 
 // ErrNoReference is the error of a URL that makes no reference: one that
 // url_host cannot read, whose scheme is not http or https, or with a
@@ -49,9 +49,10 @@ var scheme = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://`)
 // Bidi checked. idna.Lookup applies the STD3 rules, and refuses underscores.
 // It refuses an A-label whose Punycode gives an ASCII label, or a label that
 // UTS #46 does not map to itself, and its decoder refuses a delimiter with
-// nothing before it, as in xn---bbk: the A-labels it reads encode back to
-// themselves, as step 7 asks. Its tables are those of Go's version of
-// Unicode, 15.0 from Go 1.26, as step 7 allows.
+// nothing before it, as in xn---bbk. It reads two A-labels that step 7
+// refuses, which readHost refuses itself: xn--, whose Punycode gives an empty
+// label, and one that is not ASCII, such as xn--g例-. Its tables are those of
+// Go's version of Unicode, 15.0 from Go 1.26, as step 7 allows.
 var lookup = idna.New(idna.MapForLookup(), idna.Transitional(false), idna.StrictDomainName(false),
 	idna.CheckHyphens(false), idna.CheckJoiners(true), idna.BidiRule())
 
@@ -72,6 +73,12 @@ func ignored(r rune) bool {
 	return r <= ' '
 }
 
+// isControl reports whether r is a control character as url_host and path
+// define it: U+0000 to U+001F, or U+007F.
+func isControl(r rune) bool {
+	return r < ' ' || r == 0x7F
+}
+
 // ReadURL reads a value as url_host does, step by step (section 6.11). It
 // returns an error that wraps ErrCannotRead for a value that url_host cannot
 // read, and for text that is not UTF-8, which no JSON string can hold.
@@ -84,7 +91,7 @@ func ReadURL(value string) (*URL, error) {
 	start := len(value) - len(strings.TrimLeftFunc(value, ignored))
 	end := max(start, len(strings.TrimRightFunc(value, ignored)))
 	text := value[start:end]
-	if strings.IndexFunc(text, func(r rune) bool { return r < ' ' || r == 0x7F }) >= 0 {
+	if strings.IndexFunc(text, isControl) >= 0 {
 		return nil, cannotRead("a control character")
 	}
 	// 2. A scheme and //.
@@ -198,6 +205,17 @@ func readHost(name string) (string, error) {
 	if err != nil {
 		return "", cannotRead("a host that IDNA cannot convert")
 	}
+	// lookup reads xn-- as an empty label, so that a.b.xn-- would read as
+	// a.b, and xn--g例- as the A-label of g例: every A-label of the host as
+	// UTS #46 maps it must convert to itself.
+	for _, label := range strings.Split(mapped(name), ".") {
+		if !strings.HasPrefix(label, "xn--") {
+			continue
+		}
+		if a, err := lookup.ToASCII(label); err != nil || a != label {
+			return "", cannotRead("an A-label that does not convert to itself")
+		}
+	}
 	// The characters that UTS #46 reads differently, as written, and within
 	// the U-labels of the conversion, which hold those of the A-labels
 	// given. ẞ is checked as written, since Unicode 15.0 maps it to ss.
@@ -234,6 +252,25 @@ func readHost(name string) (string, error) {
 		}
 	}
 	return host, nil
+}
+
+// mapped returns a host as UTS #46 maps it, before any A-label is decoded,
+// which lookup does not give. UTS #46 maps each character on its own, then
+// normalizes the result to NFC, which joins characters but never makes an
+// ASCII one, so a label that starts with xn-- once mapped starts with it here.
+// A character that lookup refuses on its own once the whole host converts, a
+// joiner, a combining mark or a number of a right-to-left script, stays as it
+// is: none maps to x, n, - or a dot.
+func mapped(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		m, err := lookup.ToUnicode(string(r))
+		if err != nil {
+			m = string(r)
+		}
+		b.WriteString(m)
+	}
+	return b.String()
 }
 
 // defaultPorts are the default ports of the schemes that normalized URLs have.

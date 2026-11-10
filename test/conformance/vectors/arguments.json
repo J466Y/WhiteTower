@@ -1,0 +1,2231 @@
+{
+  "description": "The arguments that policies see (docs/contracts/module-contract-v0.1.md, section 6.11, EP-19). transforms: the four transforms, each case with transform, lowercase, path, url_host or email_domain; value, the string; and result, what the transform gives, or null when it cannot read the value. The cases with the IDs of the URL and address check (inputs/url-and-address-check.json) take its values, L01 to X38 as url_host reads them and E01 to F15 as email_domain does, and I01 to I14 its hosts of IDNA, in its order, as email_domain reads alice@ and the host; their results come from section 6.11. records: a tool's record of context.args, as EP-19 fills it. Each case gives args, the tool's declared arguments as the catalog file lists them (section 7.7): name, the key in the record; path, the property names that lead to the argument; transform, when one applies; and type, String, Long, Bool, Set<String> or Set<Long>; arguments, the call's arguments, a JSON object; and record, the declared arguments that the call has, each under its name, with its transform applied, a set written as its distinct elements in ascending order, or null when EP-19 denies the call with error.invalid_request: a value that does not fit its declared type, or that its transform cannot read. A missing argument is left out of the record, so that usage rules apply if_absent.",
+  "transforms": [
+    {
+      "id": "L01",
+      "description": "L01, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com",
+      "result": "example.com"
+    },
+    {
+      "id": "L02",
+      "description": "L02, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/",
+      "result": "example.com"
+    },
+    {
+      "id": "L03",
+      "description": "L03, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://www.example.com/path/to/page?x=1&y=2#section",
+      "result": "www.example.com"
+    },
+    {
+      "id": "L04",
+      "description": "L04, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "HTTPS://WWW.Example.COM/Path",
+      "result": "www.example.com"
+    },
+    {
+      "id": "L05",
+      "description": "L05, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com:8443/api",
+      "result": "example.com"
+    },
+    {
+      "id": "L06",
+      "description": "L06, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "http://localhost:8080/health",
+      "result": "localhost"
+    },
+    {
+      "id": "L07",
+      "description": "L07, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "http://127.0.0.1:5000/",
+      "result": "127.0.0.1"
+    },
+    {
+      "id": "L08",
+      "description": "L08, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "http://[::1]:3000/",
+      "result": "[::1]"
+    },
+    {
+      "id": "L09",
+      "description": "L09, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "http://10.0.0.5/internal",
+      "result": "10.0.0.5"
+    },
+    {
+      "id": "L10",
+      "description": "L10, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/search?q=hello world",
+      "result": "example.com"
+    },
+    {
+      "id": "L11",
+      "description": "L11, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/files/my document.pdf",
+      "result": "example.com"
+    },
+    {
+      "id": "L12",
+      "description": "L12, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/wiki/Caf\u00e9",
+      "result": "example.com"
+    },
+    {
+      "id": "L13",
+      "description": "L13, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://m\u00fcnchen.de/",
+      "result": "xn--mnchen-3ya.de"
+    },
+    {
+      "id": "L14",
+      "description": "L14, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://xn--mnchen-3ya.de/",
+      "result": "xn--mnchen-3ya.de"
+    },
+    {
+      "id": "L15",
+      "description": "L15, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://\u4f8b\u3048.jp/",
+      "result": "xn--r8jz45g.jp"
+    },
+    {
+      "id": "L16",
+      "description": "L16, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/?redirect=https://other.com/",
+      "result": "example.com"
+    },
+    {
+      "id": "L17",
+      "description": "L17, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/a%20b",
+      "result": "example.com"
+    },
+    {
+      "id": "L18",
+      "description": "L18, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://user@example.com/",
+      "result": "example.com"
+    },
+    {
+      "id": "L19",
+      "description": "L19, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://user:token@git.example.com/repo.git",
+      "result": "git.example.com"
+    },
+    {
+      "id": "L20",
+      "description": "L20, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": " https://example.com/page ",
+      "result": "example.com"
+    },
+    {
+      "id": "L21",
+      "description": "L21, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/page\n",
+      "result": "example.com"
+    },
+    {
+      "id": "L22",
+      "description": "L22, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://my_service.internal/",
+      "result": "my_service.internal"
+    },
+    {
+      "id": "L23",
+      "description": "L23, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com./",
+      "result": "example.com"
+    },
+    {
+      "id": "L24",
+      "description": "L24, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "wss://example.com/socket",
+      "result": "example.com"
+    },
+    {
+      "id": "L25",
+      "description": "L25, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "ftp://ftp.example.com/file.txt",
+      "result": "ftp.example.com"
+    },
+    {
+      "id": "L26",
+      "description": "L26, a legitimate value of the URL and address check, which url_host cannot read: step 2, no scheme followed by //",
+      "transform": "url_host",
+      "value": "example.com",
+      "result": null
+    },
+    {
+      "id": "L27",
+      "description": "L27, a legitimate value of the URL and address check, which url_host cannot read: step 2, no scheme followed by //",
+      "transform": "url_host",
+      "value": "www.example.com/page",
+      "result": null
+    },
+    {
+      "id": "L28",
+      "description": "L28, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://EXAMPLE.com:443/",
+      "result": "example.com"
+    },
+    {
+      "id": "L29",
+      "description": "L29, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/path?q=a\\b",
+      "result": "example.com"
+    },
+    {
+      "id": "L30",
+      "description": "L30, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://sub.domain.example.co.uk/x",
+      "result": "sub.domain.example.co.uk"
+    },
+    {
+      "id": "L31",
+      "description": "L31, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/%E2%82%AC",
+      "result": "example.com"
+    },
+    {
+      "id": "L32",
+      "description": "L32, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "http://192.168.1.1:8080/admin",
+      "result": "192.168.1.1"
+    },
+    {
+      "id": "L33",
+      "description": "L33, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://[2001:db8::1]/",
+      "result": "[2001:db8::1]"
+    },
+    {
+      "id": "L34",
+      "description": "L34, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com:8080",
+      "result": "example.com"
+    },
+    {
+      "id": "L35",
+      "description": "L35, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://\u4f8b\u5b50.\u6d4b\u8bd5/",
+      "result": "xn--fsqu00a.xn--0zwm56d"
+    },
+    {
+      "id": "L36",
+      "description": "L36, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/#/route",
+      "result": "example.com"
+    },
+    {
+      "id": "L37",
+      "description": "L37, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "s3://bucket-name/key",
+      "result": "bucket-name"
+    },
+    {
+      "id": "L38",
+      "description": "L38, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "postgres://user:pw@db.internal:5432/app",
+      "result": "db.internal"
+    },
+    {
+      "id": "L39",
+      "description": "L39, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://ex-ample.com/",
+      "result": "ex-ample.com"
+    },
+    {
+      "id": "L40",
+      "description": "L40, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://xn--80ak6aa92e.com/",
+      "result": "xn--80ak6aa92e.com"
+    },
+    {
+      "id": "L41",
+      "description": "L41, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://example.com/path/\\windows\\file",
+      "result": "example.com"
+    },
+    {
+      "id": "L42",
+      "description": "L42, a legitimate value of the URL and address check",
+      "transform": "url_host",
+      "value": "https://api.example.com/v1/items?filter=name eq 'x'",
+      "result": "api.example.com"
+    },
+    {
+      "id": "X01",
+      "description": "X01, an attack of the URL and address check, which url_host cannot read: step 3, a backslash or whitespace in the authority",
+      "transform": "url_host",
+      "value": "http://evil.com\\@good.com/",
+      "result": null
+    },
+    {
+      "id": "X02",
+      "description": "X02, an attack of the URL and address check, which url_host cannot read: step 3, a backslash or whitespace in the authority",
+      "transform": "url_host",
+      "value": "http://evil.com\\good.com/",
+      "result": null
+    },
+    {
+      "id": "X03",
+      "description": "X03, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://good.com@evil.com/",
+      "result": "evil.com"
+    },
+    {
+      "id": "X04",
+      "description": "X04, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://good.com:80@evil.com/",
+      "result": "evil.com"
+    },
+    {
+      "id": "X05",
+      "description": "X05, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://good.com#@evil.com/",
+      "result": "good.com"
+    },
+    {
+      "id": "X06",
+      "description": "X06, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://good.com?@evil.com/",
+      "result": "good.com"
+    },
+    {
+      "id": "X07",
+      "description": "X07, an attack of the URL and address check, which url_host cannot read: step 8, an IPv4 address that is not four decimal numbers",
+      "transform": "url_host",
+      "value": "http://0x7f.1/",
+      "result": null
+    },
+    {
+      "id": "X08",
+      "description": "X08, an attack of the URL and address check, which url_host cannot read: step 8, an IPv4 address that is not four decimal numbers",
+      "transform": "url_host",
+      "value": "http://2130706433/",
+      "result": null
+    },
+    {
+      "id": "X09",
+      "description": "X09, an attack of the URL and address check, which url_host cannot read: step 8, an IPv4 address that is not four decimal numbers",
+      "transform": "url_host",
+      "value": "http://0177.0.0.1/",
+      "result": null
+    },
+    {
+      "id": "X10",
+      "description": "X10, an attack of the URL and address check, which url_host cannot read: step 8, an IPv4 address that is not four decimal numbers",
+      "transform": "url_host",
+      "value": "http://127.1/",
+      "result": null
+    },
+    {
+      "id": "X11",
+      "description": "X11, an attack of the URL and address check, which url_host cannot read: step 7, a % in the host",
+      "transform": "url_host",
+      "value": "http://%67ood.com/",
+      "result": null
+    },
+    {
+      "id": "X12",
+      "description": "X12, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://good.com%2f@evil.com/",
+      "result": "evil.com"
+    },
+    {
+      "id": "X13",
+      "description": "X13, an attack of the URL and address check, which url_host cannot read: step 1, a control character within the value",
+      "transform": "url_host",
+      "value": "http://good.com\t.evil.com/",
+      "result": null
+    },
+    {
+      "id": "X14",
+      "description": "X14, an attack of the URL and address check, which url_host cannot read: step 1, a control character within the value",
+      "transform": "url_host",
+      "value": "http://evil.com\r\n.good.com/",
+      "result": null
+    },
+    {
+      "id": "X15",
+      "description": "X15, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://\uff47\uff4f\uff4f\uff44.com/",
+      "result": "good.com"
+    },
+    {
+      "id": "X16",
+      "description": "X16, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://good.com\u3002evil.com/",
+      "result": "good.com.evil.com"
+    },
+    {
+      "id": "X17",
+      "description": "X17, an attack of the URL and address check, which url_host cannot read: step 2, no scheme followed by //",
+      "transform": "url_host",
+      "value": "http:\\\\evil.com\\",
+      "result": null
+    },
+    {
+      "id": "X18",
+      "description": "X18, an attack of the URL and address check, which url_host cannot read: step 2, no scheme followed by //",
+      "transform": "url_host",
+      "value": "http:/\\evil.com/",
+      "result": null
+    },
+    {
+      "id": "X19",
+      "description": "X19, an attack of the URL and address check, which url_host cannot read: step 2, no scheme followed by //",
+      "transform": "url_host",
+      "value": "http:evil.com/",
+      "result": null
+    },
+    {
+      "id": "X20",
+      "description": "X20, an attack of the URL and address check, which url_host cannot read: step 7, an empty host, which is an empty label",
+      "transform": "url_host",
+      "value": "http:///evil.com/",
+      "result": null
+    },
+    {
+      "id": "X21",
+      "description": "X21, an attack of the URL and address check, which url_host cannot read: step 3, a backslash or whitespace in the authority",
+      "transform": "url_host",
+      "value": "http://evil.com:80\\@good.com/",
+      "result": null
+    },
+    {
+      "id": "X22",
+      "description": "X22, an attack of the URL and address check, which url_host cannot read: step 5, a port that is not 1 to 5 digits",
+      "transform": "url_host",
+      "value": "http://good.com:80evil.com/",
+      "result": null
+    },
+    {
+      "id": "X23",
+      "description": "X23, an attack of the URL and address check, which url_host cannot read: step 6, an IPv6 address with a dotted part",
+      "transform": "url_host",
+      "value": "http://[::ffff:127.0.0.1]/",
+      "result": null
+    },
+    {
+      "id": "X24",
+      "description": "X24, an attack of the URL and address check, which url_host cannot read: step 7, a % in the host",
+      "transform": "url_host",
+      "value": "http://evil.com%00.good.com/",
+      "result": null
+    },
+    {
+      "id": "X25",
+      "description": "X25, an attack of the URL and address check, which url_host cannot read: step 1, a control character within the value",
+      "transform": "url_host",
+      "value": "http://evil.com\u0000.good.com/",
+      "result": null
+    },
+    {
+      "id": "X26",
+      "description": "X26, an attack of the URL and address check, which url_host cannot read: step 3, a backslash or whitespace in the authority",
+      "transform": "url_host",
+      "value": "http://good.com\\.evil.com/",
+      "result": null
+    },
+    {
+      "id": "X27",
+      "description": "X27, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://evil.com&@good.com#@other.com/",
+      "result": "good.com"
+    },
+    {
+      "id": "X28",
+      "description": "X28, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "\u0001http://evil.com/",
+      "result": "evil.com"
+    },
+    {
+      "id": "X29",
+      "description": "X29, an attack of the URL and address check, which url_host cannot read: step 1, a control character within the value",
+      "transform": "url_host",
+      "value": "http://evil.com\u000b.good.com/",
+      "result": null
+    },
+    {
+      "id": "X30",
+      "description": "X30, an attack of the URL and address check, which url_host cannot read: step 3, a backslash or whitespace in the authority",
+      "transform": "url_host",
+      "value": "http://good.com\u2028.evil.com/",
+      "result": null
+    },
+    {
+      "id": "X31",
+      "description": "X31, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://good.com\uff3c@evil.com/",
+      "result": "evil.com"
+    },
+    {
+      "id": "X32",
+      "description": "X32, an attack of the URL and address check, which url_host cannot read: step 1, a control character within the value",
+      "transform": "url_host",
+      "value": "http://evil.com\\\t@good.com/",
+      "result": null
+    },
+    {
+      "id": "X33",
+      "description": "X33, an attack of the URL and address check, which url_host cannot read: steps 5 and 6, text after an IPv6 address that is not a port",
+      "transform": "url_host",
+      "value": "http://[::1]evil.com/",
+      "result": null
+    },
+    {
+      "id": "X34",
+      "description": "X34, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://evil.com:@good.com/",
+      "result": "good.com"
+    },
+    {
+      "id": "X35",
+      "description": "X35, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://g\u200bood.com/",
+      "result": "good.com"
+    },
+    {
+      "id": "X36",
+      "description": "X36, an attack of the URL and address check, which url_host cannot read: step 8, an IPv4 address that is not four decimal numbers",
+      "transform": "url_host",
+      "value": "http://0x7f000001/",
+      "result": null
+    },
+    {
+      "id": "X37",
+      "description": "X37, an attack of the URL and address check",
+      "transform": "url_host",
+      "value": "http://evil.com%5c@good.com/",
+      "result": "good.com"
+    },
+    {
+      "id": "X38",
+      "description": "X38, an attack of the URL and address check, which url_host cannot read: step 3, a backslash or whitespace in the authority",
+      "transform": "url_host",
+      "value": "https://good.com\\@evil.com/",
+      "result": null
+    },
+    {
+      "id": "E01",
+      "description": "E01, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "alice@corp.com",
+      "result": "corp.com"
+    },
+    {
+      "id": "E02",
+      "description": "E02, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "Alice.Smith@Corp.COM",
+      "result": "corp.com"
+    },
+    {
+      "id": "E03",
+      "description": "E03, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "alice+tag@corp.com",
+      "result": "corp.com"
+    },
+    {
+      "id": "E04",
+      "description": "E04, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "o'brien@corp.com",
+      "result": "corp.com"
+    },
+    {
+      "id": "E05",
+      "description": "E05, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "alice@sub.corp.co.uk",
+      "result": "sub.corp.co.uk"
+    },
+    {
+      "id": "E06",
+      "description": "E06, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "alice@m\u00fcnchen.de",
+      "result": "xn--mnchen-3ya.de"
+    },
+    {
+      "id": "E07",
+      "description": "E07, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "Alice Smith <alice@corp.com>",
+      "result": "corp.com"
+    },
+    {
+      "id": "E08",
+      "description": "E08, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "\"Smith, Alice\" <alice@corp.com>",
+      "result": "corp.com"
+    },
+    {
+      "id": "E09",
+      "description": "E09, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "<alice@corp.com>",
+      "result": "corp.com"
+    },
+    {
+      "id": "E10",
+      "description": "E10, a legitimate value of the URL and address check, which email_domain cannot read: step 3, a , or ; for several addresses",
+      "transform": "email_domain",
+      "value": "alice@corp.com, bob@corp.com",
+      "result": null
+    },
+    {
+      "id": "E11",
+      "description": "E11, a legitimate value of the URL and address check, which email_domain cannot read: step 3, a , or ; for several addresses",
+      "transform": "email_domain",
+      "value": "alice@corp.com; bob@corp.com",
+      "result": null
+    },
+    {
+      "id": "E12",
+      "description": "E12, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": " alice@corp.com ",
+      "result": "corp.com"
+    },
+    {
+      "id": "E13",
+      "description": "E13, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "alice@corp.com.",
+      "result": "corp.com"
+    },
+    {
+      "id": "E14",
+      "description": "E14, a legitimate value of the URL and address check, which email_domain cannot read: steps 2 and 3, a quoted local part",
+      "transform": "email_domain",
+      "value": "\"alice smith\"@corp.com",
+      "result": null
+    },
+    {
+      "id": "E15",
+      "description": "E15, a legitimate value of the URL and address check, which email_domain cannot read: step 4, a domain literal",
+      "transform": "email_domain",
+      "value": "alice@[192.168.1.1]",
+      "result": null
+    },
+    {
+      "id": "E16",
+      "description": "E16, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "ALICE@CORP.COM",
+      "result": "corp.com"
+    },
+    {
+      "id": "E17",
+      "description": "E17, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "Jos\u00e9 P\u00e9rez <jose@corp.com>",
+      "result": "corp.com"
+    },
+    {
+      "id": "E18",
+      "description": "E18, a legitimate value of the URL and address check",
+      "transform": "email_domain",
+      "value": "alice_smith-99@corp-mail.com",
+      "result": "corp-mail.com"
+    },
+    {
+      "id": "F01",
+      "description": "F01, an attack of the URL and address check, which email_domain cannot read: step 3, not exactly one @",
+      "transform": "email_domain",
+      "value": "alice@evil.com(@good.com)",
+      "result": null
+    },
+    {
+      "id": "F02",
+      "description": "F02, an attack of the URL and address check, which email_domain cannot read: step 3, not exactly one @",
+      "transform": "email_domain",
+      "value": "\"alice@good.com\"@evil.com",
+      "result": null
+    },
+    {
+      "id": "F03",
+      "description": "F03, an attack of the URL and address check, which email_domain cannot read: step 3, not exactly one @",
+      "transform": "email_domain",
+      "value": "alice@good.com@evil.com",
+      "result": null
+    },
+    {
+      "id": "F04",
+      "description": "F04, an attack of the URL and address check, which email_domain cannot read: step 3, a , or ; for several addresses",
+      "transform": "email_domain",
+      "value": "bob@evil.com, alice@good.com",
+      "result": null
+    },
+    {
+      "id": "F05",
+      "description": "F05, an attack of the URL and address check",
+      "transform": "email_domain",
+      "value": "Alice <alice@evil.com>",
+      "result": "evil.com"
+    },
+    {
+      "id": "F06",
+      "description": "F06, an attack of the URL and address check, which email_domain cannot read: step 3, not exactly one @",
+      "transform": "email_domain",
+      "value": "alice@good.com <alice@evil.com>",
+      "result": null
+    },
+    {
+      "id": "F07",
+      "description": "F07, an attack of the URL and address check",
+      "transform": "email_domain",
+      "value": "\"alice@good.com\" <alice@evil.com>",
+      "result": "evil.com"
+    },
+    {
+      "id": "F08",
+      "description": "F08, an attack of the URL and address check",
+      "transform": "email_domain",
+      "value": "=?utf-8?q?alice=40good.com?= <alice@evil.com>",
+      "result": "evil.com"
+    },
+    {
+      "id": "F09",
+      "description": "F09, an attack of the URL and address check, which email_domain cannot read: step 1, a control character",
+      "transform": "email_domain",
+      "value": "alice@evil.com\u0000@good.com",
+      "result": null
+    },
+    {
+      "id": "F10",
+      "description": "F10, an attack of the URL and address check, which email_domain cannot read: step 1, a control character",
+      "transform": "email_domain",
+      "value": "alice@evil.com\n@good.com",
+      "result": null
+    },
+    {
+      "id": "F11",
+      "description": "F11, an attack of the URL and address check",
+      "transform": "email_domain",
+      "value": "alice%evil.com@good.com",
+      "result": "good.com"
+    },
+    {
+      "id": "F12",
+      "description": "F12, an attack of the URL and address check, which email_domain cannot read: step 3, a , or ; for several addresses",
+      "transform": "email_domain",
+      "value": "alice@evil.com;alice@good.com",
+      "result": null
+    },
+    {
+      "id": "F13",
+      "description": "F13, an attack of the URL and address check, which email_domain cannot read: step 3, not exactly one @",
+      "transform": "email_domain",
+      "value": "<alice@evil.com>@good.com",
+      "result": null
+    },
+    {
+      "id": "F14",
+      "description": "F14, an attack of the URL and address check",
+      "transform": "email_domain",
+      "value": "alice@good.com\u3002evil.com",
+      "result": "good.com.evil.com"
+    },
+    {
+      "id": "F15",
+      "description": "F15, an attack of the URL and address check, which email_domain cannot read: step 3, not exactly one @",
+      "transform": "email_domain",
+      "value": "alice@evil.com (comment) <x@good.com>",
+      "result": null
+    },
+    {
+      "id": "I01",
+      "description": "The host \"m\\u00fcnchen.de\" of the URL and address check's IDNA, in an address",
+      "transform": "email_domain",
+      "value": "alice@m\u00fcnchen.de",
+      "result": "xn--mnchen-3ya.de"
+    },
+    {
+      "id": "I02",
+      "description": "The host \"xn--mnchen-3ya.de\" of the URL and address check's IDNA, in an address",
+      "transform": "email_domain",
+      "value": "alice@xn--mnchen-3ya.de",
+      "result": "xn--mnchen-3ya.de"
+    },
+    {
+      "id": "I03",
+      "description": "The host \"\\u4f8b\\u3048.jp\" of the URL and address check's IDNA, in an address",
+      "transform": "email_domain",
+      "value": "alice@\u4f8b\u3048.jp",
+      "result": "xn--r8jz45g.jp"
+    },
+    {
+      "id": "I04",
+      "description": "The host \"\\u4f8b\\u5b50.\\u6d4b\\u8bd5\" of the URL and address check's IDNA, in an address",
+      "transform": "email_domain",
+      "value": "alice@\u4f8b\u5b50.\u6d4b\u8bd5",
+      "result": "xn--fsqu00a.xn--0zwm56d"
+    },
+    {
+      "id": "I05",
+      "description": "The host \"xn--80ak6aa92e.com\" of the URL and address check's IDNA, in an address",
+      "transform": "email_domain",
+      "value": "alice@xn--80ak6aa92e.com",
+      "result": "xn--80ak6aa92e.com"
+    },
+    {
+      "id": "I06",
+      "description": "The host \"\\uff47\\uff4f\\uff4f\\uff44.com\" of the URL and address check's IDNA, in an address: UTS #46 maps fullwidth letters to ASCII",
+      "transform": "email_domain",
+      "value": "alice@\uff47\uff4f\uff4f\uff44.com",
+      "result": "good.com"
+    },
+    {
+      "id": "I07",
+      "description": "The host \"good.com\\u3002evil.com\" of the URL and address check's IDNA, in an address: UTS #46 maps the ideographic full stop to a dot",
+      "transform": "email_domain",
+      "value": "alice@good.com\u3002evil.com",
+      "result": "good.com.evil.com"
+    },
+    {
+      "id": "I08",
+      "description": "The host \"g\\u200bood.com\" of the URL and address check's IDNA, in an address: UTS #46 ignores the zero width space",
+      "transform": "email_domain",
+      "value": "alice@g\u200bood.com",
+      "result": "good.com"
+    },
+    {
+      "id": "I09",
+      "description": "The host \"good.com\\u2028.evil.com\" of the URL and address check's IDNA, in an address, which email_domain cannot read: UTS #46 does not allow the line separator (step 4, and url_host's step 7)",
+      "transform": "email_domain",
+      "value": "alice@good.com\u2028.evil.com",
+      "result": null
+    },
+    {
+      "id": "I10",
+      "description": "The host \"my_service.internal\" of the URL and address check's IDNA, in an address: without the STD3 rules, underscores pass",
+      "transform": "email_domain",
+      "value": "alice@my_service.internal",
+      "result": "my_service.internal"
+    },
+    {
+      "id": "I11",
+      "description": "The host \"EXAMPLE.com\" of the URL and address check's IDNA, in an address",
+      "transform": "email_domain",
+      "value": "alice@EXAMPLE.com",
+      "result": "example.com"
+    },
+    {
+      "id": "I12",
+      "description": "The host \"xn--gd-.com\" of the URL and address check's IDNA, in an address, which email_domain cannot read: an A-label whose Punycode gives the ASCII gd (url_host's step 7), which the check's Python idna and Node convert",
+      "transform": "email_domain",
+      "value": "alice@xn--gd-.com",
+      "result": null
+    },
+    {
+      "id": "I13",
+      "description": "The host \"fa\\u00df.de\" of the URL and address check's IDNA, in an address, which email_domain cannot read: the sharp s, which versions of UTS #46 read differently (url_host's step 7), and which every library of the check converts to xn--fa-hia.de",
+      "transform": "email_domain",
+      "value": "alice@fa\u00df.de",
+      "result": null
+    },
+    {
+      "id": "I14",
+      "description": "The host \"\\u0430\\u0440\\u0440\\u04cf\\u0435.com\" of the URL and address check's IDNA, in an address: Cyrillic letters that look like apple, in A-labels",
+      "transform": "email_domain",
+      "value": "alice@\u0430\u0440\u0440\u04cf\u0435.com",
+      "result": "xn--80ak6aa92e.com"
+    },
+    {
+      "id": "T-01",
+      "description": "The example of section 6.11: a leading // is merged, as Go's path.Clean does and Python's posixpath.normpath does not, so that a rule on /etc/* sees it",
+      "transform": "path",
+      "value": "//srv/./data/../../etc/passwd",
+      "result": "/etc/passwd"
+    },
+    {
+      "id": "T-02",
+      "description": "The example of section 6.11: with no segment before it, .. is kept in a relative path",
+      "transform": "path",
+      "value": "a/../../x",
+      "result": "../x"
+    },
+    {
+      "id": "T-03",
+      "description": "The example of section 6.11: backslashes become slashes, and a drive letter is an ordinary segment",
+      "transform": "path",
+      "value": "C:\\Windows\\..",
+      "result": "C:"
+    },
+    {
+      "id": "T-04",
+      "description": "A .. after a .. kept at the start of a relative path is kept too",
+      "transform": "path",
+      "value": "../../a/./b/../c",
+      "result": "../../a/c"
+    },
+    {
+      "id": "T-05",
+      "description": "With no segment before it, .. is dropped in an absolute path",
+      "transform": "path",
+      "value": "/../../etc/passwd",
+      "result": "/etc/passwd"
+    },
+    {
+      "id": "T-06",
+      "description": "A UNC name is ordinary segments of an absolute path, and .. cannot climb above its root",
+      "transform": "path",
+      "value": "\\\\server\\share\\..\\..\\..\\Windows",
+      "result": "/Windows"
+    },
+    {
+      "id": "T-07",
+      "description": "A .. removes a drive letter like any segment, and the next is kept in the relative path",
+      "transform": "path",
+      "value": "C:\\..\\..\\Windows",
+      "result": "../Windows"
+    },
+    {
+      "id": "T-08",
+      "description": "An empty relative result is .",
+      "transform": "path",
+      "value": "",
+      "result": "."
+    },
+    {
+      "id": "T-09",
+      "description": "An empty absolute result is /, written with one leading slash",
+      "transform": "path",
+      "value": "///",
+      "result": "/"
+    },
+    {
+      "id": "T-10",
+      "description": "A . is dropped",
+      "transform": "path",
+      "value": "./",
+      "result": "."
+    },
+    {
+      "id": "T-11",
+      "description": "A path of .. alone is the root in an absolute path",
+      "transform": "path",
+      "value": "/..",
+      "result": "/"
+    },
+    {
+      "id": "T-12",
+      "description": "Each .. removes the segment before it, and the last is kept in a relative path",
+      "transform": "path",
+      "value": "a/b/../../..",
+      "result": ".."
+    },
+    {
+      "id": "T-13",
+      "description": "Empty segments and . are dropped, a trailing slash with them",
+      "transform": "path",
+      "value": "/a//b/./c/",
+      "result": "/a/b/c"
+    },
+    {
+      "id": "T-14",
+      "description": "Three dots are an ordinary segment",
+      "transform": "path",
+      "value": "a/.../b",
+      "result": "a/.../b"
+    },
+    {
+      "id": "T-15",
+      "description": "Percent-encoding is not decoded: the segments are not dots",
+      "transform": "path",
+      "value": "%2e%2e/%2E%2E/etc/passwd",
+      "result": "%2e%2e/%2E%2E/etc/passwd"
+    },
+    {
+      "id": "T-16",
+      "description": "Spaces are ordinary characters, never ignored: a leading space makes a relative path, and a trailing one a segment",
+      "transform": "path",
+      "value": " /a/ ",
+      "result": " /a/ "
+    },
+    {
+      "id": "T-17",
+      "description": "Characters beyond ASCII are ordinary",
+      "transform": "path",
+      "value": "/donn\u00e9es/rapport \u00e9t\u00e9.pdf",
+      "result": "/donn\u00e9es/rapport \u00e9t\u00e9.pdf"
+    },
+    {
+      "id": "T-18",
+      "description": "A C1 control character is not one of the control characters of path, U+0000 to U+001F and U+007F",
+      "transform": "path",
+      "value": "/tmp/a\u0085b",
+      "result": "/tmp/a\u0085b"
+    },
+    {
+      "id": "T-19",
+      "description": "path cannot read a value with a control character: a server written in C would stop at the NUL and open /etc/passwd",
+      "transform": "path",
+      "value": "/etc/passwd\u0000.png",
+      "result": null
+    },
+    {
+      "id": "T-20",
+      "description": "path cannot read a tab, a control character",
+      "transform": "path",
+      "value": "/tmp/a\tb",
+      "result": null
+    },
+    {
+      "id": "T-21",
+      "description": "path cannot read a control character at the end either: it ignores nothing around a value",
+      "transform": "path",
+      "value": "/tmp/a\n",
+      "result": null
+    },
+    {
+      "id": "T-22",
+      "description": "path cannot read U+007F",
+      "transform": "path",
+      "value": "/tmp/a\u007f",
+      "result": null
+    },
+    {
+      "id": "T-23",
+      "description": "ASCII letters in lowercase",
+      "transform": "lowercase",
+      "value": "MAIN",
+      "result": "main"
+    },
+    {
+      "id": "T-24",
+      "description": "Only letters change",
+      "transform": "lowercase",
+      "value": "Feature/ABC-123_x",
+      "result": "feature/abc-123_x"
+    },
+    {
+      "id": "T-25",
+      "description": "Letters beyond ASCII stay as they are",
+      "transform": "lowercase",
+      "value": "\u00c4\u00d6\u00dc \u03a3\u0391\u03a3 \u0130",
+      "result": "\u00c4\u00d6\u00dc \u03a3\u0391\u03a3 \u0130"
+    },
+    {
+      "id": "T-26",
+      "description": "The Kelvin sign stays as it is: Go's strings.ToLower and Python's str.lower map it to k",
+      "transform": "lowercase",
+      "value": "\u212a",
+      "result": "\u212a"
+    },
+    {
+      "id": "T-27",
+      "description": "An empty string stays empty",
+      "transform": "lowercase",
+      "value": "",
+      "result": ""
+    },
+    {
+      "id": "T-28",
+      "description": "lowercase reads every string, control characters included",
+      "transform": "lowercase",
+      "value": "A\u0000\tB",
+      "result": "a\u0000\tb"
+    },
+    {
+      "id": "T-29",
+      "description": "url_host cannot read an empty value: step 2, no scheme followed by //",
+      "transform": "url_host",
+      "value": "",
+      "result": null
+    },
+    {
+      "id": "T-30",
+      "description": "url_host cannot read the A-label xn--, whose Punycode gives an empty label (step 7): read as an empty label, the host would be a.b",
+      "transform": "url_host",
+      "value": "https://a.b.xn--/",
+      "result": null
+    },
+    {
+      "id": "T-31",
+      "description": "url_host cannot read an A-label that is not ASCII once mapped, xn--g\u4f8b-, which does not encode back to itself (step 7)",
+      "transform": "url_host",
+      "value": "https://xn--\uff47\u4f8b-.example/",
+      "result": null
+    },
+    {
+      "id": "T-32",
+      "description": "A label of a character that UTS #46 ignores converts to an empty label: a last one is the trailing dot that url_host drops (step 7)",
+      "transform": "url_host",
+      "value": "https://a.b.\u00ad/",
+      "result": "a.b"
+    },
+    {
+      "id": "T-33",
+      "description": "email_domain cannot read a domain whose last label is a number, even an IPv4 address that url_host reads (step 4)",
+      "transform": "email_domain",
+      "value": "alice@192.168.1.1",
+      "result": null
+    },
+    {
+      "id": "T-34",
+      "description": "email_domain cannot read a domain whose last label is a hexadecimal number (step 4)",
+      "transform": "email_domain",
+      "value": "alice@corp.0x1f",
+      "result": null
+    },
+    {
+      "id": "T-35",
+      "description": "email_domain cannot read a domain whose last label is a decimal number (step 4)",
+      "transform": "email_domain",
+      "value": "alice@corp.123",
+      "result": null
+    },
+    {
+      "id": "T-36",
+      "description": "email_domain cannot read a domain literal of an IPv6 address (step 4)",
+      "transform": "email_domain",
+      "value": "alice@[IPv6:2001:db8::1]",
+      "result": null
+    },
+    {
+      "id": "T-37",
+      "description": "email_domain cannot read an IPv6 address (step 4)",
+      "transform": "email_domain",
+      "value": "alice@::1",
+      "result": null
+    },
+    {
+      "id": "T-38",
+      "description": "email_domain cannot read an empty local part (step 3)",
+      "transform": "email_domain",
+      "value": "@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-39",
+      "description": "email_domain cannot read an empty domain, an empty label (step 4)",
+      "transform": "email_domain",
+      "value": "alice@",
+      "result": null
+    },
+    {
+      "id": "T-40",
+      "description": "email_domain cannot read an empty value: no @ (step 3)",
+      "transform": "email_domain",
+      "value": "",
+      "result": null
+    },
+    {
+      "id": "T-41",
+      "description": "email_domain cannot read a space in the local part (step 3)",
+      "transform": "email_domain",
+      "value": "alice smith@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-42",
+      "description": "email_domain cannot read a : in the local part (step 3)",
+      "transform": "email_domain",
+      "value": "alice:x@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-43",
+      "description": "email_domain cannot read a backslash in the local part (step 3)",
+      "transform": "email_domain",
+      "value": "alice\\x@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-44",
+      "description": "email_domain cannot read square brackets in the local part (step 3)",
+      "transform": "email_domain",
+      "value": "a[b]@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-45",
+      "description": "email_domain cannot read a quote in the local part (step 3)",
+      "transform": "email_domain",
+      "value": "a\"b@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-46",
+      "description": "email_domain cannot read parentheses in the local part (step 3)",
+      "transform": "email_domain",
+      "value": "a(b)@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-47",
+      "description": "email_domain cannot read an angle bracket in the local part (step 3)",
+      "transform": "email_domain",
+      "value": "alice>@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-48",
+      "description": "email_domain cannot read a : in a display name (step 2)",
+      "transform": "email_domain",
+      "value": "Alice:Smith <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-49",
+      "description": "email_domain cannot read parentheses in a display name (step 2)",
+      "transform": "email_domain",
+      "value": "Alice (Ops) <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-50",
+      "description": "email_domain cannot read square brackets in a display name (step 2)",
+      "transform": "email_domain",
+      "value": "Alice [Ops] <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-51",
+      "description": "email_domain cannot read a backslash in a display name (step 2)",
+      "transform": "email_domain",
+      "value": "Alice\\Smith <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-52",
+      "description": "email_domain cannot read a quote in a display name that is not quoted (step 2)",
+      "transform": "email_domain",
+      "value": "Alice \"Al\" Smith <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-53",
+      "description": "email_domain cannot read a ; in a display name (step 2)",
+      "transform": "email_domain",
+      "value": "Smith; Alice <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-54",
+      "description": "email_domain cannot read a , in a display name that is not quoted (step 2)",
+      "transform": "email_domain",
+      "value": "Smith, Alice <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-55",
+      "description": "email_domain cannot read an angle bracket in a display name (step 2)",
+      "transform": "email_domain",
+      "value": "a>b <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-56",
+      "description": "A display name may hold spaces, apostrophes, hyphens and dots (step 2)",
+      "transform": "email_domain",
+      "value": "Alice O'Brien-Smith Jr. <alice@corp.com>",
+      "result": "corp.com"
+    },
+    {
+      "id": "T-57",
+      "description": "Spaces around a display name and its address are ignored (step 1)",
+      "transform": "email_domain",
+      "value": " Alice <alice@corp.com> ",
+      "result": "corp.com"
+    },
+    {
+      "id": "T-58",
+      "description": "A quoted name may hold angle brackets and an @: the address follows it (step 2)",
+      "transform": "email_domain",
+      "value": "\"a <b@evil.com>\" <x@good.com>",
+      "result": "good.com"
+    },
+    {
+      "id": "T-59",
+      "description": "A quoted name may be empty (step 2)",
+      "transform": "email_domain",
+      "value": "\"\" <alice@corp.com>",
+      "result": "corp.com"
+    },
+    {
+      "id": "T-60",
+      "description": "email_domain cannot read a backslash in a quoted name (step 2)",
+      "transform": "email_domain",
+      "value": "\"Smith\\Alice\" <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-61",
+      "description": "email_domain cannot read a backslash that would escape a quote: the quoted name ends at the quote after it (step 2)",
+      "transform": "email_domain",
+      "value": "\"a\\\"b\" <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-62",
+      "description": "email_domain cannot read a quoted name without its closing quote (step 2)",
+      "transform": "email_domain",
+      "value": "\"Alice <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-63",
+      "description": "email_domain cannot read text after the address (step 2)",
+      "transform": "email_domain",
+      "value": "<alice@corp.com> trailer",
+      "result": null
+    },
+    {
+      "id": "T-64",
+      "description": "email_domain cannot read two addresses in angle brackets (steps 2 and 3)",
+      "transform": "email_domain",
+      "value": "<alice@corp.com> <bob@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-65",
+      "description": "email_domain cannot read a closing angle bracket without its opening one (step 2)",
+      "transform": "email_domain",
+      "value": "alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-66",
+      "description": "email_domain ignores only spaces around a value: a tab is a control character (step 1)",
+      "transform": "email_domain",
+      "value": "alice@corp.com\t",
+      "result": null
+    },
+    {
+      "id": "T-67",
+      "description": "email_domain cannot read a % in the domain (step 4, and url_host's step 7)",
+      "transform": "email_domain",
+      "value": "alice@corp%2ecom",
+      "result": null
+    },
+    {
+      "id": "T-68",
+      "description": "The domain in A-labels and in lowercase (step 4, and url_host's step 7)",
+      "transform": "email_domain",
+      "value": "alice@M\u00dcNCHEN.DE",
+      "result": "xn--mnchen-3ya.de"
+    },
+    {
+      "id": "T-69",
+      "description": "email_domain cannot read a domain with an empty label once one trailing dot is gone (step 4, and url_host's step 7)",
+      "transform": "email_domain",
+      "value": "alice@corp.com..",
+      "result": null
+    },
+    {
+      "id": "T-70",
+      "description": "email_domain cannot read a domain with a leading dot, an empty label (step 4, and url_host's step 7)",
+      "transform": "email_domain",
+      "value": "alice@.corp.com",
+      "result": null
+    },
+    {
+      "id": "T-71",
+      "description": "A domain of one label",
+      "transform": "email_domain",
+      "value": "alice@localhost",
+      "result": "localhost"
+    },
+    {
+      "id": "T-72",
+      "description": "A label of 63 characters, the bound of DNS",
+      "transform": "email_domain",
+      "value": "alice@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com",
+      "result": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com"
+    },
+    {
+      "id": "T-73",
+      "description": "email_domain cannot read a label of 64 characters, beyond the bound of DNS (step 4, and url_host's step 7)",
+      "transform": "email_domain",
+      "value": "alice@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com",
+      "result": null
+    },
+    {
+      "id": "T-74",
+      "description": "email_domain cannot read the sharp s within an A-label (step 4, and url_host's step 7)",
+      "transform": "email_domain",
+      "value": "alice@xn--fa-hia.de",
+      "result": null
+    },
+    {
+      "id": "T-75",
+      "description": "email_domain cannot read fullwidth letters and hyphens that UTS #46 maps to the A-label xn--, whose Punycode gives an empty label (step 4, and url_host's step 7)",
+      "transform": "email_domain",
+      "value": "alice@corp.\uff58\uff4e\uff0d\uff0d",
+      "result": null
+    }
+  ],
+  "records": [
+    {
+      "id": "A-01",
+      "description": "The catalog's example: a declared argument under its name, and every argument that no declaration names left out",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": "main",
+        "head": "feature",
+        "title": "Add X",
+        "draft": false
+      },
+      "record": {
+        "base": "main"
+      }
+    },
+    {
+      "id": "A-02",
+      "description": "A nested argument, named by its path, beside another argument of the same name",
+      "args": [
+        {
+          "name": "options.base",
+          "path": [
+            "options",
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "options": {
+          "base": "main",
+          "force": true
+        },
+        "base": "dev"
+      },
+      "record": {
+        "options.base": "main"
+      }
+    },
+    {
+      "id": "A-03",
+      "description": "A path of three property names",
+      "args": [
+        {
+          "name": "a.b.c",
+          "path": [
+            "a",
+            "b",
+            "c"
+          ],
+          "type": "Long"
+        }
+      ],
+      "arguments": {
+        "a": {
+          "b": {
+            "c": 7,
+            "d": 8
+          }
+        }
+      },
+      "record": {
+        "a.b.c": 7
+      }
+    },
+    {
+      "id": "A-04",
+      "description": "Missing arguments are left out, so that usage rules apply if_absent: absent at the top level, absent from an object that the path goes through, and in an object that is absent",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        },
+        {
+          "name": "options.force",
+          "path": [
+            "options",
+            "force"
+          ],
+          "type": "Bool"
+        },
+        {
+          "name": "settings.branch",
+          "path": [
+            "settings",
+            "branch"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "options": {
+          "base": "main"
+        }
+      },
+      "record": {}
+    },
+    {
+      "id": "A-05",
+      "description": "A call without arguments has an empty record",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        },
+        {
+          "name": "url:url_host",
+          "path": [
+            "url"
+          ],
+          "transform": "url_host",
+          "type": "String"
+        }
+      ],
+      "arguments": {},
+      "record": {}
+    },
+    {
+      "id": "A-06",
+      "description": "Property names compare exactly, case included",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "Base": "main",
+        "BASE": "main"
+      },
+      "record": {}
+    },
+    {
+      "id": "A-07",
+      "description": "A tool without declared arguments has an empty record: no argument is read, so no value can deny the call",
+      "args": [],
+      "arguments": {
+        "limit": 1.5,
+        "big": 18446744073709551616,
+        "url": "example.com",
+        "file": "/etc/passwd\u0000"
+      },
+      "record": {}
+    },
+    {
+      "id": "A-08",
+      "description": "Arguments that no declaration names never deny the call, whatever their values",
+      "args": [
+        {
+          "name": "repo",
+          "path": [
+            "repo"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "repo": "acme/app",
+        "ratio": 0.5,
+        "huge": 1e400,
+        "site": "example.com"
+      },
+      "record": {
+        "repo": "acme/app"
+      }
+    },
+    {
+      "id": "A-09",
+      "description": "Each transform, named by the path, a colon and its name, beside the same argument without a transform",
+      "args": [
+        {
+          "name": "url",
+          "path": [
+            "url"
+          ],
+          "type": "String"
+        },
+        {
+          "name": "url:url_host",
+          "path": [
+            "url"
+          ],
+          "transform": "url_host",
+          "type": "String"
+        },
+        {
+          "name": "file:path",
+          "path": [
+            "file"
+          ],
+          "transform": "path",
+          "type": "String"
+        },
+        {
+          "name": "branch:lowercase",
+          "path": [
+            "branch"
+          ],
+          "transform": "lowercase",
+          "type": "String"
+        },
+        {
+          "name": "to:email_domain",
+          "path": [
+            "to"
+          ],
+          "transform": "email_domain",
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "url": "https://API.Example.COM:8443/v1?q=1",
+        "file": "//srv/data/../../etc/passwd",
+        "branch": "MAIN",
+        "to": "Alice <alice@Corp.COM>"
+      },
+      "record": {
+        "url": "https://API.Example.COM:8443/v1?q=1",
+        "url:url_host": "api.example.com",
+        "file:path": "/etc/passwd",
+        "branch:lowercase": "main",
+        "to:email_domain": "corp.com"
+      }
+    },
+    {
+      "id": "A-10",
+      "description": "A value that url_host cannot read denies the call, even when every other declared argument fits (EP-19)",
+      "args": [
+        {
+          "name": "repo",
+          "path": [
+            "repo"
+          ],
+          "type": "String"
+        },
+        {
+          "name": "url:url_host",
+          "path": [
+            "url"
+          ],
+          "transform": "url_host",
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "repo": "acme/app",
+        "url": "example.com/page"
+      },
+      "record": null
+    },
+    {
+      "id": "A-11",
+      "description": "A value that path cannot read denies the call",
+      "args": [
+        {
+          "name": "file:path",
+          "path": [
+            "file"
+          ],
+          "transform": "path",
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "file": "/tmp/report\u0000.txt"
+      },
+      "record": null
+    },
+    {
+      "id": "A-12",
+      "description": "A value that email_domain cannot read denies the call: several recipients in one string",
+      "args": [
+        {
+          "name": "to:email_domain",
+          "path": [
+            "to"
+          ],
+          "transform": "email_domain",
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "to": "alice@corp.com, bob@evil.example"
+      },
+      "record": null
+    },
+    {
+      "id": "A-13",
+      "description": "A transform applies to each element of an array of strings, which becomes a set: its distinct values, in ascending order",
+      "args": [
+        {
+          "name": "to:email_domain",
+          "path": [
+            "to"
+          ],
+          "transform": "email_domain",
+          "type": "Set<String>"
+        },
+        {
+          "name": "labels:lowercase",
+          "path": [
+            "labels"
+          ],
+          "transform": "lowercase",
+          "type": "Set<String>"
+        }
+      ],
+      "arguments": {
+        "to": [
+          "alice@Corp.com",
+          "Bob <bob@corp.com>",
+          "carol@other.example"
+        ],
+        "labels": [
+          "Bug",
+          "BUG",
+          "p1"
+        ]
+      },
+      "record": {
+        "to:email_domain": [
+          "corp.com",
+          "other.example"
+        ],
+        "labels:lowercase": [
+          "bug",
+          "p1"
+        ]
+      }
+    },
+    {
+      "id": "A-14",
+      "description": "One element that its transform cannot read denies the call",
+      "args": [
+        {
+          "name": "to:email_domain",
+          "path": [
+            "to"
+          ],
+          "transform": "email_domain",
+          "type": "Set<String>"
+        }
+      ],
+      "arguments": {
+        "to": [
+          "alice@corp.com",
+          "bob@evil.example;carol@corp.com"
+        ]
+      },
+      "record": null
+    },
+    {
+      "id": "A-15",
+      "description": "Arrays of strings and of integers become sets: duplicates removed, in ascending order, and an empty array is an empty set",
+      "args": [
+        {
+          "name": "tags",
+          "path": [
+            "tags"
+          ],
+          "type": "Set<String>"
+        },
+        {
+          "name": "ids",
+          "path": [
+            "ids"
+          ],
+          "type": "Set<Long>"
+        },
+        {
+          "name": "none",
+          "path": [
+            "none"
+          ],
+          "type": "Set<String>"
+        }
+      ],
+      "arguments": {
+        "tags": [
+          "b",
+          "a",
+          "b"
+        ],
+        "ids": [
+          3,
+          -1,
+          3,
+          9223372036854775807
+        ],
+        "none": []
+      },
+      "record": {
+        "tags": [
+          "a",
+          "b"
+        ],
+        "ids": [
+          -1,
+          3,
+          9223372036854775807
+        ],
+        "none": []
+      }
+    },
+    {
+      "id": "A-16",
+      "description": "Integers fit Long within the range of a signed 64-bit integer, and -0 is 0 (section 6.4)",
+      "args": [
+        {
+          "name": "min",
+          "path": [
+            "min"
+          ],
+          "type": "Long"
+        },
+        {
+          "name": "max",
+          "path": [
+            "max"
+          ],
+          "type": "Long"
+        },
+        {
+          "name": "zero",
+          "path": [
+            "zero"
+          ],
+          "type": "Long"
+        }
+      ],
+      "arguments": {
+        "min": -9223372036854775808,
+        "max": 9223372036854775807,
+        "zero": -0
+      },
+      "record": {
+        "min": -9223372036854775808,
+        "max": 9223372036854775807,
+        "zero": 0
+      }
+    },
+    {
+      "id": "A-17",
+      "description": "An integer above the range of a signed 64-bit integer does not fit Long",
+      "args": [
+        {
+          "name": "n",
+          "path": [
+            "n"
+          ],
+          "type": "Long"
+        }
+      ],
+      "arguments": {
+        "n": 9223372036854775808
+      },
+      "record": null
+    },
+    {
+      "id": "A-18",
+      "description": "An integer below the range of a signed 64-bit integer does not fit Long",
+      "args": [
+        {
+          "name": "n",
+          "path": [
+            "n"
+          ],
+          "type": "Long"
+        }
+      ],
+      "arguments": {
+        "n": -9223372036854775809
+      },
+      "record": null
+    },
+    {
+      "id": "A-19",
+      "description": "A number with a fraction does not fit Long, even a whole one",
+      "args": [
+        {
+          "name": "n",
+          "path": [
+            "n"
+          ],
+          "type": "Long"
+        }
+      ],
+      "arguments": {
+        "n": 1.0
+      },
+      "record": null
+    },
+    {
+      "id": "A-20",
+      "description": "A number with an exponent does not fit Long",
+      "args": [
+        {
+          "name": "n",
+          "path": [
+            "n"
+          ],
+          "type": "Long"
+        }
+      ],
+      "arguments": {
+        "n": 1e2
+      },
+      "record": null
+    },
+    {
+      "id": "A-21",
+      "description": "A string of digits does not fit Long",
+      "args": [
+        {
+          "name": "n",
+          "path": [
+            "n"
+          ],
+          "type": "Long"
+        }
+      ],
+      "arguments": {
+        "n": "42"
+      },
+      "record": null
+    },
+    {
+      "id": "A-22",
+      "description": "Booleans fit Bool",
+      "args": [
+        {
+          "name": "draft",
+          "path": [
+            "draft"
+          ],
+          "type": "Bool"
+        },
+        {
+          "name": "force",
+          "path": [
+            "force"
+          ],
+          "type": "Bool"
+        }
+      ],
+      "arguments": {
+        "draft": true,
+        "force": false
+      },
+      "record": {
+        "draft": true,
+        "force": false
+      }
+    },
+    {
+      "id": "A-23",
+      "description": "A string does not fit Bool",
+      "args": [
+        {
+          "name": "draft",
+          "path": [
+            "draft"
+          ],
+          "type": "Bool"
+        }
+      ],
+      "arguments": {
+        "draft": "true"
+      },
+      "record": null
+    },
+    {
+      "id": "A-24",
+      "description": "A number does not fit Bool",
+      "args": [
+        {
+          "name": "draft",
+          "path": [
+            "draft"
+          ],
+          "type": "Bool"
+        }
+      ],
+      "arguments": {
+        "draft": 1
+      },
+      "record": null
+    },
+    {
+      "id": "A-25",
+      "description": "A number does not fit String",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": 5
+      },
+      "record": null
+    },
+    {
+      "id": "A-26",
+      "description": "A boolean does not fit String",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": true
+      },
+      "record": null
+    },
+    {
+      "id": "A-27",
+      "description": "An array does not fit String",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": [
+          "main"
+        ]
+      },
+      "record": null
+    },
+    {
+      "id": "A-28",
+      "description": "An object does not fit String",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": {
+          "name": "main"
+        }
+      },
+      "record": null
+    },
+    {
+      "id": "A-29",
+      "description": "A number does not fit a string that a transform reads",
+      "args": [
+        {
+          "name": "url:url_host",
+          "path": [
+            "url"
+          ],
+          "transform": "url_host",
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "url": 443
+      },
+      "record": null
+    },
+    {
+      "id": "A-30",
+      "description": "A string does not fit Set<String>",
+      "args": [
+        {
+          "name": "to:email_domain",
+          "path": [
+            "to"
+          ],
+          "transform": "email_domain",
+          "type": "Set<String>"
+        }
+      ],
+      "arguments": {
+        "to": "alice@corp.com"
+      },
+      "record": null
+    },
+    {
+      "id": "A-31",
+      "description": "An array with a number does not fit Set<String>",
+      "args": [
+        {
+          "name": "tags",
+          "path": [
+            "tags"
+          ],
+          "type": "Set<String>"
+        }
+      ],
+      "arguments": {
+        "tags": [
+          "a",
+          1
+        ]
+      },
+      "record": null
+    },
+    {
+      "id": "A-32",
+      "description": "An array with an array does not fit Set<String>",
+      "args": [
+        {
+          "name": "tags",
+          "path": [
+            "tags"
+          ],
+          "type": "Set<String>"
+        }
+      ],
+      "arguments": {
+        "tags": [
+          [
+            "a"
+          ]
+        ]
+      },
+      "record": null
+    },
+    {
+      "id": "A-33",
+      "description": "An array with a string does not fit Set<Long>",
+      "args": [
+        {
+          "name": "ids",
+          "path": [
+            "ids"
+          ],
+          "type": "Set<Long>"
+        }
+      ],
+      "arguments": {
+        "ids": [
+          1,
+          "2"
+        ]
+      },
+      "record": null
+    },
+    {
+      "id": "A-34",
+      "description": "An array with a number with a fraction does not fit Set<Long>",
+      "args": [
+        {
+          "name": "ids",
+          "path": [
+            "ids"
+          ],
+          "type": "Set<Long>"
+        }
+      ],
+      "arguments": {
+        "ids": [
+          1,
+          2.5
+        ]
+      },
+      "record": null
+    },
+    {
+      "id": "A-35",
+      "description": "A number does not fit Set<Long>",
+      "args": [
+        {
+          "name": "ids",
+          "path": [
+            "ids"
+          ],
+          "type": "Set<Long>"
+        }
+      ],
+      "arguments": {
+        "ids": 1
+      },
+      "record": null
+    }
+  ]
+}
