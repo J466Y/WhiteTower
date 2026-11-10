@@ -146,6 +146,21 @@ Added on 2026-10-27 ([progress notes](#progress-notes)). People have a right to 
 
 **Done when:** after an erasure, a canary name, email, subject and external ID appear in no table and in no API response; an active principal and a service account are refused; an erased principal cannot be reactivated, and the same person logging in again gets a new principal (ST-88).
 
+### 14. Emergency revocation (HUM-10)
+
+Added on 2026-11-10 ([progress notes](#progress-notes), decision 9). White Tower assumes that its deployment may be compromised and its users rogue. An identity provider that was compromised and then fixed, with the same issuer and claims, changes no setting, so the hash that sessions record (decision 7) refuses nothing: the sessions created meanwhile last up to 12 hours, and the API tokens created with them up to 90 days. Deactivating people one by one needs to know who they are.
+
+- **Operation.** The platform administrator, or the break-glass custodian, ends every session and every API token at once, giving a reason. A token's scopes cannot grant it: it checks the role, or the break-glass session, as the authorizer does for the operations a token must never reach. The OpenAPI operation comes first.
+- **What it ends,** in one transaction, with the time from `clock.Clock`:
+  - every session, the caller's included, unless the caller's is a break-glass session: an administrator signs in again, since the session that asks could come from the compromised provider;
+  - every API token, of people and of service accounts, the CLI's tokens included.
+
+  Principals stay active, and their role bindings stay. The SCIM token and the modules' credentials (plan P1-05) are not sessions or tokens of this kind: the runbook says to rotate the SCIM token, and P1-05 to rotate the modules' credentials, if they could have leaked.
+- **Audited.** It records a new core event type, with its actor, the reason and how many sessions and tokens it ended, and every step of AGENTS.md's checklist. It raises the critical alert that a break-glass use raises.
+- **If the provider is still compromised**, a new sign-in through it gets a new session. The runbook says to turn OIDC off first, which decision 7 makes refuse every session that the provider created, then to revoke, to fix the provider, and to turn OIDC on again.
+
+**Done when:** after a revocation, every session and API token created before it is refused, a CLI token and a service account's token included, and a break-glass session that ran it stays; any other role, and a token whatever its scopes, is refused (ST-89).
+
 ## Acceptance criteria
 
 - Login and logout work against Keycloak and against at least one commercial IdP (Entra ID or Okta), or the latter is scheduled as the first pilot task if no tenant is available.
@@ -153,7 +168,8 @@ Added on 2026-10-27 ([progress notes](#progress-notes)). People have a right to 
 - The security tests of step 12 pass.
 - Deactivating a principal revokes their sessions immediately.
 - An erasure leaves the person's name, email and IdP subject nowhere in White Tower, and keeps the history consistent (HUM-09).
-- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-03-human-identity-and-access) pass: ST-13 to ST-22, and ST-88.
+- An emergency revocation ends every session and API token at once, but a break-glass session that runs it (HUM-10).
+- The security tests assigned to this plan in the [security test catalog](../../security/security-tests.md#p1-03-human-identity-and-access) pass: ST-13 to ST-22, ST-88 and ST-89.
 
 ## Risks and open questions
 
@@ -182,6 +198,7 @@ The plan landed in six pull requests. The first built the authorization engine a
 | 5. CLI token exchange and break-glass | 7, 9, ST-20 | Done (PR #40) |
 | 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Done (PR #41) |
 | 7. Erasure of a person | 13, ST-88 | To do |
+| 8. Emergency revocation | 14, ST-89 | To do |
 
 ### 2026-10-14: roles, permissions and authorization engine
 
@@ -672,3 +689,51 @@ The maintainer's decision of 2026-11-10:
    - `groups_claim` and `role_mapping` alone, where a change of identity provider or of the claim of identity leaves the sessions open for up to 12 hours, with no operation today that ends every session.
 
 The work queue's row "P1-03 fix: the session's hash covers the sign-in configuration" takes it.
+
+### 2026-11-10: the session's hash covers the sign-in configuration (fix)
+
+The maintainer's decision 7, above (ST-14), on the fix of 2026-11-09.
+
+- **What a session records.** The SHA-256 of the sign-in configuration that created it: the settings of `auth.oidc` that decide which ID tokens the server accepts (`issuer`, `client_id`, `allowed_algorithms`), which person a sign-in is (`external_id_claim`) and what roles it gives (`groups_claim`, `role_mapping`). `SessionOptions.SignInConfiguration`, of the new type `authn.SignInConfiguration`, replaces `SessionOptions.RoleMapping`, and `main` builds it from `auth.oidc` with `signInConfiguration`, from the same settings that it gives the OIDC service. The settings of transport and routine stay out, so rotating them signs no one out: `discovery_url`, `ca_file`, `cli_client_id`, `client_secret_file`, `state_key_file`, `redirect_url` and `scopes`.
+- **The canonical form**, `whitetower-sign-in-configuration-v1`: the form's name, the issuer, the client ID, the number of algorithms then each of them, the external ID claim, the groups claim, then the number of groups and each group followed by its role. Every string is preceded by its length and each list by its number of items, in eight bytes.
+  - The counts are new. With the lengths alone, strings moved from one setting to the next, such as algorithms that become the claims, could write the same bytes; a test has such a case.
+  - The algorithms are sorted in the order of their bytes, and each is written once. The verifier, go-oidc through go-jose, accepts a token whose algorithm is in the list, so it reads the list as a set: two lists that differ only in their order or in an algorithm listed twice accept the same tokens, and hash alike. Hashing the repetitions would add no protection, since a repetition never adds or removes an algorithm, and would only sign everyone in again after an edit that changes nothing.
+  - The groups are sorted as before. A nil list or mapping hashes as an empty one.
+  - An empty setting hashes apart from one that is set, even where the OIDC service gives a default, such as `sub` for `external_id_claim` or its list of algorithms. The configuration already writes those defaults, so an empty value is one that an operator emptied, and the cost is one sign-in, never a role; applying the defaults in the hash would make a second copy of them, to keep in step with the OIDC service's.
+  - The issuer is compared byte for byte, as go-oidc compares it, so a trailing slash makes another issuer.
+- **Names.** Migration `00008` renames `sessions.role_mapping_sha256` to `sign_in_configuration_sha256`, and its constraint. The new form changes every hash: after the upgrade, every session but break-glass's is refused once, and its person signs in again. No release came before, so this concerns development and evaluation stacks only.
+- **Unchanged.** The check in `Get`, its refusal as an expired session, which names neither a hash nor a setting, the exemption of break-glass sessions, the refusal of a session without a hash, and the sign-in that revokes a held session of another configuration work as the fix of 2026-11-09 says. The store hashes once, at start, and the request path does not change. With OIDC off, the issuer is empty, so the sessions that OIDC created before are refused, and only break-glass sessions remain.
+- **Documents.** The configuration reference's section `auth.oidc` names the six settings that a session records, says that after a change of any of them everyone signs in again, what is not affected, and what a rolling restart does, which moved there from `role_mapping`. Each of the six says that a change of it signs everyone in again, and `allowed_algorithms` that their order and an algorithm listed twice do not matter. The domain model's `sessions` row says what a session records.
+- **Tests (ST-14):**
+  - with a session store of another configuration, a session of the methods `oidc` and `cli` is refused as expired, and the other way round, after a change of the issuer (another one, a trailing slash, OIDC turned off), of the client ID, of the algorithms (one added, one removed, none for the defaults), of the external ID claim (another one, none for the default), of the groups claim, and of the mapping, as before; so are strings cut elsewhere, between a group and its role and between the issuer and the client ID, and strings moved from one setting to the next. The same configuration, the algorithms in another order or one of them listed twice, and lists and a mapping that are nil, then empty, accept it. After each refusal, the store of the session's configuration still accepts it;
+  - the authenticator, the idle expiry and the sign-out of the fix of 2026-11-09, now with another external ID claim;
+  - a break-glass session is accepted with another issuer, another mapping and OIDC off; a session without a hash is refused;
+  - through `main`'s `signInConfiguration`, a change of each covered setting refuses a session, and a change of each setting left out keeps it. The test names every field of `config.OIDC`, and fails on one it does not name, so that a setting added later is put on one side or the other;
+  - through `serve`, five replicas on one database. Besides the replicas of the mappings before and after, a replica that lists the mapping and the algorithms in another order, one algorithm twice, and runs another discovery URL, CLI client ID, client secret file, state key file, redirect URL and scopes accepts the session of the replica before; replicas of another issuer and of another external ID claim refuse it, as a session that does not exist. Each accepts a break-glass session.
+- **Break experiments:** each made the tests above fail, and was undone by an edit:
+  - without the check in `Get`, the 17 refusals of the table, the session without a hash, the six covered settings through `signInConfiguration` and the test through `serve` fail;
+  - without the counts of the lists, the case of strings moved from one setting to the next fails;
+  - without the lengths of the strings, both cases of strings cut elsewhere fail;
+  - with the algorithms unsorted, the cases of another order and of an algorithm listed twice, and the test through `serve`, fail; with them sorted but not written once, the case of an algorithm listed twice and the test through `serve` fail;
+  - without the issuer in the form, its three cases, its case through `signInConfiguration` and the test through `serve` fail;
+  - with `signInConfiguration` leaving out `external_id_claim`, or adding `cli_client_id` to it, the setting's case and the test through `serve` fail;
+  - with `main`'s session store given an empty configuration, the test through `serve` fails;
+  - with break-glass sessions checked too, the three break-glass cases and the test through `serve` fail;
+  - with a session without a hash accepted, its test fails.
+- **Follow-ups:**
+  - The CLI's exchange creates API tokens that last 12 hours and take their roles at each request, from the groups that the person's last sign-in recorded: after a change of the issuer, or of another covered setting, an exchanged token keeps working until it expires. Decision 7 left the exchange out, since it creates no session.
+  - The six settings reach the session store and the OIDC service through two structures that `main` fills from `auth.oidc`. The follow-up of 2026-11-09 on a mapping that changes at runtime now holds for all six.
+
+### 2026-11-10: the review of the sign-in configuration's fix, and the maintainer's decisions 8 and 9
+
+The reviewer found the fix that makes the session's hash cover the sign-in configuration complete. Its agent named one gap, and the review a second, both about what outlives a sign-in that should no longer count:
+
+- **The CLI's tokens.** The CLI's exchange turns an ID token into an API token of 12 hours, which is no session and records no hash: after a change of the issuer, or of another setting that decision 7 covers, it keeps working until it expires.
+- **A provider fixed without a change of configuration.** A compromised identity provider that is fixed with the same issuer and claims changes no setting, so no hash refuses anything: the sessions created meanwhile last up to 12 hours, and the API tokens created with them up to 90 days. Today people can only be deactivated one by one.
+
+The maintainer's decisions of 2026-11-10:
+
+8. **The CLI's tokens record the sign-in configuration (ST-14).** A token that the exchange creates records the hash of the configuration that accepted its ID token, with `cli_client_id`, the client that the exchange accepts, in place of `client_id`, and the authenticator refuses it when the hash is not the current one, as it refuses a session. A change of `cli_client_id` ends the CLI's tokens and no browser session; a change of `client_id` ends the sessions and no CLI token. The tokens that people create themselves, and those of service accounts, record none: decision 9 covers them. The alternative: leaving them to expire within 12 hours.
+9. **Emergency revocation (HUM-10, ST-89).** The platform administrator, or the break-glass custodian, ends at once every session and every API token, of people and of service accounts, the caller's session included unless it is a break-glass session, and the audit log records it: step 14. The cost: everyone signs in again, and the integrations' tokens are created again. The alternatives: ending the sessions and the CLI's tokens only, which leaves a token of 90 days that an intruder created; and the procedure of deactivating the people concerned, who can be anyone after a compromise of the provider.
+
+The requirements gain HUM-10, with its row in the permission matrix, and HUM-06 and ST-20 say that break-glass can run it; the security test catalog gains ST-89. The work queue's rows "P1-03 fix: the CLI's tokens record the sign-in configuration" and "P1-03 pull request 8: emergency revocation" take them.

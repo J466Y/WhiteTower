@@ -670,8 +670,8 @@ func TestIDTokenValidationAndSecurity(t *testing.T) {
 
 // Security test ST-14: a sign-in revokes the session that the browser held,
 // under the session cookie's name or the unprefixed one, whoever it belonged
-// to, one of another role mapping included; a sign-in that fails revokes
-// nothing
+// to, one of another sign-in configuration included; a sign-in that fails
+// revokes nothing
 func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 	ctx := context.Background()
 	idp := newMockIDP(t)
@@ -764,16 +764,16 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 		checkValid(t, dave)
 	})
 
-	// This server refuses the session of another role mapping, which a
-	// replica that runs that mapping, or a return to it, would still accept:
-	// the sign-in of the person whose session was refused revokes it, and
-	// records the revocation.
-	t.Run("a session of another role mapping", func(t *testing.T) {
+	// This server refuses the session of another sign-in configuration,
+	// which a replica that runs that configuration, or a return to it, would
+	// still accept: the sign-in of the person whose session was refused
+	// revokes it, and records the revocation.
+	t.Run("a session of another sign-in configuration", func(t *testing.T) {
 		gus, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.server.URL, Subject: "usr-gus", ExternalID: "usr-gus", DisplayName: "Gus Canary"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		other := storeWithRoleMapping(t, database, clk, map[string]string{"wt-admins": "admin"})
+		other := storeWithSignInConfiguration(t, database, clk, signInConfiguration(func(*authn.SignInConfiguration) {}))
 		held, err := other.Create(ctx, gus.ID, "oidc", []string{"admin"})
 		if err != nil {
 			t.Fatal(err)
@@ -781,7 +781,7 @@ func TestASignInRevokesTheSessionTheBrowserHeld(t *testing.T) {
 		recorded := len(eventsOf(t, database, sessionRevoked))
 		again := signIn(t, "usr-gus", &http.Cookie{Name: authn.CookieName, Value: held.Token})
 		if _, err := other.Get(ctx, held.Token); !errors.Is(err, authn.ErrSessionRevoked) {
-			t.Errorf("the session of another mapping that the browser held, with that mapping: got %v, want it revoked", err)
+			t.Errorf("the session of another configuration that the browser held, with that configuration: got %v, want it revoked", err)
 		}
 		if revoked := eventsOf(t, database, sessionRevoked); len(revoked) != recorded+1 || revoked[recorded].reason != "replaced" {
 			t.Errorf("revocations recorded: %v, want one more, replaced", revoked[recorded:])

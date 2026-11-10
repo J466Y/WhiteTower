@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Version 0.1.5, with [threat model v0.1.8](threat-model.md) |
-| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings), 2026-10-22 (the review of RFC-0001: ST-35, ST-38, ST-40, ST-49, ST-51 and ST-86), 2026-10-23 (the review of RFC-0002: ST-77, ST-79 and ST-82), 2026-10-27 (evidence bundles, plan P1-02: ST-87; the erasure of a person, plan P1-03: ST-88), 2026-11-04 (SCIM and sign-in share one principal, plan P1-03: ST-21 and ST-88; the ingestion of module events, plan P1-02: ST-10) and 2026-11-10 (sessions after a change of the sign-in configuration, plan P1-03: ST-14) |
+| **Date** | 2026-09-30; updated 2026-10-19 (RFC-0002: MCP servers, tools and models), 2026-10-21 (plan P1-17: settings), 2026-10-22 (the review of RFC-0001: ST-35, ST-38, ST-40, ST-49, ST-51 and ST-86), 2026-10-23 (the review of RFC-0002: ST-77, ST-79 and ST-82), 2026-10-27 (evidence bundles, plan P1-02: ST-87; the erasure of a person, plan P1-03: ST-88), 2026-11-04 (SCIM and sign-in share one principal, plan P1-03: ST-21 and ST-88; the ingestion of module events, plan P1-02: ST-10) and 2026-11-10 (sessions and CLI tokens after a change of the sign-in configuration, and emergency revocation, plan P1-03: ST-14, ST-20 and ST-89) |
 | **Plan** | [P0-04](../plans/phase-0/P0-04-threat-model.md), step 8 |
 
 Each test turns an abuse case of the threat model into a check that fails if the control it covers is missing. Each has one owner plan: its acceptance criteria require the test to pass, and it runs in CI from then on. Plan [P1-13](../plans/phase-1/P1-13-security-hardening-and-release.md) runs the whole catalog before the first release.
@@ -46,10 +46,11 @@ An automated test names its entry in the comment above it, as `// Security test 
 | ST-17 | Every role and permission pair of the matrix, including the negatives; no handler bypasses the authorization engine | T-03 | unit |
 | ST-18 | Separation of duties: self-approval, self-validation, a one-person release and granting oneself a role are refused | T-04, T-16, DC-4 | integration |
 | ST-19 | API tokens: scopes enforced, expiry, storage only as a hash, revocation with the principal | T-17 | integration |
-| ST-20 | A break-glass session can halt agents and the fleet and read, and nothing else: not release, not change anything; it expires after one hour; attempts are rate-limited; each use raises the critical event and the alert | T-12, T-71 | e2e |
+| ST-20 | A break-glass session can halt agents and the fleet, end every session and API token (ST-89), and read, and nothing else: not release, not change anything else; it expires after one hour; attempts are rate-limited; each use raises the critical event and the alert | T-12, T-71 | e2e |
 | ST-21 | SCIM refuses calls without its token; deactivations are audited and revoke sessions; the person whom SCIM provisions signs in as the principal SCIM created, matched by the external ID, so that a deactivation reaches their sessions and tokens; SCIM reaches no service account and no principal that White Tower acts as, such as the break-glass custodian | T-18 | integration |
 | ST-22 | Login attempts are rate-limited | T-11 | integration |
 | ST-88 | After an erasure, a canary name, email, IdP subject and external ID of the principal appear in no table and no API response; an active principal and a service account are refused; an erased principal cannot be reactivated, and the same person logging in again gets a new principal (HUM-09) | T-56, T-85 | integration |
+| ST-89 | An emergency revocation ends every session and API token, of people and of service accounts, the caller's included unless it is a break-glass session: each is refused afterwards, a CLI token included; only the platform administrator and the break-glass custodian can run it, and a token's scopes cannot grant it; it records its audit event | T-14, T-19 | integration |
 
 ## P1-04: Inventory and lifecycle
 
