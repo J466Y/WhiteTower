@@ -1202,3 +1202,11 @@ What the review settled in the specification, which is the reviewer's:
 For the part, before it merges: the vectors and both stacks follow these answers, with cases for each: hosts with each of the five characters, as written and in an A-label; hosts and labels at the bounds of DNS and beyond; a reference with `<redacted>` segments redacted again, with EP-14's two prefixes, and a fuzz property that redacting twice changes nothing; named values and headers, secret and not, as arguments and as values of `--flag=value`; and an empty segment after a prefix.
 
 For P1-16, which shows the catalog: a server's display form is what an enforcement point reports, and can hold a host that looks like another. Where the console shows it, it also shows the reference, whose host is in A-labels.
+
+After the first round, the agent asked two questions on the review's text of EP-14, and found one more difference between the stacks. The specification answers them:
+
+| Question | Answer |
+| --- | --- |
+| A named value within a value, as in `docker run --env=GITHUB_TOKEN=ghp_x`, kept its token | A value is read as an argument that is not a flag is: a URL, then a named value, then a header, and otherwise as given. The rest of a header whose name is not a secret's is a value too, so `Referer: https://u:p@h/` loses `u:p@` |
+| A header whose name starts with `-` became a flag once redacted, so redacting again redacted the argument after it | A header's name never starts with `-`, as a named value's does not; the agent's fuzz test found it. A single argument such as `--Authorization: Bearer x` is a flag, and redacts the argument after it, but keeps its own text; tools take a header as the argument after a flag, such as `--header` or `-H`, or as a flag's value, which are redacted |
+| Python's `idna` package refuses a host of more than 1024 characters before it maps it, so a host padded with characters that UTS #46 ignores reads on Go only | A host longer than 253 characters as written, without one trailing dot, cannot be read either, so the stacks agree |
