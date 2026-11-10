@@ -782,7 +782,11 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 			Name:  p.DisplayName,
 			Roles: effectiveRoles,
 		}
-		created, err = s.tokens.createWithLifetimeTx(ctx, tx, p.ID, "wtctl", authz.PermissionsList(effectiveRoles), 12*time.Hour, actor)
+		// The token records the hash of the sign-in configuration that
+		// accepted the ID token: the token store's, which main builds from
+		// the settings that it gives this service (ST-14).
+		created, err = s.tokens.createWithLifetimeTx(ctx, tx, p.ID, "wtctl", authz.PermissionsList(effectiveRoles), 12*time.Hour, actor,
+			s.tokens.signInConfiguration)
 		return err
 	})
 	switch {

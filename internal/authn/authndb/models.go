@@ -11,17 +11,18 @@ import (
 )
 
 type WhitetowerApiToken struct {
-	ID          uuid.UUID
-	PrincipalID uuid.UUID
-	Name        string
-	TokenPrefix string
-	TokenHash   []byte
-	Scopes      []string
-	CreatedBy   uuid.UUID
-	CreatedAt   time.Time
-	ExpiresAt   time.Time
-	LastUsedAt  *time.Time
-	RevokedAt   *time.Time
+	ID                        uuid.UUID
+	PrincipalID               uuid.UUID
+	Name                      string
+	TokenPrefix               string
+	TokenHash                 []byte
+	Scopes                    []string
+	CreatedBy                 uuid.UUID
+	CreatedAt                 time.Time
+	ExpiresAt                 time.Time
+	LastUsedAt                *time.Time
+	RevokedAt                 *time.Time
+	SignInConfigurationSha256 []byte
 }
 
 type WhitetowerPrincipal struct {

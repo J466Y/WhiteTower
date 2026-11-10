@@ -38,7 +38,7 @@ func setupAuthn(t *testing.T, clk *clocktest.Fake) (*authn.SessionStore, *authn.
 		IdleTimeout:      30 * time.Minute,
 		AbsoluteLifetime: 12 * time.Hour,
 	})
-	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer())
+	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer(), authn.SignInConfiguration{})
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
 	return sessionStore, principalStore, tokenStore, database
 }
@@ -260,6 +260,7 @@ func signInConfiguration(change func(c *authn.SignInConfiguration)) authn.SignIn
 	c := authn.SignInConfiguration{
 		Issuer:            "https://idp.example.com/realms/whitetower",
 		ClientID:          "whitetower-console",
+		CLIClientID:       "wtctl",
 		AllowedAlgorithms: []string{"RS256", "ES256"},
 		ExternalIDClaim:   "sub",
 		GroupsClaim:       "groups",
@@ -307,6 +308,11 @@ func TestASessionOfAnotherSignInConfigurationIsRefusedAsAnExpiredOne(t *testing.
 			c.AllowedAlgorithms, c.RoleMapping = nil, nil
 		}), signInConfiguration(func(c *authn.SignInConfiguration) {
 			c.AllowedAlgorithms, c.RoleMapping = []string{}, map[string]string{}
+		}), nil},
+		// The CLI's client, whose ID tokens the exchange turns into API
+		// tokens, and no session.
+		{"another CLI client ID", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.CLIClientID = "wtctl-2"
 		}), nil},
 
 		// Which ID tokens the server accepts.

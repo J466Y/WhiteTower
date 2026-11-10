@@ -189,16 +189,18 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	}
 	writer := audit.NewWriter(catalog, clock.System)
 
-	// The sessions record the sign-in configuration that the OIDC service
-	// creates them with, below, and the store refuses those of another
-	// configuration, as after a change and a restart (ST-14).
+	// The sessions, and the tokens of the CLI's exchange, record the sign-in
+	// configuration that the OIDC service creates them with, below, and the
+	// stores refuse those of another configuration, as after a change and a
+	// restart (ST-14).
+	signIn := signInConfiguration(cfg.Auth.OIDC)
 	sessionStore := authn.NewSessionStore(database, clock.System, writer, authn.SessionOptions{
 		IdleTimeout:         cfg.Auth.Session.IdleTimeout,
 		AbsoluteLifetime:    cfg.Auth.Session.AbsoluteLifetime,
-		SignInConfiguration: signInConfiguration(cfg.Auth.OIDC),
+		SignInConfiguration: signIn,
 	})
 	authorizer := authz.NewAuthorizer()
-	tokenStore := authn.NewTokenStore(database, clock.System, writer, authorizer)
+	tokenStore := authn.NewTokenStore(database, clock.System, writer, authorizer, signIn)
 	principalStore := authn.NewPrincipalStore(database, clock.System, writer, sessionStore, tokenStore)
 	authenticator := authn.NewAuthenticator(sessionStore, principalStore, tokenStore, cfg.Auth.OIDC.RoleMapping)
 
@@ -449,12 +451,14 @@ func readStateKey(path string) ([]byte, error) {
 // signInConfiguration returns the settings of oidc that decide which ID
 // tokens the server accepts, which person a sign-in is and what roles it
 // gives, as the OIDC service takes them: every session records their hash
-// (ST-14). The others, of transport and routine, are left out, so that
-// rotating them signs no one out.
+// with the console's client ID, and every token of the CLI's exchange with
+// the CLI's (ST-14). The others, of transport and routine, are left out, so
+// that rotating them signs no one out.
 func signInConfiguration(oidc config.OIDC) authn.SignInConfiguration {
 	return authn.SignInConfiguration{
 		Issuer:            oidc.Issuer,
 		ClientID:          oidc.ClientID,
+		CLIClientID:       oidc.CLIClientID,
 		AllowedAlgorithms: oidc.AllowedAlgorithms,
 		ExternalIDClaim:   oidc.ExternalIDClaim,
 		GroupsClaim:       oidc.GroupsClaim,

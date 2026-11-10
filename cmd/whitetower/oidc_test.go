@@ -210,7 +210,7 @@ func TestTheCoreStartsWhileTheIdentityProviderIsDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	writer := audit.NewWriter(catalog, clock.System)
-	tokens := authn.NewTokenStore(pool, clock.System, writer, authz.NewAuthorizer())
+	tokens := authn.NewTokenStore(pool, clock.System, writer, authz.NewAuthorizer(), authn.SignInConfiguration{})
 	principals := authn.NewPrincipalStore(pool, clock.System, writer, authn.NewSessionStore(pool, clock.System, writer, authn.SessionOptions{}), tokens)
 	owner, err := principals.SignIn(context.Background(), "oidc", authn.Identity{Issuer: idp.URL, Subject: "usr-before-the-outage", ExternalID: "usr-before-the-outage", DisplayName: "Olga Before", Groups: []string{"wt-owners"}}, nil)
 	if err != nil {
@@ -312,11 +312,14 @@ func TestASignInEndsOnAnotherReplicaWithTheSameStateKey(t *testing.T) {
 
 // Security test ST-14: of the settings of auth.oidc, a change of those that
 // decide which ID tokens the server accepts, which person a sign-in is and
-// what roles it gives refuses the sessions that the settings before created,
-// as after a restart, and a change of the others, of transport and routine,
-// keeps them. The test names every setting of auth.oidc, so that a setting
-// added later is put on one side or the other
-func TestOnlyTheSignInSettingsEndTheSessions(t *testing.T) {
+// what roles it gives refuses what the settings before signed in, as after a
+// restart: the sessions, unless the setting is auth.oidc.cli_client_id, and
+// the tokens of the CLI's exchange, unless it is auth.oidc.client_id. A
+// change of the others, of transport and routine, keeps both, and the tokens
+// that people and service accounts create are kept whatever the change
+// (ST-19). The test names every setting of auth.oidc, so that a setting added
+// later is put on one side or the other
+func TestOnlyTheSignInSettingsEndTheSessionsAndTheCLIsTokens(t *testing.T) {
 	ctx := context.Background()
 	pool := dbtest.New(t).Open(t)
 	catalog, err := audit.LoadCatalog(events.Files)
@@ -324,44 +327,108 @@ func TestOnlyTheSignInSettingsEndTheSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	writer := audit.NewWriter(catalog, clock.System)
-	// storeOf is the session store of a server that runs the settings oidc,
-	// as main wires it.
-	storeOf := func(oidc config.OIDC) *authn.SessionStore {
+	// sessionsOf and tokensOf are the stores of a server that runs the
+	// settings oidc, as main wires them.
+	sessionsOf := func(oidc config.OIDC) *authn.SessionStore {
 		return authn.NewSessionStore(pool, clock.System, writer, authn.SessionOptions{SignInConfiguration: signInConfiguration(oidc)})
 	}
-	principals := authn.NewPrincipalStore(pool, clock.System, writer, storeOf(config.OIDC{}), authn.NewTokenStore(pool, clock.System, writer, authz.NewAuthorizer()))
-	person, err := principals.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com/realms/whitetower", Subject: "usr-rotates", ExternalID: "usr-rotates", DisplayName: "Rita Rotates"}, nil)
-	if err != nil {
-		t.Fatal(err)
+	tokensOf := func(oidc config.OIDC) *authn.TokenStore {
+		return authn.NewTokenStore(pool, clock.System, writer, authz.NewAuthorizer(), signInConfiguration(oidc))
 	}
+	idp := newSigningProvider(t)
+	idp.up.Store(true)
 
 	before := config.Defaults().Auth.OIDC
-	before.Issuer = "https://idp.example.com/realms/whitetower"
+	before.Issuer = idp.URL
 	before.DiscoveryURL = "https://keycloak.internal:8443/realms/whitetower"
 	before.CAFile = "/etc/whitetower/idp-ca.pem"
 	before.ClientID = "whitetower-console"
 	before.ClientSecretFile = "/etc/whitetower/secrets/oidc-client-secret"
 	before.StateKeyFile = "/etc/whitetower/secrets/oidc-state-key"
 	before.RedirectURL = "https://whitetower.example.com/auth/callback"
+
+	principals := authn.NewPrincipalStore(pool, clock.System, writer, sessionsOf(before), tokensOf(before))
+	person, err := principals.SignIn(ctx, "oidc", authn.Identity{Issuer: idp.URL, Subject: "usr-rotates", ExternalID: "usr-rotates", DisplayName: "Rita Rotates", Groups: []string{"wt-owners"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A token of the person's own, and one of a service account of theirs.
+	rita := auth.Principal{ID: person.ID.String(), Kind: auth.Human, Roles: []string{"owner"}}
+	scopes := []string{string(authz.PermissionIdentityMeRead)}
+	own, err := tokensOf(before).Create(ctx, person.ID, "rita's laptop", scopes, 1, rita)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bot, err := principals.CreateServiceAccount(ctx, "Rita's deployer", nil, []string{"owner"}, rita)
+	if err != nil {
+		t.Fatal(err)
+	}
+	botToken, err := tokensOf(before).Create(ctx, bot.ID, "deploys", scopes, 1, auth.Principal{ID: bot.ID.String(), Kind: auth.ServiceAccount})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The CLI's exchange of the settings before. Its service takes from
+	// before the settings that decide which ID tokens it accepts, and the
+	// others from the test: before names files that do not exist.
+	stateKey := make([]byte, authn.MinStateKeyBytes)
+	if _, err := rand.Read(stateKey); err != nil {
+		t.Fatal(err)
+	}
+	exchanger, err := authn.NewOIDCService(authn.OIDCOptions{
+		Issuer:            before.Issuer,
+		ClientID:          before.ClientID,
+		CLIClientID:       before.CLIClientID,
+		AllowedAlgorithms: before.AllowedAlgorithms,
+		ExternalIDClaim:   before.ExternalIDClaim,
+		GroupsClaim:       before.GroupsClaim,
+		RoleMapping:       before.RoleMapping,
+		RedirectURL:       before.RedirectURL,
+		StateKey:          stateKey,
+		Tokens:            tokensOf(before),
+	}, principals, sessionsOf(before))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := exchanger.Discover(ctx); err != nil {
+		t.Fatal(err)
+	}
+	exchange := func(t *testing.T) string {
+		t.Helper()
+		created, err := exchanger.ExchangeIDToken(ctx, idp.sign(t, map[string]any{
+			"iss":    idp.URL,
+			"aud":    before.CLIClientID,
+			"sub":    "usr-rotates",
+			"name":   "Rita Rotates",
+			"groups": []string{"wt-owners"},
+			"exp":    time.Now().Add(time.Hour).Unix(),
+			"iat":    time.Now().Unix(),
+		}))
+		if err != nil {
+			t.Fatalf("exchanging an ID token: %v", err)
+		}
+		return created.Token
+	}
+
 	named := map[string]bool{}
 	for _, tt := range []struct {
-		setting string
-		change  func(c *config.OIDC) // assigns, and never edits a list or a map of before
-		ends    bool
+		setting                     string
+		change                      func(c *config.OIDC) // assigns, and never edits a list or a map of before
+		endsSessions, endsCLITokens bool
 	}{
-		{"issuer", func(c *config.OIDC) { c.Issuer = "https://idp.example.net/realms/whitetower" }, true},
-		{"client_id", func(c *config.OIDC) { c.ClientID = "whitetower-console-2" }, true},
-		{"allowed_algorithms", func(c *config.OIDC) { c.AllowedAlgorithms = []string{"RS256"} }, true},
-		{"external_id_claim", func(c *config.OIDC) { c.ExternalIDClaim = "oid" }, true},
-		{"groups_claim", func(c *config.OIDC) { c.GroupsClaim = "roles" }, true},
-		{"role_mapping", func(c *config.OIDC) { c.RoleMapping = map[string]string{"wt-owners": "user"} }, true},
-		{"discovery_url", func(c *config.OIDC) { c.DiscoveryURL = "https://keycloak.internal:9443/realms/whitetower" }, false},
-		{"ca_file", func(c *config.OIDC) { c.CAFile = "/etc/whitetower/idp-ca-rotated.pem" }, false},
-		{"cli_client_id", func(c *config.OIDC) { c.CLIClientID = "wtctl-rotated" }, false},
-		{"client_secret_file", func(c *config.OIDC) { c.ClientSecretFile = "/etc/whitetower/secrets/oidc-client-secret-rotated" }, false},
-		{"state_key_file", func(c *config.OIDC) { c.StateKeyFile = "/etc/whitetower/secrets/oidc-state-key-rotated" }, false},
-		{"redirect_url", func(c *config.OIDC) { c.RedirectURL = "https://whitetower.example.net/auth/callback" }, false},
-		{"scopes", func(c *config.OIDC) { c.Scopes = []string{"openid", "profile", "email"} }, false},
+		{"issuer", func(c *config.OIDC) { c.Issuer = "https://idp.example.net/realms/whitetower" }, true, true},
+		{"client_id", func(c *config.OIDC) { c.ClientID = "whitetower-console-2" }, true, false},
+		{"cli_client_id", func(c *config.OIDC) { c.CLIClientID = "wtctl-rotated" }, false, true},
+		{"allowed_algorithms", func(c *config.OIDC) { c.AllowedAlgorithms = []string{"RS256"} }, true, true},
+		{"external_id_claim", func(c *config.OIDC) { c.ExternalIDClaim = "oid" }, true, true},
+		{"groups_claim", func(c *config.OIDC) { c.GroupsClaim = "roles" }, true, true},
+		{"role_mapping", func(c *config.OIDC) { c.RoleMapping = map[string]string{"wt-owners": "user"} }, true, true},
+		{"discovery_url", func(c *config.OIDC) { c.DiscoveryURL = "https://keycloak.internal:9443/realms/whitetower" }, false, false},
+		{"ca_file", func(c *config.OIDC) { c.CAFile = "/etc/whitetower/idp-ca-rotated.pem" }, false, false},
+		{"client_secret_file", func(c *config.OIDC) { c.ClientSecretFile = "/etc/whitetower/secrets/oidc-client-secret-rotated" }, false, false},
+		{"state_key_file", func(c *config.OIDC) { c.StateKeyFile = "/etc/whitetower/secrets/oidc-state-key-rotated" }, false, false},
+		{"redirect_url", func(c *config.OIDC) { c.RedirectURL = "https://whitetower.example.net/auth/callback" }, false, false},
+		{"scopes", func(c *config.OIDC) { c.Scopes = []string{"openid", "profile", "email"} }, false, false},
 	} {
 		named[tt.setting] = true
 		t.Run(tt.setting, func(t *testing.T) {
@@ -370,22 +437,34 @@ func TestOnlyTheSignInSettingsEndTheSessions(t *testing.T) {
 			if reflect.DeepEqual(after, before) {
 				t.Fatal("the change changes nothing")
 			}
-			session, err := storeOf(before).Create(ctx, person.ID, "oidc", []string{"owner"})
+			session, err := sessionsOf(before).Create(ctx, person.ID, "oidc", []string{"owner"})
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = storeOf(after).Get(ctx, session.Token)
+			_, err = sessionsOf(after).Get(ctx, session.Token)
 			switch {
-			case tt.ends && !errors.Is(err, authn.ErrSessionExpired):
+			case tt.endsSessions && !errors.Is(err, authn.ErrSessionExpired):
 				t.Errorf("a session after a change of auth.oidc.%s: got %v, want it refused as expired", tt.setting, err)
-			case !tt.ends && err != nil:
+			case !tt.endsSessions && err != nil:
 				t.Errorf("a session after a change of auth.oidc.%s: got %v, want it accepted", tt.setting, err)
+			}
+			_, _, err = tokensOf(after).GetByToken(ctx, exchange(t))
+			switch {
+			case tt.endsCLITokens && !errors.Is(err, authn.ErrInvalidToken):
+				t.Errorf("a token of the CLI's exchange after a change of auth.oidc.%s: got %v, want it refused as an invalid token", tt.setting, err)
+			case !tt.endsCLITokens && err != nil:
+				t.Errorf("a token of the CLI's exchange after a change of auth.oidc.%s: got %v, want it accepted", tt.setting, err)
+			}
+			for what, token := range map[string]string{"a person's token": own.Token, "a service account's token": botToken.Token} {
+				if _, _, err := tokensOf(after).GetByToken(ctx, token); err != nil {
+					t.Errorf("%s after a change of auth.oidc.%s: got %v, want it accepted", what, tt.setting, err)
+				}
 			}
 		})
 	}
 	for _, f := range reflect.VisibleFields(reflect.TypeFor[config.OIDC]()) {
 		if setting := strings.Split(f.Tag.Get("yaml"), ",")[0]; !named[setting] {
-			t.Errorf("auth.oidc.%s: the test does not say whether a change of it ends the sessions", setting)
+			t.Errorf("auth.oidc.%s: the test does not say whether a change of it ends the sessions and the CLI's tokens", setting)
 		}
 	}
 }
@@ -394,13 +473,17 @@ func TestOnlyTheSignInSettingsEndTheSessions(t *testing.T) {
 // that runs another sign-in configuration than the one that created the
 // session refuses it, as the server does after a change and a restart: a
 // replica that still runs the role mapping before refuses the sessions of the
-// new one, and the other way round, and replicas of another issuer or another
-// external ID claim refuse them too, each as it refuses a session that does
-// not exist. A replica that lists the same mapping and algorithms in another
-// order, an algorithm twice, and other settings of transport and routine
-// accepts them. A break-glass session, which no sign-in configuration
+// new one, and the other way round, and replicas of another issuer, another
+// external ID claim or another client ID refuse them too, each as it refuses
+// a session that does not exist. A replica that lists the same mapping and
+// algorithms in another order, an algorithm twice, and other settings of
+// transport and routine accepts them, and so does a replica of another CLI
+// client ID. A token of the CLI's exchange is refused, as a token that does
+// not exist, by every replica of another configuration but the one of
+// another client ID, and the tokens that people create are accepted by every
+// replica (ST-19). A break-glass session, which no sign-in configuration
 // creates, is accepted by every replica
-func TestAReplicaRefusesTheSessionsOfAnotherSignInConfiguration(t *testing.T) {
+func TestAReplicaRefusesTheSessionsAndTheCLIsTokensOfAnotherSignInConfiguration(t *testing.T) {
 	credential, hash, err := authn.GenerateBreakglassCredential()
 	if err != nil {
 		t.Fatal(err)
@@ -425,7 +508,6 @@ func TestAReplicaRefusesTheSessionsOfAnotherSignInConfiguration(t *testing.T) {
 		"WT_AUTH_OIDC_ALLOWED_ALGORITHMS=PS256,ES512,ES384,ES256,RS256,RS256",
 		// The provider, at another address than the issuer's.
 		"WT_AUTH_OIDC_DISCOVERY_URL="+strings.Replace(idp.URL, "127.0.0.1", "localhost", 1),
-		"WT_AUTH_OIDC_CLI_CLIENT_ID=wtctl-rotated",
 		"WT_AUTH_OIDC_CLIENT_SECRET_FILE="+rotatedSecret,
 		"WT_AUTH_OIDC_STATE_KEY_FILE="+writeStateKey(t),
 		"WT_AUTH_OIDC_REDIRECT_URL=https://localhost:8443/auth/callback",
@@ -433,7 +515,9 @@ func TestAReplicaRefusesTheSessionsOfAnotherSignInConfiguration(t *testing.T) {
 	after := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_ROLE_MAPPING=wt-owners=user,wt-admins=admin")...)
 	otherIssuer := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_ISSUER="+another.URL)...)
 	otherClaim := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_EXTERNAL_ID_CLAIM=oid")...)
-	for _, s := range []*serving{before, rotated, after, otherIssuer, otherClaim} {
+	otherClient := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_CLIENT_ID=whitetower-console-rotated")...)
+	otherCLIClient := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_CLI_CLIENT_ID=wtctl-rotated")...)
+	for _, s := range []*serving{before, rotated, after, otherIssuer, otherClaim, otherClient, otherCLIClient} {
 		s.waitForDiscovery(t)
 	}
 
@@ -459,17 +543,23 @@ func TestAReplicaRefusesTheSessionsOfAnotherSignInConfiguration(t *testing.T) {
 		}
 		return p
 	}
-	refuses := func(s *serving, what string, session http.Header) {
+	// A session or an API token is refused with the answer to a credential
+	// of its kind that does not exist.
+	refuses := func(s *serving, what string, credential http.Header) {
 		t.Helper()
-		_, got := call(t, http.StatusUnauthorized, http.MethodGet, s.console+"/api/v1/me", "", session)
-		_, unknown := call(t, http.StatusUnauthorized, http.MethodGet, s.console+"/api/v1/me", "", http.Header{"Cookie": {authn.CookieName + "=unknown"}})
+		unknownCredential := http.Header{"Cookie": {authn.CookieName + "=unknown"}}
+		if credential.Get("Authorization") != "" {
+			unknownCredential = http.Header{"Authorization": {"Bearer " + authn.TokenPrefix + "unknown"}}
+		}
+		_, got := call(t, http.StatusUnauthorized, http.MethodGet, s.console+"/api/v1/me", "", credential)
+		_, unknown := call(t, http.StatusUnauthorized, http.MethodGet, s.console+"/api/v1/me", "", unknownCredential)
 		if problemOf(got) != problemOf(unknown) {
-			t.Errorf("%s: refused with %s, want the refusal of a session that does not exist, %s", what, got, unknown)
+			t.Errorf("%s: refused with %s, want the refusal of a credential that does not exist, %s", what, got, unknown)
 		}
 	}
 
 	ownerSession := signIn(before)
-	for _, s := range []*serving{before, rotated} {
+	for _, s := range []*serving{before, rotated, otherCLIClient} {
 		if _, me := get(t, s.console+"/api/v1/me", ownerSession); !strings.Contains(me, `"roles":["owner"]`) {
 			t.Errorf("/me with the session of the mapping before: %s, want the role owner", me)
 		}
@@ -477,6 +567,48 @@ func TestAReplicaRefusesTheSessionsOfAnotherSignInConfiguration(t *testing.T) {
 	refuses(after, "the session of the mapping before, on a replica of the mapping after", ownerSession)
 	refuses(otherIssuer, "the session of the mapping before, on a replica of another issuer", ownerSession)
 	refuses(otherClaim, "the session of the mapping before, on a replica of another external ID claim", ownerSession)
+	refuses(otherClient, "the session of the mapping before, on a replica of another client ID", ownerSession)
+
+	// The person of the session logs in with the CLI on the replica before,
+	// and creates a token of their own with the CLI's token.
+	idToken := idp.sign(t, map[string]any{
+		"iss":    idp.URL,
+		"aud":    "wtctl",
+		"sub":    "usr-signs-in",
+		"name":   "Sam Signs-In",
+		"groups": []string{"wt-owners"},
+		"exp":    time.Now().Add(time.Hour).Unix(),
+		"iat":    time.Now().Unix(),
+	})
+	tokenOf := func(body string) http.Header {
+		t.Helper()
+		var created struct{ Token string }
+		if err := json.Unmarshal([]byte(body), &created); err != nil || created.Token == "" {
+			t.Fatalf("a created token: %v: %s", err, body)
+		}
+		return http.Header{"Authorization": {"Bearer " + created.Token}}
+	}
+	_, exchanged := call(t, http.StatusOK, http.MethodPost, before.console+"/api/v1/tokens/exchange",
+		`{"idToken":"`+idToken+`"}`, http.Header{"Content-Type": {"application/json"}})
+	cliToken := tokenOf(exchanged)
+	_, created := call(t, http.StatusCreated, http.MethodPost, before.console+"/api/v1/tokens",
+		`{"name":"sam's script","scopes":["`+string(authz.PermissionIdentityMeRead)+`"],"expiresInDays":1}`,
+		http.Header{"Content-Type": {"application/json"}, "Authorization": cliToken["Authorization"]})
+	ownToken := tokenOf(created)
+	for _, s := range []*serving{before, rotated, otherClient} {
+		if _, me := get(t, s.console+"/api/v1/me", cliToken); !strings.Contains(me, "Sam Signs-In") {
+			t.Errorf("/me with the CLI's token of the mapping before: %s", me)
+		}
+	}
+	refuses(after, "the CLI's token of the mapping before, on a replica of the mapping after", cliToken)
+	refuses(otherIssuer, "the CLI's token of the mapping before, on a replica of another issuer", cliToken)
+	refuses(otherClaim, "the CLI's token of the mapping before, on a replica of another external ID claim", cliToken)
+	refuses(otherCLIClient, "the CLI's token of the mapping before, on a replica of another CLI client ID", cliToken)
+	for _, s := range []*serving{before, rotated, after, otherIssuer, otherClaim, otherClient, otherCLIClient} {
+		if _, me := get(t, s.console+"/api/v1/me", ownToken); !strings.Contains(me, "Sam Signs-In") {
+			t.Errorf("/me with a token that the person created: %s", me)
+		}
+	}
 
 	userSession := signIn(after)
 	if _, me := get(t, after.console+"/api/v1/me", userSession); !strings.Contains(me, `"roles":["user"]`) {
@@ -493,7 +625,7 @@ func TestAReplicaRefusesTheSessionsOfAnotherSignInConfiguration(t *testing.T) {
 			custodian = http.Header{"Cookie": {c.Name + "=" + c.Value}}
 		}
 	}
-	for _, s := range []*serving{after, otherIssuer, otherClaim} {
+	for _, s := range []*serving{after, otherIssuer, otherClaim, otherClient} {
 		if _, me := get(t, s.console+"/api/v1/me", custodian); !strings.Contains(me, `"isBreakglass":true`) {
 			t.Errorf("/me with a break-glass session, on a replica of another configuration: %s", me)
 		}

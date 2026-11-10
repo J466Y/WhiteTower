@@ -310,7 +310,7 @@ func TestSignInsOfOnePersonAtOnceRecordEachChangeOnce(t *testing.T) {
 			replica := func(name string) (*db.DB, *authn.PrincipalStore) {
 				pool := d.OpenReplica(t, name)
 				sessions := authn.NewSessionStore(pool, clk, writer, authn.SessionOptions{})
-				return pool, authn.NewPrincipalStore(pool, clk, writer, sessions, authn.NewTokenStore(pool, clk, writer, authz.NewAuthorizer()))
+				return pool, authn.NewPrincipalStore(pool, clk, writer, sessions, authn.NewTokenStore(pool, clk, writer, authz.NewAuthorizer(), authn.SignInConfiguration{}))
 			}
 			pool, first := replica("replica-a")
 			_, second := replica("replica-b")

@@ -1372,7 +1372,7 @@ func TestARefusedExchangeNamesNothingOfTheBackChannel(t *testing.T) {
 	clk := clocktest.New(testEpoch)
 	opts := backChannelOptions(idp, clk)
 	// The token store is never reached: the ID token does not verify.
-	opts.Tokens = authn.NewTokenStore(nil, clk, nil, nil)
+	opts.Tokens = authn.NewTokenStore(nil, clk, nil, nil, authn.SignInConfiguration{})
 	svc := newService(t, opts, nil, nil)
 
 	rawToken := idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{

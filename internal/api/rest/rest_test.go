@@ -648,7 +648,7 @@ func TestTokensAndServiceAccountsEndpoints(t *testing.T) {
 	}
 	writer := audit.NewWriter(cat, clk)
 	sessionStore := authn.NewSessionStore(database, clk, writer, authn.SessionOptions{})
-	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer())
+	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer(), authn.SignInConfiguration{})
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
 
 	email := "operator@example.com"
@@ -824,7 +824,7 @@ func TestOnlyItsOwnerTheirResponsiblePersonOrAnAdministratorManagesAToken(t *tes
 	}
 	writer := audit.NewWriter(cat, clk)
 	sessionStore := authn.NewSessionStore(database, clk, writer, authn.SessionOptions{})
-	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer())
+	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer(), authn.SignInConfiguration{})
 	principalStore := authn.NewPrincipalStore(database, clk, writer, sessionStore, tokenStore)
 
 	human := func(subject, name string, roles ...string) auth.Principal {
@@ -1057,7 +1057,7 @@ func TestEveryServiceAccountIsListedOnlyToAHolderOfIdentityTokensManage(t *testi
 		t.Fatal(err)
 	}
 	writer := audit.NewWriter(cat, clk)
-	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer())
+	tokenStore := authn.NewTokenStore(database, clk, writer, authz.NewAuthorizer(), authn.SignInConfiguration{})
 	principalStore := authn.NewPrincipalStore(database, clk, writer, authn.NewSessionStore(database, clk, writer, authn.SessionOptions{}), tokenStore)
 
 	human := func(subject string, roles ...string) auth.Principal {

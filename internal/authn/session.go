@@ -50,6 +50,13 @@ const (
 	// the former form, whitetower-role-mapping-v1, which hashed the role
 	// mapping alone.
 	signInConfigurationForm = "whitetower-sign-in-configuration-v1"
+
+	// cliSignInConfigurationForm names the canonical form of the sign-in
+	// configuration with which the CLI's exchange accepts ID tokens, whose
+	// hash its API tokens record: the sessions' form with the CLI's client
+	// ID. Its own name keeps the two hashes apart even when both clients are
+	// one, so that neither ever passes for the other.
+	cliSignInConfigurationForm = "whitetower-cli-sign-in-configuration-v1"
 )
 
 var (
@@ -94,27 +101,34 @@ type SessionOptions struct {
 	AbsoluteLifetime time.Duration
 	// SignInConfiguration is the configuration with which the OIDC service
 	// accepts ID tokens, finds the person and resolves the roles of the
-	// sessions that the server creates. A session records its hash, and Get
-	// refuses a session that another configuration created, as after a
-	// change of one of its settings and a restart, so that no session
-	// outlives the configuration that created it (ST-14). Break-glass
-	// sessions, whose roles come from none of its settings, are exempt.
+	// sessions that the server creates. A session records its hash, of every
+	// setting but the CLI's client ID, and Get refuses a session that another
+	// configuration created, as after a change of one of those settings and a
+	// restart, so that no session outlives the configuration that created it
+	// (ST-14). Break-glass sessions, whose roles come from none of its
+	// settings, are exempt.
 	SignInConfiguration SignInConfiguration
 }
 
 // SignInConfiguration holds the settings of auth.oidc that decide which ID
 // tokens the server accepts, which person a sign-in is and what roles it
-// gives. The settings of transport and routine, such as the discovery URL,
-// the CA file, the client secret, the state key, the redirect URL, the scopes
-// and the CLI's client ID, whose exchange creates API tokens and no session,
-// are not among them: rotating them must sign no one out.
+// gives. A session records their hash with ClientID, the console's client,
+// and an API token of the CLI's exchange with CLIClientID, the CLI's, so that
+// a change of either client ends what it signed in and nothing else. The
+// settings of transport and routine, such as the discovery URL, the CA file,
+// the client secret, the state key, the redirect URL and the scopes, are not
+// among them: rotating them must sign no one out.
 type SignInConfiguration struct {
 	// Issuer is auth.oidc.issuer, the identity provider whose ID tokens the
 	// server accepts: empty when OIDC is off, and only break-glass sessions
 	// are created.
 	Issuer string
-	// ClientID is auth.oidc.client_id, the audience of those ID tokens.
+	// ClientID is auth.oidc.client_id, the audience of the ID tokens of the
+	// console's sign-ins.
 	ClientID string
+	// CLIClientID is auth.oidc.cli_client_id, the client of the ID tokens that
+	// the CLI exchanges for API tokens.
+	CLIClientID string
 	// AllowedAlgorithms is auth.oidc.allowed_algorithms, the algorithms that
 	// may sign them. The verifier reads them as a set.
 	AllowedAlgorithms []string
@@ -149,44 +163,47 @@ func NewSessionStore(database *db.DB, clk clock.Clock, writer *audit.Writer, opt
 	if opts.AbsoluteLifetime <= 0 {
 		opts.AbsoluteLifetime = 12 * time.Hour
 	}
+	c := opts.SignInConfiguration
 	return &SessionStore{
 		database:            database,
 		clk:                 clk,
 		writer:              writer,
 		opts:                opts,
-		signInConfiguration: signInConfigurationSHA256(opts.SignInConfiguration),
+		signInConfiguration: signInConfigurationSHA256(signInConfigurationForm, c.ClientID, c),
 	}
 }
 
 // signInConfigurationSHA256 returns the SHA-256 of c in a canonical form: the
-// form's name; the issuer; the client ID; the allowed algorithms, in the
-// order of their bytes and each once; the external ID claim; the groups
-// claim; then each group of the role mapping, in the order of its bytes,
-// followed by its role. Every string is preceded by its length, and each list
-// by its number of items, in eight bytes, so that no string passes for part
-// of another or of the next setting, whatever it holds.
+// name of the form; the issuer; clientID, which is c.ClientID for sessions and
+// c.CLIClientID for the CLI's tokens, c's other client ID being left out; the
+// allowed algorithms, in the order of their bytes and each once; the external
+// ID claim; the groups claim; then each group of the role mapping, in the
+// order of its bytes, followed by its role. Every string is preceded by its
+// length, and each list by its number of items, in eight bytes, so that no
+// string passes for part of another or of the next setting, whatever it
+// holds.
 //
-// Two configurations thus hash the same exactly when their settings are the
-// same, but for what carries no meaning: the order of the algorithms, and an
-// algorithm listed twice, since the verifier reads them as a set; the order
-// of the groups, which the map has already lost; and nil or empty for a list
-// or the mapping. An empty setting hashes apart from any that is set, even
-// when the OIDC service gives it a default, such as sub for the external ID
-// claim: the configuration writes the defaults, so an empty setting is one
+// Two configurations thus hash the same in a form exactly when their settings
+// are the same, but for what carries no meaning: the order of the algorithms,
+// and an algorithm listed twice, since the verifier reads them as a set; the
+// order of the groups, which the map has already lost; and nil or empty for a
+// list or the mapping. An empty setting hashes apart from any that is set,
+// even when the OIDC service gives it a default, such as sub for the external
+// ID claim: the configuration writes the defaults, so an empty setting is one
 // that was emptied, and the cost is a sign-in, never a role. Likewise,
 // ResolveEffectiveRoles looks a group up without its leading slash too, so a
 // few mappings that differ in groups that start with slashes resolve the same
 // roles for every group, and hash apart all the same.
-func signInConfigurationSHA256(c SignInConfiguration) []byte {
+func signInConfigurationSHA256(form, clientID string, c SignInConfiguration) []byte {
 	h := sha256.New()
 	writeCount := func(n uint64) { h.Write(binary.BigEndian.AppendUint64(nil, n)) }
 	writeString := func(s string) {
 		writeCount(uint64(len(s)))
 		h.Write([]byte(s))
 	}
-	writeString(signInConfigurationForm)
+	writeString(form)
 	writeString(c.Issuer)
-	writeString(c.ClientID)
+	writeString(clientID)
 	algorithms := slices.Compact(slices.Sorted(slices.Values(c.AllowedAlgorithms)))
 	writeCount(uint64(len(algorithms)))
 	for _, algorithm := range algorithms {
