@@ -112,6 +112,7 @@ func FuzzRedactCommand(f *testing.F) {
 	f.Add("srv\x00--token\x00--password\x00pw\x00--auth=x\x00postgresql://u:p@db/app?ssl=1", "https://a.example/s/", "pat")
 	f.Add("mcp-remote\x00https://u@A.example/s/x/SECRET/sse?x\x00--pat\x00ghp\x00http://evil.com\\@good.com/", "https://a.example/", "pat")
 	f.Add("docker\x00-e\x00GITHUB_TOKEN=ghp\x00--header=Authorization: Bearer x\x00Cookie:a\x00keycloak://u:p@kc/\x00pat=x", "https://kc/", "pat")
+	f.Add("srv\x00--env=GITHUB_TOKEN=x\x00A=B=pat=c\x00X-Note:  Authorization: Bearer x\x00Referer: https://u:p@a.example/s/x/y", "https://h/", "B")
 	// Prefixes that do not end with / name segments within those of
 	// others.
 	f.Add("srv\x00https://a.example/st/x", "https://a.example/s", "")

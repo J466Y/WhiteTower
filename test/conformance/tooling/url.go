@@ -189,6 +189,11 @@ func readHost(name string) (string, error) {
 	if strings.Contains(name, "%") {
 		return "", cannotRead("a % in the host")
 	}
+	// The bound of DNS applies as written too, so that a host padded with
+	// characters that UTS #46 ignores is refused before it is converted.
+	if utf8.RuneCountInString(strings.TrimSuffix(name, ".")) > 253 {
+		return "", cannotRead("a host longer than 253 characters as written")
+	}
 	host, err := lookup.ToASCII(name)
 	if err != nil {
 		return "", cannotRead("a host that IDNA cannot convert")

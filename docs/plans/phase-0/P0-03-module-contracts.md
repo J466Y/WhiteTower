@@ -1142,9 +1142,9 @@ Part 3a-2 brings section 4.10's references, their string forms and normalized UR
 | What | Change |
 | --- | --- |
 | `test/conformance/tooling` | `ReadURL` reads a value as `url_host` does, step by step, and `URL.Normalized` normalizes it. `NormalizedURL` adds the deployment's prefixes, `RedactCommand` redacts a command line as EP-14 reads it, flags, named values, headers and URLs, and six functions give the references and their string forms, written with the `canonical` package of part 3a-1 |
-| `tooling.json` | 49 cases of URLs, U-01 to U-49, each with the host that `url_host` reads and the URL normalized, and 32 cases of references, R-01 to R-32, each with the deployment's rules when it has some, the string form and its SHA-256. The file holds 93 cases |
+| `tooling.json` | 52 cases of URLs, U-01 to U-52, each with the host that `url_host` reads and the URL normalized, and 34 cases of references, R-01 to R-34, each with the deployment's rules when it has some, the string form and its SHA-256. The file holds 98 cases |
 | `vectors_test.go` | `TestURLVectors` and `TestReferenceVectors`. The three tests of `tooling.json` share one type of the file, which still refuses unknown members |
-| The Python checker | The same reading, normalization, redaction and references, with the `idna` package. It counts 287 vectors |
+| The Python checker | The same reading, normalization, redaction and references, with the `idna` package. It counts 292 vectors |
 | `go.mod` | `golang.org/x/net`, an indirect dependency, becomes a direct one, for its `idna` package |
 
 | Cases | What they check |
@@ -1157,21 +1157,23 @@ Part 3a-2 brings section 4.10's references, their string forms and normalized UR
 | U-34 to U-43 | Hosts that hold a character that UTS #46 reads differently, `ß`, `ς`, the zero width non-joiner and joiner, each in a context that IDNA allows, and `ẞ`, as written and within an A-label |
 | U-44 to U-48 | The bounds of DNS: a host of 253 characters with labels of 63, the same with its trailing dot, a host of 254, a label of 64, and a label of 58 characters that is 64 in A-labels |
 | U-49 | A segment that is exactly `<redacted>` stays as it is, and one that is not is percent-encoded |
+| U-50 to U-52 | The bound of DNS as written: a host of 253 characters padded with soft hyphens, which converts to `a.example`, the same with its trailing dot, and one of 254 |
 | R-01 to R-07 | Remote servers: what a reference covers, the deployment's prefixes, the example of EP-14 with two, a URL equal to a prefix, a URL that makes no reference |
 | R-08 to R-17 | A connector, and local servers: canonical JSON, flags, URLs in command lines, URLs that `url_host` cannot read, the deployment's rules |
 | R-18 to R-26 | Tools and models: the examples of section 4.10, a tool of a local server, a prefix on a model's endpoint, and entries that make no reference |
 | R-27, R-28 | A reference already redacted with EP-14's two prefixes, redacted again unchanged; an empty segment after a prefix |
 | R-29 to R-32 | Named values and headers, secret and not, as arguments and as values of `--flag=value` or of a named value; a URL whose scheme holds `key`, never a header; the deployment's flags on named values and headers, and a flag with three dashes |
+| R-33, R-34 | Values within values: named values within the values of `--flag=value` and of named values, and the rests of headers whose names are not a secret's, as URLs, headers and named values, secret and not |
 
 Details the lists do not name:
 
 - **Hosts on each stack.** Go converts hosts with `x/net/idna` options close to WHATWG's: UTS #46 non-transitional, no STD3 rules, no checks on hyphens, joiners and Bidi checked. Python uses the `idna` package's `uts46_remap` without the STD3 rules, then Punycode, and checks a leading combining mark and Bidi itself, Bidi on every label of a domain with a right-to-left one, as UTS #46 says and Go does. Both refuse `ß`, `ς`, the joiners and `ẞ` in the host as written and in its U-labels, which hold the A-labels given decoded: `ẞ` is checked as written because Unicode 15.0, Go 1.26's, maps it to `ss`. Joiners are thus refused before their context could count, and Python no longer checks it. Python checks that an A-label encodes back to itself. Go's decoder refuses a delimiter with nothing before it, as in `xn---bbk`, which decodes to what `xn--bbk` does, and U-33 checks both. On both stacks, step 7's checks on empty labels, characters and the bounds of DNS run after the conversion, which accepts them. Python lists the 25 characters of White_Space.
 - **The check file.** The 80 URLs of `url-and-address-check.json` read as its `check` says, on both stacks, and its 14 IDNA hosts convert alike, `xn--gd-.com` refused as the specification answered on 2026-11-06: no difference from the specification. Its cases are part 3b's, in `arguments.json`, which reads a URL's host with `ReadURL`, and a domain of `email_domain` with steps 7 and 8 (`readHost`).
-- **The stacks agree beyond the vectors.** About 40,000 generated URLs, of which 7,300 can be read, read, normalize and redact alike on Go 1.27, Go 1.26 and Python: before the review's rules on `ẞ`, Go 1.26 read 156 of them otherwise. About 23,000 generated command lines, with flags, named values, headers and URLs, redact alike on both stacks, and redacting them again changes nothing.
+- **The stacks agree beyond the vectors.** About 40,000 generated URLs, of which 7,300 can be read, read, normalize and redact alike on Go 1.27, Go 1.26 and Python: before the review's rules on `ẞ`, Go 1.26 read 156 of them otherwise. About 23,000 generated command lines, with flags, named values, headers, URLs and values within values, redact alike on both stacks, and redacting them again changes nothing. Values within values are read in a loop, so that no nesting meets a stack's limit on recursion.
 - **Readings of EP-14's text,** which the review wrote in EP-14. A URL in a command line is written as given, what `url_host` ignores around it included (R-15). A flag's name follows all its leading dashes (R-32). The deployment's flags match exactly, case included (R-17, R-32). An argument that follows a secret flag is redacted, and still counts as a flag for the argument after it (R-13). An empty segment after a prefix is replaced (R-28).
-- **A header's name does not start with `-`.** EP-14's headers allow it, but an argument that starts with `-` is a flag, and as a header, `-key:=x` would become `-key: <redacted>`: a flag without `=`, which, redacted again, redacts the argument after it. `FuzzRedactCommand` found it. Both stacks read a header's name from a letter or a digit, which no header's name lacks, so that redacting again changes nothing; the specification's text is the reviewer's to settle.
+- **A header's name does not start with `-`.** An argument that starts with `-` is a flag, and as a header, `-key:=x` would become `-key: <redacted>`: a flag without `=`, which, redacted again, redacts the argument after it. `FuzzRedactCommand` found it, and EP-14 now says so.
 - **Fuzz tests.** `FuzzReadURL` checks that a host read has only the characters that hosts may have, within the bounds of DNS, and that normalizing a normalized URL, redacted with EP-14's nested prefixes or not, changes nothing. `FuzzRedactCommand` checks that redaction keeps every argument in its place whatever the rules, and that redacting again changes nothing with the nested prefixes and any valid one.
-- **Size.** About 1,350 changed lines without vector data, more than the 800 of a part, since both stacks need the whole reading: the review accepted it as one pull request.
+- **Size.** About 1,400 changed lines without vector data, more than the 800 of a part, since both stacks need the whole reading: the review accepted it as one pull request.
 
 Three findings for the reviewer, with options in the pull request's description:
 
@@ -1179,7 +1181,7 @@ Three findings for the reviewer, with options in the pull request's description:
 - **The Unicode version of UTS #46.** Section 6.11 names none, and the stacks differ: Unicode 15.0 or 17.0 in Go, by the Go version, and 18.0 in the `idna` package, with the standard library's 15.1 for normalization and Bidi classes.
 - **Long hosts in Python.** The `idna` package refuses a domain, or a label, longer than 1024 characters, where Go and the specification have no limit. A reference holds at most 2 KiB, so a host can be longer; P1-09 and part 3b meet it.
 
-For the specification, which is the reviewer's: section 9.1 gains `tooling.json` with 93 cases.
+For the specification, which is the reviewer's: section 9.1 gains `tooling.json` with 98 cases.
 
 ### 2026-11-10: the review of part 3a-2
 

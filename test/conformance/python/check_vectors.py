@@ -810,6 +810,10 @@ def read_host(name: str) -> str:
     # 7. A % cannot be read; the rest is converted to A-labels, in lowercase, without one trailing dot.
     if "%" in name:
         raise CannotRead("a % in the host")
+    # The bound of DNS applies as written too, so that a host padded with characters that UTS #46 ignores is refused
+    # before it is converted, and the idna package's limit of 1024 characters is never met.
+    if len(name.removesuffix(".")) > 253:
+        raise CannotRead("a host longer than 253 characters as written")
     try:
         labels = [u_label(label) for label in idna.uts46_remap(name, std3_rules=False).split(".")]
         # The characters that UTS #46 reads differently, as written, and within the labels converted, which hold
@@ -918,10 +922,10 @@ def redact_prefixes(url: str, prefixes: list[str]) -> str:
 
 
 # A named value: a name of ASCII letters, digits, _, . and -, not starting with -, then = (EP-14).
-NAMED_VALUE = re.compile(r"[A-Za-z0-9_.][A-Za-z0-9_.-]*=")
-# A header: a name of ASCII letters, digits and -, then :, as an HTTP header is written (EP-14). The name does not start
-# with -: an argument that does is a flag, and redacted as a header it could become a flag that redacts the next one.
-HEADER = re.compile(r"([A-Za-z0-9][A-Za-z0-9-]*):")
+NAMED_VALUE = re.compile(r"([A-Za-z0-9_.][A-Za-z0-9_.-]*)=")
+# A header: a name of ASCII letters, digits and -, not starting with -, then : and the spaces after it, as an HTTP
+# header is written (EP-14).
+HEADER = re.compile(r"([A-Za-z0-9][A-Za-z0-9-]*): *")
 
 
 def secret_name(name: str, rules: dict) -> bool:
@@ -957,24 +961,35 @@ def redact_url(arg: str, rules: dict) -> str:
 
 
 def redact_value(value: str, rules: dict) -> str:
-    """An argument or a value as EP-14's rules on URLs and headers write it: a URL as redact_url says, never a header;
-    a header whose name is a secret's as its name, :, a space and <redacted>; any other as given."""
-    if is_url(value):
-        return redact_url(value, rules)
-    if (m := HEADER.match(value)) is not None and secret_name(m.group(1), rules):
-        return f"{m.group(1)}: {REDACTED}"
-    return value
+    """An argument that is not a flag, or a value, as EP-14 writes it: a URL as redact_url says; then a named value,
+    whose value becomes <redacted> when its name is a secret's; then a header, written as its name, :, a space and
+    <redacted> when its name is a secret's, and otherwise keeping its name, the : and the spaces after it; and otherwise
+    as given. The value of a named value, and the rest of a header, whose name is not a secret's, are values in turn,
+    read in a loop, so that no nesting meets Python's limit on recursion."""
+    out = ""
+    while True:
+        if is_url(value):
+            return out + redact_url(value, rules)
+        for pattern, redacted in ((NAMED_VALUE, "{}=" + REDACTED), (HEADER, "{}: " + REDACTED)):
+            if (m := pattern.match(value)) is not None:
+                if secret_name(m.group(1), rules):
+                    return out + redacted.format(m.group(1))
+                out, value = out + m.group(), value[m.end():]
+                break
+        else:
+            return out + value
 
 
 def redact_argument(arg: str, rules: dict) -> str:
-    """An argument as EP-14 writes it: a URL or a header as redact_value says; a flag written --flag=value, or a named
-    value, with <redacted> as its value when its name is a secret's, and otherwise with its value as redact_value says."""
-    if is_url(arg) or HEADER.match(arg):
+    """An argument as EP-14 writes it: a flag written --flag=value with <redacted> as its value when its name is a
+    secret's, and otherwise with its value as redact_value says; any other flag as given; and an argument that is not a
+    flag as redact_value says."""
+    if not arg.startswith("-"):
         return redact_value(arg, rules)
-    name, joined, value = arg.partition("=")
-    if not joined or not (name.startswith("-") or NAMED_VALUE.match(arg)):
+    flag, joined, value = arg.partition("=")
+    if not joined:
         return arg
-    return f"{name}={REDACTED if secret_name(name.lstrip('-'), rules) else redact_value(value, rules)}"
+    return f"{flag}={REDACTED if secret_name(flag.lstrip('-'), rules) else redact_value(value, rules)}"
 
 
 def redact_command(command: list[str], rules: dict) -> list[str]:

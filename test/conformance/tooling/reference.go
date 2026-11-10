@@ -77,15 +77,14 @@ func redactPrefixes(normalized string, prefixes []string) string {
 }
 
 // namedValue is a name of ASCII letters, digits, _, . and -, not starting
-// with -, followed by =: an argument such as GITHUB_TOKEN=ghp_x (EP-14).
-var namedValue = regexp.MustCompile(`^[A-Za-z0-9_.][A-Za-z0-9_.-]*=`)
+// with -, followed by =: an argument or a value such as GITHUB_TOKEN=ghp_x
+// (EP-14).
+var namedValue = regexp.MustCompile(`^([A-Za-z0-9_.][A-Za-z0-9_.-]*)=`)
 
-// header is a name of ASCII letters, digits and -, followed by :, as an HTTP
-// header is written: an argument or a value such as Authorization: Bearer abc
-// (EP-14). The name does not start with -: an argument that does is a flag,
-// and were it also a header, -key:=x would become -key: <redacted>, a flag
-// without = that, redacted again, would redact the argument after it.
-var header = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9-]*):`)
+// header is a name of ASCII letters, digits and -, not starting with -,
+// followed by : and the spaces after it, as an HTTP header is written: an
+// argument or a value such as Authorization: Bearer abc (EP-14).
+var header = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9-]*): *`)
 
 // RedactCommand returns a command and its arguments redacted as EP-14 says,
 // with the deployment's rules. The argument that follows a flag whose name is
@@ -111,37 +110,61 @@ func redactsNext(arg string, rules Rules) bool {
 	return strings.HasPrefix(arg, "-") && !strings.Contains(arg, "=") && secretName(strings.TrimLeft(arg, "-"), rules)
 }
 
-// redactArgument writes an argument as EP-14 says. A URL or a header is
-// written as redactValue says. A flag written --flag=value, or a named value,
-// name=value, keeps its name, and its value becomes <redacted> when the name
-// is a secret's; any other value is written as redactValue says. A named
-// value or a flag written so never redacts the argument after it.
+// redactArgument writes an argument as EP-14 says. A flag written
+// --flag=value keeps its name, and its value becomes <redacted> when the name
+// is a secret's, or is written as redactValue says; it never redacts the
+// argument after it. Any other flag is written as given, and an argument that
+// is not a flag as redactValue says.
 func redactArgument(arg string, rules Rules) string {
-	if isURL(arg) || header.MatchString(arg) {
+	if !strings.HasPrefix(arg, "-") {
 		return redactValue(arg, rules)
 	}
-	name, value, joined := strings.Cut(arg, "=")
-	if !joined || (!strings.HasPrefix(name, "-") && !namedValue.MatchString(arg)) {
+	flag, value, joined := strings.Cut(arg, "=")
+	switch {
+	case !joined:
 		return arg
+	case secretName(strings.TrimLeft(flag, "-"), rules):
+		return flag + "=" + Redacted
 	}
-	if secretName(strings.TrimLeft(name, "-"), rules) {
-		return name + "=" + Redacted
-	}
-	return name + "=" + redactValue(value, rules)
+	return flag + "=" + redactValue(value, rules)
 }
 
-// redactValue writes an argument, or a value, as EP-14's rules on URLs and
-// headers say. A URL is written as redactURL says, and is never a header. A
-// header whose name is a secret's is written as its name, :, a space and
-// <redacted>. Any other is written as given.
+// redactValue writes an argument that is not a flag, or a value, as EP-14
+// says: as a URL, as redactURL says; then as a named value, which keeps its
+// name and whose value becomes <redacted> when the name is a secret's; then as
+// a header, written as its name, :, a space and <redacted> when its name is a
+// secret's, and otherwise keeping its name, the : and the spaces after it;
+// and otherwise as given. The value of a named value, and the rest of a
+// header, whose name is not a secret's, are values in turn, read in a loop
+// rather than recursively, so that no nesting can exhaust a stack.
 func redactValue(value string, rules Rules) string {
-	if isURL(value) {
-		return redactURL(value, rules)
+	var b strings.Builder
+	for {
+		if isURL(value) {
+			b.WriteString(redactURL(value, rules))
+			return b.String()
+		}
+		if m := namedValue.FindStringSubmatch(value); m != nil {
+			if secretName(m[1], rules) {
+				b.WriteString(m[1] + "=" + Redacted)
+				return b.String()
+			}
+			b.WriteString(m[0])
+			value = value[len(m[0]):]
+			continue
+		}
+		if m := header.FindStringSubmatch(value); m != nil {
+			if secretName(m[1], rules) {
+				b.WriteString(m[1] + ": " + Redacted)
+				return b.String()
+			}
+			b.WriteString(m[0])
+			value = value[len(m[0]):]
+			continue
+		}
+		b.WriteString(value)
+		return b.String()
 	}
-	if m := header.FindStringSubmatch(value); m != nil && secretName(m[1], rules) {
-		return m[1] + ": " + Redacted
-	}
-	return value
 }
 
 // secretName reports whether the name of a flag, a named value or a header is
