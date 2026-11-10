@@ -240,7 +240,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
-| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | In progress (1 of 5 parts: 3a-1) |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | In progress (2 of 5 parts: 3a-1 and 3a-2) |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -1134,3 +1134,81 @@ Details the list does not name:
 - **What no test observes.** The comments and the descriptions; and the checker's lifted limit on digits, since no vector holds an integer of more than 4300 digits.
 
 For the specification, which is the reviewer's: section 9.1 gains `hashed-arguments.json` with 12 cases and `tooling.json` with its cases, once 3a-2 has added its own.
+
+### 2026-11-10: step 12, part 3a-2: references, normalized URLs and redaction
+
+Part 3a-2 brings section 4.10's references, their string forms and normalized URLs to both stacks, with the reading of `url_host` that they use (section 6.11) and the redaction of EP-14 with the deployment's rules. No generated vector changes.
+
+| What | Change |
+| --- | --- |
+| `test/conformance/tooling` | `ReadURL` reads a value as `url_host` does, step by step, and `URL.Normalized` normalizes it. `NormalizedURL` adds the deployment's prefixes, `RedactCommand` redacts a command line as EP-14 reads it, flags, named values, headers and URLs, and six functions give the references and their string forms, written with the `canonical` package of part 3a-1 |
+| `tooling.json` | 52 cases of URLs, U-01 to U-52, each with the host that `url_host` reads and the URL normalized, and 34 cases of references, R-01 to R-34, each with the deployment's rules when it has some, the string form and its SHA-256. The file holds 98 cases |
+| `vectors_test.go` | `TestURLVectors` and `TestReferenceVectors`. The three tests of `tooling.json` share one type of the file, which still refuses unknown members |
+| The Python checker | The same reading, normalization, redaction and references, with the `idna` package. It counts 292 vectors |
+| `go.mod` | `golang.org/x/net`, an indirect dependency, becomes a direct one, for its `idna` package |
+
+| Cases | What they check |
+| --- | --- |
+| U-01 to U-08 | The example of section 4.10; an empty path; user information, query and fragment; the last `@`; ports with leading zeros, and each scheme's default |
+| U-09 to U-15 | Paths: characters encoded as UTF-8, a stray `%`, percent-encoding normalized, dot segments after it, empty segments, trailing slashes |
+| U-16 to U-20 | Hosts: A-labels, underscores, IPv6 as RFC 5952 writes it, what `url_host` ignores around a value, a right-to-left label |
+| U-21 to U-23 | Another scheme and a backslash in the path make no reference; a backslash in the query goes with it |
+| U-24 to U-33 | What `url_host` cannot read: a backslash in the authority, no scheme, an IPv4 address of other numbers, the IPv4-mapped range, a colon without a port, a `%` in the host, a joiner out of context, the Bidi rule, and A-labels that decode to ASCII or do not encode back to themselves |
+| U-34 to U-43 | Hosts that hold a character that UTS #46 reads differently, `ß`, `ς`, the zero width non-joiner and joiner, each in a context that IDNA allows, and `ẞ`, as written and within an A-label |
+| U-44 to U-48 | The bounds of DNS: a host of 253 characters with labels of 63, the same with its trailing dot, a host of 254, a label of 64, and a label of 58 characters that is 64 in A-labels |
+| U-49 | A segment that is exactly `<redacted>` stays as it is, and one that is not is percent-encoded |
+| U-50 to U-52 | The bound of DNS as written: a host of 253 characters padded with soft hyphens, which converts to `a.example`, the same with its trailing dot, and one of 254 |
+| R-01 to R-07 | Remote servers: what a reference covers, the deployment's prefixes, the example of EP-14 with two, a URL equal to a prefix, a URL that makes no reference |
+| R-08 to R-17 | A connector, and local servers: canonical JSON, flags, URLs in command lines, URLs that `url_host` cannot read, the deployment's rules |
+| R-18 to R-26 | Tools and models: the examples of section 4.10, a tool of a local server, a prefix on a model's endpoint, and entries that make no reference |
+| R-27, R-28 | A reference already redacted with EP-14's two prefixes, redacted again unchanged; an empty segment after a prefix |
+| R-29 to R-32 | Named values and headers, secret and not, as arguments and as values of `--flag=value` or of a named value; a URL whose scheme holds `key`, never a header; the deployment's flags on named values and headers, and a flag with three dashes |
+| R-33, R-34 | Values within values: named values within the values of `--flag=value` and of named values, and the rests of headers whose names are not a secret's, as URLs, headers and named values, secret and not |
+
+Details the lists do not name:
+
+- **Hosts on each stack.** Go converts hosts with `x/net/idna` options close to WHATWG's: UTS #46 non-transitional, no STD3 rules, no checks on hyphens, joiners and Bidi checked. Python uses the `idna` package's `uts46_remap` without the STD3 rules, then Punycode, and checks a leading combining mark and Bidi itself, Bidi on every label of a domain with a right-to-left one, as UTS #46 says and Go does. Both refuse `ß`, `ς`, the joiners and `ẞ` in the host as written and in its U-labels, which hold the A-labels given decoded: `ẞ` is checked as written because Unicode 15.0, Go 1.26's, maps it to `ss`. Joiners are thus refused before their context could count, and Python no longer checks it. Python checks that an A-label encodes back to itself. Go's decoder refuses a delimiter with nothing before it, as in `xn---bbk`, which decodes to what `xn--bbk` does, and U-33 checks both. On both stacks, step 7's checks on empty labels, characters and the bounds of DNS run after the conversion, which accepts them. Python lists the 25 characters of White_Space.
+- **The check file.** The 80 URLs of `url-and-address-check.json` read as its `check` says, on both stacks, and its 14 IDNA hosts convert alike, `xn--gd-.com` refused as the specification answered on 2026-11-06: no difference from the specification. Its cases are part 3b's, in `arguments.json`, which reads a URL's host with `ReadURL`, and a domain of `email_domain` with steps 7 and 8 (`readHost`).
+- **The stacks agree beyond the vectors.** About 40,000 generated URLs, of which 7,300 can be read, read, normalize and redact alike on Go 1.27, Go 1.26 and Python: before the review's rules on `ẞ`, Go 1.26 read 156 of them otherwise. About 23,000 generated command lines, with flags, named values, headers, URLs and values within values, redact alike on both stacks, and redacting them again changes nothing. Values within values are read in a loop, so that no nesting meets a stack's limit on recursion.
+- **Readings of EP-14's text,** which the review wrote in EP-14. A URL in a command line is written as given, what `url_host` ignores around it included (R-15). A flag's name follows all its leading dashes (R-32). The deployment's flags match exactly, case included (R-17, R-32). An argument that follows a secret flag is redacted, and still counts as a flag for the argument after it (R-13). An empty segment after a prefix is replaced (R-28).
+- **A header's name does not start with `-`.** An argument that starts with `-` is a flag, and as a header, `-key:=x` would become `-key: <redacted>`: a flag without `=`, which, redacted again, redacts the argument after it. `FuzzRedactCommand` found it, and EP-14 now says so.
+- **Fuzz tests.** `FuzzReadURL` checks that a host read has only the characters that hosts may have, within the bounds of DNS, and that normalizing a normalized URL, redacted with EP-14's nested prefixes or not, changes nothing. `FuzzRedactCommand` checks that redaction keeps every argument in its place whatever the rules, and that redacting again changes nothing with the nested prefixes and any valid one.
+- **Size.** About 1,400 changed lines without vector data, more than the 800 of a part, since both stacks need the whole reading: the review accepted it as one pull request.
+
+Three findings for the reviewer, with options in the pull request's description:
+
+- **Redacting again with nested prefixes.** CORE-11 has the core apply EP-14 again to what a report brings. With EP-14's own example, an enforcement point computes `https://a.example/s/<redacted>/<redacted>`. Normalized again, `<redacted>` becomes `%3Credacted%3E`, the prefix `https://a.example/s/x/` no longer matches, and the core stores `https://a.example/s/<redacted>/%3Credacted%3E`, a reference that no enforcement point computes.
+- **The Unicode version of UTS #46.** Section 6.11 names none, and the stacks differ: Unicode 15.0 or 17.0 in Go, by the Go version, and 18.0 in the `idna` package, with the standard library's 15.1 for normalization and Bidi classes.
+- **Long hosts in Python.** The `idna` package refuses a domain, or a label, longer than 1024 characters, where Go and the specification have no limit. A reference holds at most 2 KiB, so a host can be longer; P1-09 and part 3b meet it.
+
+For the specification, which is the reviewer's: section 9.1 gains `tooling.json` with 98 cases.
+
+### 2026-11-10: the review of part 3a-2
+
+The review checked the part against the specification, and its references, normalized URLs and redactions on both stacks. It found that EP-14's rules, which both stacks follow, report credentials that a command line passes as named values or as headers: `docker run -e GITHUB_TOKEN=ghp_x`, `env DATABASE_URL=postgres://u:pw@db/app` and `--header "Authorization: Bearer abc"` kept the token, the password and the bearer token in the local server's reference, which the core stores and shows to reviewers. EP-14 already says to never report a credential; its rules on reading a command line missed these forms.
+
+The maintainer's decision of 2026-11-10, on the agent's second finding:
+
+- **Hosts that UTS #46 reads differently.** `url_host` cannot read a host that holds, as written or within an A-label, `ß`, `ς`, the zero width non-joiner or joiner, or `ẞ`: versions of UTS #46, and its transitional and non-transitional processing, read them differently, so an enforcement point could read one host while the agent's client reaches another, and an allowlist of hosts would let the call through. Every other host is written in A-labels, as before, so that hosts that look alike never compare alike. The alternatives: a minimum version of Unicode alone, which leaves clients in transitional processing, such as Python's standard codec, reaching other hosts; and no version, with a warning only.
+
+What the review settled in the specification, which is the reviewer's:
+
+| Question | Answer |
+| --- | --- |
+| Redacting again with nested prefixes (the agent's first finding) | Section 4.10, step 4: a segment that is exactly `<redacted>` stays as it is, so that redacting a reference again changes nothing, with any prefixes, in URLs and in command lines (the agent's option A) |
+| Long hosts (the agent's third finding) | `url_host` cannot read a host longer than 253 characters, or with a label longer than 63, in A-labels: the bounds of DNS, which no host that resolves exceeds. The stacks then agree, the `idna` package's limit of 1024 included |
+| The version of Unicode | UTS #46 of Unicode 15.0 or later. `ẞ`, the one character whose mapping the agent saw change since, cannot be read, so Go 1.26, on Unicode 15.0, reads every host as Go 1.27 and Python do; a version that does not know a character cannot read a host that holds it, which denies |
+| Credentials in named values and headers (the review's finding) | EP-14: an argument written `name=value`, with a name of ASCII letters, digits, `_`, `.` and `-`, is read as `--flag=value` is; an argument or a value written as a header, `Name: rest`, becomes `Name: <redacted>` when its name is a secret's. A URL is never a header or a named value |
+| The agent's readings | Confirmed and written in EP-14: a URL in a command line keeps what `url_host` ignores around it; a flag's name follows all its leading dashes; the deployment's flags match exactly, case included; an argument redacted as a flag's value still counts as a flag; an empty segment after a prefix is replaced |
+
+For the part, before it merges: the vectors and both stacks follow these answers, with cases for each: hosts with each of the five characters, as written and in an A-label; hosts and labels at the bounds of DNS and beyond; a reference with `<redacted>` segments redacted again, with EP-14's two prefixes, and a fuzz property that redacting twice changes nothing; named values and headers, secret and not, as arguments and as values of `--flag=value`; and an empty segment after a prefix.
+
+For P1-16, which shows the catalog: a server's display form is what an enforcement point reports, and can hold a host that looks like another. Where the console shows it, it also shows the reference, whose host is in A-labels.
+
+After the first round, the agent asked two questions on the review's text of EP-14, and found one more difference between the stacks. The specification answers them:
+
+| Question | Answer |
+| --- | --- |
+| A named value within a value, as in `docker run --env=GITHUB_TOKEN=ghp_x`, kept its token | A value is read as an argument that is not a flag is: a URL, then a named value, then a header, and otherwise as given. The rest of a header whose name is not a secret's is a value too, so `Referer: https://u:p@h/` loses `u:p@` |
+| A header whose name starts with `-` became a flag once redacted, so redacting again redacted the argument after it | A header's name never starts with `-`, as a named value's does not; the agent's fuzz test found it. A single argument such as `--Authorization: Bearer x` is a flag, and redacts the argument after it, but keeps its own text; tools take a header as the argument after a flag, such as `--header` or `-H`, or as a flag's value, which are redacted |
+| Python's `idna` package refuses a host of more than 1024 characters before it maps it, so a host padded with characters that UTS #46 ignores reads on Go only | A host longer than 253 characters as written, without one trailing dot, cannot be read either, so the stacks agree |

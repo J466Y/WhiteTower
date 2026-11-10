@@ -1,7 +1,9 @@
 // Package tooling computes what an enforcement point reports of an agent's
 // tooling as section 4.10 of the module contracts
 // (docs/contracts/module-contract-v0.1.md) says: the definition hashes of its
-// tools. It is the reference that the vectors of tooling.json are checked
+// tools, and the references of its servers, tools and models, with the URLs
+// that url_host reads (section 6.11) and normalizes, after the redaction of
+// EP-14. It is the reference that the vectors of tooling.json are checked
 // with.
 package tooling
 
