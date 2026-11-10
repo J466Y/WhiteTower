@@ -113,7 +113,7 @@ type Migration struct {
 type Auth struct {
 	// User session settings (ADR-0009).
 	Session Session `yaml:"session"`
-	// OpenID Connect authentication and backend-for-frontend settings (ADR-0009).
+	// OpenID Connect authentication and backend-for-frontend settings (ADR-0009). Six of them decide which ID tokens the server accepts, which person a sign-in is and what roles it gives: auth.oidc.issuer, auth.oidc.client_id, auth.oidc.allowed_algorithms, auth.oidc.external_id_claim, auth.oidc.groups_claim and auth.oidc.role_mapping. A session keeps the roles of its sign-in and records the hash of those six settings, and the server refuses a session that other values created, as an expired one: after a change of any of them and a restart, everyone signs in again. Break-glass sessions, which none of them creates, and API tokens, which take their roles at each request, are not affected, and a change of the other settings of this section signs no one out. During a rolling restart, a replica that still runs the settings before refuses the sessions of the replicas that run the new ones, and the other way round, until every replica runs the same.
 	OIDC OIDC `yaml:"oidc"`
 	// Emergency break-glass access settings (plan P1-03, step 9; HUM-06, KIL-08, ST-20).
 	Breakglass Breakglass `yaml:"breakglass"`
@@ -139,13 +139,13 @@ type Breakglass struct {
 
 // OIDC holds OpenID Connect authentication and BFF settings (plan P1-03, step 1; ADR-0009).
 type OIDC struct {
-	// Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled. Browsers sign in at it, and without auth.oidc.discovery_url the server also takes the discovery document and the signing keys from it and sends it the client secret and the authorization code, so the URL is https: http only with dev.self_signed_tls, which the development stacks set.
+	// Issuer URL of the OpenID Connect identity provider, such as https://idp.example.com/realms/whitetower. Empty when OIDC login is disabled. Browsers sign in at it, and without auth.oidc.discovery_url the server also takes the discovery document and the signing keys from it and sends it the client secret and the authorization code, so the URL is https: http only with dev.self_signed_tls, which the development stacks set. After a change and a restart, everyone signs in again, as the section auth.oidc says.
 	Issuer string `yaml:"issuer"`
 	// Base URL that the server fetches the identity provider's discovery document from, under /.well-known/openid-configuration, when the server reaches the provider at another address than browsers do, such as http://keycloak:8080/realms/whitetower inside a container network. The document must still name auth.oidc.issuer as its issuer, and ID tokens are verified against auth.oidc.issuer. The server sends the client secret and the authorization code to the endpoints the document names and takes the signing keys from them, so the URL is https when the issuer is. Empty: the issuer.
 	DiscoveryURL string `yaml:"discovery_url"`
 	// PEM file with the certificate authorities that sign the identity provider's certificate on the back channel, which carries discovery, the signing keys and the token exchange: auth.oidc.discovery_url, or auth.oidc.issuer without it, when that URL is https. Empty: the system's.
 	CAFile string `yaml:"ca_file"`
-	// Client ID of the confidential client in the IdP.
+	// Client ID of the confidential client in the IdP, which the ID tokens of a sign-in must name as their audience. After a change and a restart, everyone signs in again, as the section auth.oidc says.
 	ClientID string `yaml:"client_id"`
 	// Client ID of the public client used by the CLI (wtctl): wtctl by default.
 	CLIClientID string `yaml:"cli_client_id"`
@@ -157,13 +157,13 @@ type OIDC struct {
 	RedirectURL string `yaml:"redirect_url"`
 	// Scopes requested during OIDC authorization: openid, profile, email, groups by default.
 	Scopes []string `yaml:"scopes"`
-	// Claim name in the ID token that contains group memberships: groups by default.
+	// Claim name in the ID token that contains group memberships: groups by default. After a change and a restart, everyone signs in again, as the section auth.oidc says.
 	GroupsClaim string `yaml:"groups_claim"`
-	// Claim name in the ID token whose value is the person's external ID, the value that the identity provider sends as externalId through SCIM: sub by default, oid for Microsoft Entra ID. A sign-in finds the principal with this external ID, so that SCIM's deactivation reaches the person who signs in. The claim must be a string that the person cannot change; an ID token without it is refused.
+	// Claim name in the ID token whose value is the person's external ID, the value that the identity provider sends as externalId through SCIM: sub by default, oid for Microsoft Entra ID. A sign-in finds the principal with this external ID, so that SCIM's deactivation reaches the person who signs in. The claim must be a string that the person cannot change; an ID token without it is refused. After a change and a restart, everyone signs in again, as the section auth.oidc says.
 	ExternalIDClaim string `yaml:"external_id_claim"`
-	// Map from IdP group names to White Tower roles (steering, advisory, owner, user, operator, auditor, admin). A session keeps the roles of its sign-in, and the server refuses a session whose roles came from another mapping, as an expired one: after a change and a restart, everyone signs in again. The order of the groups does not matter. Break-glass sessions, whose roles do not come from the mapping, and API tokens, which take their roles at each request, are not affected. During a rolling restart, a replica that still runs the mapping before refuses the sessions of the replicas that run the new one, and the other way round, until every replica runs the same mapping.
+	// Map from IdP group names to White Tower roles (steering, advisory, owner, user, operator, auditor, admin). The order of the groups does not matter. After a change and a restart, everyone signs in again, as the section auth.oidc says.
 	RoleMapping map[string]string `yaml:"role_mapping"`
-	// Allowed signature algorithms for ID tokens: RS256, ES256, ES384, ES512, PS256 by default.
+	// Allowed signature algorithms for ID tokens: RS256, ES256, ES384, ES512, PS256 by default. Their order does not matter, and neither does an algorithm listed twice. After a change and a restart, everyone signs in again, as the section auth.oidc says.
 	AllowedAlgorithms []string `yaml:"allowed_algorithms"`
 }
 

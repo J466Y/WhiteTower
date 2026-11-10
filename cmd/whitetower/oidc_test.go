@@ -8,11 +8,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -25,6 +27,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
+	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 )
 
@@ -307,15 +310,97 @@ func TestASignInEndsOnAnotherReplicaWithTheSameStateKey(t *testing.T) {
 	}
 }
 
+// Security test ST-14: of the settings of auth.oidc, a change of those that
+// decide which ID tokens the server accepts, which person a sign-in is and
+// what roles it gives refuses the sessions that the settings before created,
+// as after a restart, and a change of the others, of transport and routine,
+// keeps them. The test names every setting of auth.oidc, so that a setting
+// added later is put on one side or the other
+func TestOnlyTheSignInSettingsEndTheSessions(t *testing.T) {
+	ctx := context.Background()
+	pool := dbtest.New(t).Open(t)
+	catalog, err := audit.LoadCatalog(events.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := audit.NewWriter(catalog, clock.System)
+	// storeOf is the session store of a server that runs the settings oidc,
+	// as main wires it.
+	storeOf := func(oidc config.OIDC) *authn.SessionStore {
+		return authn.NewSessionStore(pool, clock.System, writer, authn.SessionOptions{SignInConfiguration: signInConfiguration(oidc)})
+	}
+	principals := authn.NewPrincipalStore(pool, clock.System, writer, storeOf(config.OIDC{}), authn.NewTokenStore(pool, clock.System, writer, authz.NewAuthorizer()))
+	person, err := principals.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com/realms/whitetower", Subject: "usr-rotates", ExternalID: "usr-rotates", DisplayName: "Rita Rotates"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	before := config.Defaults().Auth.OIDC
+	before.Issuer = "https://idp.example.com/realms/whitetower"
+	before.DiscoveryURL = "https://keycloak.internal:8443/realms/whitetower"
+	before.CAFile = "/etc/whitetower/idp-ca.pem"
+	before.ClientID = "whitetower-console"
+	before.ClientSecretFile = "/etc/whitetower/secrets/oidc-client-secret"
+	before.StateKeyFile = "/etc/whitetower/secrets/oidc-state-key"
+	before.RedirectURL = "https://whitetower.example.com/auth/callback"
+	named := map[string]bool{}
+	for _, tt := range []struct {
+		setting string
+		change  func(c *config.OIDC) // assigns, and never edits a list or a map of before
+		ends    bool
+	}{
+		{"issuer", func(c *config.OIDC) { c.Issuer = "https://idp.example.net/realms/whitetower" }, true},
+		{"client_id", func(c *config.OIDC) { c.ClientID = "whitetower-console-2" }, true},
+		{"allowed_algorithms", func(c *config.OIDC) { c.AllowedAlgorithms = []string{"RS256"} }, true},
+		{"external_id_claim", func(c *config.OIDC) { c.ExternalIDClaim = "oid" }, true},
+		{"groups_claim", func(c *config.OIDC) { c.GroupsClaim = "roles" }, true},
+		{"role_mapping", func(c *config.OIDC) { c.RoleMapping = map[string]string{"wt-owners": "user"} }, true},
+		{"discovery_url", func(c *config.OIDC) { c.DiscoveryURL = "https://keycloak.internal:9443/realms/whitetower" }, false},
+		{"ca_file", func(c *config.OIDC) { c.CAFile = "/etc/whitetower/idp-ca-rotated.pem" }, false},
+		{"cli_client_id", func(c *config.OIDC) { c.CLIClientID = "wtctl-rotated" }, false},
+		{"client_secret_file", func(c *config.OIDC) { c.ClientSecretFile = "/etc/whitetower/secrets/oidc-client-secret-rotated" }, false},
+		{"state_key_file", func(c *config.OIDC) { c.StateKeyFile = "/etc/whitetower/secrets/oidc-state-key-rotated" }, false},
+		{"redirect_url", func(c *config.OIDC) { c.RedirectURL = "https://whitetower.example.net/auth/callback" }, false},
+		{"scopes", func(c *config.OIDC) { c.Scopes = []string{"openid", "profile", "email"} }, false},
+	} {
+		named[tt.setting] = true
+		t.Run(tt.setting, func(t *testing.T) {
+			after := before
+			tt.change(&after)
+			if reflect.DeepEqual(after, before) {
+				t.Fatal("the change changes nothing")
+			}
+			session, err := storeOf(before).Create(ctx, person.ID, "oidc", []string{"owner"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = storeOf(after).Get(ctx, session.Token)
+			switch {
+			case tt.ends && !errors.Is(err, authn.ErrSessionExpired):
+				t.Errorf("a session after a change of auth.oidc.%s: got %v, want it refused as expired", tt.setting, err)
+			case !tt.ends && err != nil:
+				t.Errorf("a session after a change of auth.oidc.%s: got %v, want it accepted", tt.setting, err)
+			}
+		})
+	}
+	for _, f := range reflect.VisibleFields(reflect.TypeFor[config.OIDC]()) {
+		if setting := strings.Split(f.Tag.Get("yaml"), ",")[0]; !named[setting] {
+			t.Errorf("auth.oidc.%s: the test does not say whether a change of it ends the sessions", setting)
+		}
+	}
+}
+
 // Security test ST-14: a session keeps the roles of its sign-in, so a replica
-// that runs another role mapping than the one that resolved them refuses the
-// session, as the server does after a change of the mapping and a restart: a
-// replica that still runs the mapping before refuses the sessions of the new
-// one, and the other way round, as it refuses a session that does not exist,
-// while a replica that lists the same mapping in another order accepts them.
-// A break-glass session, whose roles do not come from the mapping, is
-// accepted by every replica
-func TestAReplicaRefusesTheSessionsOfAnotherRoleMapping(t *testing.T) {
+// that runs another sign-in configuration than the one that created the
+// session refuses it, as the server does after a change and a restart: a
+// replica that still runs the role mapping before refuses the sessions of the
+// new one, and the other way round, and replicas of another issuer or another
+// external ID claim refuse them too, each as it refuses a session that does
+// not exist. A replica that lists the same mapping and algorithms in another
+// order, an algorithm twice, and other settings of transport and routine
+// accepts them. A break-glass session, which no sign-in configuration
+// creates, is accepted by every replica
+func TestAReplicaRefusesTheSessionsOfAnotherSignInConfiguration(t *testing.T) {
 	credential, hash, err := authn.GenerateBreakglassCredential()
 	if err != nil {
 		t.Fatal(err)
@@ -325,14 +410,30 @@ func TestAReplicaRefusesTheSessionsOfAnotherRoleMapping(t *testing.T) {
 	d := dbtest.New(t)
 	idp := newSigningProvider(t)
 	idp.up.Store(true)
+	another := newSigningProvider(t)
+	another.up.Store(true)
+	rotatedSecret := filepath.Join(t.TempDir(), "oidc-client-secret")
+	writeSecret(t, rotatedSecret, "a rotated client secret\n")
 	env := append(oidcEnv(t, idp.URL, writeStateKey(t)),
-		"WT_AUTH_BREAKGLASS_ENABLED=true", "WT_AUTH_BREAKGLASS_CREDENTIAL_HASH_FILE="+hashFile)
+		"WT_AUTH_BREAKGLASS_ENABLED=true", "WT_AUTH_BREAKGLASS_CREDENTIAL_HASH_FILE="+hashFile,
+		"WT_AUTH_OIDC_ROLE_MAPPING=wt-owners=owner,wt-admins=admin")
 	// The person who signs in is in wt-owners, whose members the mapping
 	// after makes users.
-	before := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_ROLE_MAPPING=wt-owners=owner,wt-admins=admin")...)
-	reordered := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_ROLE_MAPPING=wt-admins=admin,wt-owners=owner")...)
+	before := startServeOn(t, d, env...)
+	rotated := startServeOn(t, d, append(slices.Clone(env),
+		"WT_AUTH_OIDC_ROLE_MAPPING=wt-admins=admin,wt-owners=owner",
+		"WT_AUTH_OIDC_ALLOWED_ALGORITHMS=PS256,ES512,ES384,ES256,RS256,RS256",
+		// The provider, at another address than the issuer's.
+		"WT_AUTH_OIDC_DISCOVERY_URL="+strings.Replace(idp.URL, "127.0.0.1", "localhost", 1),
+		"WT_AUTH_OIDC_CLI_CLIENT_ID=wtctl-rotated",
+		"WT_AUTH_OIDC_CLIENT_SECRET_FILE="+rotatedSecret,
+		"WT_AUTH_OIDC_STATE_KEY_FILE="+writeStateKey(t),
+		"WT_AUTH_OIDC_REDIRECT_URL=https://localhost:8443/auth/callback",
+		"WT_AUTH_OIDC_SCOPES=openid,profile,email")...)
 	after := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_ROLE_MAPPING=wt-owners=user,wt-admins=admin")...)
-	for _, s := range []*serving{before, reordered, after} {
+	otherIssuer := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_ISSUER="+another.URL)...)
+	otherClaim := startServeOn(t, d, append(slices.Clone(env), "WT_AUTH_OIDC_EXTERNAL_ID_CLAIM=oid")...)
+	for _, s := range []*serving{before, rotated, after, otherIssuer, otherClaim} {
 		s.waitForDiscovery(t)
 	}
 
@@ -345,7 +446,7 @@ func TestAReplicaRefusesTheSessionsOfAnotherRoleMapping(t *testing.T) {
 		return http.Header{"Cookie": {session}}
 	}
 	// refuses checks that s refuses a session with the answer it gives a
-	// session that does not exist, which says nothing of the mapping.
+	// session that does not exist, which says nothing of the configuration.
 	type problem struct {
 		Type, Title, Detail, Code string
 		Status                    int
@@ -368,19 +469,21 @@ func TestAReplicaRefusesTheSessionsOfAnotherRoleMapping(t *testing.T) {
 	}
 
 	ownerSession := signIn(before)
-	for _, s := range []*serving{before, reordered} {
+	for _, s := range []*serving{before, rotated} {
 		if _, me := get(t, s.console+"/api/v1/me", ownerSession); !strings.Contains(me, `"roles":["owner"]`) {
 			t.Errorf("/me with the session of the mapping before: %s, want the role owner", me)
 		}
 	}
 	refuses(after, "the session of the mapping before, on a replica of the mapping after", ownerSession)
+	refuses(otherIssuer, "the session of the mapping before, on a replica of another issuer", ownerSession)
+	refuses(otherClaim, "the session of the mapping before, on a replica of another external ID claim", ownerSession)
 
 	userSession := signIn(after)
 	if _, me := get(t, after.console+"/api/v1/me", userSession); !strings.Contains(me, `"roles":["user"]`) {
 		t.Errorf("/me with the session of the mapping after: %s, want the role user", me)
 	}
 	refuses(before, "the session of the mapping after, on a replica of the mapping before", userSession)
-	refuses(reordered, "the session of the mapping after, on a replica of the mapping before in another order", userSession)
+	refuses(rotated, "the session of the mapping after, on a replica of the mapping before in another order", userSession)
 
 	header, _ := call(t, http.StatusOK, http.MethodPost, before.console+"/auth/breakglass",
 		`{"credential":"`+credential+`"}`, http.Header{"Content-Type": {"application/json"}})
@@ -390,7 +493,9 @@ func TestAReplicaRefusesTheSessionsOfAnotherRoleMapping(t *testing.T) {
 			custodian = http.Header{"Cookie": {c.Name + "=" + c.Value}}
 		}
 	}
-	if _, me := get(t, after.console+"/api/v1/me", custodian); !strings.Contains(me, `"isBreakglass":true`) {
-		t.Errorf("/me with a break-glass session, on a replica of another mapping: %s", me)
+	for _, s := range []*serving{after, otherIssuer, otherClaim} {
+		if _, me := get(t, s.console+"/api/v1/me", custodian); !strings.Contains(me, `"isBreakglass":true`) {
+			t.Errorf("/me with a break-glass session, on a replica of another configuration: %s", me)
+		}
 	}
 }
