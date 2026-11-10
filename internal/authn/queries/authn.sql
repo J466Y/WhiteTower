@@ -78,7 +78,7 @@ WHERE id = $1;
 INSERT INTO whitetower.sessions (
     id_hash, principal_id, method, roles, csrf_token_hash,
     created_at, last_seen_at, idle_expires_at, absolute_expires_at,
-    role_mapping_sha256
+    sign_in_configuration_sha256
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $6, $7, $8, $9
 );
@@ -101,8 +101,9 @@ WHERE id_hash = $1 AND revoked_at IS NULL;
 -- name: RevokeActiveSession :one
 -- Revokes the session only while it is neither revoked nor expired, and
 -- returns whose it was: no row when nothing was revoked. A session of another
--- role mapping, which SessionStore.Get refuses, counts: a replica that still
--- runs that mapping, or a return to it, would accept the session.
+-- sign-in configuration, which SessionStore.Get refuses, counts: a replica
+-- that still runs that configuration, or a return to it, would accept the
+-- session.
 UPDATE whitetower.sessions
 SET revoked_at = $2
 WHERE id_hash = $1 AND revoked_at IS NULL

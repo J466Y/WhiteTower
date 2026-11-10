@@ -240,26 +240,45 @@ func TestSessionLifecycleAndSecurity(t *testing.T) {
 	})
 }
 
-// storeWithRoleMapping returns a session store of database whose sessions
-// take their roles from mapping: a replica, or a server after a restart, that
-// runs that auth.oidc.role_mapping.
-func storeWithRoleMapping(t *testing.T, database *db.DB, clk *clocktest.Fake, mapping map[string]string) *authn.SessionStore {
+// storeWithSignInConfiguration returns a session store of database whose
+// sessions the sign-in configuration c creates: a replica, or a server after
+// a restart, that runs those settings of auth.oidc.
+func storeWithSignInConfiguration(t *testing.T, database *db.DB, clk *clocktest.Fake, c authn.SignInConfiguration) *authn.SessionStore {
 	t.Helper()
 	return authn.NewSessionStore(database, clk, audit.NewWriter(mustCatalog(t), clk), authn.SessionOptions{
-		IdleTimeout:      30 * time.Minute,
-		AbsoluteLifetime: 12 * time.Hour,
-		RoleMapping:      mapping,
+		IdleTimeout:         30 * time.Minute,
+		AbsoluteLifetime:    12 * time.Hour,
+		SignInConfiguration: c,
 	})
 }
 
+// signInConfiguration is a sign-in configuration as an operator writes it,
+// with a change: the configuration of a server after a change of its
+// settings and a restart, or of another replica. Its lists and its mapping
+// are the configuration's own, so that change may edit them.
+func signInConfiguration(change func(c *authn.SignInConfiguration)) authn.SignInConfiguration {
+	c := authn.SignInConfiguration{
+		Issuer:            "https://idp.example.com/realms/whitetower",
+		ClientID:          "whitetower-console",
+		AllowedAlgorithms: []string{"RS256", "ES256"},
+		ExternalIDClaim:   "sub",
+		GroupsClaim:       "groups",
+		RoleMapping:       map[string]string{"wt-owners": "owner", "wt-admins": "admin"},
+	}
+	change(&c)
+	return c
+}
+
 // Security test ST-14: a session keeps the roles of its sign-in, so a server
-// whose role mapping is not the one that resolved them, after a change of the
-// mapping and a restart or on another replica, refuses the session as an
-// expired one, and the other way round; two mappings that map the same groups
-// to the same roles are one. The refusal changes nothing of the session: the
-// server of its mapping still accepts it, and a sign-out of the other one
-// clears its cookie and revokes nothing, as for an expired session
-func TestASessionOfAnotherRoleMappingIsRefusedAsAnExpiredOne(t *testing.T) {
+// whose sign-in configuration is not the one that created the session, after
+// a change of one of its settings and a restart or on another replica,
+// refuses the session as an expired one, and the other way round: a change of
+// which ID tokens the server accepts, of which person a sign-in is, or of
+// what roles it gives. Two configurations that differ only in what carries no
+// meaning are one. The refusal changes nothing of the session: the server of
+// its configuration still accepts it, and a sign-out of the other one clears
+// its cookie and revokes nothing, as for an expired session
+func TestASessionOfAnotherSignInConfigurationIsRefusedAsAnExpiredOne(t *testing.T) {
 	ctx := context.Background()
 	clk := clocktest.New(testEpoch)
 	_, principalStore, _, database := setupAuthn(t, clk)
@@ -268,24 +287,99 @@ func TestASessionOfAnotherRoleMappingIsRefusedAsAnExpiredOne(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mapping := map[string]string{"wt-owners": "owner", "wt-admins": "admin"}
+	configured := signInConfiguration(func(*authn.SignInConfiguration) {})
 	for _, tt := range []struct {
 		name          string
-		before, after map[string]string
+		before, after authn.SignInConfiguration
 		want          error // nil: the session is accepted
 	}{
-		{"the same mapping", mapping, map[string]string{"wt-admins": "admin", "wt-owners": "owner"}, nil},
-		{"no mapping, then an empty one", nil, map[string]string{}, nil},
-		{"a role changed", mapping, map[string]string{"wt-owners": "user", "wt-admins": "admin"}, authn.ErrSessionExpired},
-		{"a group added", mapping, map[string]string{"wt-owners": "owner", "wt-admins": "admin", "wt-users": "user"}, authn.ErrSessionExpired},
-		{"a group removed", mapping, map[string]string{"wt-owners": "owner"}, authn.ErrSessionExpired},
-		{"a group and its role cut elsewhere", map[string]string{"wt-owners": "owner"}, map[string]string{"wt-owner": "sowner"}, authn.ErrSessionExpired},
-		{"a group with a leading slash", map[string]string{"wt-admins": "admin"}, map[string]string{"/wt-admins": "admin"}, authn.ErrSessionExpired},
+		// What carries no meaning.
+		{"the same configuration", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.RoleMapping = map[string]string{"wt-admins": "admin", "wt-owners": "owner"}
+		}), nil},
+		{"the algorithms in another order", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.AllowedAlgorithms = []string{"ES256", "RS256"}
+		}), nil},
+		{"an algorithm listed twice", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.AllowedAlgorithms = []string{"RS256", "ES256", "RS256"}
+		}), nil},
+		{"no algorithms and no mapping, then empty ones", signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.AllowedAlgorithms, c.RoleMapping = nil, nil
+		}), signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.AllowedAlgorithms, c.RoleMapping = []string{}, map[string]string{}
+		}), nil},
+
+		// Which ID tokens the server accepts.
+		{"another issuer", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.Issuer = "https://idp.example.net/realms/whitetower"
+		}), authn.ErrSessionExpired},
+		{"the issuer with a trailing slash", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.Issuer += "/"
+		}), authn.ErrSessionExpired},
+		{"OIDC turned off", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.Issuer = ""
+		}), authn.ErrSessionExpired},
+		{"another client ID", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.ClientID = "whitetower-console-2"
+		}), authn.ErrSessionExpired},
+		{"an algorithm added", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.AllowedAlgorithms = append(c.AllowedAlgorithms, "PS256")
+		}), authn.ErrSessionExpired},
+		{"an algorithm removed", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.AllowedAlgorithms = []string{"ES256"}
+		}), authn.ErrSessionExpired},
+		{"no algorithms, for the OIDC service's defaults", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.AllowedAlgorithms = nil
+		}), authn.ErrSessionExpired},
+
+		// Which person a sign-in is.
+		{"another external ID claim", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.ExternalIDClaim = "oid"
+		}), authn.ErrSessionExpired},
+		{"no external ID claim, for the OIDC service's default", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.ExternalIDClaim = ""
+		}), authn.ErrSessionExpired},
+
+		// What roles it gives.
+		{"another groups claim", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.GroupsClaim = "roles"
+		}), authn.ErrSessionExpired},
+		{"a role changed", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.RoleMapping["wt-owners"] = "user"
+		}), authn.ErrSessionExpired},
+		{"a group added", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.RoleMapping["wt-users"] = "user"
+		}), authn.ErrSessionExpired},
+		{"a group removed", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			delete(c.RoleMapping, "wt-admins")
+		}), authn.ErrSessionExpired},
+		{"a group with a leading slash", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.RoleMapping = map[string]string{"wt-owners": "owner", "/wt-admins": "admin"}
+		}), authn.ErrSessionExpired},
+
+		// Strings that a separator would join alike.
+		{"a group and its role cut elsewhere", signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.RoleMapping = map[string]string{"wt-owners": "owner"}
+		}), signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.RoleMapping = map[string]string{"wt-owner": "sowner"}
+		}), authn.ErrSessionExpired},
+		{"the issuer and the client ID cut elsewhere", configured, signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.Issuer, c.ClientID = c.Issuer+"w", "hitetower-console"
+		}), authn.ErrSessionExpired},
+		{"strings moved from one setting to the next", signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.AllowedAlgorithms = []string{"ES256", "PS256", "RS256"}
+			c.ExternalIDClaim, c.GroupsClaim = "oid", "roles"
+			c.RoleMapping = map[string]string{"wt-owners": "owner"}
+		}), signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.AllowedAlgorithms = []string{"ES256"}
+			c.ExternalIDClaim, c.GroupsClaim = "PS256", "RS256"
+			c.RoleMapping = map[string]string{"oid": "roles", "wt-owners": "owner"}
+		}), authn.ErrSessionExpired},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			before := storeWithRoleMapping(t, database, clk, tt.before)
-			after := storeWithRoleMapping(t, database, clk, tt.after)
-			// Every session whose roles come from the mapping, whatever its
+			before := storeWithSignInConfiguration(t, database, clk, tt.before)
+			after := storeWithSignInConfiguration(t, database, clk, tt.after)
+			// Every session that the configuration creates, whatever its
 			// method, break-glass aside.
 			for _, method := range []string{"oidc", "cli"} {
 				for _, stores := range []struct {
@@ -297,18 +391,20 @@ func TestASessionOfAnotherRoleMappingIsRefusedAsAnExpiredOne(t *testing.T) {
 						t.Fatal(err)
 					}
 					if _, err := stores.to.Get(ctx, session.Token); !errors.Is(err, tt.want) {
-						t.Errorf("a session of method %s, with the mapping %s: got %v, want %v", method, stores.name, err, tt.want)
+						t.Errorf("a session of method %s, with the configuration %s: got %v, want %v", method, stores.name, err, tt.want)
 					}
 					if _, err := stores.from.Get(ctx, session.Token); err != nil {
-						t.Errorf("a session of method %s, with its own mapping: got %v, want it accepted", method, err)
+						t.Errorf("a session of method %s, with its own configuration: got %v, want it accepted", method, err)
 					}
 				}
 			}
 		})
 	}
 
-	before := storeWithRoleMapping(t, database, clk, mapping)
-	after := storeWithRoleMapping(t, database, clk, map[string]string{"wt-owners": "user", "wt-admins": "admin"})
+	before := storeWithSignInConfiguration(t, database, clk, configured)
+	after := storeWithSignInConfiguration(t, database, clk, signInConfiguration(func(c *authn.SignInConfiguration) {
+		c.ExternalIDClaim = "oid"
+	}))
 	session, err := before.Create(ctx, nia.ID, "oidc", []string{"owner"})
 	if err != nil {
 		t.Fatal(err)
@@ -319,21 +415,22 @@ func TestASessionOfAnotherRoleMappingIsRefusedAsAnExpiredOne(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
 	req.AddCookie(&http.Cookie{Name: authn.CookieName, Value: session.Token})
 	if p, err := authn.NewAuthenticator(after, principalStore, nil, nil).Authenticate(req); p != nil || !errors.Is(err, authn.ErrSessionExpired) {
-		t.Errorf("authenticating with a session of another mapping: got %v, %v; want it refused as expired", p, err)
+		t.Errorf("authenticating with a session of another configuration: got %v, %v; want it refused as expired", p, err)
 	}
 
 	// A refusal does not slide the idle expiry.
 	clk.Advance(20 * time.Minute)
 	if _, err := after.Get(ctx, session.Token); !errors.Is(err, authn.ErrSessionExpired) {
-		t.Fatalf("a session of another mapping: got %v, want it refused", err)
+		t.Fatalf("a session of another configuration: got %v, want it refused", err)
 	}
 	clk.Advance(15 * time.Minute)
 	if _, err := before.Get(ctx, session.Token); !errors.Is(err, authn.ErrSessionExpired) {
-		t.Errorf("a session idle for 35 minutes, refused by another mapping after 20: got %v, want it expired", err)
+		t.Errorf("a session idle for 35 minutes, refused by another configuration after 20: got %v, want it expired", err)
 	}
 
-	// A sign-out of the other mapping clears the cookie without the CSRF
-	// token, as that of a session it does not accept, and revokes nothing.
+	// A sign-out of the other configuration clears the cookie without the
+	// CSRF token, as that of a session it does not accept, and revokes
+	// nothing.
 	session, err = before.Create(ctx, nia.ID, "oidc", []string{"owner"})
 	if err != nil {
 		t.Fatal(err)
@@ -341,21 +438,22 @@ func TestASessionOfAnotherRoleMappingIsRefusedAsAnExpiredOne(t *testing.T) {
 	recorded := len(eventsOf(t, database, sessionRevoked))
 	rec := postLogout(t, authn.NewLogoutService(after, authn.LogoutOptions{Logger: slog.New(slog.DiscardHandler)}), http.MethodPost, session.Token, "")
 	if next := redirectOf(t, rec); next != "/" || !clearsTheCookie(rec) {
-		t.Errorf("a sign-out with a session of another mapping: to %q, cookies %v; want the console's root, and the cookie cleared", next, rec.Result().Cookies())
+		t.Errorf("a sign-out with a session of another configuration: to %q, cookies %v; want the console's root, and the cookie cleared", next, rec.Result().Cookies())
 	}
 	if n := len(eventsOf(t, database, sessionRevoked)) - recorded; n != 0 {
 		t.Errorf("%d sign-outs recorded, want none", n)
 	}
 	if _, err := before.Get(ctx, session.Token); err != nil {
-		t.Errorf("the session after a sign-out of another mapping: got %v, want it accepted by its own", err)
+		t.Errorf("the session after a sign-out of another configuration: got %v, want it accepted by its own", err)
 	}
 }
 
-// Security test ST-14: a break-glass session, whose roles do not come from
-// the role mapping, is accepted whatever the mapping; a session that recorded
-// no mapping, created before sessions recorded it, is refused as one of
-// another mapping
-func TestBreakglassSessionsAreExemptAndSessionsWithoutAMappingAreRefused(t *testing.T) {
+// Security test ST-14: a break-glass session, which no sign-in configuration
+// creates, is accepted whatever the configuration, OIDC turned off included,
+// where it is the only kind of session; a session that recorded no
+// configuration, created before sessions recorded one, is refused as one of
+// another configuration
+func TestBreakglassSessionsAreExemptAndSessionsWithoutAConfigurationAreRefused(t *testing.T) {
 	ctx := context.Background()
 	clk := clocktest.New(testEpoch)
 	_, principalStore, _, database := setupAuthn(t, clk)
@@ -363,15 +461,22 @@ func TestBreakglassSessionsAreExemptAndSessionsWithoutAMappingAreRefused(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	before := storeWithRoleMapping(t, database, clk, map[string]string{"wt-operators": "operator"})
-	after := storeWithRoleMapping(t, database, clk, map[string]string{"wt-operators": "auditor"})
+	before := storeWithSignInConfiguration(t, database, clk, signInConfiguration(func(*authn.SignInConfiguration) {}))
 
 	breakglass, err := before.Create(ctx, omar.ID, "breakglass", []string{"operator"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := after.Get(ctx, breakglass.Token); err != nil {
-		t.Errorf("a break-glass session, with another mapping: got %v, want it accepted", err)
+	for name, c := range map[string]authn.SignInConfiguration{
+		"another issuer": signInConfiguration(func(c *authn.SignInConfiguration) { c.Issuer = "https://idp.example.net/realms/whitetower" }),
+		"another role mapping": signInConfiguration(func(c *authn.SignInConfiguration) {
+			c.RoleMapping = map[string]string{"wt-owners": "user"}
+		}),
+		"OIDC turned off": {},
+	} {
+		if _, err := storeWithSignInConfiguration(t, database, clk, c).Get(ctx, breakglass.Token); err != nil {
+			t.Errorf("a break-glass session, with %s: got %v, want it accepted", name, err)
+		}
 	}
 
 	for _, method := range []string{"oidc", "cli"} {
@@ -379,11 +484,11 @@ func TestBreakglassSessionsAreExemptAndSessionsWithoutAMappingAreRefused(t *test
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := database.Exec(ctx, `UPDATE whitetower.sessions SET role_mapping_sha256 = NULL WHERE id_hash = $1`, session.IDHash); err != nil {
+		if _, err := database.Exec(ctx, `UPDATE whitetower.sessions SET sign_in_configuration_sha256 = NULL WHERE id_hash = $1`, session.IDHash); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := before.Get(ctx, session.Token); !errors.Is(err, authn.ErrSessionExpired) {
-			t.Errorf("a session of method %s without a mapping: got %v, want it refused as expired", method, err)
+			t.Errorf("a session of method %s without a configuration: got %v, want it refused as expired", method, err)
 		}
 	}
 }

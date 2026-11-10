@@ -44,15 +44,15 @@ type WhitetowerPrincipal struct {
 }
 
 type WhitetowerSession struct {
-	IDHash            []byte
-	PrincipalID       uuid.UUID
-	Method            string
-	Roles             []string
-	CsrfTokenHash     []byte
-	CreatedAt         time.Time
-	LastSeenAt        time.Time
-	IdleExpiresAt     time.Time
-	AbsoluteExpiresAt time.Time
-	RevokedAt         *time.Time
-	RoleMappingSha256 []byte
+	IDHash                    []byte
+	PrincipalID               uuid.UUID
+	Method                    string
+	Roles                     []string
+	CsrfTokenHash             []byte
+	CreatedAt                 time.Time
+	LastSeenAt                time.Time
+	IdleExpiresAt             time.Time
+	AbsoluteExpiresAt         time.Time
+	RevokedAt                 *time.Time
+	SignInConfigurationSha256 []byte
 }
