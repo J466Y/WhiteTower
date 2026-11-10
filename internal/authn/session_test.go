@@ -3,6 +3,7 @@ package authn_test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -237,4 +238,152 @@ func TestSessionLifecycleAndSecurity(t *testing.T) {
 			t.Errorf("expected ErrSessionNotFound or ErrSessionExpired, got %v", err)
 		}
 	})
+}
+
+// storeWithRoleMapping returns a session store of database whose sessions
+// take their roles from mapping: a replica, or a server after a restart, that
+// runs that auth.oidc.role_mapping.
+func storeWithRoleMapping(t *testing.T, database *db.DB, clk *clocktest.Fake, mapping map[string]string) *authn.SessionStore {
+	t.Helper()
+	return authn.NewSessionStore(database, clk, audit.NewWriter(mustCatalog(t), clk), authn.SessionOptions{
+		IdleTimeout:      30 * time.Minute,
+		AbsoluteLifetime: 12 * time.Hour,
+		RoleMapping:      mapping,
+	})
+}
+
+// Security test ST-14: a session keeps the roles of its sign-in, so a server
+// whose role mapping is not the one that resolved them, after a change of the
+// mapping and a restart or on another replica, refuses the session as an
+// expired one, and the other way round; two mappings that map the same groups
+// to the same roles are one. The refusal changes nothing of the session: the
+// server of its mapping still accepts it, and a sign-out of the other one
+// clears its cookie and revokes nothing, as for an expired session
+func TestASessionOfAnotherRoleMappingIsRefusedAsAnExpiredOne(t *testing.T) {
+	ctx := context.Background()
+	clk := clocktest.New(testEpoch)
+	_, principalStore, _, database := setupAuthn(t, clk)
+	nia, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-nia", ExternalID: "usr-nia", DisplayName: "Nia Canary"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mapping := map[string]string{"wt-owners": "owner", "wt-admins": "admin"}
+	for _, tt := range []struct {
+		name          string
+		before, after map[string]string
+		want          error // nil: the session is accepted
+	}{
+		{"the same mapping", mapping, map[string]string{"wt-admins": "admin", "wt-owners": "owner"}, nil},
+		{"no mapping, then an empty one", nil, map[string]string{}, nil},
+		{"a role changed", mapping, map[string]string{"wt-owners": "user", "wt-admins": "admin"}, authn.ErrSessionExpired},
+		{"a group added", mapping, map[string]string{"wt-owners": "owner", "wt-admins": "admin", "wt-users": "user"}, authn.ErrSessionExpired},
+		{"a group removed", mapping, map[string]string{"wt-owners": "owner"}, authn.ErrSessionExpired},
+		{"a group and its role cut elsewhere", map[string]string{"wt-owners": "owner"}, map[string]string{"wt-owner": "sowner"}, authn.ErrSessionExpired},
+		{"a group with a leading slash", map[string]string{"wt-admins": "admin"}, map[string]string{"/wt-admins": "admin"}, authn.ErrSessionExpired},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			before := storeWithRoleMapping(t, database, clk, tt.before)
+			after := storeWithRoleMapping(t, database, clk, tt.after)
+			// Every session whose roles come from the mapping, whatever its
+			// method, break-glass aside.
+			for _, method := range []string{"oidc", "cli"} {
+				for _, stores := range []struct {
+					name     string
+					from, to *authn.SessionStore
+				}{{"after", before, after}, {"before", after, before}} {
+					session, err := stores.from.Create(ctx, nia.ID, method, []string{"owner"})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err := stores.to.Get(ctx, session.Token); !errors.Is(err, tt.want) {
+						t.Errorf("a session of method %s, with the mapping %s: got %v, want %v", method, stores.name, err, tt.want)
+					}
+					if _, err := stores.from.Get(ctx, session.Token); err != nil {
+						t.Errorf("a session of method %s, with its own mapping: got %v, want it accepted", method, err)
+					}
+				}
+			}
+		})
+	}
+
+	before := storeWithRoleMapping(t, database, clk, mapping)
+	after := storeWithRoleMapping(t, database, clk, map[string]string{"wt-owners": "user", "wt-admins": "admin"})
+	session, err := before.Create(ctx, nia.ID, "oidc", []string{"owner"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The authenticator refuses it as an expired session, which the API
+	// answers as any credential that it does not accept.
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	req.AddCookie(&http.Cookie{Name: authn.CookieName, Value: session.Token})
+	if p, err := authn.NewAuthenticator(after, principalStore, nil, nil).Authenticate(req); p != nil || !errors.Is(err, authn.ErrSessionExpired) {
+		t.Errorf("authenticating with a session of another mapping: got %v, %v; want it refused as expired", p, err)
+	}
+
+	// A refusal does not slide the idle expiry.
+	clk.Advance(20 * time.Minute)
+	if _, err := after.Get(ctx, session.Token); !errors.Is(err, authn.ErrSessionExpired) {
+		t.Fatalf("a session of another mapping: got %v, want it refused", err)
+	}
+	clk.Advance(15 * time.Minute)
+	if _, err := before.Get(ctx, session.Token); !errors.Is(err, authn.ErrSessionExpired) {
+		t.Errorf("a session idle for 35 minutes, refused by another mapping after 20: got %v, want it expired", err)
+	}
+
+	// A sign-out of the other mapping clears the cookie without the CSRF
+	// token, as that of a session it does not accept, and revokes nothing.
+	session, err = before.Create(ctx, nia.ID, "oidc", []string{"owner"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded := len(eventsOf(t, database, sessionRevoked))
+	rec := postLogout(t, authn.NewLogoutService(after, authn.LogoutOptions{Logger: slog.New(slog.DiscardHandler)}), http.MethodPost, session.Token, "")
+	if next := redirectOf(t, rec); next != "/" || !clearsTheCookie(rec) {
+		t.Errorf("a sign-out with a session of another mapping: to %q, cookies %v; want the console's root, and the cookie cleared", next, rec.Result().Cookies())
+	}
+	if n := len(eventsOf(t, database, sessionRevoked)) - recorded; n != 0 {
+		t.Errorf("%d sign-outs recorded, want none", n)
+	}
+	if _, err := before.Get(ctx, session.Token); err != nil {
+		t.Errorf("the session after a sign-out of another mapping: got %v, want it accepted by its own", err)
+	}
+}
+
+// Security test ST-14: a break-glass session, whose roles do not come from
+// the role mapping, is accepted whatever the mapping; a session that recorded
+// no mapping, created before sessions recorded it, is refused as one of
+// another mapping
+func TestBreakglassSessionsAreExemptAndSessionsWithoutAMappingAreRefused(t *testing.T) {
+	ctx := context.Background()
+	clk := clocktest.New(testEpoch)
+	_, principalStore, _, database := setupAuthn(t, clk)
+	omar, err := principalStore.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-omar", ExternalID: "usr-omar", DisplayName: "Omar Canary"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := storeWithRoleMapping(t, database, clk, map[string]string{"wt-operators": "operator"})
+	after := storeWithRoleMapping(t, database, clk, map[string]string{"wt-operators": "auditor"})
+
+	breakglass, err := before.Create(ctx, omar.ID, "breakglass", []string{"operator"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := after.Get(ctx, breakglass.Token); err != nil {
+		t.Errorf("a break-glass session, with another mapping: got %v, want it accepted", err)
+	}
+
+	for _, method := range []string{"oidc", "cli"} {
+		session, err := before.Create(ctx, omar.ID, method, []string{"operator"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := database.Exec(ctx, `UPDATE whitetower.sessions SET role_mapping_sha256 = NULL WHERE id_hash = $1`, session.IDHash); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := before.Get(ctx, session.Token); !errors.Is(err, authn.ErrSessionExpired) {
+			t.Errorf("a session of method %s without a mapping: got %v, want it refused as expired", method, err)
+		}
+	}
 }

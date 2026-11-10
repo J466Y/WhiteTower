@@ -189,9 +189,13 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	}
 	writer := audit.NewWriter(catalog, clock.System)
 
+	// The sessions record the role mapping that the OIDC service resolves
+	// their roles with, below, and the store refuses those of another
+	// mapping, as after a change and a restart (ST-14).
 	sessionStore := authn.NewSessionStore(database, clock.System, writer, authn.SessionOptions{
 		IdleTimeout:      cfg.Auth.Session.IdleTimeout,
 		AbsoluteLifetime: cfg.Auth.Session.AbsoluteLifetime,
+		RoleMapping:      cfg.Auth.OIDC.RoleMapping,
 	})
 	authorizer := authz.NewAuthorizer()
 	tokenStore := authn.NewTokenStore(database, clock.System, writer, authorizer)

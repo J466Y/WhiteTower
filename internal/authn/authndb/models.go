@@ -54,4 +54,5 @@ type WhitetowerSession struct {
 	IdleExpiresAt     time.Time
 	AbsoluteExpiresAt time.Time
 	RevokedAt         *time.Time
+	RoleMappingSha256 []byte
 }
