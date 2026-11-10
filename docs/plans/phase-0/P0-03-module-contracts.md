@@ -1251,3 +1251,33 @@ Findings where the check file differs from the specification, which decides:
 - X20, `http:///evil.com/`: the check gives the reason "no host", which no step names. Step 7 refuses an empty host as an empty label, with the same result.
 
 For the specification, which is the reviewer's: section 9.1 gains `arguments.json` with 237 cases.
+
+### 2026-11-10: the review of part 3b
+
+The agent of part 3b left seven cases that section 6.11 does not settle out of the vectors, and implemented the reading that denies more for each. The review settled them in the specification, and they go into the vectors before the part merges.
+
+The maintainer's decision of 2026-11-10:
+
+- **`null` as a declared argument's value** does not fit its type, and denies the call. A tool can read `null` otherwise than an absent argument (`filter: null` can mean no filter), so a rule that lets an absent argument pass must not let `null` pass. The cost: frameworks that send `null` for an optional parameter, as OpenAI's strict mode does, have those calls denied until they leave it out. The alternative was `null` as an absent argument, decided by `if_absent`.
+
+What the review settled, which is the reviewer's:
+
+| Question | Answer |
+| --- | --- |
+| A space between a name and `<` in `email_domain` | Required, as the forms are written: `Alice<alice@corp.com>` cannot be read |
+| A declared path through a value that is not an object | Denies the call (EP-19): some tools parse a JSON string, or take an array's first element |
+| A member name that repeats in the call's arguments | Denies the call when it repeats in the arguments object or in any object that a declared path goes through, where two parsers could give a rule different values, as the decision of 2026-11-06 did for definition hashes. A repeat elsewhere reaches no rule |
+| A lone surrogate in a declared string | Denies the call: Cedar strings cannot hold one, and parsers replace it or refuse it |
+| `email_domain`'s control characters and whitespace | Unicode's Cc category, C1 included, and its White_Space property |
+| Arguments that are absent, not JSON or not an object | Absent arguments are an empty object, as MCP allows them to be absent. Arguments that are not a JSON object deny the call, whatever the tool declares |
+
+The review also accepted:
+
+- **The fix of `readHost`, 3a-2's code, in this part.** `x/net/idna` read `xn--` as an empty label and `xn--g例-` as an A-label, which step 7 refuses. It is the reading that `url_host` and `email_domain` share, and Python already refused both.
+- **The check file's three differences**, which the specification decides: `faß.de` and `xn--gd-.com` cannot be read, and `http:///evil.com/` cannot be read as an empty label rather than as "no host".
+
+For the part, before it merges:
+
+- the vectors cover each answer above, on both stacks;
+- the stacks deny arguments that are not an object whatever the tool declares, and read absent arguments as an empty object;
+- the Python checker refuses a host with a code point that `unicodedata` does not know, as Go refuses one that its tables do not know, so that one stack never reads with two versions of Unicode.
