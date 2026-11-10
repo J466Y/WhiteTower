@@ -820,6 +820,11 @@ def read_host(name: str) -> str:
         # those of the A-labels given. U+1E9E is checked as written, since Unicode 15.0 maps it to ss.
         if READ_DIFFERENTLY.intersection(name) or any(READ_DIFFERENTLY.intersection(label) for label in labels):
             raise CannotRead("a character that versions of UTS #46 read differently")
+        # The idna package's tables are of a later version of Unicode than unicodedata's, which gives the Bidi classes:
+        # a code point that unicodedata does not know, as written or within the labels converted, cannot be read, so
+        # that one host is read with one version.
+        if any(unicodedata.category(c) == "Cn" for c in name + "".join(labels)):
+            raise CannotRead("a code point that unicodedata does not know")
         rtl = any(unicodedata.bidirectional(c) in ("R", "AL", "AN") for label in labels for c in label)
         for label in filter(None, labels):
             idna.check_initial_combiner(label)
@@ -1051,16 +1056,15 @@ NOT_IN_LOCAL_PART = frozenset('"()<>[]\\,;:') | WHITE_SPACE
 
 
 def email_domain(value: str) -> str:
-    """The domain of an address as email_domain reads it, step by step (section 6.11), or CannotRead. Its control
-    characters and whitespace, which the section does not define, are read as those that deny more: Unicode's Cc
-    category, C1 included, and its White_Space property."""
-    # 1. Leading and trailing spaces are ignored, and a control character anywhere cannot be read.
+    """The domain of an address as email_domain reads it, step by step (section 6.11), or CannotRead."""
+    # 1. Leading and trailing spaces are ignored, and a control character anywhere, of Unicode's Cc category, C1
+    # included, cannot be read.
     if any(unicodedata.category(c) == "Cc" for c in value):
         raise CannotRead("a control character")
     # 2. The address, alone or after a name.
     address = angle_address(value.strip(" "))
-    # 3. Exactly one @, and a local part that is not empty and has none of the characters that parsers read
-    # differently.
+    # 3. Exactly one @, and a local part that is not empty, without whitespace, Unicode's White_Space property, or the
+    # characters that parsers read differently.
     local, _, domain = address.partition("@")
     if address.count("@") != 1:
         raise CannotRead("not exactly one @")
@@ -1076,7 +1080,7 @@ def email_domain(value: str) -> str:
 
 def angle_address(text: str) -> str:
     """The address of a value as step 2 of email_domain reads it: the value itself, Display Name <address> or
-    "Quoted Name" <address>. A name that is not empty is followed by a space, as the forms are written."""
+    "Quoted Name" <address>. A name that is not empty is followed by at least one space before <."""
     if text.startswith('"'):
         name, closed, after = text[1:].partition('"')
         if not closed or "\\" in name:
@@ -1111,11 +1115,16 @@ class InvalidArgument(Exception):
 
 
 def tool_record(arguments, declared: list[dict]) -> dict:
-    """A tool's record of context.args as EP-19 fills it: each declared argument that the arguments have, under its
-    name, with its transform applied, and nothing else; a set as its distinct elements in ascending order. A missing
-    argument is left out. It also denies what section 6.11 leaves open, as the reading that denies more: a path
-    through a value that is not an object, the arguments themselves included, a member name that repeats in an object
-    that a path reads, null, and a string with a lone surrogate."""
+    """A tool's record of context.args as EP-19 fills it from the call's arguments, an empty object when the call has
+    none: each declared argument that the arguments have, under its name, with its transform applied, and nothing else;
+    a set as its distinct elements in ascending order. A missing argument is left out. It raises InvalidArgument for
+    arguments that are not an object, or that repeat a member name, whatever the tool declares; a path through a value
+    that is not an object, or through an object that repeats a member name; and a declared argument's value that does
+    not fit its type, null and a string with a lone surrogate included, or that its transform cannot read."""
+    if not isinstance(arguments, (dict, Members)):
+        raise InvalidArgument("the arguments are not an object")
+    if repeats(arguments):
+        raise InvalidArgument("a member name repeats in the arguments")
     record = {}
     for arg in declared:
         value, found = arguments, True
@@ -1303,9 +1312,15 @@ def main() -> int:
         except CannotRead:
             got = None
         check(f"transform {case['id']}", {"result": got}, {"result": case["result"]})
+    # A case gives the call's arguments as a JSON value, as text read with read_json, or neither when the call has
+    # none, which is an empty object.
     for case in arguments["records"]:
         try:
-            got = canonical_json(tool_record(case["arguments"], case["args"]))
+            try:
+                args = read_json(case["arguments_text"]) if "arguments_text" in case else case.get("arguments", {})
+            except ValueError:
+                raise InvalidArgument("the arguments are not JSON") from None
+            got = canonical_json(tool_record(args, case["args"]))
         except InvalidArgument:
             got = None
         want = None if case["record"] is None else canonical_json(case["record"])

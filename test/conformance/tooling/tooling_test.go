@@ -44,30 +44,6 @@ func TestReadURLCannotReadTextThatIsNotUTF8(t *testing.T) {
 	}
 }
 
-func TestRecordDeniesWhatSection611LeavesOpen(t *testing.T) {
-	// The readings that deny more, until the specification settles them:
-	// the vectors leave these cases out.
-	declared := []tooling.Argument{{Name: "options.base", Path: []string{"options", "base"}, Type: "String"}}
-	for _, tt := range []struct{ name, arguments string }{
-		{"arguments that are not JSON", `{"options":`},
-		{"arguments that are not an object", `[{"options":{"base":"main"}}]`},
-		{"a path through a string", `{"options":"main"}`},
-		{"a path through an array", `{"options":[{"base":"main"}]}`},
-		{"a path through null", `{"options":null}`},
-		{"null", `{"options":{"base":null}}`},
-		{"a name repeated on the path", `{"options":{"base":"dev"},"options":{"base":"main"}}`},
-		{"a name repeated beside the path", `{"options":{"base":"main","force":true,"force":false}}`},
-		{"a lone surrogate", `{"options":{"base":"main\ud800"}}`},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			record, err := tooling.Record([]byte(tt.arguments), declared)
-			if !errors.Is(err, tooling.ErrInvalidArgument) {
-				t.Errorf("got %v, %v; want ErrInvalidArgument", record, err)
-			}
-		})
-	}
-}
-
 func TestTransformCannotReadTextThatIsNotUTF8(t *testing.T) {
 	for _, name := range []string{"lowercase", "path", "url_host", "email_domain"} {
 		if got, err := tooling.Transform(name, "a@b.example/\xff"); !errors.Is(err, tooling.ErrCannotRead) {

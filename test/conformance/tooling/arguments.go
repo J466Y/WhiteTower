@@ -36,27 +36,37 @@ type Argument struct {
 }
 
 // Record returns a tool's record of context.args as EP-19 fills it from the
-// call's arguments, given as JSON text: each declared argument that the
-// arguments have, under its name, with its transform applied, and nothing
-// else. A string is a string, an integer an int64, a boolean a bool, and a set
-// a slice of its distinct elements in ascending order. A missing argument is
-// left out, so that usage rules apply if_absent.
+// call's arguments, given as JSON text, or nil when the call has none, which
+// reads as an empty object: each declared argument that the arguments have,
+// under its name, with its transform applied, and nothing else. A string is a
+// string, an integer an int64, a boolean a bool, and a set a slice of its
+// distinct elements in ascending order. A missing argument is left out, so
+// that usage rules apply if_absent.
 //
 // Record returns an error that wraps ErrInvalidArgument when EP-19 denies the
-// call: a declared argument's value does not fit its type, or its transform
-// cannot read it. It also denies what section 6.11 leaves open, as the reading
-// that denies more: arguments that are not JSON, a path through a value that
-// is not an object, the arguments themselves included, a member name that
-// repeats in an object that a path reads, null, and a string with a lone
-// surrogate.
+// call: arguments that are not a JSON object, or that repeat a member name,
+// whatever the tool declares; a path through a value that is not an object, or
+// through an object that repeats a member name; and a declared argument's value
+// that does not fit its type, null and a string with a lone surrogate
+// included, or that its transform cannot read.
 func Record(arguments []byte, declared []Argument) (map[string]any, error) {
-	args, err := canonical.Parse(arguments)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
+	var args any = canonical.Object{}
+	if arguments != nil {
+		var err error
+		if args, err = canonical.Parse(arguments); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
+		}
+	}
+	obj, ok := args.(canonical.Object)
+	switch {
+	case !ok:
+		return nil, fmt.Errorf("%w: the arguments are not an object", ErrInvalidArgument)
+	case obj.HasRepeatedName():
+		return nil, fmt.Errorf("%w: a member name repeats in the arguments", ErrInvalidArgument)
 	}
 	record := map[string]any{}
 	for _, arg := range declared {
-		v, found, err := find(args, arg.Path)
+		v, found, err := find(obj, arg.Path)
 		if err == nil && found {
 			record[arg.Name], err = fit(v, arg.Type, arg.Transform)
 		}
@@ -207,12 +217,11 @@ func cleanPath(value string) (string, error) {
 }
 
 // emailDomain reads the domain of an address as email_domain does, step by
-// step. Section 6.11 does not define its control characters and whitespace,
-// so they are read as those that deny more: Unicode's Cc category, C1 included,
-// and its White_Space property.
+// step.
 func emailDomain(value string) (string, error) {
 	// 1. Leading and trailing spaces are ignored, and a control character
-	// anywhere cannot be read.
+	// anywhere cannot be read: unicode.IsControl is Unicode's Cc category, C1
+	// included.
 	if strings.IndexFunc(value, unicode.IsControl) >= 0 {
 		return "", cannotRead("a control character")
 	}
@@ -221,8 +230,9 @@ func emailDomain(value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// 3. Exactly one @, and a local part that is not empty and has none of
-	// the characters that parsers read differently.
+	// 3. Exactly one @, and a local part that is not empty, without
+	// whitespace, Unicode's White_Space property, or the characters that
+	// parsers read differently.
 	local, domain, _ := strings.Cut(address, "@")
 	if strings.Count(address, "@") != 1 {
 		return "", cannotRead("not exactly one @")
@@ -249,8 +259,8 @@ func emailDomain(value string) (string, error) {
 // it: the value itself; Display Name <address>, whose name may be empty, with
 // no quote, angle bracket, @, ",", ";", ":", parenthesis, square bracket or
 // backslash in the name; or "Quoted Name" <address>, with no quote or
-// backslash between the quotes. A name that is not empty is followed by a
-// space, as the forms are written, and section 6.11 does not say otherwise.
+// backslash between the quotes. A name that is not empty is followed by at
+// least one space before <.
 func angleAddress(text string) (string, error) {
 	var rest string
 	if quoted, ok := strings.CutPrefix(text, `"`); ok {

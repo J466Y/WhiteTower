@@ -660,7 +660,10 @@ type argumentsFile struct {
 		ID          string             `json:"id"`
 		Description string             `json:"description"`
 		Args        []tooling.Argument `json:"args"`
-		Arguments   json.RawMessage    `json:"arguments"`
+		// The call's arguments as a JSON value or, where a parsed value
+		// cannot hold them, as their text; neither when the call has none.
+		Arguments     json.RawMessage `json:"arguments"`
+		ArgumentsText *string         `json:"arguments_text"`
 		// nil when EP-19 denies the call; sets as their distinct elements
 		// in ascending order.
 		Record map[string]any `json:"record"`
@@ -749,7 +752,14 @@ func TestRecordVectors(t *testing.T) {
 	}
 	for _, c := range file.Records {
 		t.Run(c.ID, func(t *testing.T) {
-			got, err := tooling.Record(c.Arguments, c.Args)
+			arguments := []byte(c.Arguments)
+			switch {
+			case c.Arguments != nil && c.ArgumentsText != nil:
+				t.Fatal("the case gives its arguments both as a value and as text")
+			case c.ArgumentsText != nil:
+				arguments = []byte(*c.ArgumentsText)
+			}
+			got, err := tooling.Record(arguments, c.Args)
 			if err != nil && !errors.Is(err, tooling.ErrInvalidArgument) {
 				t.Fatal(err)
 			}

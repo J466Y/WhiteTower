@@ -1,5 +1,5 @@
 {
-  "description": "The arguments that policies see (docs/contracts/module-contract-v0.1.md, section 6.11, EP-19). transforms: the four transforms, each case with transform, lowercase, path, url_host or email_domain; value, the string; and result, what the transform gives, or null when it cannot read the value. The cases with the IDs of the URL and address check (inputs/url-and-address-check.json) take its values, L01 to X38 as url_host reads them and E01 to F15 as email_domain does, and I01 to I14 its hosts of IDNA, in its order, as email_domain reads alice@ and the host; their results come from section 6.11. records: a tool's record of context.args, as EP-19 fills it. Each case gives args, the tool's declared arguments as the catalog file lists them (section 7.7): name, the key in the record; path, the property names that lead to the argument; transform, when one applies; and type, String, Long, Bool, Set<String> or Set<Long>; arguments, the call's arguments, a JSON object; and record, the declared arguments that the call has, each under its name, with its transform applied, a set written as its distinct elements in ascending order, or null when EP-19 denies the call with error.invalid_request: a value that does not fit its declared type, or that its transform cannot read. A missing argument is left out of the record, so that usage rules apply if_absent.",
+  "description": "The arguments that policies see (docs/contracts/module-contract-v0.1.md, section 6.11, EP-19). transforms: the four transforms, each case with transform, lowercase, path, url_host or email_domain; value, the string; and result, what the transform gives, or null when it cannot read the value. The cases with the IDs of the URL and address check (inputs/url-and-address-check.json) take its values, L01 to X38 as url_host reads them and E01 to F15 as email_domain does, and I01 to I14 its hosts of IDNA, in its order, as email_domain reads alice@ and the host; their results come from section 6.11. records: a tool's record of context.args, as EP-19 fills it. Each case gives args, the tool's declared arguments as the catalog file lists them (section 7.7): name, the key in the record; path, the property names that lead to the argument; transform, when one applies; and type, String, Long, Bool, Set<String> or Set<Long>; the call's arguments, as a JSON value in arguments or, where a parsed value cannot hold them, as their text in arguments_text, and neither when the call has none, which is an empty object; and record, the declared arguments that the call has, each under its name, with its transform applied, a set written as its distinct elements in ascending order, or null when EP-19 denies the call with error.invalid_request: arguments that are not a JSON object, or that repeat a member name, whatever the tool declares; a path through a value that is not an object, or through an object that repeats a member name; or a declared argument's value that does not fit its declared type, null and a string with a lone surrogate included, or that its transform cannot read. A missing argument is left out of the record, so that usage rules apply if_absent.",
   "transforms": [
     {
       "id": "L01",
@@ -1414,6 +1414,104 @@
       "transform": "email_domain",
       "value": "alice@corp.\uff58\uff4e\uff0d\uff0d",
       "result": null
+    },
+    {
+      "id": "T-76",
+      "description": "email_domain cannot read a display name that no space follows before < (step 2)",
+      "transform": "email_domain",
+      "value": "Alice<alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-77",
+      "description": "email_domain cannot read a quoted name that no space follows before < (step 2)",
+      "transform": "email_domain",
+      "value": "\"Alice\"<alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-78",
+      "description": "Several spaces may follow a display name (step 2)",
+      "transform": "email_domain",
+      "value": "Alice  <alice@corp.com>",
+      "result": "corp.com"
+    },
+    {
+      "id": "T-79",
+      "description": "Several spaces may follow a quoted name (step 2)",
+      "transform": "email_domain",
+      "value": "\"Alice\"  <alice@corp.com>",
+      "result": "corp.com"
+    },
+    {
+      "id": "T-80",
+      "description": "email_domain cannot read a C1 control character, of Unicode's Cc category: U+0085 at the end (step 1)",
+      "transform": "email_domain",
+      "value": "alice@corp.com\u0085",
+      "result": null
+    },
+    {
+      "id": "T-81",
+      "description": "email_domain cannot read a C1 control character in a display name: U+0080 (step 1)",
+      "transform": "email_domain",
+      "value": "Alice\u0080 <alice@corp.com>",
+      "result": null
+    },
+    {
+      "id": "T-82",
+      "description": "email_domain cannot read the last C1 control character, U+009F, at the start (step 1)",
+      "transform": "email_domain",
+      "value": "\u009falice@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-83",
+      "description": "email_domain cannot read a no-break space in the local part, whitespace of Unicode's White_Space property (step 3)",
+      "transform": "email_domain",
+      "value": "alice\u00a0smith@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-84",
+      "description": "email_domain ignores only U+0020 around a value: a leading no-break space is whitespace in the local part (steps 1 and 3)",
+      "transform": "email_domain",
+      "value": "\u00a0alice@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-85",
+      "description": "email_domain cannot read the ideographic space in the local part (step 3)",
+      "transform": "email_domain",
+      "value": "alice\u3000@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-86",
+      "description": "email_domain cannot read the line separator in the local part (step 3)",
+      "transform": "email_domain",
+      "value": "alice\u2028x@corp.com",
+      "result": null
+    },
+    {
+      "id": "T-87",
+      "description": "A display name may hold whitespace other than spaces: only the local part cannot (steps 2 and 3)",
+      "transform": "email_domain",
+      "value": "Alice\u00a0Smith <alice@corp.com>",
+      "result": "corp.com"
+    },
+    {
+      "id": "T-88",
+      "description": "url_host cannot read a host with a code point that a stack's version of Unicode does not know: U+190EA, in an A-label, which the idna package's tables know and Python's unicodedata and Go's tables do not (step 7)",
+      "transform": "url_host",
+      "value": "https://xn--0x7f.example/",
+      "result": null
+    },
+    {
+      "id": "T-89",
+      "description": "email_domain cannot read a domain with a code point that a stack's version of Unicode does not know: U+190EA, as written (step 4, and url_host's step 7)",
+      "transform": "email_domain",
+      "value": "alice@\ud824\udcea.example",
+      "result": null
     }
   ],
   "records": [
@@ -1526,7 +1624,7 @@
     },
     {
       "id": "A-05",
-      "description": "A call without arguments has an empty record",
+      "description": "An empty arguments object gives an empty record",
       "args": [
         {
           "name": "base",
@@ -2226,6 +2324,407 @@
         "ids": 1
       },
       "record": null
+    },
+    {
+      "id": "A-36",
+      "description": "Absent arguments are an empty object: a tool with declared arguments has an empty record",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "record": {}
+    },
+    {
+      "id": "A-37",
+      "description": "Absent arguments, for a tool without declared arguments",
+      "args": [],
+      "record": {}
+    },
+    {
+      "id": "A-38",
+      "description": "Arguments that are not JSON deny the call",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments_text": "{\"base\":",
+      "record": null
+    },
+    {
+      "id": "A-39",
+      "description": "Arguments that are not JSON deny the call, whatever the tool declares",
+      "args": [],
+      "arguments_text": "base=main",
+      "record": null
+    },
+    {
+      "id": "A-40",
+      "description": "Arguments that are an array deny the call",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": [
+        {
+          "base": "main"
+        }
+      ],
+      "record": null
+    },
+    {
+      "id": "A-41",
+      "description": "Arguments that are an array deny the call, whatever the tool declares",
+      "args": [],
+      "arguments": [],
+      "record": null
+    },
+    {
+      "id": "A-42",
+      "description": "Arguments that are a string deny the call, even one that holds a JSON object",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": "{\"base\":\"main\"}",
+      "record": null
+    },
+    {
+      "id": "A-43",
+      "description": "Arguments that are a string deny the call, whatever the tool declares",
+      "args": [],
+      "arguments": "base=main",
+      "record": null
+    },
+    {
+      "id": "A-44",
+      "description": "Arguments that are null deny the call: null is not an object",
+      "args": [],
+      "arguments": null,
+      "record": null
+    },
+    {
+      "id": "A-45",
+      "description": "A declared argument whose value is null does not fit its type: a tool can read null otherwise than an absent argument",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": null
+      },
+      "record": null
+    },
+    {
+      "id": "A-46",
+      "description": "null at the end of a nested path does not fit its type either",
+      "args": [
+        {
+          "name": "options.base",
+          "path": [
+            "options",
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "options": {
+          "base": null
+        }
+      },
+      "record": null
+    },
+    {
+      "id": "A-47",
+      "description": "null in an argument that no declaration names is never read",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": "main",
+        "filter": null
+      },
+      "record": {
+        "base": "main"
+      }
+    },
+    {
+      "id": "A-48",
+      "description": "A path through a string denies the call, even one that holds a JSON object: some tools parse it",
+      "args": [
+        {
+          "name": "options.base",
+          "path": [
+            "options",
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "options": "{\"base\":\"main\"}"
+      },
+      "record": null
+    },
+    {
+      "id": "A-49",
+      "description": "A path through an array denies the call: some tools take its first element",
+      "args": [
+        {
+          "name": "options.base",
+          "path": [
+            "options",
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "options": [
+          {
+            "base": "main"
+          }
+        ]
+      },
+      "record": null
+    },
+    {
+      "id": "A-50",
+      "description": "A path through null denies the call",
+      "args": [
+        {
+          "name": "options.base",
+          "path": [
+            "options",
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "options": null
+      },
+      "record": null
+    },
+    {
+      "id": "A-51",
+      "description": "A declared argument given twice denies the call: parsers keep the first value or the last",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments_text": "{\"base\":\"dev\",\"base\":\"main\"}",
+      "record": null
+    },
+    {
+      "id": "A-52",
+      "description": "A member name that repeats in the arguments object denies the call, even one that no declaration names",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments_text": "{\"base\":\"main\",\"title\":\"a\",\"title\":\"b\"}",
+      "record": null
+    },
+    {
+      "id": "A-53",
+      "description": "A member name that repeats in the arguments object denies the call, whatever the tool declares",
+      "args": [],
+      "arguments_text": "{\"title\":\"a\",\"title\":\"b\"}",
+      "record": null
+    },
+    {
+      "id": "A-54",
+      "description": "A member name that repeats in an object that a declared path goes through denies the call",
+      "args": [
+        {
+          "name": "options.base",
+          "path": [
+            "options",
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments_text": "{\"options\":{\"base\":\"main\",\"force\":true,\"force\":false}}",
+      "record": null
+    },
+    {
+      "id": "A-55",
+      "description": "A member name that repeats in the last object of a longer path denies the call",
+      "args": [
+        {
+          "name": "a.b.c",
+          "path": [
+            "a",
+            "b",
+            "c"
+          ],
+          "type": "Long"
+        }
+      ],
+      "arguments_text": "{\"a\":{\"b\":{\"c\":1,\"c\":2}}}",
+      "record": null
+    },
+    {
+      "id": "A-56",
+      "description": "A repeat elsewhere reaches no rule: in an object within one that the path goes through, in an object that no declared path goes through, and in an array's object",
+      "args": [
+        {
+          "name": "options.base",
+          "path": [
+            "options",
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments_text": "{\"options\":{\"base\":\"main\",\"sub\":{\"z\":1,\"z\":2}},\"meta\":{\"x\":1,\"x\":2},\"list\":[{\"y\":1,\"y\":2}]}",
+      "record": {
+        "options.base": "main"
+      }
+    },
+    {
+      "id": "A-57",
+      "description": "A repeat elsewhere, for a tool without declared arguments",
+      "args": [],
+      "arguments_text": "{\"meta\":{\"x\":1,\"x\":2}}",
+      "record": {}
+    },
+    {
+      "id": "A-58",
+      "description": "A declared string with a lone surrogate denies the call",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": "main\ud800"
+      },
+      "record": null
+    },
+    {
+      "id": "A-59",
+      "description": "An element of a declared set with a lone surrogate denies the call",
+      "args": [
+        {
+          "name": "tags",
+          "path": [
+            "tags"
+          ],
+          "type": "Set<String>"
+        }
+      ],
+      "arguments": {
+        "tags": [
+          "a",
+          "\udc00b"
+        ]
+      },
+      "record": null
+    },
+    {
+      "id": "A-60",
+      "description": "A lone surrogate denies the call before a transform reads the string",
+      "args": [
+        {
+          "name": "url:url_host",
+          "path": [
+            "url"
+          ],
+          "transform": "url_host",
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "url": "https://example.com/\ud800"
+      },
+      "record": null
+    },
+    {
+      "id": "A-61",
+      "description": "A lone surrogate in an argument that no declaration names is never read",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": "main",
+        "note": "\ud800"
+      },
+      "record": {
+        "base": "main"
+      }
+    },
+    {
+      "id": "A-62",
+      "description": "A surrogate pair is one character, not a lone surrogate",
+      "args": [
+        {
+          "name": "base",
+          "path": [
+            "base"
+          ],
+          "type": "String"
+        }
+      ],
+      "arguments": {
+        "base": "\ud835\udc9c"
+      },
+      "record": {
+        "base": "\ud835\udc9c"
+      }
     }
   ]
 }
