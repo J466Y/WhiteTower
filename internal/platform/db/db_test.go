@@ -13,6 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 
 	"github.com/J466Y/WhiteTower/internal/platform/config"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
@@ -95,6 +97,78 @@ func TestCheckSchema(t *testing.T) {
 	}
 	if err := pool.CheckSchema(ctx); !errors.Is(err, db.ErrSchemaAhead) {
 		t.Fatalf("on a newer schema: %v, want ErrSchemaAhead", err)
+	}
+}
+
+// Migration 00009 gives the tokens of the CLI's exchange created before it,
+// the only tokens named wtctl that last 12 hours, a hash of no sign-in
+// configuration, which the server refuses, and leaves every other token
+// without one: those that people and service accounts create last whole
+// days, a person's token named wtctl among them (plan P1-03; ST-14).
+func TestMigration00009MarksTheCLIsTokensOfBefore(t *testing.T) {
+	ctx := context.Background()
+	d := dbtest.Empty(t)
+	cc, err := pgx.ParseConfig(d.Config.Migration.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	password, err := os.ReadFile(d.Config.Migration.PasswordFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cc.Password = strings.TrimRight(string(password), "\r\n")
+	provider, err := goose.NewProvider(goose.DialectPostgres, stdlib.OpenDB(*cc), os.DirFS("migrations"), goose.WithDisableGlobalRegistry(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer provider.Close()
+	if _, err := provider.UpTo(ctx, 8); err != nil {
+		t.Fatal(err)
+	}
+
+	conn := d.Superuser(t)
+	var principal string
+	if err := conn.QueryRow(ctx, `INSERT INTO whitetower.principals (id, kind, issuer, subject, display_name)
+		VALUES (gen_random_uuid(), 'human', 'https://idp.example.com', 'usr-before', 'Bo Before') RETURNING id::text`).Scan(&principal); err != nil {
+		t.Fatal(err)
+	}
+	created := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	tokens := []struct {
+		what     string
+		name     string
+		lifetime time.Duration
+		marked   bool
+		id       string
+	}{
+		{what: "a token of the CLI's exchange", name: "wtctl", lifetime: 12 * time.Hour, marked: true},
+		{what: "a person's token named wtctl", name: "wtctl", lifetime: 24 * time.Hour},
+		{what: "a token of 12 hours named otherwise, which no code creates", name: "ci", lifetime: 12 * time.Hour},
+		{what: "a person's token", name: "ci", lifetime: 30 * 24 * time.Hour},
+	}
+	for i := range tokens {
+		tt := &tokens[i]
+		if err := conn.QueryRow(ctx, `INSERT INTO whitetower.api_tokens
+			(id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at)
+			VALUES (gen_random_uuid(), $1, $2, 'wt_pat_before', sha256($3), '{identity.me.read}', $1, $4, $5) RETURNING id::text`,
+			principal, tt.name, []byte(tt.what), created, created.Add(tt.lifetime)).Scan(&tt.id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range tokens {
+		var hash []byte
+		if err := conn.QueryRow(ctx, "SELECT sign_in_configuration_sha256 FROM whitetower.api_tokens WHERE id = $1", tt.id).Scan(&hash); err != nil {
+			t.Fatal(err)
+		}
+		switch {
+		case tt.marked && !bytes.Equal(hash, make([]byte, 32)):
+			t.Errorf("%s: %x, want 32 zero bytes", tt.what, hash)
+		case !tt.marked && hash != nil:
+			t.Errorf("%s: %x, want none", tt.what, hash)
+		}
 	}
 }
 

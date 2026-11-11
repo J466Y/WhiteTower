@@ -127,9 +127,10 @@ WHERE principal_id = $1 AND revoked_at IS NULL;
 
 -- name: CreateAPIToken :exec
 INSERT INTO whitetower.api_tokens (
-    id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at
+    id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at,
+    sign_in_configuration_sha256
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 );
 
 -- name: GetAPITokenByHash :one

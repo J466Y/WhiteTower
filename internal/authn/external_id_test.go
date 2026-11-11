@@ -438,7 +438,7 @@ func TestASCIMProvisioningThatACreationOvertookIsRefused(t *testing.T) {
 			}
 			writer := audit.NewWriter(cat, clk)
 			pool := d.Open(t)
-			principals := authn.NewPrincipalStore(pool, clk, writer, authn.NewSessionStore(pool, clk, writer, authn.SessionOptions{}), authn.NewTokenStore(pool, clk, writer, authz.NewAuthorizer()))
+			principals := authn.NewPrincipalStore(pool, clk, writer, authn.NewSessionStore(pool, clk, writer, authn.SessionOptions{}), authn.NewTokenStore(pool, clk, writer, authz.NewAuthorizer(), authn.SignInConfiguration{}))
 			signedIn, err := principals.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-vic", ExternalID: "idp-vic", DisplayName: "Vic Canary"}, nil)
 			if err != nil {
 				t.Fatal(err)

@@ -102,7 +102,7 @@ func TestBeforeDiscoverySignInIsUnavailable(t *testing.T) {
 	opts.StateKey = newStateKey(t)
 	// Nothing reaches the stores before discovery, and a logout without a
 	// session cookie revokes nothing.
-	opts.Tokens = authn.NewTokenStore(nil, clk, nil, nil)
+	opts.Tokens = authn.NewTokenStore(nil, clk, nil, nil, authn.SignInConfiguration{})
 	svc, err := authn.NewOIDCService(opts, nil, nil)
 	if err != nil {
 		t.Fatalf("creating OIDC service: %v", err)

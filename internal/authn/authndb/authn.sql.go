@@ -109,22 +109,24 @@ func (q *Queries) CountPeople(ctx context.Context, systemIds []uuid.UUID) (int64
 
 const createAPIToken = `-- name: CreateAPIToken :exec
 INSERT INTO whitetower.api_tokens (
-    id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at
+    id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at,
+    sign_in_configuration_sha256
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 )
 `
 
 type CreateAPITokenParams struct {
-	ID          uuid.UUID
-	PrincipalID uuid.UUID
-	Name        string
-	TokenPrefix string
-	TokenHash   []byte
-	Scopes      []string
-	CreatedBy   uuid.UUID
-	CreatedAt   time.Time
-	ExpiresAt   time.Time
+	ID                        uuid.UUID
+	PrincipalID               uuid.UUID
+	Name                      string
+	TokenPrefix               string
+	TokenHash                 []byte
+	Scopes                    []string
+	CreatedBy                 uuid.UUID
+	CreatedAt                 time.Time
+	ExpiresAt                 time.Time
+	SignInConfigurationSha256 []byte
 }
 
 func (q *Queries) CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) error {
@@ -138,6 +140,7 @@ func (q *Queries) CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) 
 		arg.CreatedBy,
 		arg.CreatedAt,
 		arg.ExpiresAt,
+		arg.SignInConfigurationSha256,
 	)
 	return err
 }
@@ -247,7 +250,7 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context, arg DeleteExpiredSe
 }
 
 const getAPITokenByHash = `-- name: GetAPITokenByHash :one
-SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at FROM whitetower.api_tokens
+SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at, sign_in_configuration_sha256 FROM whitetower.api_tokens
 WHERE token_hash = $1
 `
 
@@ -266,12 +269,13 @@ func (q *Queries) GetAPITokenByHash(ctx context.Context, tokenHash []byte) (Whit
 		&i.ExpiresAt,
 		&i.LastUsedAt,
 		&i.RevokedAt,
+		&i.SignInConfigurationSha256,
 	)
 	return i, err
 }
 
 const getAPITokenByID = `-- name: GetAPITokenByID :one
-SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at FROM whitetower.api_tokens
+SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at, sign_in_configuration_sha256 FROM whitetower.api_tokens
 WHERE id = $1
 `
 
@@ -290,6 +294,7 @@ func (q *Queries) GetAPITokenByID(ctx context.Context, id uuid.UUID) (Whitetower
 		&i.ExpiresAt,
 		&i.LastUsedAt,
 		&i.RevokedAt,
+		&i.SignInConfigurationSha256,
 	)
 	return i, err
 }
@@ -539,7 +544,7 @@ func (q *Queries) InsertHumanPrincipal(ctx context.Context, arg InsertHumanPrinc
 }
 
 const listAPITokensByPrincipal = `-- name: ListAPITokensByPrincipal :many
-SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at FROM whitetower.api_tokens
+SELECT id, principal_id, name, token_prefix, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at, sign_in_configuration_sha256 FROM whitetower.api_tokens
 WHERE principal_id = $1
 ORDER BY created_at DESC
 `
@@ -565,6 +570,7 @@ func (q *Queries) ListAPITokensByPrincipal(ctx context.Context, principalID uuid
 			&i.ExpiresAt,
 			&i.LastUsedAt,
 			&i.RevokedAt,
+			&i.SignInConfigurationSha256,
 		); err != nil {
 			return nil, err
 		}

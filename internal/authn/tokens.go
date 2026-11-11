@@ -1,6 +1,7 @@
 package authn
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -69,16 +70,27 @@ type TokenStore struct {
 	clk        clock.Clock
 	writer     *audit.Writer
 	authorizer auth.Authorizer
+	// signInConfiguration is the hash of the sign-in configuration with the
+	// CLI's client ID, which the tokens of the CLI's exchange record.
+	signInConfiguration []byte
 }
 
 // NewTokenStore returns an initialized TokenStore. The authorizer decides who
-// holds the permission to manage the tokens of any principal.
-func NewTokenStore(database *db.DB, clk clock.Clock, writer *audit.Writer, authorizer auth.Authorizer) *TokenStore {
+// holds the permission to manage the tokens of any principal. signIn is the
+// configuration with which the CLI's exchange accepts ID tokens: a token of
+// the exchange records its hash, with signIn.CLIClientID in place of
+// signIn.ClientID, and GetByToken refuses a token that another configuration
+// created, as after a change of one of those settings and a restart, so that
+// no token of the exchange outlives the configuration that accepted its ID
+// token (ST-14). The tokens that people create, and those of service
+// accounts, record none and are not affected.
+func NewTokenStore(database *db.DB, clk clock.Clock, writer *audit.Writer, authorizer auth.Authorizer, signIn SignInConfiguration) *TokenStore {
 	return &TokenStore{
-		database:   database,
-		clk:        clk,
-		writer:     writer,
-		authorizer: authorizer,
+		database:            database,
+		clk:                 clk,
+		writer:              writer,
+		authorizer:          authorizer,
+		signInConfiguration: signInConfigurationSHA256(cliSignInConfigurationForm, signIn.CLIClientID, signIn),
 	}
 }
 
@@ -123,7 +135,7 @@ func (ts *TokenStore) CreateWithLifetime(
 ) (*CreatedToken, error) {
 	var created *CreatedToken
 	err := ts.database.InTx(ctx, func(ctx context.Context, tx *db.Tx) (err error) {
-		created, err = ts.createWithLifetimeTx(ctx, tx, principalID, name, scopes, lifetime, actor)
+		created, err = ts.createWithLifetimeTx(ctx, tx, principalID, name, scopes, lifetime, actor, nil)
 		return err
 	})
 	if err != nil {
@@ -133,7 +145,8 @@ func (ts *TokenStore) CreateWithLifetime(
 }
 
 // createWithLifetimeTx is CreateWithLifetime in tx, for a sign-in that creates
-// a token in its own transaction.
+// a token in its own transaction. The token records signInConfiguration: the
+// store's own for the CLI's exchange, and none for any other token.
 func (ts *TokenStore) createWithLifetimeTx(
 	ctx context.Context,
 	tx *db.Tx,
@@ -142,6 +155,7 @@ func (ts *TokenStore) createWithLifetimeTx(
 	scopes []string,
 	lifetime time.Duration,
 	actor auth.Principal,
+	signInConfiguration []byte,
 ) (*CreatedToken, error) {
 	name = strings.TrimSpace(name)
 	if len(name) < 1 || len(name) > 100 {
@@ -195,15 +209,16 @@ func (ts *TokenStore) createWithLifetimeTx(
 	}
 
 	if err := q.CreateAPIToken(ctx, authndb.CreateAPITokenParams{
-		ID:          tokenID,
-		PrincipalID: principalID,
-		Name:        name,
-		TokenPrefix: prefix,
-		TokenHash:   hash,
-		Scopes:      scopes,
-		CreatedBy:   creatorID,
-		CreatedAt:   now,
-		ExpiresAt:   expiresAt,
+		ID:                        tokenID,
+		PrincipalID:               principalID,
+		Name:                      name,
+		TokenPrefix:               prefix,
+		TokenHash:                 hash,
+		Scopes:                    scopes,
+		CreatedBy:                 creatorID,
+		CreatedAt:                 now,
+		ExpiresAt:                 expiresAt,
+		SignInConfigurationSha256: signInConfiguration,
 	}); err != nil {
 		return nil, fmt.Errorf("inserting api token: %w", err)
 	}
@@ -250,6 +265,12 @@ func (ts *TokenStore) createWithLifetimeTx(
 }
 
 // GetByToken authenticates rawToken, checks revocation, expiration, and principal status.
+// A token of the CLI's exchange that another sign-in configuration than the
+// store's created is ErrInvalidToken, as a token that does not exist, and is
+// neither revoked nor touched: a replica that still runs that configuration,
+// during a rolling restart, accepts it, and so would this one after a return
+// to it (ST-14). The exchange's tokens created before tokens recorded a
+// configuration hold the hash of none, which is refused too.
 func (ts *TokenStore) GetByToken(ctx context.Context, rawToken string) (*APIToken, *Principal, error) {
 	if !strings.HasPrefix(rawToken, TokenPrefix) {
 		return nil, nil, ErrInvalidToken
@@ -273,6 +294,9 @@ func (ts *TokenStore) GetByToken(ctx context.Context, rawToken string) (*APIToke
 	now := ts.clk.Now().UTC()
 	if now.After(row.ExpiresAt) {
 		return nil, nil, ErrTokenExpired
+	}
+	if row.SignInConfigurationSha256 != nil && !bytes.Equal(row.SignInConfigurationSha256, ts.signInConfiguration) {
+		return nil, nil, ErrInvalidToken
 	}
 
 	pRow, err := q.GetPrincipalByID(ctx, row.PrincipalID)
