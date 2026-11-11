@@ -740,15 +740,12 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 		return nil, fmt.Errorf("%w: empty id token", ErrInvalidToken)
 	}
 
-	// Verify ID token: try cliVerifier (audience wtctl), fallback to verifier
-	// (console client). Both fetch the signing keys with the provider's client.
+	// Only an ID token issued for the CLI's client verifies. One issued for
+	// the console's confidential client is refused: the exchange does not
+	// check the nonce that the callback checks, so such a token, replayed
+	// here, would mint an API token (ST-16). The verifier fetches the signing
+	// keys with the provider's client.
 	idToken, err := provider.cliVerifier.Verify(ctx, rawIDToken)
-	if err != nil {
-		if fallback, fallbackErr := provider.verifier.Verify(ctx, rawIDToken); fallbackErr == nil {
-			idToken = fallback
-			err = nil
-		}
-	}
 	if err != nil {
 		// Fetching the signing keys can fail on the provider's back channel,
 		// whose address no client may learn: only the log holds the cause,

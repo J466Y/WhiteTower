@@ -1196,6 +1196,59 @@ func TestADiscoveryDocumentThatNamesAnotherIssuerIsRefused(t *testing.T) {
 	}
 }
 
+// Security test ST-16: the CLI's exchange accepts only an ID token issued for
+// the CLI's client. One issued for the console's confidential client, which
+// the callback accepts with the nonce of its sign-in, is refused as a token
+// that does not verify, and leaves no principal and no API token: replayed
+// into the exchange, which checks no nonce, it would mint an API token
+func TestTheExchangeRefusesAnIDTokenOfTheConsolesClient(t *testing.T) {
+	ctx := context.Background()
+	idp := newMockIDP(t)
+	clk := clocktest.New(testEpoch)
+	sessionStore, principalStore, tokenStore, database := setupAuthn(t, clk)
+	svc := newService(t, authn.OIDCOptions{
+		Issuer:            idp.server.URL,
+		ClientID:          "whitetower-console",
+		CLIClientID:       "wtctl",
+		ClientSecret:      "test-secret",
+		RedirectURL:       "https://127.0.0.1:8443/auth/callback",
+		Clock:             clk,
+		RoleMapping:       map[string]string{"wt-owners": "owner"},
+		AllowedAlgorithms: []string{"RS256"},
+		Tokens:            tokenStore,
+	}, principalStore, sessionStore)
+	idTokenFor := func(audience string) string {
+		return idp.signIDToken(map[string]any{"alg": "RS256"}, map[string]any{
+			"iss":    idp.server.URL,
+			"aud":    audience,
+			"sub":    "usr-replays",
+			"name":   "Rex Replays",
+			"groups": []string{"wt-owners"},
+			"exp":    clk.Now().Add(time.Hour).Unix(),
+			"iat":    clk.Now().Unix(),
+		})
+	}
+
+	if created, err := svc.ExchangeIDToken(ctx, idTokenFor("whitetower-console")); created != nil || !errors.Is(err, authn.ErrInvalidToken) {
+		t.Fatalf("exchanging an ID token of the console's client: a token created: %t, error %v; want it refused as an invalid token", created != nil, err)
+	}
+	var principals, tokens int
+	if err := database.QueryRow(ctx, "SELECT count(*) FROM whitetower.principals WHERE subject = 'usr-replays'").Scan(&principals); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.QueryRow(ctx, "SELECT count(*) FROM whitetower.api_tokens").Scan(&tokens); err != nil {
+		t.Fatal(err)
+	}
+	if principals != 0 || tokens != 0 {
+		t.Errorf("after the refusal: %d principals and %d API tokens, want none", principals, tokens)
+	}
+
+	// The same person's ID token for the CLI's client is exchanged.
+	if _, err := svc.ExchangeIDToken(ctx, idTokenFor("wtctl")); err != nil {
+		t.Errorf("exchanging an ID token of the CLI's client: %v", err)
+	}
+}
+
 // The endpoints that browsers use may leave the issuer's origin, as a
 // provider whose sign-in pages have their own host does: the server checks
 // the document's issuer, not where the document sends browsers.

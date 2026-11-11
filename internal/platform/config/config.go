@@ -147,7 +147,7 @@ type OIDC struct {
 	CAFile string `yaml:"ca_file"`
 	// Client ID of the confidential client in the IdP, which the ID tokens of a sign-in must name as their audience. After a change and a restart, everyone signs in again in the console, and the CLI's tokens are not affected, as the section auth.oidc says.
 	ClientID string `yaml:"client_id"`
-	// Client ID of the public client used by the CLI (wtctl): wtctl by default. The CLI exchanges an ID token of this client for an API token of 12 hours, which records this setting in place of auth.oidc.client_id. After a change and a restart, everyone logs in again with the CLI, and the console's sessions are not affected, as the section auth.oidc says.
+	// Client ID of the public client used by the CLI (wtctl): wtctl by default. The CLI exchanges an ID token of this client for an API token of 12 hours, which records this setting in place of auth.oidc.client_id; the exchange refuses the ID tokens of any other client, auth.oidc.client_id's included. After a change and a restart, everyone logs in again with the CLI, and the console's sessions are not affected, as the section auth.oidc says.
 	CLIClientID string `yaml:"cli_client_id"`
 	// File with the confidential client secret: the secret never belongs in the configuration file or the environment.
 	ClientSecretFile string `yaml:"client_secret_file"`
