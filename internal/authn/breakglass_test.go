@@ -21,7 +21,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/platform/ratelimit"
 )
 
-// Security test ST-20: A break-glass session can halt agents and the fleet and read, and nothing else: not release, not change anything; it expires after one hour; attempts are rate-limited; each use raises the critical event and the alert
+// Security test ST-20: A break-glass session can halt agents and the fleet, end every session and API token (ST-89), and read, and nothing else: not release, not change anything else; it expires after one hour; attempts are rate-limited; each use raises the critical event and the alert
 func TestBreakglassEmergencyAccess(t *testing.T) {
 	startTime := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
 	clk := clocktest.New(startTime)
@@ -159,10 +159,12 @@ func TestBreakglassEmergencyAccess(t *testing.T) {
 	}
 
 	// 7. Test permission matrix enforcement (ST-20):
-	// A break-glass session can halt agents and the fleet and read, and nothing else.
+	// A break-glass session can halt agents and the fleet, end every session
+	// and API token, and read, and nothing else.
 	allowedOps := []string{
 		"haltAgent",
 		"haltFleet",
+		"revokeAllSessionsAndTokens",
 		"getMe",
 		"listAgents",
 		"getAgent",

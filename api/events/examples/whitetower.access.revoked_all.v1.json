@@ -1,0 +1,17 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000089",
+  "source": "/core",
+  "type": "whitetower.access.revoked_all.v1",
+  "time": "2026-11-11T09:30:00.000Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "actor": {
+      "type": "breakglass",
+      "id": "00000000-0000-0000-0000-000000000001"
+    },
+    "reason": "INC-2041: the identity provider was compromised",
+    "sessions": 42,
+    "tokens": 17
+  }
+}

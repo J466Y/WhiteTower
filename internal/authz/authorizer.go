@@ -63,6 +63,7 @@ func (az *Authorizer) registerDefaults() {
 	az.operations["revokeToken"] = PermissionIdentityMeRead
 	az.operations["listServiceAccounts"] = PermissionIdentityMeRead
 	az.operations["createServiceAccount"] = PermissionIdentityMeRead
+	az.operations["revokeAllSessionsAndTokens"] = PermissionIdentityEmergencyRevoke
 
 	// The inventory (plan P1-04). Its handlers check the scope of each grant
 	// against the agent: ownership, an active agent, a sign-off.
@@ -138,7 +139,22 @@ func (az *Authorizer) Authorize(ctx context.Context, p *auth.Principal, operatio
 		return fmt.Errorf("%w: unknown operation %q", auth.ErrDenied, operation)
 	}
 
-	// Enforce break-glass restrictions (ST-20): can halt agents and the fleet and read, and nothing else.
+	// An emergency revocation (HUM-10, ST-89) is the break-glass custodian's,
+	// by the session, and the platform administrator's, by role, below. It is
+	// never an API token's, whatever its scopes hold, even an administrator's:
+	// a token that someone obtained through a compromised identity provider
+	// must not end the sessions of the people who answer the incident.
+	if perm == PermissionIdentityEmergencyRevoke {
+		if p.IsBreakglass {
+			return nil
+		}
+		if p.Scopes != nil {
+			return auth.ErrDenied
+		}
+	}
+
+	// Enforce break-glass restrictions (ST-20): besides an emergency
+	// revocation, above, can halt agents and the fleet and read, and nothing else.
 	if p.IsBreakglass {
 		switch perm {
 		case PermissionHaltAgentIssue, PermissionHaltFleetIssue, PermissionInventoryView, PermissionAuditEventsRead, PermissionAuditVerify, PermissionAuditExport, PermissionIdentityMeRead:

@@ -27,3 +27,4 @@ The design of White Tower, from the charter to the implementation plans. All doc
 | `rfcs/` | Requests for comments on contract changes | P0-01 (template), P0-03 (RFC-0001) |
 | `performance/` | Load and measurement reports | P1-07, P1-08, P1-09, P1-13, P1-15 |
 | `reference/` | Generated configuration and CLI reference | P1-01, P1-11 |
+| `runbooks/` | What an operator does, step by step, such as [after a compromise of the identity provider](runbooks/identity-provider-compromise.md) | P1-03, then the plans that need one |

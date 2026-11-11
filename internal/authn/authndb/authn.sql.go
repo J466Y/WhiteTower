@@ -813,6 +813,20 @@ func (q *Queries) LockHumanPrincipalByIdentity(ctx context.Context, arg LockHuma
 	return i, err
 }
 
+const lockSessionsAndAPITokens = `-- name: LockSessionsAndAPITokens :exec
+LOCK TABLE whitetower.sessions, whitetower.api_tokens IN SHARE ROW EXCLUSIVE MODE
+`
+
+// Locks the sessions and the API tokens until the transaction ends against
+// every insert, update and delete, on every replica, and against another
+// transaction that takes this lock: a sign-in or an exchange that has written
+// its session or token commits before the lock is granted, and one that has
+// not waits until the transaction ends. Reads go on.
+func (q *Queries) LockSessionsAndAPITokens(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockSessionsAndAPITokens)
+	return err
+}
+
 const revokeAPIToken = `-- name: RevokeAPIToken :execrows
 UPDATE whitetower.api_tokens
 SET revoked_at = $2
@@ -879,6 +893,44 @@ func (q *Queries) RevokeActiveSession(ctx context.Context, arg RevokeActiveSessi
 	var i RevokeActiveSessionRow
 	err := row.Scan(&i.PrincipalID, &i.Method)
 	return i, err
+}
+
+const revokeAllActiveAPITokens = `-- name: RevokeAllActiveAPITokens :execrows
+UPDATE whitetower.api_tokens
+SET revoked_at = $1
+WHERE revoked_at IS NULL AND expires_at >= $1
+`
+
+// Revokes every API token that is neither revoked nor expired.
+func (q *Queries) RevokeAllActiveAPITokens(ctx context.Context, revokedAt *time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAllActiveAPITokens, revokedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeAllActiveSessions = `-- name: RevokeAllActiveSessions :execrows
+UPDATE whitetower.sessions
+SET revoked_at = $1
+WHERE revoked_at IS NULL
+  AND idle_expires_at >= $1 AND absolute_expires_at >= $1
+  AND id_hash IS DISTINCT FROM $2
+`
+
+type RevokeAllActiveSessionsParams struct {
+	RevokedAt *time.Time
+	Keep      []byte
+}
+
+// Revokes every session that is neither revoked nor expired, but the one whose
+// hash is keep, when it is set.
+func (q *Queries) RevokeAllActiveSessions(ctx context.Context, arg RevokeAllActiveSessionsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAllActiveSessions, arg.RevokedAt, arg.Keep)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const revokeSession = `-- name: RevokeSession :exec

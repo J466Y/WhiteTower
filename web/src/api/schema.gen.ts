@@ -165,6 +165,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/emergency-revocation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End every session and API token at once
+         * @description Ends, at once and for a reason, every session and every API token,
+         *     of people and of service accounts, the CLI's tokens included, so that
+         *     nothing that a compromised identity provider let someone obtain
+         *     outlives it (HUM-10). Principals and their roles stay: everyone signs
+         *     in again, and the integrations' tokens are created again. The
+         *     caller's own session ends too, unless it is a break-glass session:
+         *     the answer then clears the session cookie, as a sign-out does. Every
+         *     other break-glass session ends.
+         *
+         *     The platform administrator runs it, from a session
+         *     (`identity.emergency.revoke`), and so does the break-glass custodian.
+         *     An API token never does, whatever its scopes: it is `forbidden`. A
+         *     missing, blank or longer reason is `bad_request`. The audit log
+         *     records it, with how many sessions and tokens it ended, and the
+         *     server logs a security alert. A second run ends nothing new, and is
+         *     recorded too.
+         */
+        post: operations["revokeAllSessionsAndTokens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit/events": {
         parameters: {
             query?: never;
@@ -1015,6 +1050,27 @@ export interface components {
         ExchangeTokenRequest: {
             /** @description Raw OpenID Connect ID token obtained by the CLI. */
             idToken: string;
+        };
+        EmergencyRevocationRequest: {
+            /** @description Why everything ends, such as a reference to the incident. The audit log keeps it. */
+            reason: string;
+        };
+        EmergencyRevocation: {
+            /**
+             * Format: int64
+             * @description How many sessions it ended, of those that were neither revoked nor expired.
+             */
+            sessions: number;
+            /**
+             * Format: int64
+             * @description How many API tokens it ended, of those that were neither revoked nor expired.
+             */
+            tokens: number;
+            /**
+             * Format: date-time
+             * @description When it ended them. A session or a token created later was not ended.
+             */
+            revokedAt: string;
         };
         AuditEvent: {
             /** Format: uuid */
@@ -1869,6 +1925,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceAccount"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    revokeAllSessionsAndTokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmergencyRevocationRequest"];
+            };
+        };
+        responses: {
+            /** @description What the revocation ended. */
+            200: {
+                headers: {
+                    /** @description Clears the session cookie when the caller's own session ended. */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyRevocation"];
                 };
             };
             default: components["responses"]["Problem"];

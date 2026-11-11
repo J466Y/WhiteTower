@@ -336,6 +336,16 @@
       "example": "examples/whitetower.breakglass.used.v1.json"
     },
     {
+      "type": "whitetower.access.revoked_all.v1",
+      "summary": "An emergency revocation ended every session and API token at once, but the break-glass session that ran it (HUM-10, ST-89).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "optional",
+      "schema": "schemas/whitetower.access.revoked_all.v1.json",
+      "example": "examples/whitetower.access.revoked_all.v1.json"
+    },
+    {
       "type": "whitetower.audit.read.v1",
       "summary": "The audit log was queried or an audit event was read (AUD-09, ST-12).",
       "emitters": [

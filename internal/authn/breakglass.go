@@ -38,10 +38,12 @@ const BreakglassCredentialPrefix = "wt_bg_"
 const BreakglassLifetime = 1 * time.Hour
 
 // BreakglassScopes defines the strict subset of permissions allowed during emergency break-glass (ST-20).
-// A break-glass session can halt agents and the fleet and read, and nothing else.
+// A break-glass session can halt agents and the fleet, end every session and
+// API token (HUM-10), and read, and nothing else.
 var BreakglassScopes = []string{
 	string(authz.PermissionHaltAgentIssue),
 	string(authz.PermissionHaltFleetIssue),
+	string(authz.PermissionIdentityEmergencyRevoke),
 	string(authz.PermissionInventoryView),
 	string(authz.PermissionAuditEventsRead),
 	string(authz.PermissionAuditVerify),

@@ -91,10 +91,11 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 			PermissionIdentityMeRead:  ScopeAll,
 		},
 		RoleAdmin: {
-			PermissionInventoryView:        ScopeAll,
-			PermissionSettingsManage:       ScopeAll,
-			PermissionIdentityMeRead:       ScopeAll,
-			PermissionIdentityTokensManage: ScopeAll,
+			PermissionInventoryView:           ScopeAll,
+			PermissionSettingsManage:          ScopeAll,
+			PermissionIdentityMeRead:          ScopeAll,
+			PermissionIdentityTokensManage:    ScopeAll,
+			PermissionIdentityEmergencyRevoke: ScopeAll,
 		},
 	}
 
@@ -104,8 +105,8 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 	if len(roles) != 7 {
 		t.Fatalf("expected 7 roles, got %d", len(roles))
 	}
-	if len(permissions) != 26 {
-		t.Fatalf("expected 26 permissions, got %d", len(permissions))
+	if len(permissions) != 27 {
+		t.Fatalf("expected 27 permissions, got %d", len(permissions))
 	}
 
 	totalChecked := 0
@@ -127,8 +128,8 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 		}
 	}
 
-	if totalChecked != 7*26 {
-		t.Fatalf("expected 182 checks, got %d", totalChecked)
+	if totalChecked != 7*27 {
+		t.Fatalf("expected 189 checks, got %d", totalChecked)
 	}
 }
 
@@ -385,6 +386,48 @@ func TestOnlyTheAdministratorManagesTheTokensOfAnyPrincipal(t *testing.T) {
 			err := az.Authorize(context.Background(), &tt.p, manage)
 			if tt.allowed != (err == nil) {
 				t.Errorf("got %v, want allowed=%v", err, tt.allowed)
+			}
+		})
+	}
+}
+
+// Security test ST-89: only the platform administrator, from a session, and a
+// break-glass session end every session and API token; an API token never
+// does, whatever its scopes hold, even an administrator's with every scope
+func TestOnlyTheAdministratorsSessionAndBreakglassRevokeEverything(t *testing.T) {
+	az := NewAuthorizer()
+	everyScope := []string{"*"}
+	for _, p := range AllPermissions() {
+		everyScope = append(everyScope, string(p))
+	}
+	type caller struct {
+		name    string
+		p       auth.Principal
+		allowed bool
+	}
+	cases := []caller{
+		{"the administrator's session", auth.Principal{Roles: []string{string(RoleAdmin)}}, true},
+		{"a break-glass session", auth.Principal{Roles: []string{string(RoleOperator)}, Scopes: []string{string(PermissionHaltFleetIssue)}, IsBreakglass: true}, true},
+		{"an administrator's token with every scope", auth.Principal{Roles: []string{string(RoleAdmin)}, Scopes: everyScope}, false},
+		{"an administrator's token with the permission alone", auth.Principal{Roles: []string{string(RoleAdmin)}, Scopes: []string{string(PermissionIdentityEmergencyRevoke)}}, false},
+		{"an administrator's token without scopes", auth.Principal{Roles: []string{string(RoleAdmin)}, Scopes: []string{}}, false},
+		{"a service account's token of the administrator role", auth.Principal{Kind: auth.ServiceAccount, Roles: []string{string(RoleAdmin)}, Scopes: everyScope}, false},
+		{"a session without roles", auth.Principal{}, false},
+	}
+	for _, role := range AllRoles() {
+		if role != RoleAdmin {
+			cases = append(cases,
+				caller{"the role " + string(role), auth.Principal{Roles: []string{string(role)}}, false},
+				caller{"a token of the role " + string(role) + " with every scope", auth.Principal{Roles: []string{string(role)}, Scopes: everyScope}, false})
+		}
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.p.ID = "p1"
+			for _, op := range []string{"revokeAllSessionsAndTokens", string(PermissionIdentityEmergencyRevoke)} {
+				if err := az.Authorize(context.Background(), &tt.p, op); tt.allowed != (err == nil) {
+					t.Errorf("%s: got %v, want allowed=%v", op, err, tt.allowed)
+				}
 			}
 		})
 	}

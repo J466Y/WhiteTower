@@ -89,6 +89,11 @@ const (
 	// the service accounts they are responsible for, with
 	// PermissionIdentityMeRead.
 	PermissionIdentityTokensManage Permission = "identity.tokens.manage"
+
+	// PermissionIdentityEmergencyRevoke allows ending every session and every
+	// API token at once (HUM-10). The authorizer never grants it to an API
+	// token, whatever its scopes, and grants it to a break-glass session.
+	PermissionIdentityEmergencyRevoke Permission = "identity.emergency.revoke"
 )
 
 // allPermissions lists all permissions in deterministic order.
@@ -119,6 +124,7 @@ var allPermissions = []Permission{
 	PermissionSettingsManage,
 	PermissionIdentityMeRead,
 	PermissionIdentityTokensManage,
+	PermissionIdentityEmergencyRevoke,
 }
 
 // AllPermissions returns a copy of all defined permissions.

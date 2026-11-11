@@ -156,6 +156,29 @@ UPDATE whitetower.api_tokens
 SET revoked_at = $2
 WHERE principal_id = $1 AND revoked_at IS NULL;
 
+-- name: LockSessionsAndAPITokens :exec
+-- Locks the sessions and the API tokens until the transaction ends against
+-- every insert, update and delete, on every replica, and against another
+-- transaction that takes this lock: a sign-in or an exchange that has written
+-- its session or token commits before the lock is granted, and one that has
+-- not waits until the transaction ends. Reads go on.
+LOCK TABLE whitetower.sessions, whitetower.api_tokens IN SHARE ROW EXCLUSIVE MODE;
+
+-- name: RevokeAllActiveSessions :execrows
+-- Revokes every session that is neither revoked nor expired, but the one whose
+-- hash is keep, when it is set.
+UPDATE whitetower.sessions
+SET revoked_at = sqlc.arg(revoked_at)
+WHERE revoked_at IS NULL
+  AND idle_expires_at >= sqlc.arg(revoked_at) AND absolute_expires_at >= sqlc.arg(revoked_at)
+  AND id_hash IS DISTINCT FROM sqlc.narg(keep);
+
+-- name: RevokeAllActiveAPITokens :execrows
+-- Revokes every API token that is neither revoked nor expired.
+UPDATE whitetower.api_tokens
+SET revoked_at = sqlc.arg(revoked_at)
+WHERE revoked_at IS NULL AND expires_at >= sqlc.arg(revoked_at);
+
 -- name: ListAPITokensByPrincipal :many
 SELECT * FROM whitetower.api_tokens
 WHERE principal_id = $1

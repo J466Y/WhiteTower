@@ -466,7 +466,8 @@ func groupSet(groups []string) []string {
 
 // actorOf returns the audit actor of a change to the principal id, or to its
 // session, made through method: SCIM's service account for a provisioning,
-// the break-glass custodian, or the person who signs in or out.
+// the break-glass custodian, or the person who signs in or out. An emergency
+// revocation's actor is that of the session that runs it, as a sign-out's.
 func actorOf(method string, id uuid.UUID) map[string]any {
 	switch method {
 	case "scim":
