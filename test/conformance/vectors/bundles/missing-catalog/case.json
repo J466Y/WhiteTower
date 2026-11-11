@@ -1,0 +1,15 @@
+{
+  "description": "The manifest names a catalog file that the bundle does not carry",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "8afe1113301abd98413a2beae9c33f5764e928ba7d1f31121f2982e7b20e51e3",
+    "size_bytes": 6741
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "missing_file"
+  }
+}

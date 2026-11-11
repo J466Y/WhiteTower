@@ -1,0 +1,15 @@
+{
+  "description": "An approved function tool of the catalog file without its definition, which approval pins",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "283bfe44bf3e5df7dde99dbf5cda1725c2997b4454d8b98ede6e0b5413f60aa8",
+    "size_bytes": 8722
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

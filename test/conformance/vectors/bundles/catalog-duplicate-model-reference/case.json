@@ -1,0 +1,15 @@
+{
+  "description": "Two models share a reference: the same provider and name, and endpoints written otherwise that section 4.10 normalizes alike",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "b29510e1943c95d5ecdf34e7b2f3538c047d808c0a18c0cabe5bcf2aff38ecc1",
+    "size_bytes": 8945
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

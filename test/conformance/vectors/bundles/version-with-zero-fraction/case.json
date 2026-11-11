@@ -1,0 +1,15 @@
+{
+  "description": "The manifest's version is written 42.0, the integer 42, which canonical JSON writes 42: not the manifest's canonical JSON",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "27d25975a511858d3368a95235bff30ef88dad5a6d7298a62674438e587edc7b",
+    "size_bytes": 8804
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

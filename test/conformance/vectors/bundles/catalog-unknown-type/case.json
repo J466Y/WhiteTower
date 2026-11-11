@@ -1,0 +1,15 @@
+{
+  "description": "An argument of the type Set\u003cBool\u003e, which is none of the five types of section 7.7",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "adde678143fa4347a3aa1d4b670a4be34a5e9a2a361e09dee35939c910fd85a7",
+    "size_bytes": 8802
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

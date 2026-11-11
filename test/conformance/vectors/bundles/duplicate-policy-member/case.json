@@ -1,0 +1,15 @@
+{
+  "description": "A policy entry gives its scope twice, with the same value: a member name twice, deeper in the manifest",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "7e109ad8ee99a3a911b0bd3cb1f3b813812733ef9dc5d5835898253f6a9fa375",
+    "size_bytes": 8819
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "description": "Two tools, send_email and send_mail, share the key agent/send_email",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "59f8e3aab11792558425038bdc133ecc5ce5acb7ca66c4da6cfc2ac2f5239e30",
+    "size_bytes": 8976
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

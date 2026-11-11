@@ -1,0 +1,15 @@
+{
+  "description": "A catalog file that starts with a byte order mark, which JSON in UTF-8 never carries (section 1)",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "80a0e1440fd5f8b83ba3d4c92d62a8f802fa556b0355cc2d13eb6c2ae6352de0",
+    "size_bytes": 8805
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

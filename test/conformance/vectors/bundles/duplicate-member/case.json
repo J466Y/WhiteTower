@@ -1,0 +1,15 @@
+{
+  "description": "The manifest gives agent_id twice, with the same value: a member name twice is not I-JSON (section 1), whichever of them a reader keeps",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "ee37511de1363523a07a96e8fb7993646fb44eb72b1b5264416fa9223a54668c",
+    "size_bytes": 8852
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

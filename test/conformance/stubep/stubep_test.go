@@ -551,7 +551,7 @@ func TestTheStubChecksTheBodyAsItIsWritten(t *testing.T) {
 		{name: "a subject for another agent, which the stub replaces", want: profile.ReasonPermit, body: []byte(`{
 			"subject": {"type": "agent", "id": "0192f1c2-7a3b-7c4d-8e5f-000000000002"},
 			"action": {"name": "tool.invoke"},
-			"resource": {"type": "tool", "id": "read_invoice", "properties": {"kind": "function"}},
+			"resource": {"type": "tool", "id": "agent/read_invoice", "properties": {"kind": "function"}},
 			"context": {"time": "2026-09-29T10:00:00.000Z"}
 		}`)},
 	}
@@ -664,7 +664,7 @@ func decide(e *EP) profile.Response {
 func callWith(context string) []byte {
 	return []byte(`{
 		"action": {"name": "tool.invoke"},
-		"resource": {"type": "tool", "id": "read_invoice", "properties": {"kind": "function"}},
+		"resource": {"type": "tool", "id": "agent/read_invoice", "properties": {"kind": "function"}},
 		"context": ` + context + `
 	}`)
 }

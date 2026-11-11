@@ -1,0 +1,15 @@
+{
+  "description": "An MCP tool whose server, gitlab, is no server of the catalog file",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "8385535633693401bf97574d028f42400fe363a0d44207ce74e9e8a050b66d49",
+    "size_bytes": 8802
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "description": "Two functions, agent/send_email and agent/send_email_v2, are both named send_email: one reference",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "68360f9a3ba80f6984d5c911fed3630f654347b05297bee268049522d9ee2d6a",
+    "size_bytes": 8980
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

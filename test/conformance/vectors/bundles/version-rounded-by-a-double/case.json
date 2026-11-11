@@ -1,0 +1,15 @@
+{
+  "description": "The manifest's version is 42.000000000000001, which a double rounds to 42: not I-JSON, since no double holds it as written, and no integer",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "457e9539e6fea6ee2c7137d73a2669d3efd97793b9c2ae573a42af6e1a79a990",
+    "size_bytes": 8818
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

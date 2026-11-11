@@ -150,7 +150,7 @@ func startStub(t *testing.T, ttl time.Duration) (context.Context, *kit.Core, *ki
 		Ref:    ref,
 		Permitted: kit.DecideRequest{
 			Action:   profile.Action{Name: "tool.invoke"},
-			Resource: profile.Resource{Type: "tool", ID: "read_invoice", Properties: map[string]any{"kind": "function"}},
+			Resource: profile.Resource{Type: "tool", ID: "agent/read_invoice", Properties: map[string]any{"kind": "function"}},
 			Context:  profile.Context{Time: "2026-09-29T10:00:00.000Z"},
 		},
 	}
