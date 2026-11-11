@@ -17,11 +17,16 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/cedar-policy/cedar-go"
 	"github.com/gowebpki/jcs"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+
+	"github.com/J466Y/WhiteTower/api/policy"
+	"github.com/J466Y/WhiteTower/test/conformance/canonical"
 )
 
 // Format constants of whitetower.bundle.v1.
@@ -34,6 +39,8 @@ const (
 	Type = "whitetower-bundle+jws"
 	// CedarSchemaPath is where a bundle carries its Cedar schema.
 	CedarSchemaPath = "schema.cedarschema"
+	// CatalogPath is where a bundle carries its catalog file.
+	CatalogPath = "catalog.json"
 	// MaxSize is the largest bundle, manifest and files together, in bytes.
 	MaxSize = 2 << 20
 	// MaxFiles is the largest number of files in a bundle.
@@ -67,21 +74,25 @@ func reject(reason, format string, args ...any) error {
 	return &RejectError{Reason: reason, Detail: fmt.Sprintf(format, args...)}
 }
 
-// Manifest is the signed description of a bundle. Every member is required
-// (api/policy/bundle-manifest.schema.json).
+// Manifest is the signed description of a bundle. Every member but Catalog is
+// required (api/policy/bundle-manifest.schema.json).
 type Manifest struct {
-	Format             string        `json:"format"`
-	AgentID            string        `json:"agent_id"`
-	Version            uint64        `json:"version"`
-	CreatedAt          string        `json:"created_at"`
-	CombiningAlgorithm string        `json:"combining_algorithm"`
-	Language           string        `json:"language"`
-	CedarSchema        File          `json:"cedar_schema"`
-	Policies           []PolicyEntry `json:"policies"`
+	Format             string `json:"format"`
+	AgentID            string `json:"agent_id"`
+	Version            uint64 `json:"version"`
+	CreatedAt          string `json:"created_at"`
+	CombiningAlgorithm string `json:"combining_algorithm"`
+	Language           string `json:"language"`
+	CedarSchema        File   `json:"cedar_schema"`
+	// Catalog names the catalog file, which the core always includes. A
+	// bundle without one decides as with an empty catalog (section 7.7).
+	Catalog  *File         `json:"catalog,omitempty"`
+	Policies []PolicyEntry `json:"policies"`
 }
 
-// The members of a manifest, of its Cedar schema's entry and of a policy
-// entry: exactly these, each of them required.
+// The members of a manifest, of the entry of its Cedar schema or of its
+// catalog file, and of a policy entry: exactly these, each of them required
+// but catalog.
 var (
 	manifestMembers = []string{"format", "agent_id", "version", "created_at", "combining_algorithm", "language", "cedar_schema", "policies"}
 	fileMembers     = []string{"path", "sha256"}
@@ -225,6 +236,13 @@ func Build(m Manifest, files map[string][]byte, keyID string, priv ed25519.Priva
 		return nil, fmt.Errorf("no file for %s", m.CedarSchema.Path)
 	}
 	m.CedarSchema.SHA256 = SHA256Hex(content)
+	if m.Catalog != nil {
+		content, ok := files[m.Catalog.Path]
+		if !ok {
+			return nil, fmt.Errorf("no file for %s", m.Catalog.Path)
+		}
+		m.Catalog = &File{Path: m.Catalog.Path, SHA256: SHA256Hex(content)}
+	}
 	manifest, err := Canonical(m)
 	if err != nil {
 		return nil, err
@@ -318,9 +336,9 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 	}
 
 	// V5. Files. Each policy's path is built from its entry's ID and scope and
-	// the language, with no duplicates, and the Cedar schema sits at
-	// schema.cedarschema: any other path is malformed. Then exactly the
-	// listed files, with their hashes.
+	// the language, with no duplicates, the Cedar schema sits at
+	// schema.cedarschema and the catalog file at catalog.json: any other path
+	// is malformed. Then exactly the listed files, with their hashes.
 	listed := map[string]string{}
 	for _, p := range m.Policies {
 		path := "policies/" + p.Scope + "/" + p.ID + "." + m.Language
@@ -336,6 +354,12 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 		return nil, reject(ReasonInvalidManifest, "Cedar schema at %q, not at %q", m.CedarSchema.Path, CedarSchemaPath)
 	}
 	listed[CedarSchemaPath] = m.CedarSchema.SHA256
+	if m.Catalog != nil {
+		if m.Catalog.Path != CatalogPath {
+			return nil, reject(ReasonInvalidManifest, "catalog file at %q, not at %q", m.Catalog.Path, CatalogPath)
+		}
+		listed[CatalogPath] = m.Catalog.SHA256
+	}
 	for _, path := range slices.Sorted(maps.Keys(listed)) {
 		content, ok := b.Files[path]
 		if !ok {
@@ -359,26 +383,69 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 	// V7. Every policy parses as a static Cedar policy. cedar-go parses no
 	// templates, so a template does not parse. Validating the policies against
 	// the bundle's schema is the core's job (POL-07): a policy that fails it is
-	// activated all the same.
+	// activated all the same. The catalog file parses against its schema.
 	for _, p := range m.Policies {
 		if _, err := cedar.NewPolicyListFromBytes(p.Path, b.Files[p.Path]); err != nil {
 			return nil, reject(ReasonParseError, "%s: %v", p.Path, err)
 		}
 	}
+	if m.Catalog != nil {
+		if err := parseCatalog(b.Files[CatalogPath]); err != nil {
+			return nil, reject(ReasonParseError, "%s: %v", CatalogPath, err)
+		}
+	}
 	return m, nil
 }
 
+// catalogSchemaURL places the embedded schema of the catalog file at a URL,
+// from which the compiler resolves its references. Nothing is fetched from it.
+const catalogSchemaURL = "file:///whitetower/policy/catalog.schema.json"
+
+// parseCatalog parses a catalog file as step V7 does: I-JSON, as the
+// manifest is (ReadIJSON), that matches api/policy/catalog.schema.json
+// (section 7.7). JSON Schema reads an object whose member names repeat as
+// one of its readings, which another reader could read otherwise, so such a
+// file never reaches the schema.
+func parseCatalog(data []byte) error {
+	text, err := ReadIJSON(data)
+	if err != nil {
+		return fmt.Errorf("not I-JSON: %w", err)
+	}
+	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(text))
+	if err != nil {
+		return err
+	}
+	schema, err := policy.Files.ReadFile("catalog.schema.json")
+	if err != nil {
+		return err
+	}
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schema))
+	if err != nil {
+		return err
+	}
+	compiler := jsonschema.NewCompiler()
+	if err := compiler.AddResource(catalogSchemaURL, doc); err != nil {
+		return err
+	}
+	compiled, err := compiler.Compile(catalogSchemaURL)
+	if err != nil {
+		return err
+	}
+	return compiled.Validate(inst)
+}
+
 // ParseManifest applies the checks of step V4 that read the manifest alone,
-// in their order (section 7.4). A manifest that is not JSON in UTF-8 without a
-// byte order mark (section 1), or not an object, or that has an unknown or a
-// missing member, or a member of the wrong type, is invalid_manifest: the
-// types are those of api/policy/bundle-manifest.schema.json, the forms of its
-// strings included. Then a format, combining algorithm or language that is not
-// supported is unsupported, even though the schema's constant fails too. Paths
-// need only be strings here: step V5 builds them from their entries.
+// in their order (section 7.4). A manifest that is not I-JSON (section 1, see
+// ReadIJSON), or not an object, or that has an unknown or a missing member,
+// or a member of the wrong type, is invalid_manifest: the types are those of
+// api/policy/bundle-manifest.schema.json, the forms of its strings included.
+// Then a format, combining algorithm or language that is not supported is
+// unsupported, even though the schema's constant fails too. Paths need only be
+// strings here: step V5 builds them from their entries.
 func ParseManifest(data []byte, languages []string) (*Manifest, error) {
-	if !utf8JSON(data) {
-		return nil, reject(ReasonInvalidManifest, "JSON is UTF-8, without a byte order mark")
+	data, err := ReadIJSON(data)
+	if err != nil {
+		return nil, reject(ReasonInvalidManifest, "not I-JSON: %v", err)
 	}
 	if err := checkMembers(data); err != nil {
 		return nil, reject(ReasonInvalidManifest, "%v", err)
@@ -403,21 +470,148 @@ func utf8JSON(data []byte) bool {
 	return utf8.Valid(data) && !bytes.HasPrefix(data, []byte("\xef\xbb\xbf"))
 }
 
-// checkMembers checks that the manifest, its Cedar schema's entry and each
-// policy entry are objects with exactly their members, none of them null.
-// Decoding into a Manifest then checks the type of each member, since
-// encoding/json neither reports a missing member nor refuses null.
+// maxInteger is 2^53 - 1, the largest magnitude of an integer in I-JSON
+// (section 1).
+const maxInteger = 1<<53 - 1
+
+// ErrNumber is the error of a number that I-JSON does not hold: an integer of
+// a magnitude beyond 2^53 - 1, or another number that no double holds as it
+// is written.
+var ErrNumber = errors.New("a number that I-JSON does not hold")
+
+// ReadIJSON reads the JSON text of a bundle's manifest or catalog file, which
+// is I-JSON (section 1, RFC 7493), and returns its canonical JSON. It refuses
+// text that is not UTF-8, or that starts with a byte order mark; a member
+// name twice in an object, at any depth; a string with a lone surrogate or a
+// noncharacter; and a number that a double does not hold as it is written.
+// It reads a number by its exact value, whatever its spelling: 4.2e1 and 42.0
+// are the integer 42, and 9007199254740992, 9.007199254740992e15 and
+// -9007199254740992.0 are all integers beyond 2^53 - 1. The canonical JSON
+// writes each number as its value, so that encoding/json, which takes 42.0 for
+// no integer, decodes what was checked.
+func ReadIJSON(data []byte) ([]byte, error) {
+	if !utf8JSON(data) {
+		return nil, errors.New("JSON is UTF-8, without a byte order mark")
+	}
+	v, err := canonical.Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkIJSON(v); err != nil {
+		return nil, err
+	}
+	// Encode refuses a member name twice and a lone surrogate.
+	return canonical.Encode(v)
+}
+
+// checkIJSON checks the numbers and the strings of a value that
+// canonical.Parse returned, at every depth.
+func checkIJSON(v any) error {
+	switch v := v.(type) {
+	case canonical.Number:
+		return checkNumber(v)
+	case canonical.String:
+		return checkString(v)
+	case []any:
+		for _, item := range v {
+			if err := checkIJSON(item); err != nil {
+				return err
+			}
+		}
+	case canonical.Object:
+		for _, m := range v {
+			if err := checkString(m.Name); err != nil {
+				return err
+			}
+			if err := checkIJSON(m.Value); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// checkString refuses a noncharacter, which I-JSON's strings never hold (RFC
+// 7493, section 2.1). String writes a lone surrogate as U+FFFD, which is not
+// one: canonical.Encode refuses it.
+func checkString(s canonical.String) error {
+	for _, r := range s.String() {
+		if r >= 0xFDD0 && r <= 0xFDEF || r&0xFFFE == 0xFFFE {
+			return fmt.Errorf("the noncharacter %U", r)
+		}
+	}
+	return nil
+}
+
+// checkNumber checks that a double holds a number as it is written, by the
+// number's exact value: an integer has a magnitude of at most 2^53 - 1, and
+// any other number is the value of the shortest form of its double, so that
+// 0.1 passes, while 0.10000000000000001 and 1e-400 do not.
+func checkNumber(n canonical.Number) error {
+	neg, digits, exp := exactDecimal(string(n))
+	if exp >= 0 {
+		// At most 16 digits, which ParseUint always reads: 2^53 - 1 has 16.
+		if int64(len(digits))+exp <= 16 {
+			if v, _ := strconv.ParseUint("0"+digits+strings.Repeat("0", int(exp)), 10, 64); v <= maxInteger {
+				return nil
+			}
+		}
+		return fmt.Errorf("%w: %s is an integer of a magnitude beyond 2^53 - 1", ErrNumber, n)
+	}
+	if f, err := strconv.ParseFloat(string(n), 64); err == nil {
+		if fneg, fdigits, fexp := exactDecimal(strconv.FormatFloat(f, 'g', -1, 64)); fneg == neg && fdigits == digits && fexp == exp {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: no double holds %s as it is written", ErrNumber, n)
+}
+
+// exactDecimal returns the exact value of a number that RFC 8259's grammar
+// writes, as its sign, its digits without leading or trailing zeros, and the
+// power of ten that multiplies them: -4.20e1 is true, "42" and 0, and 1.5 is
+// false, "15" and -1. Zero has no sign, no digits and the power 0. A power
+// beyond 2^40 either way, which no text of a bundle's size could bring back
+// within reach, counts as 2^40.
+func exactDecimal(text string) (neg bool, digits string, exp int64) {
+	neg = strings.HasPrefix(text, "-")
+	mantissa := strings.TrimPrefix(text, "-")
+	if i := strings.IndexAny(mantissa, "eE"); i >= 0 {
+		// ParseInt takes the exponent's sign, and gives the largest
+		// magnitude of its sign for one out of range.
+		exp, _ = strconv.ParseInt(mantissa[i+1:], 10, 64)
+		exp = max(min(exp, 1<<40), -1<<40)
+		mantissa = mantissa[:i]
+	}
+	whole, fraction, _ := strings.Cut(mantissa, ".")
+	all := strings.TrimLeft(whole+fraction, "0")
+	digits = strings.TrimRight(all, "0")
+	if digits == "" {
+		return false, "", 0
+	}
+	return neg, digits, exp - int64(len(fraction)) + int64(len(all)-len(digits))
+}
+
+// checkMembers checks that the manifest, the entries of its Cedar schema and
+// of its catalog file, and each policy entry are objects with exactly their
+// members, none of them null, the catalog's entry being optional. Decoding
+// into a Manifest then checks the type of each member, since encoding/json
+// neither reports a missing member nor refuses null.
 func checkMembers(data []byte) error {
 	var v any
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
-	manifest, err := object(v, manifestMembers)
+	manifest, err := object(v, manifestMembers, "catalog")
 	if err != nil {
 		return err
 	}
 	if _, err := object(manifest["cedar_schema"], fileMembers); err != nil {
 		return fmt.Errorf("cedar_schema: %w", err)
+	}
+	if catalog, ok := manifest["catalog"]; ok {
+		if _, err := object(catalog, fileMembers); err != nil {
+			return fmt.Errorf("catalog: %w", err)
+		}
 	}
 	policies, ok := manifest["policies"].([]any)
 	if !ok {
@@ -431,22 +625,22 @@ func checkMembers(data []byte) error {
 	return nil
 }
 
-// object returns v as an object that has exactly the members named, none of
-// them null.
-func object(v any, members []string) (map[string]any, error) {
+// object returns v as an object that has exactly the members required, and
+// may have those optional, none of them null.
+func object(v any, required []string, optional ...string) (map[string]any, error) {
 	obj, ok := v.(map[string]any)
 	if !ok {
 		return nil, errors.New("not an object")
 	}
 	for name, value := range obj {
-		if !slices.Contains(members, name) {
+		if !slices.Contains(required, name) && !slices.Contains(optional, name) {
 			return nil, fmt.Errorf("unknown member %q", name)
 		}
 		if value == nil {
 			return nil, fmt.Errorf("member %q is null", name)
 		}
 	}
-	for _, name := range members {
+	for _, name := range required {
 		if _, ok := obj[name]; !ok {
 			return nil, fmt.Errorf("missing member %q", name)
 		}
@@ -467,6 +661,8 @@ func checkForms(m *Manifest) error {
 		return fmt.Errorf("created_at %q is not a time with milliseconds in UTC", m.CreatedAt)
 	case !sha256Form.MatchString(m.CedarSchema.SHA256):
 		return fmt.Errorf("cedar_schema.sha256 %q is not a SHA-256", m.CedarSchema.SHA256)
+	case m.Catalog != nil && !sha256Form.MatchString(m.Catalog.SHA256):
+		return fmt.Errorf("catalog.sha256 %q is not a SHA-256", m.Catalog.SHA256)
 	}
 	for i, p := range m.Policies {
 		switch n := utf8.RuneCountInString(p.Name); {

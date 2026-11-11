@@ -1288,3 +1288,44 @@ For the part, before it merges:
 - the vectors cover each answer above, on both stacks;
 - the stacks deny arguments that are not an object whatever the tool declares, and read absent arguments as an empty object;
 - the Python checker refuses a host with a code point that `unicodedata` does not know, as Go refuses one that its tables do not know, so that one stack never reads with two versions of Unicode.
+
+### 2026-11-11: step 12, part 3c: the Cedar schema, the catalog file and bundles with a catalog
+
+Part 3c brings RFC-0002's Cedar schema, the catalog file and its schema, and bundles with a catalog file to both stacks, with the refusal of a bundle manifest that is not I-JSON, the maintainer's decision of 2026-10-28. It regenerates the bundle vectors, which needs the endpoint security's exception.
+
+| What | Change |
+| --- | --- |
+| `whitetower.cedarschema` | RFC-0002's schema (its section 7.6), as section 6.7 states it: `Tool` in `McpServer`, with `origin`, `name`, `read_only`, `destructive` and `open_world` required and `server`, `transport` and `provider` optional; `Model` with `provider`, `name` and `endpoint` required; `ExposeContext` with `calls_decided`, `ModelContext` with `digest`; and the action `tool.expose`. `model.result` keeps the common context, and `ToolArgs` stays empty, since the core generates each bundle's schema from this one |
+| `catalog.schema.json` | New: the catalog file, `whitetower.catalog.v1` (section 7.7). Every member of the file, of its redaction rules and of its entries is required but those that depend on a tool's kind: an MCP tool carries `server`, a built-in tool `provider` and `type` and no `definition`, and any other tool none of them. An approved tool of another kind than built-in carries its `definition`. Arguments take the five types, a transform applies to `String` and `Set<String>` only, and a path holds no `.` or `:` |
+| `bundle-manifest.schema.json` | `catalog`, at `catalog.json`, known and not required; versions bounded at 2^53 - 1 |
+| `api/policy/policy.go` | Embeds `catalog.schema.json`, which the verifier reads at V7 |
+| The reference verifier, `bundle.go` | `ReadIJSON` reads the manifest and the catalog file as I-JSON, on the `canonical` package of part 3a-1. V4 refuses what it refuses as `invalid_manifest`, and knows the optional `catalog` with exactly `path` and `sha256`. V5 finds the catalog file at `catalog.json` only. V7 reads it as I-JSON and checks it against its schema, or `parse_error`. `Build` hashes the catalog file |
+| The Python checker | The same steps: `read_ijson`, with `exact_decimal` and `ijson_value` for numbers, `unique_members` and `ijson_strings`; the catalog's entry, path and file. It counts 600 vectors |
+| The bundle vectors | 30 new cases, 80 in all, below. Every bundle carries the catalog file of `valid` unless its case says otherwise, and the base policies name tools by their keys. The valid bundle's manifest hash is now `cbb392be26cd3e1733cee8537b89f6eccfb4e0e5e58fc8d26853aa70e4d1aab3`, and its size 9225 bytes |
+| `whitetower.bundle.activated.v1` | The example takes the valid bundle's reference |
+| Tests | `TestTheManifestSchemaAgreesWithStepV4` reads a manifest that is not I-JSON as matching no schema, but for its numbers, which the schema bounds. `TestReadIJSONReadsNumbersByTheirValue`, `TestReadIJSONRefusesWhatIsNotIJSON` and `FuzzReadIJSONNumbers`, which compares the reading of numbers with `math/big`'s rationals. `TestTheCatalogSchemaFollowsSection77` checks each rule of the catalog's schema both ways |
+
+| Step | New cases |
+| --- | --- |
+| V4, I-JSON | `duplicate-member`, `duplicate-format` (before `unsupported`), `duplicate-policy-member`; `version-beyond-max`, `version-beyond-max-with-exponent`, `version-beyond-max-with-fraction`, `policy-version-beyond-max`, `negative-version-beyond-max`, `version-rounded-by-a-double`; `lone-surrogate`, `noncharacter`; `max-version`, `version-with-exponent` and `version-with-zero-fraction`, activated |
+| V4, catalog | `null-catalog`, `unknown-catalog-member`, `missing-catalog-member`; `no-catalog`, activated |
+| V5 | `misplaced-catalog`, `missing-catalog`, `tampered-catalog`, `unlisted-catalog` |
+| V7 | `catalog-not-json`, `catalog-byte-order-mark`, `catalog-duplicate-member`, `catalog-unknown-member`, `catalog-other-format`, `catalog-unknown-type`, `catalog-missing-definition`; `empty-catalog`, activated |
+
+Details the list does not name:
+
+- **Numbers by their value.** Both stacks read a number's exact value from its digits and its exponent, whatever its spelling, so that `9.007199254740992e15` and `9007199254740992.0` are 2^53 and refused, and `4.2e1` and `42.0` are the integer 42, as JSON Schema reads them. Every number of a magnitude beyond 2^53 - 1 is refused, since every double of that size is an integer: `1.5e300` too. Any other number must be one that a double holds as written, as MAN-1's reader has it, so that `42.000000000000001`, which a double rounds to 42, is refused rather than read as a version. Neither `big.Rat` nor `Decimal` reads every exponent that JSON allows, so neither is used: `0e99999999999999999999` is 0.
+- **The stacks agree beyond the vectors.** 250,000 generated texts, 200,000 numbers of every spelling and 50,000 strings of surrogates and noncharacters, give the same outcome on both stacks, and the same canonical JSON when they are I-JSON. The fuzz test ran 1.1 million inputs.
+- **Re-encoding.** The Go verifier decodes the manifest from its canonical JSON, which writes each number as its value, since encoding/json takes `42.0` for no integer. It is safe because I-JSON numbers are held by a double as written.
+- **What no test observes.** `negative-version-beyond-max`, since a version below 1 is refused anyway; in Go, `missing-catalog-member`, since an empty `sha256` fails its form too; in Python, the check that a double holds a number as written, since a fraction is never an `int`, which a version must be.
+
+For the reviewer, with options in the pull request's description:
+
+- **Strings.** V4 refuses lone surrogates and noncharacters as not I-JSON, as RFC 7493 does and as MAN-1's reader already does; section 1 names neither.
+- **The catalog file as I-JSON.** V7 reads the catalog file as V4 reads the manifest, so that a member name twice, such as an `enabled` given as `false` and then `true`, is `parse_error`; section 7.7 says only that it parses against its schema.
+- **Rules of the catalog's schema beyond section 7.7's text.** An approved tool other than a built-in one needs its `definition`; URL prefixes take the shape of a normalized `http` or `https` URL that ends with `/`; a flag name never starts with `-` nor holds `=`, since it could never match.
+- **Two entries with one key or one reference.** No schema can refuse them, and the specification does not say which an enforcement point uses.
+- **The JWS header.** V2 counts the header's members after both stacks have kept the last of a name given twice.
+- **Numbers spelled otherwise.** A version written `42.0` or `4.2e1` is activated, as the schema's `integer` reads it; refusing it would deny more, but changes the contract.
+
+For the specification, which is the reviewer's: section 9.1 counts 80 bundle vectors, and appendix A takes the valid bundle, `cbb392be…`, of 9225 bytes.

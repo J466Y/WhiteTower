@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "White Tower catalog file",
+  "description": "An agent's catalog file, catalog.json, format whitetower.catalog.v1: the MCP servers, tools and models enabled for the agent and those observed for it, and the deployment's redaction rules (docs/contracts/module-contract-v0.1.md, section 7.7). A closed document: step V7 refuses a file that does not match this schema (parse_error).",
+  "type": "object",
+  "required": ["format", "redaction", "servers", "tools", "models"],
+  "additionalProperties": false,
+  "properties": {
+    "format": { "const": "whitetower.catalog.v1" },
+    "redaction": {
+      "description": "The deployment's redaction rules, which EP-14 applies beyond its own.",
+      "type": "object",
+      "required": ["url_prefixes", "flags"],
+      "additionalProperties": false,
+      "properties": {
+        "url_prefixes": {
+          "description": "Normalized http or https URLs that end with /, after each of which the next path segment is a secret. A normalized URL has a lowercase scheme and host, no user information, query or fragment, and a path that RFC 3986 allows.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^https?://[a-z0-9._:\\[\\]-]+/([A-Za-z0-9._~!&'()*+,;=:@%-]*/)*$" }
+        },
+        "flags": {
+          "description": "Names of flags whose values are secrets, matched exactly against a flag's name, which follows its leading dashes and ends before its first =: a name that starts with - or holds = would never match.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[^=-][^=]*$" }
+        }
+      }
+    },
+    "servers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "reference", "transport", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "$ref": "#/$defs/serverKey" },
+          "reference": { "description": "The server's reference, as section 4.10 computes it.", "type": "string", "minLength": 1 },
+          "transport": { "enum": ["stdio", "http"] },
+          "status": { "$ref": "#/$defs/status" }
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "description": "A tool, which carries what makes up its reference (section 4.10): an MCP tool its server and its name, a built-in tool its provider, its type and its name, and any other tool its name alone.",
+        "type": "object",
+        "required": ["key", "name", "kind", "origin", "status", "enabled", "read_only", "destructive", "open_world"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "server": { "$ref": "#/$defs/serverKey" },
+          "provider": { "type": "string", "minLength": 1 },
+          "type": { "description": "A built-in tool's type, as its provider names it.", "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["function", "mcp", "builtin", "http", "other"] },
+          "origin": { "enum": ["agent", "provider"] },
+          "status": { "$ref": "#/$defs/status" },
+          "enabled": { "type": "boolean" },
+          "definition": { "description": "The pinned definition hash.", "$ref": "#/$defs/sha256" },
+          "read_only": { "type": "boolean" },
+          "destructive": { "type": "boolean" },
+          "open_world": { "type": "boolean" },
+          "args": {
+            "description": "The tool's arguments that policies may see (section 6.11).",
+            "type": "array",
+            "items": { "$ref": "#/$defs/argument" }
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "kind": { "const": "mcp" } } },
+            "then": { "required": ["server"], "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["type"] }] } },
+            "else": { "not": { "required": ["server"] } }
+          },
+          {
+            "description": "A built-in tool has no definition, and an approved tool of any other kind has its definition pinned: a tool without a definition hash can never be approved (section 4.10).",
+            "if": { "properties": { "kind": { "const": "builtin" } } },
+            "then": { "required": ["provider", "type"], "not": { "required": ["definition"] } },
+            "else": {
+              "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["type"] }] },
+              "if": { "properties": { "status": { "const": "approved" } } },
+              "then": { "required": ["definition"] }
+            }
+          }
+        ]
+      }
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "provider", "endpoint", "name", "status", "enabled"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "provider": { "type": "string", "minLength": 1 },
+          "endpoint": { "description": "The normalized base URL of the endpoint (section 4.10).", "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "status": { "$ref": "#/$defs/status" },
+          "enabled": { "type": "boolean" },
+          "digest": { "description": "The pinned digest of the model's weights.", "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "serverKey": {
+      "description": "A server's key: a slug of lowercase letters, digits and hyphens, of at most 63 characters (section 4.10).",
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,63}$"
+    },
+    "status": { "enum": ["discovered", "approved"] },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "argument": {
+      "description": "A declared argument: its name, which is its key in the tool's record of context.args, its path in the call's arguments, through objects only, its transform, and its type as Cedar names it. A property whose name holds . or : cannot be declared, and a transform applies to strings only.",
+      "type": "object",
+      "required": ["name", "path", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[^.:]*(\\.[^.:]*)*(:(lowercase|path|url_host|email_domain))?$" },
+        "path": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[^.:]*$" } },
+        "transform": { "enum": ["lowercase", "path", "url_host", "email_domain"] },
+        "type": { "enum": ["String", "Long", "Bool", "Set<String>", "Set<Long>"] }
+      },
+      "if": { "required": ["transform"] },
+      "then": { "properties": { "type": { "enum": ["String", "Set<String>"] } } }
+    }
+  }
+}

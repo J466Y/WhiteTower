@@ -4,9 +4,107 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"fmt"
+	"math/big"
+	"regexp"
 	"slices"
+	"strconv"
 	"testing"
 )
+
+// TestReadIJSONReadsNumbersByTheirValue checks that the JSON of a bundle
+// reads a number by its exact value, whatever its spelling (section 1): an
+// integer has a magnitude of at most 2^53 - 1, written with an exponent or a
+// fraction of zeros too, and any other number is one that a double holds as
+// written. The canonical JSON writes each by its value.
+func TestReadIJSONReadsNumbersByTheirValue(t *testing.T) {
+	for _, c := range []struct{ number, canonical string }{
+		{"9007199254740991", "9007199254740991"},
+		{"-9007199254740991.000", "-9007199254740991"},
+		{"9.007199254740991e15", "9007199254740991"},
+		{"4.2e1", "42"},
+		{"4200E-2", "42"},
+		{"0.042e+3", "42"},
+		{"-0", "0"},
+		{"0.0e-7", "0"},
+		{"0e99999999999999999999", "0"},
+		{"0.1", "0.1"},
+		{"5e-324", "5e-324"},
+		{"1.5e-7", "1.5e-7"},
+		// Refused: integers beyond 2^53 - 1, and numbers that no double
+		// holds as written.
+		{"9007199254740992", ""},
+		{"-9007199254740992", ""},
+		{"9.007199254740992e15", ""},
+		{"9007199254740992.0", ""},
+		{"90071992547409920e-1", ""},
+		{"1.5e300", ""},
+		{"1e400", ""},
+		{"1e99999999999999999999", ""},
+		{"42.000000000000001", ""},
+		{"0.10000000000000001", ""},
+		{"1e-400", ""},
+		{"1e-99999999999999999999", ""},
+	} {
+		got, err := ReadIJSON([]byte("[" + c.number + "]"))
+		switch {
+		case c.canonical == "" && err == nil:
+			t.Errorf("%s: read as %s, want it refused", c.number, got)
+		case c.canonical != "" && (err != nil || string(got) != "["+c.canonical+"]"):
+			t.Errorf("%s: got %s, %v; want [%s]", c.number, got, err, c.canonical)
+		}
+	}
+}
+
+// TestReadIJSONRefusesWhatIsNotIJSON checks the rest of I-JSON (RFC 7493):
+// member names once, at any depth, and strings without a lone surrogate or a
+// noncharacter, in names too.
+func TestReadIJSONRefusesWhatIsNotIJSON(t *testing.T) {
+	for _, c := range []struct {
+		text string
+		ok   bool
+	}{
+		{`{"a":1,"b":{"a":1}}`, true},
+		{`["😀","😀"]`, true},
+		{`{"a":1,"a":1}`, false},
+		{`[{"b":{"a":1,"a":2}}]`, false},
+		{`["\ud800"]`, false},
+		{`["\udc00\ud800"]`, false},
+		{`{"￾":1}`, false},
+		{`["﷯"]`, false},
+		{`["􏿿"]`, false},
+		{"[\"\U0001FFFF\"]", false},
+		{"\xef\xbb\xbf[]", false},
+	} {
+		if _, err := ReadIJSON([]byte(c.text)); (err == nil) != c.ok {
+			t.Errorf("%s: error %v, want I-JSON %v", c.text, err, c.ok)
+		}
+	}
+}
+
+// FuzzReadIJSONNumbers checks the reading of numbers against math/big's exact
+// rationals, for every number whose exponent big.Rat reads.
+func FuzzReadIJSONNumbers(f *testing.F) {
+	for _, seed := range []string{"9007199254740991", "9.007199254740992e15", "4.2e1", "-0", "0.1", "1e-400", "42.000000000000001", "5e-324"} {
+		f.Add(seed)
+	}
+	number := regexp.MustCompile(`^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][-+]?[0-9]+)?$`)
+	maxInt := new(big.Rat).SetInt64(maxInteger)
+	f.Fuzz(func(t *testing.T, n string) {
+		exact, ok := new(big.Rat).SetString(n)
+		if !number.MatchString(n) || !ok {
+			return
+		}
+		want := new(big.Rat).Abs(exact).Cmp(maxInt) <= 0
+		if !exact.IsInt() {
+			f, _ := strconv.ParseFloat(n, 64)
+			held, ok := new(big.Rat).SetString(strconv.FormatFloat(f, 'g', -1, 64))
+			want = ok && held.Cmp(exact) == 0
+		}
+		if _, err := ReadIJSON([]byte("[" + n + "]")); (err == nil) != want {
+			t.Errorf("%s: error %v, want I-JSON %v", n, err, want)
+		}
+	})
+}
 
 // TestParseKeysIgnoresTheKeysItCannotUse checks section 7.3's JWK Set: the
 // verifier trusts the OKP keys on Ed25519 that carry a key ID and a public key
