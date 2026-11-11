@@ -608,7 +608,9 @@ func (ps *PrincipalStore) deactivateTx(ctx context.Context, tx *db.Tx, id uuid.U
 		return fmt.Errorf("updating principal status: %w", err)
 	}
 
-	// Revoke all sessions within the transaction.
+	// Revoke all sessions within the transaction, before the API tokens: in
+	// the order in which an emergency revocation locks them, so that the two
+	// never deadlock (LockSessionsAndAPITokens).
 	if err := ps.sessionStore.RevokeAllForPrincipalTx(ctx, tx, id); err != nil {
 		return fmt.Errorf("revoking sessions for deactivated principal: %w", err)
 	}

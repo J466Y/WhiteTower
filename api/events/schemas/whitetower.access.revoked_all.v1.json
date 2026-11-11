@@ -21,12 +21,12 @@
       "maxLength": 1000
     },
     "sessions": {
-      "description": "How many sessions it ended, of those that were neither revoked nor expired.",
+      "description": "How many sessions it revoked: those that were not revoked before, expired ones included, since another replica's clock may not have reached their expiry.",
       "type": "integer",
       "minimum": 0
     },
     "tokens": {
-      "description": "How many API tokens it ended, of those that were neither revoked nor expired.",
+      "description": "How many API tokens it revoked: those that were not revoked before, expired ones included.",
       "type": "integer",
       "minimum": 0
     }

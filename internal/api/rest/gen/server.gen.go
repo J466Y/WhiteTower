@@ -994,10 +994,10 @@ type EmergencyRevocation struct {
 	// RevokedAt When it ended them. A session or a token created later was not ended.
 	RevokedAt time.Time `json:"revokedAt"`
 
-	// Sessions How many sessions it ended, of those that were neither revoked nor expired.
+	// Sessions How many sessions it revoked, of those not revoked before, expired ones included.
 	Sessions int64 `json:"sessions"`
 
-	// Tokens How many API tokens it ended, of those that were neither revoked nor expired.
+	// Tokens How many API tokens it revoked, of those not revoked before, expired ones included.
 	Tokens int64 `json:"tokens"`
 }
 

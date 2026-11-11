@@ -433,6 +433,21 @@ func TestOnlyTheAdministratorsSessionAndBreakglassRevokeEverything(t *testing.T)
 	}
 }
 
+// Security test ST-89: every permission may be an API token's scope but the
+// emergency revocation's, which no token can use, and nothing else is one
+func TestEveryPermissionButTheEmergencyRevocationIsATokenScope(t *testing.T) {
+	for _, p := range AllPermissions() {
+		if IsTokenScope(p) != (p != PermissionIdentityEmergencyRevoke) {
+			t.Errorf("%s: a token scope %v", p, IsTokenScope(p))
+		}
+	}
+	for _, p := range []Permission{"*", "", "identity.unknown"} {
+		if IsTokenScope(p) {
+			t.Errorf("%q is a token scope", p)
+		}
+	}
+}
+
 func TestPermissionsList(t *testing.T) {
 	perms := PermissionsList([]string{string(RoleAdmin)})
 	if !slices.Contains(perms, string(PermissionSettingsManage)) {

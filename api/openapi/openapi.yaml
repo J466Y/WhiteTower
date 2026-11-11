@@ -121,6 +121,8 @@ paths:
         creates it: each scope must be a permission of the token's principal
         and of the caller, and one of the scopes of the caller's own token when
         the caller uses one; otherwise the request is refused (`forbidden`).
+        No token holds `identity.emergency.revoke`, which no token can use:
+        that scope is `bad_request`, as an unknown one is.
       tags: [tokens]
       requestBody:
         required: true
@@ -250,8 +252,10 @@ paths:
         Ends, at once and for a reason, every session and every API token,
         of people and of service accounts, the CLI's tokens included, so that
         nothing that a compromised identity provider let someone obtain
-        outlives it (HUM-10). Principals and their roles stay: everyone signs
-        in again, and the integrations' tokens are created again. The
+        outlives it (HUM-10). It revokes every one that is not revoked yet,
+        expired ones included, since the clock of another replica may not
+        have reached their expiry. Principals and their roles stay: everyone
+        signs in again, and the integrations' tokens are created again. The
         caller's own session ends too, unless it is a break-glass session:
         the answer then clears the session cookie, as a sign-out does. Every
         other break-glass session ends.
@@ -1677,12 +1681,12 @@ components:
           type: integer
           format: int64
           minimum: 0
-          description: How many sessions it ended, of those that were neither revoked nor expired.
+          description: How many sessions it revoked, of those not revoked before, expired ones included.
         tokens:
           type: integer
           format: int64
           minimum: 0
-          description: How many API tokens it ended, of those that were neither revoked nor expired.
+          description: How many API tokens it revoked, of those not revoked before, expired ones included.
         revokedAt:
           type: string
           format: date-time

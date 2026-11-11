@@ -45,8 +45,8 @@ func breakglassService(t *testing.T, clk *clocktest.Fake, database *db.DB, sessi
 // Security test ST-89: an emergency revocation ends every session and API
 // token, of people and of service accounts, the CLI's tokens and the other
 // break-glass sessions included, but the break-glass session that runs it;
-// an administrator's own session ends. Revoked and expired ones are left as
-// they were, and principals and their roles stay. Each run records its event,
+// an administrator's own session ends. A token revoked before keeps its
+// revocation, and principals and their roles stay. Each run records its event,
 // with how many it ended, and raises the alert; a second run ends nothing new
 func TestAnEmergencyRevocationEndsEverySessionAndToken(t *testing.T) {
 	ctx := context.Background()
@@ -77,19 +77,15 @@ func TestAnEmergencyRevocationEndsEverySessionAndToken(t *testing.T) {
 		return created
 	}
 
-	// What is no longer valid stays as it was: a session and a token that
-	// expired, and a token revoked before.
-	otto, staleSession := person("usr-otto", "owner")
-	staleToken := token(otto, time.Minute)
+	otto, ottoSession := person("usr-otto", "owner")
 	revokedToken := token(otto, time.Hour)
 	if err := tokens.Revoke(ctx, revokedToken.ID, otto, "rotated"); err != nil {
 		t.Fatal(err)
 	}
 	revokedAt := clk.Now().UTC()
-	clk.Advance(31 * time.Minute)
+	clk.Advance(time.Minute)
 
 	ada, adaSession := person("usr-ada", "admin")
-	_, ottoSession := person("usr-otto", "owner")
 	bot, err := principals.CreateServiceAccount(ctx, "Otto's bot", nil, []string{"owner"}, otto)
 	if err != nil {
 		t.Fatal(err)
@@ -126,12 +122,6 @@ func TestAnEmergencyRevocationEndsEverySessionAndToken(t *testing.T) {
 	}
 	if _, err := sessions.Get(ctx, running); err != nil {
 		t.Errorf("the break-glass session that ran it: %v, want it valid", err)
-	}
-	if _, err := sessions.Get(ctx, staleSession.Token); !errors.Is(err, authn.ErrSessionExpired) {
-		t.Errorf("an expired session: %v, want it expired, not revoked", err)
-	}
-	if _, _, err := tokens.GetByToken(ctx, staleToken.Token); !errors.Is(err, authn.ErrTokenExpired) {
-		t.Errorf("an expired token: %v, want it expired, not revoked", err)
 	}
 	if listed, err := tokens.ListByPrincipal(ctx, uuid.MustParse(otto.ID)); err != nil || !slices.ContainsFunc(listed, func(tok *authn.APIToken) bool {
 		return tok.ID == revokedToken.ID && tok.RevokedAt != nil && tok.RevokedAt.Equal(revokedAt)
@@ -188,6 +178,88 @@ func TestAnEmergencyRevocationEndsEverySessionAndToken(t *testing.T) {
 	}
 	if n := strings.Count(logs.String(), `"level":"ERROR","msg":"SECURITY ALERT: emergency revocation ended every session and API token"`); n != 3 {
 		t.Errorf("%d alerts logged, want 3:\n%s", n, logs.String())
+	}
+}
+
+// Security test ST-89: an emergency revocation ends the sessions and the
+// tokens that have expired on its replica's clock but not on another's. That
+// replica refuses them as revoked, and does not slide the session's idle
+// expiry, as a request that read the session just before the revocation
+// would once it commits, if the revocation had left it.
+func TestAnEmergencyRevocationEndsWhatAnotherReplicaStillAccepts(t *testing.T) {
+	ctx := context.Background()
+	// Replica B, whose clock is behind replica A's, which revokes.
+	clkB := clocktest.New(testEpoch)
+	sessionsB, principals, tokensB, database := setupAuthn(t, clkB)
+	clkA := clocktest.New(testEpoch.Add(31 * time.Minute))
+	sessionsA := authn.NewSessionStore(database, clkA, audit.NewWriter(mustCatalog(t), clkA), authn.SessionOptions{IdleTimeout: 30 * time.Minute})
+	ada, err := principals.SignIn(ctx, "oidc", authn.Identity{Issuer: "https://idp.example.com", Subject: "usr-ada", ExternalID: "usr-ada", DisplayName: "Ada"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The session's idle expiry and the token's expiry fall at 30 minutes,
+	// past A's clock and not B's.
+	session, err := sessionsB.Create(ctx, ada.ID, "oidc", []string{"admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := auth.Principal{ID: ada.ID.String(), Kind: auth.Human, Roles: []string{"admin"}}
+	token, err := tokensB.CreateWithLifetime(ctx, ada.ID, "key", []string{string(authz.PermissionIdentityMeRead)}, 30*time.Minute, actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clkB.Advance(29 * time.Minute)
+	caller, err := sessionsA.Create(ctx, ada.ID, "oidc", []string{"admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	revoked, err := authn.NewEmergencyRevocation(sessionsA, slog.New(slog.DiscardHandler)).Revoke(ctx, caller, "INC-2041")
+	if err != nil || revoked.Sessions != 2 || revoked.Tokens != 1 {
+		t.Errorf("the revocation: %+v, %v, want the caller's session, the session and the token ended", revoked, err)
+	}
+	if _, err := sessionsB.Get(ctx, session.Token); !errors.Is(err, authn.ErrSessionRevoked) {
+		t.Errorf("the session on replica B: %v, want it revoked", err)
+	}
+	var idle time.Time
+	if err := database.QueryRow(ctx, "SELECT idle_expires_at FROM whitetower.sessions WHERE id_hash = $1", session.IDHash).Scan(&idle); err != nil || !idle.Equal(session.IdleExpiresAt) {
+		t.Errorf("the session's idle expiry: %v, %v, want %v, not slid", idle, err, session.IdleExpiresAt)
+	}
+	if _, _, err := tokensB.GetByToken(ctx, token.Token); !errors.Is(err, authn.ErrTokenRevoked) {
+		t.Errorf("the token on replica B: %v, want it revoked", err)
+	}
+}
+
+// Security test ST-89: no API token carries the permission to end every
+// session and API token. A token that asks for it is refused, as for any
+// invalid scope, and the CLI's exchange gives an administrator every other
+// permission of the role.
+func TestNoTokenCarriesTheEmergencyRevocation(t *testing.T) {
+	ctx := context.Background()
+	idp := newMockIDP(t)
+	clk := clocktest.New(testEpoch)
+	sessions, principals, tokens, _ := setupAuthn(t, clk)
+	svc := newService(t, authn.OIDCOptions{
+		Issuer: idp.server.URL, ClientID: "whitetower-console", ClientSecret: "test-secret",
+		RedirectURL: "https://127.0.0.1:8443/auth/callback", Clock: clk, AllowedAlgorithms: []string{"RS256"},
+		RoleMapping: map[string]string{"wt-admins": "admin"}, Tokens: tokens,
+	}, principals, sessions)
+	exchanged, err := svc.ExchangeIDToken(ctx, exchangeToken(idp, clk, map[string]any{"sub": "usr-ada", "groups": []string{"wt-admins"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"identity.me.read", "identity.tokens.manage", "inventory.view", "settings.manage"}; !slices.Equal(exchanged.Scopes, want) {
+		t.Errorf("an administrator's token of the exchange: scopes %v, want %v", exchanged.Scopes, want)
+	}
+	ada := auth.Principal{ID: exchanged.PrincipalID.String(), Kind: auth.Human, Roles: []string{"admin"}}
+	revoke := string(authz.PermissionIdentityEmergencyRevoke)
+	for _, scopes := range [][]string{{revoke}, {string(authz.PermissionIdentityMeRead), revoke}} {
+		if _, err := tokens.Create(ctx, exchanged.PrincipalID, "key", scopes, 1, ada); err == nil || err.Error() != `invalid scope "identity.emergency.revoke"` {
+			t.Errorf("a token with the scopes %v: %v, want the scope refused", scopes, err)
+		}
+	}
+	if listed, err := tokens.ListByPrincipal(ctx, exchanged.PrincipalID); err != nil || len(listed) != 1 {
+		t.Errorf("the administrator's tokens: %d, %v, want the exchange's alone", len(listed), err)
 	}
 }
 

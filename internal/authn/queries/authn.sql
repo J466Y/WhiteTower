@@ -157,27 +157,31 @@ SET revoked_at = $2
 WHERE principal_id = $1 AND revoked_at IS NULL;
 
 -- name: LockSessionsAndAPITokens :exec
--- Locks the sessions and the API tokens until the transaction ends against
+-- Locks the sessions, then the API tokens, until the transaction ends against
 -- every insert, update and delete, on every replica, and against another
 -- transaction that takes this lock: a sign-in or an exchange that has written
 -- its session or token commits before the lock is granted, and one that has
--- not waits until the transaction ends. Reads go on.
+-- not waits until the transaction ends. Reads go on. Every transaction that
+-- writes both tables writes the sessions first, in this order, so that none
+-- deadlocks with this one: the deactivation of a principal, and a sign-in
+-- through the CLI's exchange that changes the person's groups.
 LOCK TABLE whitetower.sessions, whitetower.api_tokens IN SHARE ROW EXCLUSIVE MODE;
 
--- name: RevokeAllActiveSessions :execrows
--- Revokes every session that is neither revoked nor expired, but the one whose
--- hash is keep, when it is set.
+-- name: RevokeAllSessions :execrows
+-- Revokes every session that is not revoked yet, expired ones included, but
+-- the one whose hash is keep, when it is set. A session that has expired on
+-- this replica's clock may not have on another's, whose request that read it
+-- just before would then slide its idle expiry once this commits.
 UPDATE whitetower.sessions
 SET revoked_at = sqlc.arg(revoked_at)
-WHERE revoked_at IS NULL
-  AND idle_expires_at >= sqlc.arg(revoked_at) AND absolute_expires_at >= sqlc.arg(revoked_at)
-  AND id_hash IS DISTINCT FROM sqlc.narg(keep);
+WHERE revoked_at IS NULL AND id_hash IS DISTINCT FROM sqlc.narg(keep);
 
--- name: RevokeAllActiveAPITokens :execrows
--- Revokes every API token that is neither revoked nor expired.
+-- name: RevokeAllAPITokens :execrows
+-- Revokes every API token that is not revoked yet, expired ones included, as
+-- another replica's clock may not have reached their expiry.
 UPDATE whitetower.api_tokens
-SET revoked_at = sqlc.arg(revoked_at)
-WHERE revoked_at IS NULL AND expires_at >= sqlc.arg(revoked_at);
+SET revoked_at = $1
+WHERE revoked_at IS NULL;
 
 -- name: ListAPITokensByPrincipal :many
 SELECT * FROM whitetower.api_tokens

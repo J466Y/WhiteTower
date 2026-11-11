@@ -16,10 +16,11 @@ import (
 // on one replica ends, on every replica, every session and API token: an
 // administrator's session, another break-glass session, the CLI's token, a
 // service account's token and the administrator's own token; the break-glass
-// session that runs it stays, also on a replica without OIDC. A token is
-// refused it whatever its scopes, and so is a request without the session's
-// CSRF token or without a reason. An administrator who runs it ends their
-// own session, and the answer clears its cookie. Each run logs the alert
+// session that runs it stays, also on a replica without OIDC. No token holds
+// its permission, neither the CLI's nor one that the administrator creates,
+// and a token is refused it whatever its scopes, as is a request without the
+// session's CSRF token or without a reason. An administrator who runs it ends
+// their own session, and the answer clears its cookie. Each run logs the alert
 func TestAnEmergencyRevocationEndsEverySessionAndTokenOnEveryReplica(t *testing.T) {
 	credential, hash, err := authn.GenerateBreakglassCredential()
 	if err != nil {
@@ -100,6 +101,9 @@ func TestAnEmergencyRevocationEndsEverySessionAndTokenOnEveryReplica(t *testing.
 		"exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(),
 	})+`"}`, jsonBody)
 	cliToken := bearer(exchanged)
+	if strings.Contains(exchanged, "identity.emergency.revoke") {
+		t.Errorf("the CLI's token of an administrator holds the emergency revocation: %s", exchanged)
+	}
 	_, account := call(t, http.StatusCreated, http.MethodPost, withOIDC.console+"/api/v1/service-accounts", `{"displayName":"Sync bot","roles":["admin"]}`, admin.change)
 	var bot struct{ ID string }
 	if err := json.Unmarshal([]byte(account), &bot); err != nil {
@@ -108,10 +112,14 @@ func TestAnEmergencyRevocationEndsEverySessionAndTokenOnEveryReplica(t *testing.
 	_, created := call(t, http.StatusCreated, http.MethodPost, withOIDC.console+"/api/v1/tokens",
 		`{"name":"bot key","scopes":["identity.me.read"],"principalId":"`+bot.ID+`"}`, admin.change)
 	botsToken := bearer(created)
-	// The administrator's own token holds every permission they hold, the
-	// emergency revocation's included.
+	// No token holds the emergency revocation's permission; the
+	// administrator's own token holds every other permission they hold.
+	if _, refused := call(t, http.StatusBadRequest, http.MethodPost, withOIDC.console+"/api/v1/tokens",
+		`{"name":"revoker","scopes":["identity.emergency.revoke"]}`, admin.change); !strings.Contains(refused, `invalid scope \"identity.emergency.revoke\"`) {
+		t.Errorf("a token with the emergency revocation's permission: %s", refused)
+	}
 	_, created = call(t, http.StatusCreated, http.MethodPost, withOIDC.console+"/api/v1/tokens",
-		`{"name":"everything","scopes":["identity.emergency.revoke","identity.me.read","identity.tokens.manage","inventory.view","settings.manage"]}`, admin.change)
+		`{"name":"everything","scopes":["identity.me.read","identity.tokens.manage","inventory.view","settings.manage"]}`, admin.change)
 	adminsToken := bearer(created)
 	running, other := custodian(withoutOIDC), custodian(withOIDC)
 

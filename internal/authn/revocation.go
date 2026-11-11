@@ -27,7 +27,7 @@ var ErrInvalidReason = fmt.Errorf("the reason is required, and holds at most %d 
 // Revocation is what an emergency revocation ended.
 type Revocation struct {
 	// Sessions and Tokens count the sessions and the API tokens that it
-	// revoked, of those that were neither revoked nor expired.
+	// revoked: those that were not revoked before, expired ones included.
 	Sessions, Tokens int64
 	// At is when it revoked them.
 	At time.Time
@@ -63,6 +63,12 @@ func NewEmergencyRevocation(sessions *SessionStore, logger *slog.Logger) *Emerge
 // role bindings stay. Once it commits, it raises a security alert, as a
 // break-glass use does, whoever ran it.
 //
+// It revokes every session and token that is not revoked yet, as the
+// deactivation of a principal does, expired ones included: one that has
+// expired on this replica's clock may not have on another's, and a request
+// that read a session there just before would slide its idle expiry once
+// this commits.
+//
 // The transaction first locks the sessions and the API tokens against
 // inserts and updates (LockSessionsAndAPITokens), so that no session or token
 // that another replica creates while it runs survives it once its creation
@@ -91,11 +97,11 @@ func (e *EmergencyRevocation) Revoke(ctx context.Context, caller *Session, reaso
 		// Read once the lock is granted: no session or token is created
 		// from then until the commit.
 		now := s.clk.Now().UTC()
-		sessions, err := q.RevokeAllActiveSessions(ctx, authndb.RevokeAllActiveSessionsParams{RevokedAt: &now, Keep: keep})
+		sessions, err := q.RevokeAllSessions(ctx, authndb.RevokeAllSessionsParams{RevokedAt: &now, Keep: keep})
 		if err != nil {
 			return fmt.Errorf("revoking every session: %w", err)
 		}
-		tokens, err := q.RevokeAllActiveAPITokens(ctx, &now)
+		tokens, err := q.RevokeAllAPITokens(ctx, &now)
 		if err != nil {
 			return fmt.Errorf("revoking every API token: %w", err)
 		}

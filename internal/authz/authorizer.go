@@ -140,17 +140,16 @@ func (az *Authorizer) Authorize(ctx context.Context, p *auth.Principal, operatio
 	}
 
 	// An emergency revocation (HUM-10, ST-89) is the break-glass custodian's,
-	// by the session, and the platform administrator's, by role, below. It is
-	// never an API token's, whatever its scopes hold, even an administrator's:
-	// a token that someone obtained through a compromised identity provider
-	// must not end the sessions of the people who answer the incident.
-	if perm == PermissionIdentityEmergencyRevoke {
-		if p.IsBreakglass {
-			return nil
-		}
-		if p.Scopes != nil {
-			return auth.ErrDenied
-		}
+	// by the session, and the platform administrator's, by role, below.
+	if perm == PermissionIdentityEmergencyRevoke && p.IsBreakglass {
+		return nil
+	}
+	// A permission that is no token scope is never an API token's, whatever
+	// its scopes hold, even an administrator's: a token that someone obtained
+	// through a compromised identity provider must not end the sessions of
+	// the people who answer the incident.
+	if p.Scopes != nil && !p.IsBreakglass && !IsTokenScope(perm) {
+		return auth.ErrDenied
 	}
 
 	// Enforce break-glass restrictions (ST-20): besides an emergency

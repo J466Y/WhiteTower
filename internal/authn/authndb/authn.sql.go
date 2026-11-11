@@ -817,11 +817,14 @@ const lockSessionsAndAPITokens = `-- name: LockSessionsAndAPITokens :exec
 LOCK TABLE whitetower.sessions, whitetower.api_tokens IN SHARE ROW EXCLUSIVE MODE
 `
 
-// Locks the sessions and the API tokens until the transaction ends against
+// Locks the sessions, then the API tokens, until the transaction ends against
 // every insert, update and delete, on every replica, and against another
 // transaction that takes this lock: a sign-in or an exchange that has written
 // its session or token commits before the lock is granted, and one that has
-// not waits until the transaction ends. Reads go on.
+// not waits until the transaction ends. Reads go on. Every transaction that
+// writes both tables writes the sessions first, in this order, so that none
+// deadlocks with this one: the deactivation of a principal, and a sign-in
+// through the CLI's exchange that changes the person's groups.
 func (q *Queries) LockSessionsAndAPITokens(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, lockSessionsAndAPITokens)
 	return err
@@ -895,38 +898,39 @@ func (q *Queries) RevokeActiveSession(ctx context.Context, arg RevokeActiveSessi
 	return i, err
 }
 
-const revokeAllActiveAPITokens = `-- name: RevokeAllActiveAPITokens :execrows
+const revokeAllAPITokens = `-- name: RevokeAllAPITokens :execrows
 UPDATE whitetower.api_tokens
 SET revoked_at = $1
-WHERE revoked_at IS NULL AND expires_at >= $1
+WHERE revoked_at IS NULL
 `
 
-// Revokes every API token that is neither revoked nor expired.
-func (q *Queries) RevokeAllActiveAPITokens(ctx context.Context, revokedAt *time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeAllActiveAPITokens, revokedAt)
+// Revokes every API token that is not revoked yet, expired ones included, as
+// another replica's clock may not have reached their expiry.
+func (q *Queries) RevokeAllAPITokens(ctx context.Context, revokedAt *time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAllAPITokens, revokedAt)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const revokeAllActiveSessions = `-- name: RevokeAllActiveSessions :execrows
+const revokeAllSessions = `-- name: RevokeAllSessions :execrows
 UPDATE whitetower.sessions
 SET revoked_at = $1
-WHERE revoked_at IS NULL
-  AND idle_expires_at >= $1 AND absolute_expires_at >= $1
-  AND id_hash IS DISTINCT FROM $2
+WHERE revoked_at IS NULL AND id_hash IS DISTINCT FROM $2
 `
 
-type RevokeAllActiveSessionsParams struct {
+type RevokeAllSessionsParams struct {
 	RevokedAt *time.Time
 	Keep      []byte
 }
 
-// Revokes every session that is neither revoked nor expired, but the one whose
-// hash is keep, when it is set.
-func (q *Queries) RevokeAllActiveSessions(ctx context.Context, arg RevokeAllActiveSessionsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeAllActiveSessions, arg.RevokedAt, arg.Keep)
+// Revokes every session that is not revoked yet, expired ones included, but
+// the one whose hash is keep, when it is set. A session that has expired on
+// this replica's clock may not have on another's, whose request that read it
+// just before would then slide its idle expiry once this commits.
+func (q *Queries) RevokeAllSessions(ctx context.Context, arg RevokeAllSessionsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAllSessions, arg.RevokedAt, arg.Keep)
 	if err != nil {
 		return 0, err
 	}

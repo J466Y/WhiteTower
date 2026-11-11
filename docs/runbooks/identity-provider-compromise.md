@@ -35,7 +35,7 @@ curl -X POST https://whitetower.example.com/api/v1/emergency-revocation \
 ```
 
 - It ends every session and every API token, of people and of service accounts, the CLI's included, on every replica. The other break-glass sessions end too. Only your break-glass session stays, so that you can go on halting agents while the provider is fixed.
-- The answer says how many sessions and tokens it ended. The audit log records `whitetower.access.revoked_all.v1`, and the server logs a security alert.
+- The answer says how many sessions and tokens it revoked, of those not revoked before, expired ones included. The audit log records `whitetower.access.revoked_all.v1`, and the server logs a security alert.
 - Principals and their roles stay. Running it again ends what was created since, and is recorded again.
 - No API token can run it, whatever its scopes. The platform administrator can, from a session, but only break-glass sessions exist while OIDC is off.
 

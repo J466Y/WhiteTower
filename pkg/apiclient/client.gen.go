@@ -993,10 +993,10 @@ type EmergencyRevocation struct {
 	// RevokedAt When it ended them. A session or a token created later was not ended.
 	RevokedAt time.Time `json:"revokedAt"`
 
-	// Sessions How many sessions it ended, of those that were neither revoked nor expired.
+	// Sessions How many sessions it revoked, of those not revoked before, expired ones included.
 	Sessions int64 `json:"sessions"`
 
-	// Tokens How many API tokens it ended, of those that were neither revoked nor expired.
+	// Tokens How many API tokens it revoked, of those not revoked before, expired ones included.
 	Tokens int64 `json:"tokens"`
 }
 
@@ -2345,8 +2345,10 @@ type ClientInterface interface {
 	// Ends, at once and for a reason, every session and every API token,
 	// of people and of service accounts, the CLI's tokens included, so that
 	// nothing that a compromised identity provider let someone obtain
-	// outlives it (HUM-10). Principals and their roles stay: everyone signs
-	// in again, and the integrations' tokens are created again. The
+	// outlives it (HUM-10). It revokes every one that is not revoked yet,
+	// expired ones included, since the clock of another replica may not
+	// have reached their expiry. Principals and their roles stay: everyone
+	// signs in again, and the integrations' tokens are created again. The
 	// caller's own session ends too, unless it is a break-glass session:
 	// the answer then clears the session cookie, as a sign-out does. Every
 	// other break-glass session ends.
@@ -2369,8 +2371,10 @@ type ClientInterface interface {
 	// Ends, at once and for a reason, every session and every API token,
 	// of people and of service accounts, the CLI's tokens included, so that
 	// nothing that a compromised identity provider let someone obtain
-	// outlives it (HUM-10). Principals and their roles stay: everyone signs
-	// in again, and the integrations' tokens are created again. The
+	// outlives it (HUM-10). It revokes every one that is not revoked yet,
+	// expired ones included, since the clock of another replica may not
+	// have reached their expiry. Principals and their roles stay: everyone
+	// signs in again, and the integrations' tokens are created again. The
 	// caller's own session ends too, unless it is a break-glass session:
 	// the answer then clears the session cookie, as a sign-out does. Every
 	// other break-glass session ends.
@@ -2537,6 +2541,8 @@ type ClientInterface interface {
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
+	// No token holds `identity.emergency.revoke`, which no token can use:
+	// that scope is `bad_request`, as an unknown one is.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2554,6 +2560,8 @@ type ClientInterface interface {
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
+	// No token holds `identity.emergency.revoke`, which no token can use:
+	// that scope is `bad_request`, as an unknown one is.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3378,8 +3386,10 @@ func (c *Client) ListDataCategories(ctx context.Context, reqEditors ...RequestEd
 // Ends, at once and for a reason, every session and every API token,
 // of people and of service accounts, the CLI's tokens included, so that
 // nothing that a compromised identity provider let someone obtain
-// outlives it (HUM-10). Principals and their roles stay: everyone signs
-// in again, and the integrations' tokens are created again. The
+// outlives it (HUM-10). It revokes every one that is not revoked yet,
+// expired ones included, since the clock of another replica may not
+// have reached their expiry. Principals and their roles stay: everyone
+// signs in again, and the integrations' tokens are created again. The
 // caller's own session ends too, unless it is a break-glass session:
 // the answer then clears the session cookie, as a sign-out does. Every
 // other break-glass session ends.
@@ -3412,8 +3422,10 @@ func (c *Client) RevokeAllSessionsAndTokensWithBody(ctx context.Context, content
 // Ends, at once and for a reason, every session and every API token,
 // of people and of service accounts, the CLI's tokens included, so that
 // nothing that a compromised identity provider let someone obtain
-// outlives it (HUM-10). Principals and their roles stay: everyone signs
-// in again, and the integrations' tokens are created again. The
+// outlives it (HUM-10). It revokes every one that is not revoked yet,
+// expired ones included, since the clock of another replica may not
+// have reached their expiry. Principals and their roles stay: everyone
+// signs in again, and the integrations' tokens are created again. The
 // caller's own session ends too, unless it is a break-glass session:
 // the answer then clears the session cookie, as a sign-out does. Every
 // other break-glass session ends.
@@ -3700,6 +3712,8 @@ func (c *Client) ListTokens(ctx context.Context, params *ListTokensParams, reqEd
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
+// No token holds `identity.emergency.revoke`, which no token can use:
+// that scope is `bad_request`, as an unknown one is.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3727,6 +3741,8 @@ func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, bo
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
+// No token holds `identity.emergency.revoke`, which no token can use:
+// that scope is `bad_request`, as an unknown one is.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6898,8 +6914,10 @@ type ClientWithResponsesInterface interface {
 	// Ends, at once and for a reason, every session and every API token,
 	// of people and of service accounts, the CLI's tokens included, so that
 	// nothing that a compromised identity provider let someone obtain
-	// outlives it (HUM-10). Principals and their roles stay: everyone signs
-	// in again, and the integrations' tokens are created again. The
+	// outlives it (HUM-10). It revokes every one that is not revoked yet,
+	// expired ones included, since the clock of another replica may not
+	// have reached their expiry. Principals and their roles stay: everyone
+	// signs in again, and the integrations' tokens are created again. The
 	// caller's own session ends too, unless it is a break-glass session:
 	// the answer then clears the session cookie, as a sign-out does. Every
 	// other break-glass session ends.
@@ -6922,8 +6940,10 @@ type ClientWithResponsesInterface interface {
 	// Ends, at once and for a reason, every session and every API token,
 	// of people and of service accounts, the CLI's tokens included, so that
 	// nothing that a compromised identity provider let someone obtain
-	// outlives it (HUM-10). Principals and their roles stay: everyone signs
-	// in again, and the integrations' tokens are created again. The
+	// outlives it (HUM-10). It revokes every one that is not revoked yet,
+	// expired ones included, since the clock of another replica may not
+	// have reached their expiry. Principals and their roles stay: everyone
+	// signs in again, and the integrations' tokens are created again. The
 	// caller's own session ends too, unless it is a break-glass session:
 	// the answer then clears the session cookie, as a sign-out does. Every
 	// other break-glass session ends.
@@ -7104,6 +7124,8 @@ type ClientWithResponsesInterface interface {
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
+	// No token holds `identity.emergency.revoke`, which no token can use:
+	// that scope is `bad_request`, as an unknown one is.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7121,6 +7143,8 @@ type ClientWithResponsesInterface interface {
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
+	// No token holds `identity.emergency.revoke`, which no token can use:
+	// that scope is `bad_request`, as an unknown one is.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -9966,8 +9990,10 @@ func (c *ClientWithResponses) ListDataCategoriesWithResponse(ctx context.Context
 // Ends, at once and for a reason, every session and every API token,
 // of people and of service accounts, the CLI's tokens included, so that
 // nothing that a compromised identity provider let someone obtain
-// outlives it (HUM-10). Principals and their roles stay: everyone signs
-// in again, and the integrations' tokens are created again. The
+// outlives it (HUM-10). It revokes every one that is not revoked yet,
+// expired ones included, since the clock of another replica may not
+// have reached their expiry. Principals and their roles stay: everyone
+// signs in again, and the integrations' tokens are created again. The
 // caller's own session ends too, unless it is a break-glass session:
 // the answer then clears the session cookie, as a sign-out does. Every
 // other break-glass session ends.
@@ -9996,8 +10022,10 @@ func (c *ClientWithResponses) RevokeAllSessionsAndTokensWithBodyWithResponse(ctx
 // Ends, at once and for a reason, every session and every API token,
 // of people and of service accounts, the CLI's tokens included, so that
 // nothing that a compromised identity provider let someone obtain
-// outlives it (HUM-10). Principals and their roles stay: everyone signs
-// in again, and the integrations' tokens are created again. The
+// outlives it (HUM-10). It revokes every one that is not revoked yet,
+// expired ones included, since the clock of another replica may not
+// have reached their expiry. Principals and their roles stay: everyone
+// signs in again, and the integrations' tokens are created again. The
 // caller's own session ends too, unless it is a break-glass session:
 // the answer then clears the session cookie, as a sign-out does. Every
 // other break-glass session ends.
@@ -10250,6 +10278,8 @@ func (c *ClientWithResponses) ListTokensWithResponse(ctx context.Context, params
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
+// No token holds `identity.emergency.revoke`, which no token can use:
+// that scope is `bad_request`, as an unknown one is.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10273,6 +10303,8 @@ func (c *ClientWithResponses) CreateTokenWithBodyWithResponse(ctx context.Contex
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
+// No token holds `identity.emergency.revoke`, which no token can use:
+// that scope is `bad_request`, as an unknown one is.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

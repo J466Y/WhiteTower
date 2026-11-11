@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -779,10 +780,14 @@ func (s *OIDCService) ExchangeIDToken(ctx context.Context, rawIDToken string) (*
 			Name:  p.DisplayName,
 			Roles: effectiveRoles,
 		}
-		// The token records the hash of the sign-in configuration that
-		// accepted the ID token: the token store's, which main builds from
-		// the settings that it gives this service (ST-14).
-		created, err = s.tokens.createWithLifetimeTx(ctx, tx, p.ID, "wtctl", authz.PermissionsList(effectiveRoles), 12*time.Hour, actor,
+		// The token's scopes are the permissions of the person's roles that
+		// a token may hold (HUM-10). It records the hash of the sign-in
+		// configuration that accepted the ID token: the token store's, which
+		// main builds from the settings that it gives this service (ST-14).
+		scopes := slices.DeleteFunc(authz.PermissionsList(effectiveRoles), func(scope string) bool {
+			return !authz.IsTokenScope(authz.Permission(scope))
+		})
+		created, err = s.tokens.createWithLifetimeTx(ctx, tx, p.ID, "wtctl", scopes, 12*time.Hour, actor,
 			s.tokens.signInConfiguration)
 		return err
 	})
