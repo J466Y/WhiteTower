@@ -1329,3 +1329,18 @@ For the reviewer, with options in the pull request's description:
 - **Numbers spelled otherwise.** A version written `42.0` or `4.2e1` is activated, as the schema's `integer` reads it; refusing it would deny more, but changes the contract.
 
 For the specification, which is the reviewer's: section 9.1 counts 80 bundle vectors, and appendix A takes the valid bundle, `cbb392be…`, of 9225 bytes.
+
+### 2026-11-11: the review of part 3c
+
+The review found the part's code sound, and its vectors checked on both stacks without the exception. It answered the part's questions, which the specification now states, in sections 1, 7.2, 7.4 and 7.7, and which the part implements before its vectors are regenerated, so that the exception opens once:
+
+| Question | Answer |
+| --- | --- |
+| Numbers spelled otherwise | The maintainer's decision of 2026-11-11: V4 refuses a bundle manifest whose bytes are not its own canonical JSON, which section 7.2 says the core signs. A manifest then has one form, and one reference, and one rule refuses `42.0`, `4.2e1`, spaces and members out of order. The alternatives were to refuse only integers written with a fraction or an exponent, which the JSON Schema cannot express, since it reads `42.0` as an integer, and to accept them as integers, which leaves a manifest several forms and has a Go verifier re-encode what the core never writes |
+| The catalog file | The same rule, from the review: the core writes the catalog file in canonical JSON, and V7 refuses other bytes as `parse_error`. It reads the file as I-JSON, as the part does |
+| Strings | I-JSON's strings hold no lone surrogate and no noncharacter (RFC 7493, section 2.1), and section 1 now says so. The core must then never write such a string into a catalog file, or it would block the agent's bundles: P1-16 refuses them where a report brings them |
+| Rules of the catalog's schema beyond section 7.7 | Kept, and written into section 7.7: each closes a way to fail open, a definition never pinned, a prefix or a flag name that would never match |
+| Two entries with one key or one reference | V7 refuses them, so that an enforcement point never chooses between two entries. So too a tool whose `server` is no server of the file, an approved tool whose server is not approved, an argument whose name is not its path and its transform (section 6.11), and a name that one tool declares twice |
+| The JWS header | V2 reads it as I-JSON: a member name twice is `signature`, whichever of the two values a reader keeps |
+
+Section 9.1's count of bundle vectors and appendix A's valid bundle wait for the reviewer's pull request after part 3d, as planned.
