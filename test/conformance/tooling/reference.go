@@ -173,12 +173,7 @@ func redactValue(value string, rules Rules) string {
 // Unicode case mapping changes what matches, or it is one of the deployment's
 // flags, matched exactly, case included.
 func secretName(name string, rules Rules) bool {
-	lower := strings.Map(func(r rune) rune {
-		if 'A' <= r && r <= 'Z' {
-			return r + 'a' - 'A'
-		}
-		return r
-	}, name)
+	lower := asciiLower(name)
 	for _, word := range secretWords {
 		if strings.Contains(lower, word) {
 			return true

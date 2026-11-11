@@ -3,8 +3,9 @@
 // (docs/contracts/module-contract-v0.1.md) says: the definition hashes of its
 // tools, and the references of its servers, tools and models, with the URLs
 // that url_host reads (section 6.11) and normalizes, after the redaction of
-// EP-14. It is the reference that the vectors of tooling.json are checked
-// with.
+// EP-14. It also fills a tool's record of context.args from a call's
+// arguments, with the transforms of section 6.11 (EP-19). It is the reference
+// that the vectors of tooling.json and arguments.json are checked with.
 package tooling
 
 import (
@@ -53,14 +54,16 @@ func MCPDefinitions(message []byte) ([]*Definition, error) {
 	if msg.HasRepeatedName() {
 		return nil, fmt.Errorf("%w: a member name repeats in the message", canonical.ErrNoCanonicalJSON)
 	}
-	result, ok := member(msg, "result").(canonical.Object)
+	v, _ = member(msg, "result")
+	result, ok := v.(canonical.Object)
 	if !ok {
 		return nil, errors.New("the message has no result object")
 	}
 	if result.HasRepeatedName() {
 		return nil, fmt.Errorf("%w: a member name repeats in the result", canonical.ErrNoCanonicalJSON)
 	}
-	tools, ok := member(result, "tools").([]any)
+	v, _ = member(result, "tools")
+	tools, ok := v.([]any)
 	if !ok {
 		return nil, errors.New("the result has no array of tools")
 	}
@@ -118,15 +121,17 @@ func hash(members canonical.Object) (*Definition, error) {
 	return &Definition{CanonicalJSON: data, SHA256: hex.EncodeToString(sum[:])}, nil
 }
 
-// member returns the value of the member of obj named name, or nil. obj has
-// no repeated names.
-func member(obj canonical.Object, name string) any {
+// member returns the value of the member of obj named name, and whether obj
+// has one. Names compare as their UTF-16 code units, so that a lone surrogate
+// matches no name. obj has no repeated names.
+func member(obj canonical.Object, name string) (any, bool) {
+	want := text(name)
 	for _, m := range obj {
-		if m.Name.String() == name {
-			return m.Value
+		if slices.Equal(m.Name, want) {
+			return m.Value, true
 		}
 	}
-	return nil
+	return nil, false
 }
 
 // text returns a Go string as a canonical.String.
