@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "White Tower policy bundle manifest",
-  "description": "The signed manifest of a policy bundle, format whitetower.bundle.v1 (docs/contracts/module-contract-v0.1.md, section 7). The signed bytes are the RFC 8785 canonical JSON of this document. It is I-JSON (section 1): step V4 refuses a member name twice and an integer of a magnitude beyond 2^53 - 1, which bounds the versions below.",
+  "description": "The signed manifest of a policy bundle, format whitetower.bundle.v1 (docs/contracts/module-contract-v0.1.md, section 7). The signed bytes are the RFC 8785 canonical JSON of this document, and step V4 refuses any other bytes (section 7.2), which no schema can express. It is I-JSON (section 1): step V4 refuses a member name twice and an integer of a magnitude beyond 2^53 - 1, which bounds the versions below.",
   "type": "object",
   "required": ["format", "agent_id", "version", "created_at", "combining_algorithm", "language", "cedar_schema", "policies"],
   "additionalProperties": false,

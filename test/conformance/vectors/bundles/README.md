@@ -17,7 +17,7 @@ Signed policy bundles for the verification steps of the specification ([section 
 
 ## Cases
 
-Each case expects the outcome that steps V1 to V7 give it, in their order. A case that breaks two rules, as those that check the order of step V4 do, gets the reason of the rule checked first. Every bundle carries the catalog file of `valid` unless its case says otherwise.
+Each case expects the outcome that steps V1 to V7 give it, in their order. A case that breaks two rules, as those that check the order of step V4 do, gets the reason of the rule checked first. Every bundle carries the catalog file of `valid` unless its case says otherwise. Manifests and catalog files are their own canonical JSON (section 7.2), but those of the cases that test their form or a check before it.
 
 | Step | Case | Expected | What the bundle holds |
 | --- | --- | --- | --- |
@@ -35,6 +35,7 @@ Each case expects the outcome that steps V1 to V7 give it, in their order. A cas
 | V2 | `header-b64-crit` | `signature` | A signature by the trusted key over the encoded manifest, under a JWS header that also carries `b64` set to `true`, listed in `crit` (RFC 7797). Since `true` keeps the payload encoded, a verifier that lets the extra members through activates it, whether it reads them or not |
 | V2 | `header-no-kid` | `signature` | A signature by the trusted key, under a JWS header without `kid` |
 | V2 | `header-any-order` | `activated` | A JWS header with its three members in another order |
+| V2 | `header-duplicate-alg` | `signature` | A signature by the trusted key, under a JWS header that gives `alg` twice, `none` and then `EdDSA`: not I-JSON (section 7.2), whichever of them a reader keeps |
 | V2 | `header-jku-instead-of-kid` | `signature` | A signature by the trusted key, under a JWS header with `jku` in place of `kid`: three members, but not the three of section 7.2 |
 | V2 | `header-line-break` | `signature` | A JWS header whose base64url has a line break, signed by the trusted key as it travels: RFC 7515's base64url has none |
 | V2 | `signature-padding` | `signature` | A signature whose base64url ends with the `=` padding that RFC 7515 leaves out |
@@ -68,11 +69,15 @@ Each case expects the outcome that steps V1 to V7 give it, in their order. A cas
 | V4 | `policy-version-beyond-max` | `invalid_manifest` | A policy entry at version 2^53 |
 | V4 | `negative-version-beyond-max` | `invalid_manifest` | A policy entry at version -2^53 |
 | V4 | `max-version` | `activated` | A manifest at version 2^53 - 1, the largest integer of I-JSON, which governance state names |
-| V4 | `version-with-exponent` | `activated` | A manifest whose version is written `4.2e1`, the integer 42 |
-| V4 | `version-with-zero-fraction` | `activated` | A manifest whose version is written `42.0`, the integer 42 |
 | V4 | `version-rounded-by-a-double` | `invalid_manifest` | A manifest whose version is `42.000000000000001`, which a double rounds to 42: no double holds it as written, and it is no integer |
 | V4 | `lone-surrogate` | `invalid_manifest` | A policy's name that ends with the escape of a lone surrogate, which I-JSON's strings never hold (RFC 7493) |
 | V4 | `noncharacter` | `invalid_manifest` | A policy's name that ends with the noncharacter U+FDD0, which I-JSON's strings never hold either |
+| V4 | `version-with-exponent` | `invalid_manifest` | A manifest whose version is written `4.2e1`, the integer 42, which canonical JSON writes `42`: not the manifest's canonical JSON (section 7.2) |
+| V4 | `version-with-zero-fraction` | `invalid_manifest` | A manifest whose version is written `42.0`, which canonical JSON writes `42` |
+| V4 | `manifest-with-spaces` | `invalid_manifest` | An indented manifest, with spaces and line breaks between its members |
+| V4 | `members-out-of-order` | `invalid_manifest` | A manifest that gives its version first, where canonical JSON sorts it last |
+| V4 | `escaped-character` | `invalid_manifest` | A policy's name with its `e` written as a JSON escape of six characters, where canonical JSON writes the character itself: the same name, in another form |
+| V4 | `unsupported-and-not-canonical` | `invalid_manifest` | An unsupported format, in a manifest with spaces: the canonical form is checked before the format |
 | V4 | `no-catalog` | `activated` | A bundle without a catalog file, on which an enforcement point decides as with an empty catalog (section 7.7) |
 | V4 | `null-catalog` | `invalid_manifest` | A manifest whose `catalog` is `null`, which is not a manifest without a catalog |
 | V4 | `unknown-catalog-member` | `invalid_manifest` | A catalog file's entry with a member that the format does not define |
@@ -101,9 +106,22 @@ Each case expects the outcome that steps V1 to V7 give it, in their order. A cas
 | V7 | `catalog-other-format` | `parse_error` | A catalog file of the format `whitetower.catalog.v2` |
 | V7 | `catalog-unknown-type` | `parse_error` | An argument of the type `Set<Bool>`, none of the five of section 7.7 |
 | V7 | `catalog-missing-definition` | `parse_error` | An approved function without its definition, which approval pins |
+| V7 | `catalog-not-canonical` | `parse_error` | The valid catalog file as `bundle_vectors_test.go` writes it, indented and with its members in another order: not its own canonical JSON, which the core writes |
+| V7 | `catalog-duplicate-server-key` | `parse_error` | Two servers that share the key `github`, with other references |
+| V7 | `catalog-duplicate-server-reference` | `parse_error` | Two servers, `github` and `github-copy`, that share a reference |
+| V7 | `catalog-duplicate-tool-key` | `parse_error` | Two tools, `send_email` and `send_mail`, that share the key `agent/send_email` |
+| V7 | `catalog-duplicate-tool-reference` | `parse_error` | Two functions, `agent/send_email` and `agent/send_email_v2`, both named `send_email`: one reference |
+| V7 | `catalog-duplicate-model-key` | `parse_error` | Two models that share the key `gpu-01/llama3.1-8b` |
+| V7 | `catalog-duplicate-model-reference` | `parse_error` | Two models with the same provider and name, and endpoints written otherwise that section 4.10 normalizes alike: one reference |
+| V7 | `catalog-unreadable-endpoint` | `parse_error` | A model whose endpoint has no scheme, so that its reference cannot be computed |
+| V7 | `catalog-unknown-server` | `parse_error` | An MCP tool whose server is no server of the file |
+| V7 | `catalog-server-not-approved` | `parse_error` | An approved MCP tool whose server is discovered |
+| V7 | `catalog-argument-name` | `parse_error` | An argument at the path `options.amount` named `amount` |
+| V7 | `catalog-argument-name-transform` | `parse_error` | An argument under the transform `email_domain` named `to`, without `:email_domain` |
+| V7 | `catalog-argument-twice` | `parse_error` | A tool that declares the argument `base` twice |
 
 ## Using them
 
 To verify a case as an enforcement point would: trust the keys of `trusted-keys.json`, build the expectation from `case.json`, run the steps of section 7.4, and compare with `expected`. The files are generated by `bundle_vectors_test.go`; never edit them by hand, since any change breaks their signatures.
 
-The same test file checks every manifest against [`bundle-manifest.schema.json`](../../../../api/policy/bundle-manifest.schema.json): a manifest that step V4 refuses on its own fails the schema, one that is not I-JSON included, and the manifest of every activated bundle passes it. The catalog file's schema is [`catalog.schema.json`](../../../../api/policy/catalog.schema.json), against which step V7 parses it.
+The same test file checks every manifest against [`bundle-manifest.schema.json`](../../../../api/policy/bundle-manifest.schema.json): a manifest that step V4 refuses on its own fails the schema, one that is not I-JSON included, and the manifest of every activated bundle passes it. The schema reads values, not their spelling, so it cannot express the canonical form: for a manifest that is not its own canonical JSON, the test compares the schema with V4 on that canonical JSON. The catalog file's schema is [`catalog.schema.json`](../../../../api/policy/catalog.schema.json), against which step V7 parses it, before it checks what no schema can: keys, references, servers and argument names.

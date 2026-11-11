@@ -91,7 +91,7 @@ func baseFiles(t *testing.T) map[string][]byte {
 	}
 	return map[string][]byte{
 		bundle.CedarSchemaPath: schema,
-		bundle.CatalogPath:     []byte(validCatalog),
+		bundle.CatalogPath:     canonicalText(t, validCatalog),
 		"policies/global/" + globalID + ".cedar": []byte(`@id("global-no-external-email")
 forbid (principal, action == WhiteTower::Action::"tool.invoke", resource == WhiteTower::Tool::"agent/send_email");
 `),
@@ -102,11 +102,22 @@ when { [WhiteTower::Tool::"agent/read_invoice", WhiteTower::Tool::"agent/send_em
 	}
 }
 
-// validCatalog is the catalog file of the valid bundle (section 7.7): a tool
-// of each kind but http and other, approved and discovered, enabled and not,
-// arguments of each type and two transforms, a model with its digest, and the
-// deployment's redaction rules. The definitions and the digest are hashes of
-// placeholders.
+// canonicalText returns the canonical JSON of JSON text, in which the core
+// writes a catalog file (section 7.7).
+func canonicalText(t *testing.T, text string) []byte {
+	t.Helper()
+	data, err := bundle.ReadIJSON([]byte(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// validCatalog is the catalog file of the valid bundle (section 7.7), which
+// carries its canonical JSON: a tool of each kind but http and other,
+// approved and discovered, enabled and not, arguments of each type and two
+// transforms, a model with its digest, and the deployment's redaction rules.
+// The definitions and the digest are hashes of placeholders.
 const validCatalog = `{
   "format": "whitetower.catalog.v1",
   "redaction": { "url_prefixes": ["https://mcp.example.net/s/"], "flags": ["pat"] },
@@ -153,9 +164,9 @@ const validCatalog = `{
 }
 `
 
-// emptyCatalog is a catalog file with no entries and no redaction rules.
-const emptyCatalog = `{"format":"whitetower.catalog.v1","redaction":{"url_prefixes":[],"flags":[]},"servers":[],"tools":[],"models":[]}
-`
+// emptyCatalog is a catalog file with no entries and no redaction rules, in
+// canonical JSON.
+const emptyCatalog = `{"format":"whitetower.catalog.v1","models":[],"redaction":{"flags":[],"url_prefixes":[]},"servers":[],"tools":[]}`
 
 // moved moves a bundle's file to another path, and returns the files.
 func moved(files map[string][]byte, from, to string) map[string][]byte {
@@ -329,6 +340,10 @@ func generateBundleCases(t *testing.T) []generated {
 
 	b = signedWith(fmt.Sprintf(`{"typ":%q,"kid":%q,"alg":"EdDSA"}`, bundle.Type, trustedID), signedByTrusted)
 	add("header-any-order", "The JWS header has its three members in another order", b, b.Ref(42), 41, bundleOutcome{Outcome: "activated"})
+
+	b = signedWith(fmt.Sprintf(`{"alg":"none","alg":"EdDSA","kid":%q,"typ":%q}`, trustedID, bundle.Type), signedByTrusted)
+	add("header-duplicate-alg", "The trusted key signs the bundle, but the JWS header gives alg twice, none and then EdDSA: not I-JSON (section 7.2), whichever of them a reader keeps",
+		b, b.Ref(42), 41, rejected(bundle.ReasonSignature))
 
 	b = signedWith(fmt.Sprintf(`{"alg":"EdDSA","jku":"https://keys.example/bundle-keys.json","typ":%q}`, bundle.Type), signedByTrusted)
 	add("header-jku-instead-of-kid", "The trusted key signs the bundle, but the JWS header has jku in place of kid: three members, not the three that section 7.2 names",
@@ -513,12 +528,6 @@ func generateBundleCases(t *testing.T) []generated {
 	b = build(baseManifest(1<<53-1), baseFiles(t), trustedID, trusted)
 	add("max-version", "The manifest's version is 2^53 - 1, the largest integer of I-JSON, and governance state names that version", b, b.Ref(1<<53-1), 41, activated)
 
-	b = replaced(valid(), `"version":42}`, `"version":4.2e1}`)
-	add("version-with-exponent", "The manifest's version is written 4.2e1: by its value, the integer 42, which governance state names", b, b.Ref(42), 41, activated)
-
-	b = replaced(valid(), `"version":42}`, `"version":42.0}`)
-	add("version-with-zero-fraction", "The manifest's version is written 42.0: by its value, the integer 42, which governance state names", b, b.Ref(42), 41, activated)
-
 	b = replaced(valid(), `"version":42}`, `"version":42.000000000000001}`)
 	add("version-rounded-by-a-double", "The manifest's version is 42.000000000000001, which a double rounds to 42: not I-JSON, since no double holds it as written, and no integer",
 		b, b.Ref(42), 41, invalid)
@@ -528,6 +537,38 @@ func generateBundleCases(t *testing.T) []generated {
 
 	b = replaced(valid(), `"name":"global-no-external-email"`, `"name":"global-no-external-email`+string(rune(0xFDD0))+`"`)
 	add("noncharacter", "A policy's name ends with the noncharacter U+FDD0, which I-JSON's strings never hold (RFC 7493)", b, b.Ref(42), 41, invalid)
+
+	// V4 refuses a manifest whose bytes are not its own canonical JSON
+	// (section 7.2), right after the I-JSON reading, so before its values.
+	b = replaced(valid(), `"version":42}`, `"version":4.2e1}`)
+	add("version-with-exponent", "The manifest's version is written 4.2e1, the integer 42, which canonical JSON writes 42: not the manifest's canonical JSON",
+		b, b.Ref(42), 41, invalid)
+
+	b = replaced(valid(), `"version":42}`, `"version":42.0}`)
+	add("version-with-zero-fraction", "The manifest's version is written 42.0, the integer 42, which canonical JSON writes 42: not the manifest's canonical JSON",
+		b, b.Ref(42), 41, invalid)
+
+	spaced := func(b *bundle.Bundle) *bundle.Bundle {
+		var text bytes.Buffer
+		if err := json.Indent(&text, b.Manifest, "", "  "); err != nil {
+			t.Fatal(err)
+		}
+		return resigned(b, text.Bytes())
+	}
+	b = spaced(valid())
+	add("manifest-with-spaces", "The manifest is indented, with spaces and line breaks between its members: not its own canonical JSON", b, b.Ref(42), 41, invalid)
+
+	b = replaced(replaced(valid(), `,"version":42}`, `}`), `{"agent_id"`, `{"version":42,"agent_id"`)
+	add("members-out-of-order", "The manifest gives its version first, where canonical JSON sorts it last: not its own canonical JSON", b, b.Ref(42), 41, invalid)
+
+	b = replaced(valid(), `"name":"global-no-external-email"`, `"name":"global-no-external-`+"\\"+`u0065mail"`)
+	add("escaped-character", "A policy's name writes its e as the escape \\u0065, where canonical JSON writes the character itself: the same name, not the manifest's canonical JSON",
+		b, b.Ref(42), 41, invalid)
+
+	m = baseManifest(42)
+	m.Format = "whitetower.bundle.v2"
+	b = spaced(build(m, baseFiles(t), trustedID, trusted))
+	add("unsupported-and-not-canonical", "An unsupported format, in a manifest with spaces: the canonical form is checked before the format", b, b.Ref(42), 41, invalid)
 
 	// V4 knows the catalog file's entry, which a manifest need not have
 	// (section 7.7), with exactly its members.
@@ -620,15 +661,17 @@ permit (principal == ?principal, action == WhiteTower::Action::"tool.invoke", re
 	add("fails-validation", "A policy parses, but fails validation against the bundle's Cedar schema, which is the core's job only",
 		b, b.Ref(42), 41, bundleOutcome{Outcome: "activated"})
 
-	// V7. The catalog file is I-JSON, as the manifest is, and matches its
-	// schema (section 7.7). withCatalog builds a valid bundle with the catalog
-	// file given, and catalogWith returns the valid catalog file with the
-	// first old replaced.
-	withCatalog := func(catalog string) *bundle.Bundle {
+	// V7. The catalog file is I-JSON in its own canonical form, as the
+	// manifest is, matches its schema, and names its entries and arguments as
+	// section 7.7 says. withText builds a valid bundle with the catalog file's
+	// bytes given, withCatalog with the canonical JSON of the text given, and
+	// catalogWith returns the valid catalog file with the first old replaced.
+	withText := func(catalog []byte) *bundle.Bundle {
 		files := baseFiles(t)
-		files[bundle.CatalogPath] = []byte(catalog)
+		files[bundle.CatalogPath] = catalog
 		return build(baseManifest(42), files, trustedID, trusted)
 	}
+	withCatalog := func(catalog string) *bundle.Bundle { return withText(canonicalText(t, catalog)) }
 	catalogWith := func(old, with string) string {
 		if !strings.Contains(validCatalog, old) {
 			t.Fatalf("the valid catalog file has no %s", old)
@@ -640,14 +683,18 @@ permit (principal == ?principal, action == WhiteTower::Action::"tool.invoke", re
 	b = withCatalog(emptyCatalog)
 	add("empty-catalog", "A catalog file with no entries and no redaction rules", b, b.Ref(42), 41, activated)
 
-	b = withCatalog("not JSON\n")
+	b = withText([]byte("not JSON\n"))
 	add("catalog-not-json", "A catalog file that is not JSON", b, b.Ref(42), 41, parseError)
 
-	b = withCatalog("\xef\xbb\xbf" + validCatalog)
+	b = withText(append([]byte("\xef\xbb\xbf"), canonicalText(t, validCatalog)...))
 	add("catalog-byte-order-mark", "A catalog file that starts with a byte order mark, which JSON in UTF-8 never carries (section 1)", b, b.Ref(42), 41, parseError)
 
-	b = withCatalog(catalogWith(`"enabled": false,`, `"enabled": false, "enabled": true,`))
+	b = withText([]byte(catalogWith(`"enabled": false,`, `"enabled": false, "enabled": true,`)))
 	add("catalog-duplicate-member", "An MCP tool of the catalog file gives enabled twice, false and then true: not I-JSON, whichever of them a reader keeps",
+		b, b.Ref(42), 41, parseError)
+
+	b = withText([]byte(validCatalog))
+	add("catalog-not-canonical", "The valid catalog file, indented, with its members in another order: not its own canonical JSON, which the core writes",
 		b, b.Ref(42), 41, parseError)
 
 	b = withCatalog(catalogWith(`"name": "create_pull_request",`, `"name": "create_pull_request", "description": "Opens a pull request",`))
@@ -661,6 +708,51 @@ permit (principal == ?principal, action == WhiteTower::Action::"tool.invoke", re
 
 	b = withCatalog(catalogWith(`"definition": "26d8a787f636d022f95db63ee0f572d2590cbe0ff5b63badf9f9b23d7343371c",`, ""))
 	add("catalog-missing-definition", "An approved function tool of the catalog file without its definition, which approval pins", b, b.Ref(42), 41, parseError)
+
+	// Keys and references: no two servers, tools or models share one.
+	// References are computed as section 4.10 says, so that two spellings of
+	// one endpoint are one reference.
+	const server = `{ "key": "github", "reference": "https://api.githubcopilot.com/mcp/", "transport": "http", "status": "approved" }`
+	b = withCatalog(catalogWith(server, server+`, { "key": "github", "reference": "https://mcp.example.org/", "transport": "http", "status": "approved" }`))
+	add("catalog-duplicate-server-key", "Two servers share the key github, with other references", b, b.Ref(42), 41, parseError)
+
+	b = withCatalog(catalogWith(server, server+`, { "key": "github-copy", "reference": "https://api.githubcopilot.com/mcp/", "transport": "http", "status": "discovered" }`))
+	add("catalog-duplicate-server-reference", "Two servers, github and github-copy, share a reference", b, b.Ref(42), 41, parseError)
+
+	const function = `{ "name": "send_email", "kind": "function", "origin": "agent", "status": "discovered", "enabled": false, "read_only": false, "destructive": true, "open_world": true, "key": `
+	b = withCatalog(catalogWith(`"tools": [`, `"tools": [`+strings.Replace(function, `"send_email"`, `"send_mail"`, 1)+`"agent/send_email" },`))
+	add("catalog-duplicate-tool-key", "Two tools, send_email and send_mail, share the key agent/send_email", b, b.Ref(42), 41, parseError)
+
+	b = withCatalog(catalogWith(`"tools": [`, `"tools": [`+function+`"agent/send_email_v2" },`))
+	add("catalog-duplicate-tool-reference", "Two functions, agent/send_email and agent/send_email_v2, are both named send_email: one reference", b, b.Ref(42), 41, parseError)
+
+	const model = `{ "provider": "ollama", "status": "discovered", "enabled": false, `
+	b = withCatalog(catalogWith(`"models": [`, `"models": [`+model+`"key": "gpu-01/llama3.1-8b", "endpoint": "http://gpu-01.internal:11434/", "name": "llama3.2:3b" },`))
+	add("catalog-duplicate-model-key", "Two models, llama3.1:8b and llama3.2:3b, share the key gpu-01/llama3.1-8b", b, b.Ref(42), 41, parseError)
+
+	b = withCatalog(catalogWith(`"models": [`, `"models": [`+model+`"key": "gpu-01/copy", "endpoint": "HTTP://GPU-01.internal:11434", "name": "llama3.1:8b" },`))
+	add("catalog-duplicate-model-reference", "Two models share a reference: the same provider and name, and endpoints written otherwise that section 4.10 normalizes alike",
+		b, b.Ref(42), 41, parseError)
+
+	b = withCatalog(catalogWith(`"endpoint": "http://gpu-01.internal:11434/"`, `"endpoint": "gpu-01.internal:11434"`))
+	add("catalog-unreadable-endpoint", "A model whose endpoint has no scheme, so that its reference cannot be computed", b, b.Ref(42), 41, parseError)
+
+	// Servers and argument names.
+	b = withCatalog(catalogWith(`"server": "github"`, `"server": "gitlab"`))
+	add("catalog-unknown-server", "An MCP tool whose server, gitlab, is no server of the catalog file", b, b.Ref(42), 41, parseError)
+
+	b = withCatalog(catalogWith(server, strings.Replace(server, `"approved"`, `"discovered"`, 1)))
+	add("catalog-server-not-approved", "An approved MCP tool whose server is discovered", b, b.Ref(42), 41, parseError)
+
+	b = withCatalog(catalogWith(`"name": "options.amount"`, `"name": "amount"`))
+	add("catalog-argument-name", "An argument at the path options.amount named amount: its name is its path, joined by .", b, b.Ref(42), 41, parseError)
+
+	b = withCatalog(catalogWith(`"name": "to:email_domain"`, `"name": "to"`))
+	add("catalog-argument-name-transform", "An argument under the transform email_domain named to, without :email_domain", b, b.Ref(42), 41, parseError)
+
+	const base = `{ "name": "base", "path": ["base"], "type": "String" }`
+	b = withCatalog(catalogWith(base, base+", "+base))
+	add("catalog-argument-twice", "A tool declares the argument base twice", b, b.Ref(42), 41, parseError)
 
 	return out
 }
@@ -863,9 +955,12 @@ func validateManifest(schema *jsonschema.Schema, manifest []byte) error {
 // vector against bundle-manifest.schema.json. A manifest that step V4 refuses
 // on its own, as invalid_manifest or unsupported, fails the schema, one that
 // is not I-JSON included, and the manifest of every activated bundle passes
-// it, whatever the spelling of its numbers. The other manifests may go either
-// way: the schema cannot tie a path to its entry, which step V5 does, nor know
-// the agent and the version that governance state names.
+// it. The schema cannot express the canonical form, which V4 also requires
+// (section 7.2), since JSON Schema reads values, not their spelling: for an
+// I-JSON manifest that is not its own canonical JSON, the test compares the
+// schema with V4 on that canonical JSON instead. The other manifests may go
+// either way: the schema cannot tie a path to its entry, which step V5 does,
+// nor know the agent and the version that governance state names.
 func TestTheManifestSchemaAgreesWithStepV4(t *testing.T) {
 	schema := compileSchema(t, "../../api/policy/bundle-manifest.schema.json")
 	for _, name := range bundleCaseNames(t) {
@@ -876,6 +971,9 @@ func TestTheManifestSchemaAgreesWithStepV4(t *testing.T) {
 			manifest, err := os.ReadFile(filepath.Join(root, "manifest.json"))
 			if err != nil {
 				t.Fatal(err)
+			}
+			if canonical, err := bundle.ReadIJSON(manifest); err == nil {
+				manifest = canonical
 			}
 			schemaErr := validateManifest(schema, manifest)
 			if _, err := bundle.ParseManifest(manifest, []string{"cedar"}); err != nil && schemaErr == nil {

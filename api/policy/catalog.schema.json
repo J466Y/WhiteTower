@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "White Tower catalog file",
-  "description": "An agent's catalog file, catalog.json, format whitetower.catalog.v1: the MCP servers, tools and models enabled for the agent and those observed for it, and the deployment's redaction rules (docs/contracts/module-contract-v0.1.md, section 7.7). A closed document: step V7 refuses a file that does not match this schema (parse_error).",
+  "description": "An agent's catalog file, catalog.json, format whitetower.catalog.v1: the MCP servers, tools and models enabled for the agent and those observed for it, and the deployment's redaction rules (docs/contracts/module-contract-v0.1.md, section 7.7). A closed document: step V7 refuses a file that does not match this schema (parse_error), and also one that is not its own canonical JSON, or whose keys, references, servers or argument names break the rules of section 7.7 that no schema can express.",
   "type": "object",
   "required": ["format", "redaction", "servers", "tools", "models"],
   "additionalProperties": false,

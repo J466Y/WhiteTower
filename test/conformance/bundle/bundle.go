@@ -27,6 +27,7 @@ import (
 
 	"github.com/J466Y/WhiteTower/api/policy"
 	"github.com/J466Y/WhiteTower/test/conformance/canonical"
+	"github.com/J466Y/WhiteTower/test/conformance/tooling"
 )
 
 // Format constants of whitetower.bundle.v1.
@@ -284,9 +285,10 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 
 	// V2. Signature over the exact manifest bytes. The header and the
 	// signature are in base64url as RFC 7515 defines it, and the header is
-	// JSON in UTF-8 (section 1) with exactly alg, kid and typ, in any order
-	// (section 7.2): any other member, such as b64, which would change what
-	// is signed (RFC 7797), or such as jku in place of kid, is refused.
+	// I-JSON (section 1) with exactly alg, kid and typ, in any order (section
+	// 7.2): any other member, such as b64, which would change what is signed
+	// (RFC 7797), or such as jku in place of kid, is refused, and so is a
+	// member name twice, whichever of its values a reader would keep.
 	parts := strings.Split(b.Signature, ".")
 	if len(parts) != 3 || parts[1] != "" {
 		return nil, reject(ReasonSignature, "not a JWS with a detached payload")
@@ -295,8 +297,8 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 	if err != nil {
 		return nil, reject(ReasonSignature, "header encoding: %v", err)
 	}
-	if !utf8JSON(rawHeader) {
-		return nil, reject(ReasonSignature, "header: JSON is UTF-8, without a byte order mark")
+	if _, err := ReadIJSON(rawHeader); err != nil {
+		return nil, reject(ReasonSignature, "header: not I-JSON: %v", err)
 	}
 	var header map[string]any
 	if err := json.Unmarshal(rawHeader, &header); err != nil {
@@ -401,17 +403,17 @@ func Verify(b *Bundle, trusted []Key, want Expectation) (*Manifest, error) {
 // from which the compiler resolves its references. Nothing is fetched from it.
 const catalogSchemaURL = "file:///whitetower/policy/catalog.schema.json"
 
-// parseCatalog parses a catalog file as step V7 does: I-JSON, as the
-// manifest is (ReadIJSON), that matches api/policy/catalog.schema.json
-// (section 7.7). JSON Schema reads an object whose member names repeat as
-// one of its readings, which another reader could read otherwise, so such a
-// file never reaches the schema.
+// parseCatalog parses a catalog file as step V7 does: I-JSON in its own
+// canonical form, as the manifest is (readCanonical), that matches
+// api/policy/catalog.schema.json and names its entries and arguments as
+// section 7.7 says (checkEntries). JSON Schema reads an object whose member
+// names repeat as one of its readings, which another reader could read
+// otherwise, so such a file never reaches the schema.
 func parseCatalog(data []byte) error {
-	text, err := ReadIJSON(data)
-	if err != nil {
-		return fmt.Errorf("not I-JSON: %w", err)
+	if err := readCanonical(data); err != nil {
+		return err
 	}
-	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(text))
+	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
@@ -431,21 +433,128 @@ func parseCatalog(data []byte) error {
 	if err != nil {
 		return err
 	}
-	return compiled.Validate(inst)
+	if err := compiled.Validate(inst); err != nil {
+		return err
+	}
+	var c catalogFile
+	if err := json.Unmarshal(data, &c); err != nil {
+		return err
+	}
+	return checkEntries(&c)
+}
+
+// catalogFile is what step V7 reads of a catalog file that matches its
+// schema, to check what the schema cannot: its keys, references, servers and
+// argument names (section 7.7).
+type catalogFile struct {
+	Redaction tooling.Rules `json:"redaction"`
+	Servers   []struct {
+		Key       string `json:"key"`
+		Reference string `json:"reference"`
+		Status    string `json:"status"`
+	} `json:"servers"`
+	Tools []struct {
+		Key      string             `json:"key"`
+		Server   string             `json:"server"`
+		Provider string             `json:"provider"`
+		Type     string             `json:"type"`
+		Name     string             `json:"name"`
+		Kind     string             `json:"kind"`
+		Status   string             `json:"status"`
+		Args     []tooling.Argument `json:"args"`
+	} `json:"tools"`
+	Models []struct {
+		Key      string `json:"key"`
+		Provider string `json:"provider"`
+		Endpoint string `json:"endpoint"`
+		Name     string `json:"name"`
+	} `json:"models"`
+}
+
+// distinct holds the values of one list that are already taken.
+type distinct map[string]bool
+
+// take reports whether v was free, and takes it.
+func (d distinct) take(v string) bool {
+	if d[v] {
+		return false
+	}
+	d[v] = true
+	return true
+}
+
+// checkEntries checks the rules of section 7.7 that the schema cannot state:
+// no two servers, two tools or two models share a key or a reference, so that
+// an enforcement point never chooses between two entries; a tool's server is
+// a server of the file, approved when the tool is; and an argument's name is
+// its path joined by . and followed by : and its transform, once per tool.
+// References are computed as section 4.10 says, a model's with the file's
+// own redaction rules, and a model whose reference cannot be computed is
+// refused.
+func checkEntries(c *catalogFile) error {
+	keys, refs := distinct{}, distinct{}
+	servers := map[string]int{}
+	for i, s := range c.Servers {
+		if !keys.take(s.Key) || !refs.take(s.Reference) {
+			return fmt.Errorf("server %q: a key or a reference that another server has", s.Key)
+		}
+		servers[s.Key] = i
+	}
+	keys, refs = distinct{}, distinct{}
+	for _, t := range c.Tools {
+		ref := tooling.ToolReference(t.Name)
+		switch t.Kind {
+		case "mcp":
+			i, ok := servers[t.Server]
+			if !ok {
+				return fmt.Errorf("tool %q: no server has the key %q", t.Key, t.Server)
+			}
+			if t.Status == "approved" && c.Servers[i].Status != "approved" {
+				return fmt.Errorf("tool %q is approved, and its server is not", t.Key)
+			}
+			ref = tooling.MCPToolReference(c.Servers[i].Reference, t.Name)
+		case "builtin":
+			ref = tooling.BuiltinToolReference(t.Provider, t.Type)
+		}
+		if !keys.take(t.Key) || !refs.take(ref) {
+			return fmt.Errorf("tool %q: a key or a reference that another tool has", t.Key)
+		}
+		names := distinct{}
+		for _, a := range t.Args {
+			name := strings.Join(a.Path, ".")
+			if a.Transform != "" {
+				name += ":" + a.Transform
+			}
+			if a.Name != name || !names.take(a.Name) {
+				return fmt.Errorf("tool %q: the argument %q is not named %q, or is declared twice", t.Key, a.Name, name)
+			}
+		}
+	}
+	keys, refs = distinct{}, distinct{}
+	for _, m := range c.Models {
+		ref, err := tooling.ModelReference(m.Provider, m.Endpoint, m.Name, c.Redaction)
+		if err != nil {
+			return fmt.Errorf("model %q: %w", m.Key, err)
+		}
+		if !keys.take(m.Key) || !refs.take(ref) {
+			return fmt.Errorf("model %q: a key or a reference that another model has", m.Key)
+		}
+	}
+	return nil
 }
 
 // ParseManifest applies the checks of step V4 that read the manifest alone,
-// in their order (section 7.4). A manifest that is not I-JSON (section 1, see
-// ReadIJSON), or not an object, or that has an unknown or a missing member,
-// or a member of the wrong type, is invalid_manifest: the types are those of
+// in their order (section 7.4). A manifest that is not I-JSON, or not its own
+// canonical JSON (sections 1 and 7.2, readCanonical), or not an object, or
+// that has an unknown or a missing member, or a member of the wrong type, is
+// invalid_manifest: the types are those of
 // api/policy/bundle-manifest.schema.json, the forms of its strings included.
 // Then a format, combining algorithm or language that is not supported is
 // unsupported, even though the schema's constant fails too. Paths need only be
 // strings here: step V5 builds them from their entries.
 func ParseManifest(data []byte, languages []string) (*Manifest, error) {
-	data, err := ReadIJSON(data)
-	if err != nil {
-		return nil, reject(ReasonInvalidManifest, "not I-JSON: %v", err)
+	if err := readCanonical(data); err != nil {
+		return nil, reject(ReasonInvalidManifest, "%v", err)
 	}
 	if err := checkMembers(data); err != nil {
 		return nil, reject(ReasonInvalidManifest, "%v", err)
@@ -479,16 +588,15 @@ const maxInteger = 1<<53 - 1
 // is written.
 var ErrNumber = errors.New("a number that I-JSON does not hold")
 
-// ReadIJSON reads the JSON text of a bundle's manifest or catalog file, which
-// is I-JSON (section 1, RFC 7493), and returns its canonical JSON. It refuses
-// text that is not UTF-8, or that starts with a byte order mark; a member
-// name twice in an object, at any depth; a string with a lone surrogate or a
-// noncharacter; and a number that a double does not hold as it is written.
-// It reads a number by its exact value, whatever its spelling: 4.2e1 and 42.0
-// are the integer 42, and 9007199254740992, 9.007199254740992e15 and
-// -9007199254740992.0 are all integers beyond 2^53 - 1. The canonical JSON
-// writes each number as its value, so that encoding/json, which takes 42.0 for
-// no integer, decodes what was checked.
+// ReadIJSON reads JSON text that must be I-JSON (section 1, RFC 7493), as a
+// bundle's JWS header, manifest and catalog file must, and returns its
+// canonical JSON. It refuses text that is not UTF-8, or that starts with a
+// byte order mark; a member name twice in an object, at any depth; a string
+// with a lone surrogate or a noncharacter; and a number that a double does not
+// hold as it is written. It reads a number by its exact value, whatever its
+// spelling: 4.2e1 and 42.0 are the integer 42, which the canonical JSON writes
+// 42, and 9007199254740992, 9.007199254740992e15 and -9007199254740992.0 are
+// all integers beyond 2^53 - 1.
 func ReadIJSON(data []byte) ([]byte, error) {
 	if !utf8JSON(data) {
 		return nil, errors.New("JSON is UTF-8, without a byte order mark")
@@ -502,6 +610,21 @@ func ReadIJSON(data []byte) ([]byte, error) {
 	}
 	// Encode refuses a member name twice and a lone surrogate.
 	return canonical.Encode(v)
+}
+
+// readCanonical checks that a bundle's manifest or catalog file is I-JSON and
+// its own canonical JSON (sections 1 and 7.2): bytes that differ from it, by
+// spaces, the order of members, an escape or the spelling of a number, are
+// refused, so that a manifest has one form and one reference.
+func readCanonical(data []byte) error {
+	text, err := ReadIJSON(data)
+	if err != nil {
+		return fmt.Errorf("not I-JSON: %w", err)
+	}
+	if !bytes.Equal(text, data) {
+		return errors.New("not its own canonical JSON")
+	}
+	return nil
 }
 
 // checkIJSON checks the numbers and the strings of a value that

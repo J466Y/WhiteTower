@@ -309,13 +309,6 @@ def trusted_key(jwk: dict) -> Ed25519PublicKey | None:
         return None
 
 
-def utf8_json(data: bytes):
-    """Parses JSON in the encoding that section 1 states: UTF-8, without a byte order
-    mark, which json.loads refuses in text. From bytes, json.loads would take a byte
-    order mark, UTF-16 and UTF-32. Raises ValueError otherwise."""
-    return json.loads(data.decode("utf-8"))
-
-
 # A number as RFC 8259 writes it.
 JSON_NUMBER = re.compile(r"(-?)(0|[1-9][0-9]*)(?:\.([0-9]+))?(?:[eE]([-+]?[0-9]+))?")
 
@@ -370,13 +363,24 @@ def ijson_strings(value) -> None:
 
 
 def read_ijson(data: bytes):
-    """Reads the JSON text of a bundle's manifest or catalog file, which is I-JSON (section 1, RFC 7493), as steps V4
-    and V7 do. It raises ManifestRefused, as the manifest reader of section 3.1 does, for text that is not: a member
+    """Reads JSON text that must be I-JSON (section 1, RFC 7493), as a bundle's JWS header, manifest and catalog file
+    must. It raises ManifestRefused, as the manifest reader of section 3.1 does, for text that is not: a member
     name twice, a string with a lone surrogate or a noncharacter, or a number that ijson_value refuses; and ValueError
-    for text that is not JSON in UTF-8 without a byte order mark (utf8_json)."""
+    for text that is not JSON in the encoding that section 1 states, UTF-8 without a byte order mark, which json.loads
+    refuses in text: from bytes, it would take a byte order mark, UTF-16 and UTF-32."""
     value = json.loads(data.decode("utf-8"), object_pairs_hook=unique_members, parse_int=ijson_value,
                        parse_float=ijson_value, parse_constant=not_json)
     ijson_strings(value)
+    return value
+
+
+def read_canonical(data: bytes):
+    """Reads a bundle's manifest or catalog file, which is I-JSON and its own canonical JSON (sections 1 and 7.2):
+    bytes that differ from it, by spaces, the order of members, an escape or the spelling of a number, raise
+    ManifestRefused, so that a manifest has one form and one reference."""
+    value = read_ijson(data)
+    if canonical_json(value).encode() != data:
+        raise ManifestRefused("not its own canonical JSON")
     return value
 
 
@@ -399,15 +403,16 @@ def positive(value) -> bool:
 def check_manifest(manifest: bytes) -> dict:
     """The checks of step V4 that read the manifest alone, in their order (section 7.4).
 
-    A manifest that is not I-JSON (section 1, read_ijson), or not an object, or
-    that has an unknown or a missing member, or a member of the wrong type, is
-    invalid_manifest: the types are those of bundle-manifest.schema.json, the
-    forms of its strings included. Then a format, combining algorithm or language
-    that is not supported is unsupported, even though the schema's constant fails
-    too. Paths need only be strings here: V5 builds them from their entries.
+    A manifest that is not I-JSON, or not its own canonical JSON (sections 1 and
+    7.2, read_canonical), or not an object, or that has an unknown or a missing
+    member, or a member of the wrong type, is invalid_manifest: the types are
+    those of bundle-manifest.schema.json, the forms of its strings included. Then
+    a format, combining algorithm or language that is not supported is
+    unsupported, even though the schema's constant fails too. Paths need only be
+    strings here: V5 builds them from their entries.
     """
     try:
-        m = read_ijson(manifest)
+        m = read_canonical(manifest)
     except (ValueError, ManifestRefused, RecursionError):
         raise Rejected("invalid_manifest") from None
     members(m, MANIFEST_MEMBERS, frozenset({"catalog"}))
@@ -452,14 +457,15 @@ def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: di
     if ref["size_bytes"] > 2 << 20 or size > 2 << 20 or len(files) > 1000:
         raise Rejected("oversized")
     # V2. Signature. The header and the signature are in base64url as RFC 7515
-    # defines it, and the header is JSON in UTF-8 with exactly alg, kid and typ,
-    # in any order (section 7.2): any other member, such as b64, is refused.
+    # defines it, and the header is I-JSON with exactly alg, kid and typ, in any
+    # order (section 7.2): any other member, such as b64, is refused, and so is
+    # a member name twice.
     parts = signature.split(".")
     if len(parts) != 3 or parts[1] != "":
         raise Rejected("signature")
     try:
-        header = utf8_json(b64url(parts[0]))
-    except ValueError:
+        header = read_ijson(b64url(parts[0]))
+    except (ValueError, ManifestRefused, RecursionError):
         raise Rejected("signature") from None
     if type(header) is not dict or set(header) != {"alg", "kid", "typ"} \
             or header["alg"] != "EdDSA" or header["typ"] != "whitetower-bundle+jws":
@@ -507,18 +513,55 @@ def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: di
     if m["version"] < case["active_version"] or (
             m["version"] == case["active_version"] and digest != case.get("active_manifest_sha256")):
         raise Rejected("older_version")
-    # V7. Static policies, and a catalog file that is I-JSON, as the manifest
-    # is, and matches its schema.
+    # V7. Static policies, and a catalog file that is I-JSON in its own
+    # canonical form, as the manifest is, matches its schema, and names its
+    # entries and arguments as section 7.7 says.
     for p in m["policies"]:
         parse_static(files[p["path"]])
     if "catalog" in m:
         try:
-            catalog = read_ijson(files["catalog.json"])
+            catalog = read_canonical(files["catalog.json"])
         except (ValueError, ManifestRefused, RecursionError):
             raise Rejected("parse_error") from None
-        if not catalog_validator.is_valid(catalog):
+        if not catalog_validator.is_valid(catalog) or not catalog_entries_hold(catalog):
             raise Rejected("parse_error")
     return {"outcome": "activated"}
+
+
+def catalog_entries_hold(catalog: dict) -> bool:
+    """Whether a catalog file that matches its schema keeps the rules of section 7.7 that the schema cannot state: no
+    two servers, two tools or two models share a key or a reference; a tool's server is a server of the file, approved
+    when the tool is; and an argument's name is its path joined by . and followed by : and its transform, once per tool.
+    References are computed as section 4.10 says, a model's with the file's own redaction rules, and a model whose
+    reference cannot be computed fails."""
+    rules = catalog["redaction"]
+    servers = {s["key"]: s for s in catalog["servers"]}
+    tool_references = []
+    for t in catalog["tools"]:
+        if t["kind"] == "mcp":
+            server = servers.get(t["server"])
+            if server is None or (t["status"] == "approved" and server["status"] != "approved"):
+                return False
+            entry = {"kind": "mcp_tool", "name": t["name"], "server": server["reference"]}
+        elif t["kind"] == "builtin":
+            entry = {"kind": "builtin_tool", "provider": t["provider"], "type": t["type"]}
+        else:
+            entry = {"kind": "tool", "name": t["name"]}
+        tool_references.append(reference(entry, rules))
+        names = [a["name"] for a in t.get("args", [])]
+        if len(set(names)) != len(names) or any(
+                a["name"] != ".".join(a["path"]) + (":" + a["transform"] if "transform" in a else "")
+                for a in t.get("args", [])):
+            return False
+    try:
+        model_references = [reference({"kind": "model", "provider": m["provider"], "endpoint": m["endpoint"],
+                                       "name": m["name"]}, rules) for m in catalog["models"]]
+    except NoReference:
+        return False
+    return all(len(set(values)) == len(values) for values in (
+        [s["key"] for s in catalog["servers"]], [s["reference"] for s in catalog["servers"]],
+        [t["key"] for t in catalog["tools"]], tool_references,
+        [m["key"] for m in catalog["models"]], model_references))
 
 
 class ManifestRefused(Exception):
@@ -1093,7 +1136,9 @@ def reference(entry: dict, rules: dict) -> str:
     if kind == "local_server":
         return "stdio:" + canonical_json(redact_command(entry["command"], rules))
     if kind == "mcp_tool":
-        return canonical_json({"name": entry["name"], "server": reference(entry["server"], rules)})
+        # Its server, as an entry, or as the reference that a catalog file gives it.
+        server = entry["server"] if type(entry["server"]) is str else reference(entry["server"], rules)
+        return canonical_json({"name": entry["name"], "server": server})
     if kind == "tool":
         return canonical_json({"name": entry["name"]})
     if kind == "builtin_tool":
