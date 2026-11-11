@@ -644,6 +644,134 @@ func TestReferenceVectors(t *testing.T) {
 	}
 }
 
+// argumentsFile is arguments.json: the transforms, and tools' records of
+// context.args.
+type argumentsFile struct {
+	Description string `json:"description"`
+	Transforms  []struct {
+		ID          string `json:"id"`
+		Description string `json:"description"`
+		Transform   string `json:"transform"`
+		Value       string `json:"value"`
+		// nil when the transform cannot read the value.
+		Result *string `json:"result"`
+	} `json:"transforms"`
+	Records []struct {
+		ID          string             `json:"id"`
+		Description string             `json:"description"`
+		Args        []tooling.Argument `json:"args"`
+		// The call's arguments as a JSON value or, where a parsed value
+		// cannot hold them, as their text; neither when the call has none.
+		Arguments     json.RawMessage `json:"arguments"`
+		ArgumentsText *string         `json:"arguments_text"`
+		// nil when EP-19 denies the call; sets as their distinct elements
+		// in ascending order.
+		Record map[string]any `json:"record"`
+	} `json:"records"`
+}
+
+// TestTransformVectors applies the transforms of arguments.json (section
+// 6.11).
+func TestTransformVectors(t *testing.T) {
+	var file argumentsFile
+	loadJSON(t, "vectors/arguments.json", &file)
+	if len(file.Transforms) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range file.Transforms {
+		t.Run(c.ID, func(t *testing.T) {
+			var result *string
+			got, err := tooling.Transform(c.Transform, c.Value)
+			switch {
+			case errors.Is(err, tooling.ErrCannotRead):
+			case err != nil:
+				t.Fatal(err)
+			default:
+				result = &got
+			}
+			if !reflect.DeepEqual(result, c.Result) {
+				t.Errorf("got %s, want %s", show(result), show(c.Result))
+			}
+		})
+	}
+}
+
+// TestTheTransformVectorsTakeTheValuesOfTheCheck checks that arguments.json
+// has a case for each value of the URL and address check, under its ID: each
+// URL as url_host reads it, each address as email_domain does, and each host
+// of its IDNA, in its order, as email_domain reads alice@ and the host.
+func TestTheTransformVectorsTakeTheValuesOfTheCheck(t *testing.T) {
+	data, err := os.ReadFile("vectors/inputs/url-and-address-check.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	type value struct{ ID, Value string }
+	var check struct {
+		URLHost     []value `json:"url_host"`
+		EmailDomain []value `json:"email_domain"`
+		IDNA        []struct{ Host string }
+	}
+	if err := json.Unmarshal(data, &check); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][2]string{}
+	for _, v := range check.URLHost {
+		want[v.ID] = [2]string{"url_host", v.Value}
+	}
+	for _, v := range check.EmailDomain {
+		want[v.ID] = [2]string{"email_domain", v.Value}
+	}
+	for i, v := range check.IDNA {
+		want[fmt.Sprintf("I%02d", i+1)] = [2]string{"email_domain", "alice@" + v.Host}
+	}
+	if len(want) != 80+33+14 {
+		t.Fatalf("the check has %d values, want 127", len(want))
+	}
+	var file argumentsFile
+	loadJSON(t, "vectors/arguments.json", &file)
+	for _, c := range file.Transforms {
+		if w, ok := want[c.ID]; ok {
+			if got := [2]string{c.Transform, c.Value}; got != w {
+				t.Errorf("%s: %s of %q, want %s of %q", c.ID, got[0], got[1], w[0], w[1])
+			}
+			delete(want, c.ID)
+		}
+	}
+	for id := range want {
+		t.Errorf("no case takes the check's %s", id)
+	}
+}
+
+// TestRecordVectors fills the records of arguments.json from each call's
+// arguments, as EP-19 says (section 6.11).
+func TestRecordVectors(t *testing.T) {
+	var file argumentsFile
+	loadJSON(t, "vectors/arguments.json", &file)
+	if len(file.Records) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range file.Records {
+		t.Run(c.ID, func(t *testing.T) {
+			arguments := []byte(c.Arguments)
+			switch {
+			case c.Arguments != nil && c.ArgumentsText != nil:
+				t.Fatal("the case gives its arguments both as a value and as text")
+			case c.ArgumentsText != nil:
+				arguments = []byte(*c.ArgumentsText)
+			}
+			got, err := tooling.Record(arguments, c.Args)
+			if err != nil && !errors.Is(err, tooling.ErrInvalidArgument) {
+				t.Fatal(err)
+			}
+			// Through JSON, an int64 and the vector's number compare as the
+			// same text.
+			if show(got) != show(c.Record) {
+				t.Errorf("got %s (%v), want %s", show(got), err, show(c.Record))
+			}
+		})
+	}
+}
+
 // show returns the JSON of a test's value, for its messages.
 func show(v any) string {
 	data, err := json.Marshal(v)

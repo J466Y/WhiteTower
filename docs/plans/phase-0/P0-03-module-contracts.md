@@ -1212,3 +1212,79 @@ After the first round, the agent asked two questions on the review's text of EP-
 | A named value within a value, as in `docker run --env=GITHUB_TOKEN=ghp_x`, kept its token | A value is read as an argument that is not a flag is: a URL, then a named value, then a header, and otherwise as given. The rest of a header whose name is not a secret's is a value too, so `Referer: https://u:p@h/` loses `u:p@` |
 | A header whose name starts with `-` became a flag once redacted, so redacting again redacted the argument after it | A header's name never starts with `-`, as a named value's does not; the agent's fuzz test found it. A single argument such as `--Authorization: Bearer x` is a flag, and redacts the argument after it, but keeps its own text; tools take a header as the argument after a flag, such as `--header` or `-H`, or as a flag's value, which are redacted |
 | Python's `idna` package refuses a host of more than 1024 characters before it maps it, so a host padded with characters that UTS #46 ignores reads on Go only | A host longer than 253 characters as written, without one trailing dot, cannot be read either, so the stacks agree |
+
+### 2026-11-10: step 12, part 3b: arguments and transforms
+
+Part 3b brings section 6.11's per-tool arguments and its four transforms to both stacks, in a new vector file. No generated vector changes.
+
+| What | Change |
+| --- | --- |
+| `test/conformance/tooling` | `Transform` applies `lowercase`, `path`, `url_host` and `email_domain`. `Record` fills a tool's record of `context.args` from a call's arguments, absent ones read as an empty object, and the tool's declared arguments (`Argument`, an entry of the catalog file's `args`), and denies the call with `ErrInvalidArgument` (EP-19). `url_host` is `ReadURL`'s host, and `email_domain` reads its domain with `readHost`, the steps 7 and 8 of `url_host`. `readHost` refuses two A-labels that `x/net/idna` reads (below) |
+| `arguments.json` | A new vector file: 216 transforms and 62 records. 127 transforms take the values of the URL and address check under its IDs: L01 to X38 as `url_host` reads them, E01 to F15 as `email_domain` does, and its 14 hosts of IDNA as I01 to I14, in an address. A case gives the call's arguments as a JSON value, as text where a parsed value cannot hold them, or not at all |
+| `vectors_test.go` | `TestTransformVectors` and `TestRecordVectors`, and `TestTheTransformVectorsTakeTheValuesOfTheCheck`, which checks that every value of the check has its case |
+| The Python checker | The same transforms, `path` from the steps of section 6.11 rather than `posixpath.normpath`, and the same records. `read_host` refuses a host with a code point that `unicodedata` does not know. It counts 570 vectors |
+
+| Cases | What they check |
+| --- | --- |
+| L01 to X38, E01 to F15 | The check's URLs and addresses, with the results it gives, which section 6.11 gives too |
+| I01 to I14 | The check's hosts of IDNA, as the domain of `alice@`: `xn--gd-.com` and `faß.de` cannot be read |
+| T-01 to T-22 | `path`: the examples of section 6.11, `..` kept and dropped, drive letters and UNC names, empty results, spaces and percent-encoding as ordinary characters, a C1 control character, and the control characters it cannot read |
+| T-23 to T-28 | `lowercase`: ASCII letters only, the Kelvin sign kept |
+| T-29 to T-32 | `url_host`: an empty value, the A-labels that `readHost` now refuses, and a label of an ignored character, which converts to a trailing dot |
+| T-33 to T-75 | `email_domain`: a last label that is a number, IPv6 addresses and domain literals, empty parts, each character that a local part or a display name cannot hold, quoted names, text around the address, a tab, a `%` in the domain, the bounds of DNS, `ß` in an A-label, and `xn--` written in fullwidth letters |
+| T-76 to T-87 | `email_domain`, as the review settled it: names before `<` with no space and with several, C1 control characters, and White_Space characters in a local part and in a display name |
+| T-88, T-89 | U+190EA, which the `idna` package knows and Python's `unicodedata` and Go's tables do not, in an A-label and as written |
+| A-01 to A-08 | Records: names and paths, missing arguments, exact property names, and arguments that no declaration names, never read |
+| A-09 to A-14 | Each transform in a record, a value that it cannot read denying the call, and sets transformed element by element |
+| A-15 to A-35 | Types: sets, the range and the forms of `Long`, `Bool`, and each value that does not fit `String`, `Set<String>` or `Set<Long>` |
+| A-36 to A-44 | Arguments that are absent, not JSON, an array, a string or `null`, for a tool with declared arguments and for one without |
+| A-45 to A-50 | `null` at the top level and within a declared path, and in an argument that no declaration names; a string, an array and `null` where a declared path needs an object |
+| A-51 to A-57 | Member names that repeat: a declared argument given twice, in the arguments object with declarations and without, along a declared path, and elsewhere, which is allowed |
+| A-58 to A-62 | Lone surrogates in a declared string, in a set's element and under a transform; one that no declaration reads, and a surrogate pair |
+
+Details the lists do not name:
+
+- **Two A-labels that the Go stack read.** `x/net/idna` reads the A-label `xn--`, whose Punycode gives an empty label, as an empty label, so that `https://a.b.xn--/` read as `a.b`; and it decodes an A-label that is not ASCII once mapped, such as `xn--g例-`, as the A-label of `g例`. Step 7 refuses both, and the Python stack did. `readHost` now maps the host as UTS #46 does, character by character, without decoding its A-labels, and refuses an A-label that does not convert to itself. A comparison of the stacks on generated values found it.
+- **The stacks agree beyond the vectors.** 100,000 generated values, URLs, addresses, hosts and other text, give the same results under the four transforms on Go 1.27, Go 1.26 and Python. Before the review, 42 hosts that hold U+190EA differed: the `idna` package's tables, of Unicode 18.0, know it, Python's `unicodedata`, of Unicode 15.1, does not, and Python read them. It now refuses them, as Go does.
+- **Unicode's version on each stack.** Go's tables are of one version: on Go 1.27, `x/net/idna` and the normalization and Bidi tables of `x/text` are of Unicode 17.0, and on Go 1.26 of 15.0. So Go 1.27 reads a host with a character that Unicode 16.0 or 17.0 assigns, such as U+16D40, which Go 1.26 and Python refuse. Section 6.11 allows both readings, and the vectors hold no such character.
+- **The review's answers.** The seven cases that section 6.11 left open, which the review settled (below), are in the vectors on both stacks, cases that are denied and cases that are allowed. A member name that repeats in the arguments object denies the call whatever the tool declares, as arguments that are not an object do (A-53), while a repeat in an object that no declared path goes through does not (A-56, A-57). The unit test that pinned these cases on the Go stack is gone.
+- **Sets** are written in the vectors as their distinct elements in ascending order, by code point for strings, so that both stacks compare them exactly.
+- **Fuzz tests.** `FuzzTransform` checks that each transform reads what it gives as it is, and `FuzzRecord` that a record holds the declared argument alone, of its declared type, and that a call is denied only with `ErrInvalidArgument`.
+
+Findings where the check file differs from the specification, which decides:
+
+- `faß.de`, among the hosts of IDNA: every library of the check converts it to `xn--fa-hia.de`, and section 6.11 refuses it since the review of part 3a-2 (I13).
+- `xn--gd-.com`: the check's Python `idna` and Node convert it, and section 6.11 refuses it, as the specification answered on 2026-11-06 (I12).
+- X20, `http:///evil.com/`: the check gives the reason "no host", which no step names. Step 7 refuses an empty host as an empty label, with the same result.
+
+For the specification, which is the reviewer's: section 9.1 gains `arguments.json` with 278 cases.
+
+### 2026-11-10: the review of part 3b
+
+The agent of part 3b left seven cases that section 6.11 does not settle out of the vectors, and implemented the reading that denies more for each. The review settled them in the specification, and they go into the vectors before the part merges.
+
+The maintainer's decision of 2026-11-10:
+
+- **`null` as a declared argument's value** does not fit its type, and denies the call. A tool can read `null` otherwise than an absent argument (`filter: null` can mean no filter), so a rule that lets an absent argument pass must not let `null` pass. The cost: frameworks that send `null` for an optional parameter, as OpenAI's strict mode does, have those calls denied until they leave it out. The alternative was `null` as an absent argument, decided by `if_absent`.
+
+What the review settled, which is the reviewer's:
+
+| Question | Answer |
+| --- | --- |
+| A space between a name and `<` in `email_domain` | Required, as the forms are written: `Alice<alice@corp.com>` cannot be read |
+| A declared path through a value that is not an object | Denies the call (EP-19): some tools parse a JSON string, or take an array's first element |
+| A member name that repeats in the call's arguments | Denies the call when it repeats in the arguments object or in any object that a declared path goes through, where two parsers could give a rule different values, as the decision of 2026-11-06 did for definition hashes. A repeat elsewhere reaches no rule |
+| A lone surrogate in a declared string | Denies the call: Cedar strings cannot hold one, and parsers replace it or refuse it |
+| `email_domain`'s control characters and whitespace | Unicode's Cc category, C1 included, and its White_Space property |
+| Arguments that are absent, not JSON or not an object | Absent arguments are an empty object, as MCP allows them to be absent. Arguments that are not a JSON object deny the call, whatever the tool declares |
+
+The review also accepted:
+
+- **The fix of `readHost`, 3a-2's code, in this part.** `x/net/idna` read `xn--` as an empty label and `xn--g例-` as an A-label, which step 7 refuses. It is the reading that `url_host` and `email_domain` share, and Python already refused both.
+- **The check file's three differences**, which the specification decides: `faß.de` and `xn--gd-.com` cannot be read, and `http:///evil.com/` cannot be read as an empty label rather than as "no host".
+
+For the part, before it merges:
+
+- the vectors cover each answer above, on both stacks;
+- the stacks deny arguments that are not an object whatever the tool declares, and read absent arguments as an empty object;
+- the Python checker refuses a host with a code point that `unicodedata` does not know, as Go refuses one that its tables do not know, so that one stack never reads with two versions of Unicode.

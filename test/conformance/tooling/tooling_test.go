@@ -44,6 +44,127 @@ func TestReadURLCannotReadTextThatIsNotUTF8(t *testing.T) {
 	}
 }
 
+func TestTransformCannotReadTextThatIsNotUTF8(t *testing.T) {
+	for _, name := range []string{"lowercase", "path", "url_host", "email_domain"} {
+		if got, err := tooling.Transform(name, "a@b.example/\xff"); !errors.Is(err, tooling.ErrCannotRead) {
+			t.Errorf("%s: got %q, %v; want ErrCannotRead", name, got, err)
+		}
+	}
+}
+
+func TestRecordRefusesAnUnknownTypeOrTransform(t *testing.T) {
+	for _, arg := range []tooling.Argument{
+		{Name: "n", Path: []string{"n"}, Type: "Decimal"},
+		{Name: "n:uppercase", Path: []string{"n"}, Type: "String", Transform: "uppercase"},
+	} {
+		record, err := tooling.Record([]byte(`{"n":"1"}`), []tooling.Argument{arg})
+		if err == nil || errors.Is(err, tooling.ErrInvalidArgument) {
+			t.Errorf("%+v: got %v, %v; want an error in the declaration", arg, record, err)
+		}
+	}
+}
+
+// FuzzTransform checks that the transforms never panic, and that each reads
+// what it gives as it is: a cleaned path cleans to itself and has no
+// backslash, a host that url_host reads reads again in a URL, and a domain
+// that email_domain reads reads again in an address.
+func FuzzTransform(f *testing.F) {
+	for _, seed := range []string{
+		"//srv/./data/../../etc/passwd",
+		"C:\\Windows\\..\\..\\x",
+		"../../a/b/../c",
+		"/etc/passwd\x00.png",
+		"MAIN-\u212a",
+		"Alice Smith <alice@M\u00fcnchen.DE.>",
+		"\"a <b@evil.com>\" <x@good.com>",
+		"alice@evil.com(@good.com)",
+		"alice@good.com\u3002evil.com",
+		"alice@192.168.1.1",
+		"https://user@[2001:db8::1]:8443/",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		for name, again := range map[string]func(string) string{
+			"lowercase":    func(s string) string { return s },
+			"path":         func(s string) string { return s },
+			"url_host":     func(s string) string { return "https://" + s + "/" },
+			"email_domain": func(s string) string { return "alice@" + s },
+		} {
+			got, err := tooling.Transform(name, value)
+			if err != nil {
+				if !errors.Is(err, tooling.ErrCannotRead) {
+					t.Fatalf("%s(%q): %v, which does not wrap ErrCannotRead", name, value, err)
+				}
+				continue
+			}
+			if name == "path" && strings.Contains(got, `\`) {
+				t.Fatalf("path(%q) gives %q", value, got)
+			}
+			if twice, err := tooling.Transform(name, again(got)); err != nil || twice != got {
+				t.Fatalf("%s(%q) gives %q, which reads as %q, %v", name, value, got, twice, err)
+			}
+		}
+	})
+}
+
+// FuzzRecord checks that filling a record never panics, whatever the call's
+// arguments, that it denies a call only with ErrInvalidArgument, and that a
+// record holds the declared argument alone, of its declared type. The
+// fuzzer's text is the arguments, the argument's path, its names separated by
+// dots, and a choice of its type and transform.
+func FuzzRecord(f *testing.F) {
+	f.Add(`{"options":{"to":["Alice <a@Corp.com>","b@corp.com"]}}`, "options.to", uint8(7))
+	f.Add(`{"n":[3,1,3,-9223372036854775808]}`, "n", uint8(8))
+	f.Add(`{"n":1.0,"n":2}`, "n", uint8(5))
+	f.Add(`{"a":{"b":"//etc/../passwd"}}`, "a.b", uint8(2))
+	kinds := []struct{ typ, transform string }{
+		{"String", ""},
+		{"String", "lowercase"},
+		{"String", "path"},
+		{"String", "url_host"},
+		{"String", "email_domain"},
+		{"Long", ""},
+		{"Bool", ""},
+		{"Set<String>", "email_domain"},
+		{"Set<Long>", ""},
+	}
+	f.Fuzz(func(t *testing.T, arguments, path string, kind uint8) {
+		k := kinds[int(kind)%len(kinds)]
+		arg := tooling.Argument{Name: path, Path: strings.Split(path, "."), Transform: k.transform, Type: k.typ}
+		record, err := tooling.Record([]byte(arguments), []tooling.Argument{arg})
+		if err != nil {
+			if !errors.Is(err, tooling.ErrInvalidArgument) {
+				t.Fatalf("%q: %v, which does not wrap ErrInvalidArgument", arguments, err)
+			}
+			return
+		}
+		v, ok := record[path]
+		switch {
+		case !ok && len(record) == 0:
+			return
+		case !ok || len(record) != 1:
+			t.Fatalf("%q gives the record %v for the argument %q", arguments, record, path)
+		}
+		var fits bool
+		switch v := v.(type) {
+		case string:
+			fits = k.typ == "String"
+		case int64:
+			fits = k.typ == "Long"
+		case bool:
+			fits = k.typ == "Bool"
+		case []string:
+			fits = k.typ == "Set<String>" && slices.IsSorted(v) && len(slices.Compact(slices.Clone(v))) == len(v)
+		case []int64:
+			fits = k.typ == "Set<Long>" && slices.IsSorted(v) && len(slices.Compact(slices.Clone(v))) == len(v)
+		}
+		if !fits {
+			t.Fatalf("%q gives %#v for an argument of type %s", arguments, v, k.typ)
+		}
+	})
+}
+
 // nested are EP-14's two prefixes, one within the other.
 var nested = []string{"https://a.example/s/", "https://a.example/s/x/"}
 
