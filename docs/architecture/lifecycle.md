@@ -3,8 +3,8 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md), step 4) |
-| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)); sections 3 and 4 updated on 2026-10-19 for shared use cases and the decisions on proposals (the maintainer's decisions, plan P1-04); sections 2, 3, 4 and 7 updated on 2026-10-20 for the design of the halt path and the maintainer's decisions on it (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes)); sections 1 and 9 updated on 2026-10-22 for the gate in production (the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)) |
-| **Normative** | Yes. The machine-readable form is [agent-lifecycle.yaml](agent-lifecycle.yaml); plan P1-04 generates the transition guards from it, and the two must never disagree |
+| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)); sections 3 and 4 updated on 2026-10-19 for shared use cases and the decisions on proposals (the maintainer's decisions, plan P1-04); sections 2, 3, 4 and 7 updated on 2026-10-20 for the design of the halt path and the maintainer's decisions on it (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes)); sections 1 and 9 updated on 2026-10-22 for the gate in production (the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)); the normative note and section 4 updated on 2026-11-12 for the engine's table and for separation of duties over past assignments (the review of plan P1-04's pull request 4) |
+| **Normative** | Yes. The machine-readable form is [agent-lifecycle.yaml](agent-lifecycle.yaml); plan P1-04's lifecycle engine holds the same table, which a test keeps equal to it, and the two must never disagree |
 | **Related** | [Requirements 5.1.1](../requirements/mvp-requirements.md#511-agent-lifecycle-initial-proposal-refined-in-plan-p0-02), [domain model](domain-model.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md) |
 
 The lifecycle turns the charter's governance model into rules the system enforces: **no agent reaches production without an owner, a validated use case and a specific policy**, and an agent whose owner leaves or whose review lapses stops being allowed to run.
@@ -74,7 +74,7 @@ The transitions White Tower makes itself (T7, T8, T11 and T12) cannot be asked f
 | `metadata_complete` | Every mandatory field of requirement INV-01 is set |
 | `use_case_linked` | The agent references a use case |
 | `owner_active` | The primary owner is an active principal |
-| `not_owner_or_creator` | The actor is neither the primary owner, a delegate, nor the creator of the agent or its use case (separation of duties, HUM-04) |
+| `not_owner_or_creator` | The actor is neither the creator of the agent or of its use case, nor the agent's primary owner or one of its delegates, now or ever, whether the assignment ended or not (separation of duties, HUM-04) |
 | `comment_given` | The request carries a non-empty comment |
 | `use_case_not_prohibited` | The use case's EU AI Act classification is not `prohibited` |
 | `use_case_not_rejected` | The use case's status is not `rejected` |

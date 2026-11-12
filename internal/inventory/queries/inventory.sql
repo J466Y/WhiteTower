@@ -15,6 +15,24 @@ INSERT INTO whitetower.use_cases (
 -- name: GetUseCase :one
 SELECT * FROM whitetower.use_cases WHERE id = $1;
 
+-- name: LockUseCase :one
+-- Locks a use case until the transaction ends, then reads it: the decisions
+-- on the agents that it justifies happen one after the other, and each sees
+-- the status that the one before it left.
+SELECT * FROM whitetower.use_cases WHERE id = $1 FOR NO KEY UPDATE;
+
+-- name: SetUseCaseStatus :exec
+-- Moves a use case that no decision has made final to another status. A
+-- validated or rejected use case never changes.
+UPDATE whitetower.use_cases
+SET status = sqlc.arg(status), updated_at = sqlc.arg(updated_at), version = version + 1
+WHERE id = sqlc.arg(id) AND status NOT IN ('validated', 'rejected');
+
+-- name: RecordDecision :exec
+INSERT INTO whitetower.use_case_decisions (id, use_case_id, agent_id, decision, comment, decided_by, decided_at)
+VALUES (sqlc.arg(id), sqlc.arg(use_case_id), sqlc.arg(agent_id), sqlc.arg(decision), sqlc.arg(comment),
+  sqlc.arg(decided_by), sqlc.arg(decided_at));
+
 -- name: UpdateUseCase :execrows
 -- Changes a use case if it is still at the version the caller read.
 UPDATE whitetower.use_cases SET
@@ -123,6 +141,31 @@ SELECT EXISTS (
   SELECT 1 FROM whitetower.agent_owners
   WHERE agent_id = $1 AND principal_id = $2 AND ended_at IS NULL
 );
+
+-- name: EverAssigned :one
+-- Whether the principal is, or ever was, the agent's primary owner or one of
+-- its delegates.
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.agent_owners WHERE agent_id = $1 AND principal_id = $2
+);
+
+-- name: SetLifecycleState :execrows
+-- Moves an agent to another state of its lifecycle, if it is still at the
+-- version the caller read.
+UPDATE whitetower.agents
+SET lifecycle_state = sqlc.arg(lifecycle_state), updated_at = sqlc.arg(updated_at), version = version + 1
+WHERE id = sqlc.arg(id) AND version = sqlc.arg(version);
+
+-- name: ListTransitions :many
+-- A page of the agent's lifecycle transitions, newest first, with the display
+-- name of whoever took each one; the system has none.
+SELECT t.*, p.display_name
+FROM whitetower.lifecycle_transitions t
+LEFT JOIN whitetower.principals p ON p.id = t.actor_id
+WHERE t.agent_id = sqlc.arg(agent_id)
+  AND (sqlc.narg(before)::uuid IS NULL OR t.id < sqlc.narg(before)::uuid)
+ORDER BY t.id DESC
+LIMIT sqlc.arg(page_limit);
 
 -- name: PrincipalRefs :many
 SELECT id, display_name, status FROM whitetower.principals WHERE id = ANY(sqlc.arg(ids)::uuid[]);
@@ -240,10 +283,14 @@ WHERE agent_id = sqlc.arg(agent_id) AND status = 'pending'
 RETURNING id;
 
 -- name: AddInboxItem :exec
-INSERT INTO whitetower.inbox_items (id, principal_id, kind, subject_type, subject_id, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(principal_id), sqlc.arg(kind), sqlc.arg(subject_type), sqlc.arg(subject_id), sqlc.arg(created_at));
+-- Adds an item to the inbox of one principal, or of everyone who holds one
+-- role.
+INSERT INTO whitetower.inbox_items (id, principal_id, role, kind, subject_type, subject_id, created_at)
+VALUES (sqlc.arg(id), sqlc.narg(principal_id), sqlc.narg(role), sqlc.arg(kind), sqlc.arg(subject_type),
+  sqlc.arg(subject_id), sqlc.arg(created_at));
 
 -- name: ResolveInboxItems :exec
--- Takes the items about a subject out of every inbox.
+-- Takes the items of one kind about a subject out of every inbox.
 UPDATE whitetower.inbox_items SET resolved_at = sqlc.arg(resolved_at)
-WHERE subject_type = sqlc.arg(subject_type) AND subject_id = sqlc.arg(subject_id) AND resolved_at IS NULL;
+WHERE kind = sqlc.arg(kind) AND subject_type = sqlc.arg(subject_type) AND subject_id = sqlc.arg(subject_id)
+  AND resolved_at IS NULL;
