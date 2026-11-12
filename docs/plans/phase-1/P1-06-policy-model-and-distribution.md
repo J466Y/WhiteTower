@@ -96,6 +96,8 @@ Write the OpenAPI operations for policies, versions, validation, approvals, diff
 
 Implement the interface P1-04 uses: an agent can be activated only if it has at least one active agent-specific policy (POL-04).
 
+Retiring an agent (T14) retires its agent-specific policies, in the transaction of the transition, through a hook that this plan adds to P1-04's lifecycle engine (P1-04's progress notes, 2026-11-12).
+
 **Done when:** the lifecycle property tests run against the real implementation instead of the stub.
 
 ### 6. Effective sets and bundles

@@ -49,6 +49,7 @@ A `keys` interface (sign, public JWK, key ID, rotation state) with a file backen
 - List, revoke and rotate keys; each is identified by its RFC 7638 JWK thumbprint.
 - The client ID is the agent ID.
 - Allowed to the agent's owner and to operators (permission matrix). Every change is audited.
+- Retiring an agent (T14) revokes every credential it has, in the transaction of the transition, through a hook that this plan adds to P1-04's lifecycle engine (P1-04's progress notes, 2026-11-12). The gate refuses a retired agent's tokens anyway (step 5); revoking them as well leaves a retired agent no live credential, should a later change of the gate let one through, and records the end of each credential in the audit log.
 
 **Done when:** the permission and validation tests pass, and private keys are never accepted by mistake (a PEM private key is rejected with a clear error).
 
