@@ -1,0 +1,15 @@
+{
+  "description": "The manifest's version is 2^53 written with a fraction of zeros, 9007199254740992.0: by its value, an integer beyond 2^53 - 1",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 9007199254740992,
+    "manifest_sha256": "da67a570c6ab29de86c15bcce052ee7ab11c78a193f58b7b778c80e4927a643d",
+    "size_bytes": 8818
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

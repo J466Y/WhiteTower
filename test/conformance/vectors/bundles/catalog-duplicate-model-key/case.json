@@ -1,0 +1,15 @@
+{
+  "description": "Two models, llama3.1:8b and llama3.2:3b, share the key gpu-01/llama3.1-8b",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "1d3272ac4c7d075cb817e14e3868275fab627c91f46f58d591555b0d9d4480d2",
+    "size_bytes": 8953
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

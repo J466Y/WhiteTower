@@ -1,6 +1,6 @@
 """Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519, PyYAML for manifests,
-jsonschema for the request schema, idna for the hosts of URLs and addresses, and the standard library's json, hashlib
-and hmac for canonical JSON, definition hashes and hashed arguments.
+jsonschema for the request schema and the catalog file, idna for the hosts of URLs and addresses, and the standard
+library's json, hashlib and hmac for canonical JSON, I-JSON, definition hashes and hashed arguments.
 
 The Go tests in test/conformance check the same vectors with cedar-go, the
 manifest vectors with yaml.v3, canonical JSON with the kit's own reader and
@@ -41,6 +41,7 @@ from decimal import Decimal
 VECTORS = Path(__file__).resolve().parent.parent / "vectors"
 CEDAR_SCHEMA = Path(__file__).resolve().parents[3] / "api" / "policy" / "whitetower.cedarschema"
 REQUEST_SCHEMA = Path(__file__).resolve().parents[3] / "api" / "policy" / "decision-request.schema.json"
+CATALOG_SCHEMA = Path(__file__).resolve().parents[3] / "api" / "policy" / "catalog.schema.json"
 
 ACTION_RESOURCE = {
     "agent.start": "agent", "input.receive": "agent", "output.emit": "agent", "agent.stop": "agent",
@@ -58,14 +59,14 @@ class InvalidRequest(Exception):
 
 def ecma262_pattern(validator, pattern, instance, schema):
     """The keyword pattern as JSON Schema reads it: an ECMA-262 regular expression, whose $ matches at the end of the
-    string only, where Python's also matches before a final line break. The request schema's patterns end with $,
-    which this reads as \\Z, the end alone."""
+    string only, where Python's also matches before a final line break. The profile's patterns end with $, which this
+    reads as \\Z, the end alone."""
     if validator.is_type(instance, "string") and re.search(re.sub(r"\$\Z", r"\\Z", pattern), instance) is None:
         yield jsonschema.ValidationError(f"{instance!r} does not match {pattern!r}")
 
 
-# The validator of decision-request.schema.json.
-RequestValidator = jsonschema.validators.extend(jsonschema.Draft202012Validator, {"pattern": ecma262_pattern})
+# The validator of the profile's schemas: decision-request.schema.json and catalog.schema.json.
+SchemaValidator = jsonschema.validators.extend(jsonschema.Draft202012Validator, {"pattern": ecma262_pattern})
 
 INT64 = range(-2**63, 2**63)
 
@@ -153,7 +154,7 @@ def to_cedar(req: dict) -> tuple[dict, list]:
 class Engine:
     """One bundle's policies for one agent, with the combining algorithm wt-deny-overrides-v1."""
 
-    def __init__(self, agent_id: str, bundle_version: int, policies: list[dict], validator: RequestValidator):
+    def __init__(self, agent_id: str, bundle_version: int, policies: list[dict], validator: SchemaValidator):
         self.agent_id = agent_id
         self.bundle_version = bundle_version
         self.validator = validator
@@ -285,8 +286,8 @@ class Rejected(Exception):
         self.reason = reason
 
 
-# The members of a bundle manifest, of its Cedar schema's entry and of a policy
-# entry: exactly these, each of them required (bundle-manifest.schema.json).
+# The members of a bundle manifest, of the entry of its Cedar schema or of its catalog file, and of a policy entry:
+# exactly these, each of them required but the manifest's catalog (bundle-manifest.schema.json).
 MANIFEST_MEMBERS = {"format", "agent_id", "version", "created_at", "combining_algorithm", "language",
                     "cedar_schema", "policies"}
 FILE_MEMBERS = {"path", "sha256"}
@@ -308,16 +309,85 @@ def trusted_key(jwk: dict) -> Ed25519PublicKey | None:
         return None
 
 
-def utf8_json(data: bytes):
-    """Parses JSON in the encoding that section 1 states: UTF-8, without a byte order
-    mark, which json.loads refuses in text. From bytes, json.loads would take a byte
-    order mark, UTF-16 and UTF-32. Raises ValueError otherwise."""
-    return json.loads(data.decode("utf-8"))
+# A number as RFC 8259 writes it.
+JSON_NUMBER = re.compile(r"(-?)(0|[1-9][0-9]*)(?:\.([0-9]+))?(?:[eE]([-+]?[0-9]+))?")
 
 
-def members(value, names: set) -> dict:
-    """An object with exactly the members named, none of them null, or invalid_manifest."""
-    if type(value) is not dict or set(value) != names or None in value.values():
+def exact_decimal(text: str) -> tuple[bool, str, int]:
+    """The exact value of a number as RFC 8259 writes it: its sign, its digits without leading or trailing zeros, and
+    the power of ten that multiplies them. -4.20e1 is (True, "42", 0), 1.5 is (False, "15", -1), and zero is
+    (False, "", 0). Decimal cannot read the exponents beyond 10^18 that JSON allows."""
+    sign, whole, fraction, exponent = JSON_NUMBER.fullmatch(text).groups()
+    fraction = fraction or ""
+    digits = (whole + fraction).lstrip("0")
+    stripped = digits.rstrip("0")
+    if not stripped:
+        return False, "", 0
+    return sign == "-", stripped, int(exponent or 0) - len(fraction) + len(digits) - len(stripped)
+
+
+def ijson_value(text: str) -> int | float:
+    """A number of I-JSON (section 1), read by its exact value whatever its spelling, as an int when it is an integer:
+    4.2e1 and 42.0 are 42. An integer has a magnitude of at most 2^53 - 1, so that 9.007199254740992e15 is refused as
+    9007199254740992 is, and any other number is the value of the shortest form of its double, which repr writes, so
+    that 0.1 passes, and 0.10000000000000001 and 1e-400 do not."""
+    negative, digits, exponent = exact_decimal(text)
+    if exponent >= 0:
+        if len(digits) + exponent > 16 or int("0" + digits + "0" * exponent) > 2**53 - 1:
+            raise ManifestRefused(f"{text} is not I-JSON: an integer's magnitude is at most 2^53 - 1")
+        return int(("-" if negative else "") + "0" + digits + "0" * exponent)
+    value = float(text)
+    if not math.isfinite(value) or exact_decimal(repr(value)) != (negative, digits, exponent):
+        raise ManifestRefused(f"{text} is not I-JSON: a double cannot hold it")
+    return value
+
+
+def unique_members(pairs: list) -> dict:
+    """An object whose member names are unique, as I-JSON's are."""
+    if len({name for name, _ in pairs}) != len(pairs):
+        raise ManifestRefused("a member name twice is not I-JSON")
+    return dict(pairs)
+
+
+def ijson_strings(value) -> None:
+    """Checks every string of a value, member names included, with ijson_string."""
+    if isinstance(value, str):
+        ijson_string(value)
+    elif isinstance(value, list):
+        for item in value:
+            ijson_strings(item)
+    elif isinstance(value, dict):
+        for name, item in value.items():
+            ijson_string(name)
+            ijson_strings(item)
+
+
+def read_ijson(data: bytes):
+    """Reads JSON text that must be I-JSON (section 1, RFC 7493), as a bundle's JWS header, manifest and catalog file
+    must. It raises ManifestRefused, as the manifest reader of section 3.1 does, for text that is not: a member
+    name twice, a string with a lone surrogate or a noncharacter, or a number that ijson_value refuses; and ValueError
+    for text that is not JSON in the encoding that section 1 states, UTF-8 without a byte order mark, which json.loads
+    refuses in text: from bytes, it would take a byte order mark, UTF-16 and UTF-32."""
+    value = json.loads(data.decode("utf-8"), object_pairs_hook=unique_members, parse_int=ijson_value,
+                       parse_float=ijson_value, parse_constant=not_json)
+    ijson_strings(value)
+    return value
+
+
+def read_canonical(data: bytes):
+    """Reads a bundle's manifest or catalog file, which is I-JSON and its own canonical JSON (sections 1 and 7.2):
+    bytes that differ from it, by spaces, the order of members, an escape or the spelling of a number, raise
+    ManifestRefused, so that a manifest has one form and one reference."""
+    value = read_ijson(data)
+    if canonical_json(value).encode() != data:
+        raise ManifestRefused("not its own canonical JSON")
+    return value
+
+
+def members(value, names: set, optional: frozenset = frozenset()) -> dict:
+    """An object with exactly the members named, and those optional that it has, none of them null, or
+    invalid_manifest."""
+    if type(value) is not dict or not names <= set(value) <= names | optional or None in value.values():
         raise Rejected("invalid_manifest")
     return value
 
@@ -333,26 +403,26 @@ def positive(value) -> bool:
 def check_manifest(manifest: bytes) -> dict:
     """The checks of step V4 that read the manifest alone, in their order (section 7.4).
 
-    A manifest that is not JSON in UTF-8 without a byte order mark (section 1), or
-    not an object, or that has an unknown or a missing member, or a member of the
-    wrong type, is invalid_manifest: the types are those of
-    bundle-manifest.schema.json, the forms of its strings included. Then a format,
-    combining algorithm or language that is not supported is unsupported, even
-    though the schema's constant fails too. Paths need only be strings here: V5
-    builds them from their entries.
+    A manifest that is not I-JSON, or not its own canonical JSON (sections 1 and
+    7.2, read_canonical), or not an object, or that has an unknown or a missing
+    member, or a member of the wrong type, is invalid_manifest: the types are
+    those of bundle-manifest.schema.json, the forms of its strings included. Then
+    a format, combining algorithm or language that is not supported is
+    unsupported, even though the schema's constant fails too. Paths need only be
+    strings here: V5 builds them from their entries.
     """
     try:
-        m = utf8_json(manifest)
-    except ValueError:
+        m = read_canonical(manifest)
+    except (ValueError, ManifestRefused, RecursionError):
         raise Rejected("invalid_manifest") from None
-    members(m, MANIFEST_MEMBERS)
-    schema = members(m["cedar_schema"], FILE_MEMBERS)
+    members(m, MANIFEST_MEMBERS, frozenset({"catalog"}))
+    files = [members(m[k], FILE_MEMBERS) for k in ("cedar_schema", "catalog") if k in m]
     if type(m["policies"]) is not list:
         raise Rejected("invalid_manifest")
     policies = [members(p, POLICY_MEMBERS) for p in m["policies"]]
     if not (all(type(m[k]) is str for k in ("format", "combining_algorithm", "language"))
             and form(UUID, m["agent_id"]) and positive(m["version"]) and form(TIMESTAMP, m["created_at"])
-            and type(schema["path"]) is str and form(SHA256, schema["sha256"])
+            and all(type(f["path"]) is str and form(SHA256, f["sha256"]) for f in files)
             and all(form(UUID, p["id"]) and type(p["name"]) is str and 1 <= len(p["name"]) <= 200
                     and positive(p["version"]) and p["scope"] in ("global", "agent")
                     and type(p["path"]) is str and form(SHA256, p["sha256"]) for p in policies)):
@@ -374,8 +444,9 @@ def parse_static(policy: bytes) -> None:
         raise Rejected("parse_error") from None
 
 
-def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: dict) -> dict:
-    """The verification steps V1 to V7 of section 7.4, in their order."""
+def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: dict,
+                  catalog_validator: SchemaValidator) -> dict:
+    """The verification steps V1 to V7 of section 7.4, in their order, with the validator of catalog.schema.json."""
     files = {p.relative_to(case_dir).as_posix(): p.read_bytes() for p in case_dir.rglob("*") if p.is_file()}
     manifest = files.pop("manifest.json")
     signature = files.pop("manifest.jws", b"").decode()
@@ -386,14 +457,15 @@ def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: di
     if ref["size_bytes"] > 2 << 20 or size > 2 << 20 or len(files) > 1000:
         raise Rejected("oversized")
     # V2. Signature. The header and the signature are in base64url as RFC 7515
-    # defines it, and the header is JSON in UTF-8 with exactly alg, kid and typ,
-    # in any order (section 7.2): any other member, such as b64, is refused.
+    # defines it, and the header is I-JSON with exactly alg, kid and typ, in any
+    # order (section 7.2): any other member, such as b64, is refused, and so is
+    # a member name twice.
     parts = signature.split(".")
     if len(parts) != 3 or parts[1] != "":
         raise Rejected("signature")
     try:
-        header = utf8_json(b64url(parts[0]))
-    except ValueError:
+        header = read_ijson(b64url(parts[0]))
+    except (ValueError, ManifestRefused, RecursionError):
         raise Rejected("signature") from None
     if type(header) is not dict or set(header) != {"alg", "kid", "typ"} \
             or header["alg"] != "EdDSA" or header["typ"] != "whitetower-bundle+jws":
@@ -414,8 +486,9 @@ def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: di
     m = check_manifest(manifest)
     if m["agent_id"] != case["agent_id"] or m["version"] != ref["version"]:
         raise Rejected("invalid_manifest")
-    # V5. Each policy's path is built from its entry, with no duplicates, and
-    # the schema sits at schema.cedarschema; then exactly the listed files.
+    # V5. Each policy's path is built from its entry, with no duplicates, the
+    # schema sits at schema.cedarschema and the catalog file at catalog.json;
+    # then exactly the listed files.
     listed = {}
     for p in m["policies"]:
         path = f"policies/{p['scope']}/{p['id']}.{m['language']}"
@@ -425,6 +498,10 @@ def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: di
     if m["cedar_schema"]["path"] != "schema.cedarschema":
         raise Rejected("invalid_manifest")
     listed["schema.cedarschema"] = m["cedar_schema"]["sha256"]
+    if "catalog" in m:
+        if m["catalog"]["path"] != "catalog.json":
+            raise Rejected("invalid_manifest")
+        listed["catalog.json"] = m["catalog"]["sha256"]
     for path in sorted(listed):
         if path not in files:
             raise Rejected("missing_file")
@@ -436,10 +513,55 @@ def verify_bundle(case_dir: Path, trusted: dict[str, Ed25519PublicKey], case: di
     if m["version"] < case["active_version"] or (
             m["version"] == case["active_version"] and digest != case.get("active_manifest_sha256")):
         raise Rejected("older_version")
-    # V7. Static policies.
+    # V7. Static policies, and a catalog file that is I-JSON in its own
+    # canonical form, as the manifest is, matches its schema, and names its
+    # entries and arguments as section 7.7 says.
     for p in m["policies"]:
         parse_static(files[p["path"]])
+    if "catalog" in m:
+        try:
+            catalog = read_canonical(files["catalog.json"])
+        except (ValueError, ManifestRefused, RecursionError):
+            raise Rejected("parse_error") from None
+        if not catalog_validator.is_valid(catalog) or not catalog_entries_hold(catalog):
+            raise Rejected("parse_error")
     return {"outcome": "activated"}
+
+
+def catalog_entries_hold(catalog: dict) -> bool:
+    """Whether a catalog file that matches its schema keeps the rules of section 7.7 that the schema cannot state: no
+    two servers, two tools or two models share a key or a reference; a tool's server is a server of the file, approved
+    when the tool is; and an argument's name is its path joined by . and followed by : and its transform, once per tool.
+    References are computed as section 4.10 says, a model's with the file's own redaction rules, and a model whose
+    reference cannot be computed fails."""
+    rules = catalog["redaction"]
+    servers = {s["key"]: s for s in catalog["servers"]}
+    tool_references = []
+    for t in catalog["tools"]:
+        if t["kind"] == "mcp":
+            server = servers.get(t["server"])
+            if server is None or (t["status"] == "approved" and server["status"] != "approved"):
+                return False
+            entry = {"kind": "mcp_tool", "name": t["name"], "server": server["reference"]}
+        elif t["kind"] == "builtin":
+            entry = {"kind": "builtin_tool", "provider": t["provider"], "type": t["type"]}
+        else:
+            entry = {"kind": "tool", "name": t["name"]}
+        tool_references.append(reference(entry, rules))
+        names = [a["name"] for a in t.get("args", [])]
+        if len(set(names)) != len(names) or any(
+                a["name"] != ".".join(a["path"]) + (":" + a["transform"] if "transform" in a else "")
+                for a in t.get("args", [])):
+            return False
+    try:
+        model_references = [reference({"kind": "model", "provider": m["provider"], "endpoint": m["endpoint"],
+                                       "name": m["name"]}, rules) for m in catalog["models"]]
+    except NoReference:
+        return False
+    return all(len(set(values)) == len(values) for values in (
+        [s["key"] for s in catalog["servers"]], [s["reference"] for s in catalog["servers"]],
+        [t["key"] for t in catalog["tools"]], tool_references,
+        [m["key"] for m in catalog["models"]], model_references))
 
 
 class ManifestRefused(Exception):
@@ -1014,7 +1136,9 @@ def reference(entry: dict, rules: dict) -> str:
     if kind == "local_server":
         return "stdio:" + canonical_json(redact_command(entry["command"], rules))
     if kind == "mcp_tool":
-        return canonical_json({"name": entry["name"], "server": reference(entry["server"], rules)})
+        # Its server, as an entry, or as the reference that a catalog file gives it.
+        server = entry["server"] if type(entry["server"]) is str else reference(entry["server"], rules)
+        return canonical_json({"name": entry["name"], "server": server})
     if kind == "tool":
         return canonical_json({"name": entry["name"]})
     if kind == "builtin_tool":
@@ -1203,7 +1327,7 @@ def main() -> int:
             failures += 1
             print(f"FAIL {name}: reason {got['reason']} with {error}")
 
-    request_validator = RequestValidator(json.loads(REQUEST_SCHEMA.read_text(encoding="utf-8")))
+    request_validator = SchemaValidator(json.loads(REQUEST_SCHEMA.read_text(encoding="utf-8")))
     combination = json.loads((VECTORS / "combination.json").read_text(encoding="utf-8"))
     schema = CEDAR_SCHEMA.read_text(encoding="utf-8").replace("type ToolArgs = {};", combination["tool_args_extension"], 1)
     for case in combination["cases"]:
@@ -1225,11 +1349,12 @@ def main() -> int:
     # The trusted bundle keys, a JWK Set (section 7.3).
     keys = json.loads((VECTORS / "bundles" / "trusted-keys.json").read_text(encoding="utf-8"))
     trusted = {k["kid"]: key for k in keys["keys"] if (key := trusted_key(k)) is not None}
+    catalog_validator = SchemaValidator(json.loads(CATALOG_SCHEMA.read_text(encoding="utf-8")))
     bundle_cases = sorted(p for p in (VECTORS / "bundles").iterdir() if p.is_dir())
     for case_dir in bundle_cases:
         case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
         try:
-            got = verify_bundle(case_dir, trusted, case)
+            got = verify_bundle(case_dir, trusted, case, catalog_validator)
         except Rejected as r:
             got = {"outcome": "rejected", "reason": r.reason}
         check(f"bundle {case_dir.name}", got, case["expected"])

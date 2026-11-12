@@ -1,0 +1,15 @@
+{
+  "description": "A policy's name ends with the noncharacter U+FDD0, which I-JSON's strings never hold (RFC 7493)",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "2255841ab5605d9b960b4f03e2fcac40fb8309d36649864518b9a067cfb06f09",
+    "size_bytes": 8805
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

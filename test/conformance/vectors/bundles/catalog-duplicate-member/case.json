@@ -1,0 +1,15 @@
+{
+  "description": "An MCP tool of the catalog file gives enabled twice, false and then true: not I-JSON, whichever of them a reader keeps",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "de6f6c2c993fa84be6ba90938d5df4dc0ab4388ee13642e66ff8ca473925634b",
+    "size_bytes": 9242
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

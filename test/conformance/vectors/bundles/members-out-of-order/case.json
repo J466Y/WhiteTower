@@ -1,0 +1,15 @@
+{
+  "description": "The manifest gives its version first, where canonical JSON sorts it last: not its own canonical JSON",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "b305b2de7b1d5a85ada053b81918576d4cf8e74130c2ac23dce4c70eefe9063b",
+    "size_bytes": 8802
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}
