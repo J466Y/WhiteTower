@@ -21,14 +21,17 @@ import (
 	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/clock/clocktest"
+	"github.com/J466Y/WhiteTower/internal/platform/db"
 	"github.com/J466Y/WhiteTower/internal/platform/db/dbtest"
 	"github.com/J466Y/WhiteTower/internal/platform/notify"
 )
 
-// Otto has the owner role, as Olivia does; Omar is an operator.
+// Otto has the owner role, as Olivia does; Omar is an operator, and Alex is
+// on the advisory committee.
 const (
 	otto = "0192f2c4-8d1e-7c3a-9b2f-5e1d2c3b4a60"
 	omar = "0192f2c4-8d1e-7c3a-9b2f-5e1d2c3b4a61"
+	alex = "0192f2c4-8d1e-7c3a-9b2f-5e1d2c3b4a62"
 )
 
 // useCaseJSON is a use case to create, and proposalJSON an agent that it
@@ -46,6 +49,14 @@ func proposalJSON(useCase uuid.UUID) string {
 // database of its own, where each of the people is a principal with the
 // owner role, from the IdP group wt-owner.
 func inventoryOptions(t *testing.T, people map[string]string) Options {
+	t.Helper()
+	opts, _ := inventoryStore(t, people)
+	return opts
+}
+
+// inventoryStore returns the options of inventoryOptions and the inventory's
+// database, where a test changes rows the way a later plan would.
+func inventoryStore(t *testing.T, people map[string]string) (Options, *db.DB) {
 	t.Helper()
 	ctx := context.Background()
 	pool := dbtest.New(t).Open(t)
@@ -67,7 +78,7 @@ func inventoryOptions(t *testing.T, people map[string]string) Options {
 		Versions:    govstate.NewVersions(notify.NewMemory(), opts.Logger),
 		RoleMapping: map[string]string{"wt-owner": "owner"},
 	})
-	return opts
+	return opts, pool
 }
 
 // sender sends requests to the handler, as the principal that "as" names.
@@ -86,7 +97,7 @@ func ifMatch(etag string) http.Header { return http.Header{"If-Match": []string{
 // unbuilt lists the operations of plan P1-04 whose server side is not built
 // yet. The pull request that builds one removes it from here.
 var unbuilt = []string{
-	"exportAgents", "getAgentActions", "listAgentTransitions", "transitionAgent", "listAgentInstances",
+	"exportAgents", "getAgentActions", "listAgentInstances",
 	"listAgentReviews", "listReviews", "getReview", "completeReview", "signOffReview", "listInboxItems",
 }
 
@@ -338,4 +349,110 @@ func TestOwnershipThroughTheAPI(t *testing.T) {
 	}
 	problemOf(t, send(http.MethodGet, path+"/owners?cursor=bm9wZQ", olivia, "", nil), problem.InvalidCursor)
 	problemOf(t, send(http.MethodGet, "/agents/"+uuid.NewString()+"/owners", olivia, "", nil), problem.NotFound)
+}
+
+// Security test ST-23: Every guarded transition of a proposal is refused through the API when its guard fails, validating one's own use case included
+func TestTheProposalPhaseThroughTheAPI(t *testing.T) {
+	opts, pool := inventoryStore(t, map[string]string{olivia: "Olivia Owner", alex: "Alex Advisory"})
+	send := sender(Handler(opts))
+	as := func(p auth.Principal) func(method, path, as, body string, header http.Header) result {
+		o := opts
+		o.Authenticator = fixedAuthenticator{p: p}
+		return sender(Handler(o))
+	}
+	asAlex := as(auth.Principal{ID: alex, Kind: auth.Human, Name: "Alex Advisory", Roles: []string{"advisory"}})
+	// Olivia, who wrote the proposal and its use case, also sits on the
+	// advisory committee.
+	asOliviaAdvisory := as(auth.Principal{ID: olivia, Kind: auth.Human, Name: "Olivia Owner", Roles: []string{"owner", "advisory"}})
+	set := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(context.Background(), sql, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	res := send(http.MethodPost, "/use-cases", olivia, useCaseJSON, nil)
+	var uc gen.UseCase
+	if res.status != http.StatusCreated || json.Unmarshal(res.body, &uc) != nil {
+		t.Fatalf("createUseCase: %d %s", res.status, res.body)
+	}
+	res = send(http.MethodPost, "/agents", olivia, proposalJSON(uc.Id), nil)
+	var agent gen.Agent
+	if res.status != http.StatusCreated || json.Unmarshal(res.body, &agent) != nil {
+		t.Fatalf("proposeAgent: %d %s", res.status, res.body)
+	}
+	path := "/agents/" + agent.Id.String()
+	transitions := path + "/transitions"
+	etag := func() http.Header { return ifMatch(send(http.MethodGet, path, olivia, "", nil).header.Get("ETag")) }
+	act := func(action, comment string) string {
+		return fmt.Sprintf(`{"action":%q,"comment":%q}`, action, comment)
+	}
+	// guard checks that the action is refused while the row that spoil
+	// changes breaks the guard, and restores the row.
+	guard := func(send func(method, path, as, body string, header http.Header) result, body, name, spoil, restore string, arg any) {
+		t.Helper()
+		set(spoil, arg)
+		if p := problemOf(t, send(http.MethodPost, transitions, olivia, body, etag()), problem.Conflict); !strings.Contains(p.Detail, name) {
+			t.Errorf("the detail %q does not name the guard %s", p.Detail, name)
+		}
+		set(restore, arg)
+	}
+	inactive := `UPDATE whitetower.principals SET status = 'inactive' WHERE id = $1`
+	active := `UPDATE whitetower.principals SET status = 'active' WHERE id = $1`
+	rejected := `UPDATE whitetower.use_cases SET status = 'rejected' WHERE id = $1`
+
+	// T2 needs complete metadata, an active owner and a use case that is not
+	// rejected.
+	submit := `{"action":"submit"}`
+	guard(send, submit, "metadata_complete", `UPDATE whitetower.agents SET framework = NULL WHERE id = $1`,
+		`UPDATE whitetower.agents SET framework = 'langgraph' WHERE id = $1`, agent.Id)
+	guard(send, submit, "owner_active", inactive, active, olivia)
+	guard(send, submit, "use_case_not_rejected", rejected, `UPDATE whitetower.use_cases SET status = 'draft' WHERE id = $1`, uc.Id)
+	problemOf(t, send(http.MethodPost, transitions, olivia, submit, nil), problem.PreconditionRequired)
+	problemOf(t, send(http.MethodPost, transitions, olivia, submit, ifMatch(`"9"`)), problem.PreconditionFailed)
+	if res = send(http.MethodPost, transitions, olivia, submit, etag()); res.status != http.StatusOK ||
+		!strings.Contains(string(res.body), `"lifecycleState":"proposed"`) || res.header.Get("ETag") != `"2"` {
+		t.Fatalf("submit: %d %s %s", res.status, res.header.Get("ETag"), res.body)
+	}
+
+	// T4 to T6 are refused to whoever wrote the proposal or its use case, and
+	// need a comment; T6 also needs a use case that is neither prohibited nor
+	// rejected, and an active owner.
+	for _, action := range []string{"request_changes", "reject", "validate"} {
+		problemOf(t, asOliviaAdvisory(http.MethodPost, transitions, "", act(action, "My own."), etag()), problem.Forbidden)
+		problemOf(t, asAlex(http.MethodPost, transitions, "", act(action, " "), etag()), problem.BadRequest)
+	}
+	validate := act("validate", "The use case holds.")
+	guard(asAlex, validate, "use_case_not_prohibited", `UPDATE whitetower.use_cases SET ai_act_classification = 'prohibited' WHERE id = $1`,
+		`UPDATE whitetower.use_cases SET ai_act_classification = 'not_assessed' WHERE id = $1`, uc.Id)
+	guard(asAlex, validate, "use_case_not_rejected", rejected, `UPDATE whitetower.use_cases SET status = 'submitted' WHERE id = $1`, uc.Id)
+	guard(asAlex, validate, "owner_active", inactive, active, olivia)
+
+	// Actions that the agent's state, White Tower or a later part take.
+	problemOf(t, send(http.MethodPost, transitions, olivia, submit, etag()), problem.Conflict)
+	problemOf(t, send(http.MethodPost, transitions, olivia, `{"action":"mark_ready"}`, etag()), problem.BadRequest)
+	problemOf(t, send(http.MethodPost, transitions, olivia, `{"action":"activate"}`, etag()), problem.NotImplemented)
+	if res = asAlex(http.MethodPost, transitions, "", validate, etag()); res.status != http.StatusOK ||
+		!strings.Contains(string(res.body), `"lifecycleState":"validated"`) {
+		t.Fatalf("validate: %d %s", res.status, res.body)
+	}
+
+	// The history, newest first, a page at a time.
+	var page gen.TransitionList
+	if res = send(http.MethodGet, transitions+"?limit=2", olivia, "", nil); res.status != http.StatusOK || json.Unmarshal(res.body, &page) != nil ||
+		len(page.Transitions) != 2 || page.NextCursor == nil {
+		t.Fatalf("listAgentTransitions: %d %s", res.status, res.body)
+	}
+	latest := page.Transitions[0]
+	if latest.Transition != "T6" || latest.Action != gen.LifecycleActionValidate || *latest.FromState != gen.LifecycleStateProposed ||
+		latest.Actor.Type != gen.ActorTypeHuman || latest.Actor.Id.String() != alex || *latest.Actor.DisplayName != "Alex Advisory" ||
+		*latest.Comment != "The use case holds." || page.Transitions[1].Transition != "T2" {
+		t.Errorf("listAgentTransitions: %s", res.body)
+	}
+	var last gen.TransitionList
+	if res = send(http.MethodGet, transitions+"?cursor="+*page.NextCursor, olivia, "", nil); res.status != http.StatusOK ||
+		json.Unmarshal(res.body, &last) != nil || len(last.Transitions) != 1 || last.Transitions[0].FromState != nil || last.NextCursor != nil {
+		t.Fatalf("listAgentTransitions, last page: %d %s", res.status, res.body)
+	}
+	problemOf(t, send(http.MethodGet, "/agents/"+uuid.NewString()+"/transitions", olivia, "", nil), problem.NotFound)
 }

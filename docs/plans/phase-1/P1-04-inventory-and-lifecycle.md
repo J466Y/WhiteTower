@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (3 of 8 pull requests) |
+| **Status** | In progress (4 of 10 pull requests) |
 | **Size** | L |
 | **Depends on** | P1-03 (and the P1-02 writer); the first pull request of P1-07.1 for pull requests 4 to 8 |
 | **Unblocks** | P1-05, P1-06, P1-08, P1-10.2, P1-16 (steps 1 to 4) |
@@ -158,14 +158,16 @@ A YAML format for agents (with references to use cases and owners by email), a d
 
 ## Progress notes
 
-The plan lands in eight pull requests. The first agrees on the whole API before anything is built (step 1), so that the console and the CLI can work against it; the second brings the agents and their API, which P1-06 and P1-16 wait for. Each pull request brings the tests of its steps (step 12).
+The plan lands in ten pull requests, the fourth in three parts (the maintainer's decision of 2026-11-12). The first agrees on the whole API before anything is built (step 1), so that the console and the CLI can work against it; the second brings the agents and their API, which P1-06 and P1-16 wait for. Each pull request brings the tests of its steps (step 12).
 
 | Pull request | Steps | Status |
 | --- | --- | --- |
 | 1. API | 1; the permission `agent.ownership.reassign` | Done |
 | 2. Use cases and agents | 2, 4; the data categories; the ownership check that P1-16 reuses; each new agent's governance state, through P1-07's interface, stubbed | Done |
 | 3. Ownership | 3; the inbox items of transfers | Done |
-| 4. Lifecycle engine | 5, through P1-06's interface, stubbed; the property tests; ST-23; a token without the action's scope is refused (ST-19); `service_account` in `lifecycle_transitions.actor_type`; the entry point for the transitions White Tower makes, where T12 skips drills; the active selector halts in every write of the state record, through P1-08's interface, stubbed; the shared form of the selector halts' advisory lock, with the key of `internal/govstate`, taken first in T1 and `editAgent`; `state_version` in `whitetower.agent.updated.v1` when a change concerns what enforcement points see; after the first pull request of P1-07.1, and once the lifecycle and the requirements say that drills do not suspend ([design note](P1-08-kill-switch.md#progress-notes), section 13, decision 1) | Not started |
+| 4a. Lifecycle engine: the proposal phase | 5 for T2 to T6, with `transitionAgent` and `listAgentTransitions`; the check of the engine's table against `agent-lifecycle.yaml`; ST-23 for their guards; a token without the action's scope is refused (ST-19); separation of duties over past assignments; `service_account` in `lifecycle_transitions.actor_type`; the advisory committee's inbox item of a submitted proposal; a rejection cancels the pending ownership transfer | Done |
+| 4b. Lifecycle engine: into and out of service | 5 for T9, T10, T13 and T14, through P1-06's interface, stubbed: no agent policy is active; `getAgentActions`; the property tests, 10,000 sequences on the decision core and about 200 on PostgreSQL; ST-23 for activation without the invariant; service accounts take only T10, which the lifecycle says beside "People decide on proposals"; T14 cancels the pending ownership transfer and takes the proposal out of the advisory committee's inbox | Not started |
+| 4c. Lifecycle engine: the transitions White Tower makes | 5 for T7, T8, T11 and T12: the entry point for the transitions White Tower makes, where T12 skips drills, and T7 when an edit declares a harness; the active selector halts in every write of the state record, through P1-08's interface, stubbed; the shared form of the selector halts' advisory lock, with the key of `internal/govstate`, taken first in T1 and `editAgent`; `state_version` in `whitetower.agent.updated.v1` when a change concerns what enforcement points see ([design note](P1-08-kill-switch.md#progress-notes), sections 8, 13 and 14) | Not started |
 | 5. Reviews and the lifecycle guard job | 6, 7, through P1-16's interface, stubbed; the guard job suspends one agent per transaction | Not started |
 | 6. Coverage, instances, search and export | 8, 9; ST-24, with cells that start after a `;` or with a tab or a carriage return; C3 through P1-08's interface, stubbed | Not started |
 | 7. Inbox and notifications | 10; the dismissal of items that ask for no action, each member their own copy (P1-17 step 4, DC-4) | Not started |
@@ -304,3 +306,59 @@ A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-0
 - **The OpenAPI document keeps its data categories as they were.** `minLength: 1` on the items of `dataCategories` is a breaking change for oasdiff 1.32.1 (`request-property-min-length-set`, an error) in `proposeAgent`, `editAgent`, `createUseCase` and `editUseCase`, which fails CI. An empty category was already refused as `bad_request`, so the API answers as before; only the refusal's detail changes. The new pattern of `Labels` gives warnings only (`request-property-pattern-changed` and `response-property-pattern-changed`).
 - Use cases share the check of data categories, so they refuse an empty category too.
 - Tests: label keys through the inventory and through the API, one case per rule: keys that the schema allows, up to 63 characters, then a leading or trailing `.`, `_`, `/` or `-`, 64 characters, an uppercase letter and an empty key; the inventory's pattern, the OpenAPI document's and the schema's are the same (`TestTheInventoryTheAPIAndTheDecisionRequestShareTheLabelKeyPattern`); and an empty data category is refused, even from a setting that holds one.
+
+### 2026-11-12: lifecycle engine, the proposal phase (PR 4a)
+
+**Pull request 4 in three parts.** The agent of pull request 4 stopped before writing code: the whole of it came to about 2,200 changed lines, generated code aside. The maintainer chose three parts, each from `main` once the part before it is merged (rows 4a, 4b and 4c of the table above). Its two conditions hold: the first pull request of P1-07.1 is merged, and the lifecycle and the requirements say that drills do not suspend.
+
+**The maintainer's decisions of 2026-11-12:**
+
+| Question | Decision |
+| --- | --- |
+| What P1-06's stub answers for `agent_policy_active` (open question of pull request 1) | No agent policy is active until P1-06 lands, so POL-04 holds. No agent reaches `ready` before P1-06, since T7 needs an active agent policy, and the evaluation seed's `doc-indexer`, suspended from `active`, cannot be reinstated: T13 checks the invariants of the state it returns to. Part 4b builds the stub |
+| Separation of duties (open questions of pull requests 1 and 3) | `not_owner_or_creator` refuses the creator of the agent or of its use case, and whoever is or ever was the agent's primary owner or one of its delegates, whether the assignment ended or not. The lifecycle's section 4 says so |
+| Service accounts | A service account takes only T10, suspend, when its roles allow it, and never T9, T13 or T14: retirement cannot be undone, so a stolen automation token must never retire agents. As before, the decisions on a proposal (T4 to T6) are people's. The principal's kind decides, so that a person's own service account is refused too, with `forbidden`. Part 4a refuses service accounts every action but suspend, and part 4b writes the rule beside "People decide on proposals" in the lifecycle |
+| T14's revocation of credentials and retirement of agent-specific policies | P1-05 and P1-06 add their hooks into T14 when they land |
+| The review of T9, and the open review that T14 cancels | Pull request 5, which builds reviews |
+| The advisory committee's inbox item of a submitted proposal | Part 4a adds it at T2 and takes it out at T3 to T6; part 4b, at T14 |
+| The engine's table | A Go table, with a test that parses `agent-lifecycle.yaml` and fails when the two differ |
+| Property tests | 10,000 sequences on the decision core, and about 200 on PostgreSQL, in part 4b |
+
+**What part 4a builds:**
+
+- **`transitionAgent` for T2 to T6** (`Inventory.Transition`): submit, withdraw, request changes, reject and validate. One transaction locks the agent's row (`FOR NO KEY UPDATE`), then its use case's, checks, moves the agent at the version the caller read, applies the effects, and writes the governance state, the transition's row and `whitetower.agent.lifecycle_changed.v1` at one governance state version. activate, suspend, reinstate and retire answer `not_implemented` until part 4b.
+- **Refusals, in this order:**
+  - an action that is not one, or that White Tower takes itself: `bad_request`;
+  - an agent that the caller may not see: `not_found`, as for reads;
+  - a service account, a missing permission, or an owner of another agent submitting or withdrawing: `forbidden`. The action's permission goes through `Authorize` with the agent's relationship, so an API token needs it among its scopes (ST-19);
+  - separation of duties: `forbidden`;
+  - a stale If-Match: `precondition_failed`;
+  - a state the transition does not start from: `conflict`;
+  - a missing comment: `bad_request`;
+  - the other guards: `conflict`, with a detail that names each guard that does not hold.
+- **The engine's table** holds the fourteen transitions of `agent-lifecycle.yaml`, with their states, actors and guards, and each guard of a built transition is checked by name. A test parses the file and fails when the two differ. The effects are in the code of each transition.
+- **The use case follows the decisions** while no decision has made it final: T2 submits it, T3 takes it back to a draft once no agent that it justifies is proposed, and T4 to T6 decide on it. Each decision records its comment in `use_case_decisions`, with the agent. A new status gives the use case a new version, so an edit read before it fails.
+- **Decisions on agents that share a use case happen one after the other.** The use case's row is locked before the guards read it; otherwise an agent could be validated on a use case that a concurrent decision rejected (`TestDecisionsOnOneUseCaseHappenOneAfterTheOther`, which fails without the lock).
+- **The inbox.** T2 adds an item of kind `use_case_validation`, addressed to the advisory role, about the agent, and T3 to T6 take it out. `ResolveInboxItems` now matches the kind too, so that closing one kind of item about a subject leaves the others open.
+- **A rejection cancels the agent's pending ownership transfer**, which could never be accepted (follow-up of pull request 3); part 4b does the same at T14.
+- **`listAgentTransitions`** (`Inventory.Transitions`): the history, newest first, with each actor's display name, the reason, the comment and the version. Whoever sees the agent sees its history.
+- **Migration `00010`**: `lifecycle_transitions.actor_type` takes `service_account`, with a schema check (open question of pull request 1).
+- **The description of `transitionAgent`** names former owners and delegates among those that separation of duties refuses; the generated code changed in its comments only.
+
+**Tests:** each transition with its history, version, event, use case and inbox item; each decision with its record; a withdrawal while another agent of the use case waits; decided use cases shared by several agents; separation of duties for a delegate, a former delegate, the primary owner, the agent's creator and the use case's creator (ST-18); each refused caller, service accounts and break-glass included; a token with and without the action's scope (ST-19); stale versions, wrong states, unknown and unbuilt actions; a rejection that cancels a transfer; the history's pages; concurrent decisions on one use case; the table against the file; 10,000 random sequences of T2 to T6 on the decision core; and the same through the API, each guard of T2 and T6 refused with `conflict` and its name, and validating one's own use case refused (ST-23).
+
+**Differences from the plan:**
+
+- Step 5's 10,000 sequences cover T2 to T6 in this part. Part 4b runs them over every transition that people take, and about 200 on PostgreSQL.
+- The notes for implementers ask to generate the guards from the table. The engine reads its own Go table, which a test keeps equal to the file's, so no generator is needed.
+
+**Follow-ups:**
+
+- Parts 4b and 4c, as their rows say. For 4c, this reading of the [design note](P1-08-kill-switch.md#progress-notes), section 8, was accepted on 2026-11-12:
+  - the entry point locks the agent's row, then its state row, both before it calls `Next`; a caller that has already called `Next`, such as a halt, holds both already, so the entry point never waits under the head (a test covers that path);
+  - it never fails its caller's transaction because a guard does not hold: T7 and T8 leave the agent as it is, and T12 leaves an agent in any state but `validated`, `ready` or `active` as it is;
+  - it gives the agent's row a new version, so an edit whose If-Match was read before it fails;
+  - it writes only the lifecycle state of the state row, skipping the selector halts' fold, and reads no setting.
+- P1-05 and P1-06 add their hooks into T14: the revocation of the agent's credentials and the retirement of its agent-specific policies.
+- Pull request 5 schedules the first review at T9, and cancels the open review at T14.
+- The notifications to the owner of T4 to T6 (`notify_owner`) wait for pull request 7, with the inbox.
