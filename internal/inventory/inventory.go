@@ -79,6 +79,9 @@ const (
 	// Stale is a change to a version of the resource that is no longer
 	// current.
 	Stale
+	// NotBuilt is a request that the API agreed on, which the inventory does
+	// not take yet: a lifecycle action of a later part of plan P1-04.
+	NotBuilt
 )
 
 // Refusal is a request that the inventory refuses. Its detail tells the
@@ -131,16 +134,22 @@ func seesAll(caller auth.Principal) bool {
 	return authz.Allows(caller.Roles, authz.PermissionInventoryView, authz.Relationship{})
 }
 
-// actorOf names the caller in an audit event, by pseudonymous ID.
-func actorOf(caller auth.Principal) map[string]any {
+// actorType is the kind of actor that the caller is, in the audit log and in
+// the lifecycle's history.
+func actorType(caller auth.Principal) string {
 	switch {
 	case caller.IsBreakglass:
-		return map[string]any{"type": "breakglass", "id": caller.ID}
+		return "breakglass"
 	case caller.Kind == auth.ServiceAccount:
-		return map[string]any{"type": "service_account", "id": caller.ID}
+		return "service_account"
 	default:
-		return map[string]any{"type": "human", "id": caller.ID}
+		return "human"
 	}
+}
+
+// actorOf names the caller in an audit event, by pseudonymous ID.
+func actorOf(caller auth.Principal) map[string]any {
+	return map[string]any{"type": actorType(caller), "id": caller.ID}
 }
 
 // setting decodes the value of a setting (domain model, section 5) into v.

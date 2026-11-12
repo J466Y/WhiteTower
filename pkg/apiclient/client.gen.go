@@ -2240,13 +2240,13 @@ type ClientInterface interface {
 	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
 	// for the others. The decisions on a proposal (`request_changes`,
 	// `reject` and `validate`) are taken by people, never by a service
-	// account, and nobody decides on a proposal they own, are a delegate of
-	// or created, nor on one whose use case they created (HUM-04): these
-	// refusals are `forbidden`. A guard that does not hold answers
-	// `conflict`, and the detail names it; getAgentActions tells beforehand
-	// which guards refuse. `request_changes`, `reject`, `validate`,
-	// `suspend`, `reinstate` and `retire` need a comment, and a request
-	// without one is refused (`bad_request`).
+	// account, and nobody decides on a proposal they own or are a delegate
+	// of, or ever were, nor on one they created or whose use case they
+	// created (HUM-04): these refusals are `forbidden`. A guard that does
+	// not hold answers `conflict`, and the detail names it; getAgentActions
+	// tells beforehand which guards refuse. `request_changes`, `reject`,
+	// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
+	// request without one is refused (`bad_request`).
 	//
 	// A use case can justify several agents. `submit`, `withdraw`,
 	// `request_changes`, `reject` and `validate` change the agent's use case
@@ -2278,13 +2278,13 @@ type ClientInterface interface {
 	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
 	// for the others. The decisions on a proposal (`request_changes`,
 	// `reject` and `validate`) are taken by people, never by a service
-	// account, and nobody decides on a proposal they own, are a delegate of
-	// or created, nor on one whose use case they created (HUM-04): these
-	// refusals are `forbidden`. A guard that does not hold answers
-	// `conflict`, and the detail names it; getAgentActions tells beforehand
-	// which guards refuse. `request_changes`, `reject`, `validate`,
-	// `suspend`, `reinstate` and `retire` need a comment, and a request
-	// without one is refused (`bad_request`).
+	// account, and nobody decides on a proposal they own or are a delegate
+	// of, or ever were, nor on one they created or whose use case they
+	// created (HUM-04): these refusals are `forbidden`. A guard that does
+	// not hold answers `conflict`, and the detail names it; getAgentActions
+	// tells beforehand which guards refuse. `request_changes`, `reject`,
+	// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
+	// request without one is refused (`bad_request`).
 	//
 	// A use case can justify several agents. `submit`, `withdraw`,
 	// `request_changes`, `reject` and `validate` change the agent's use case
@@ -3211,13 +3211,13 @@ func (c *Client) ListAgentTransitions(ctx context.Context, id AgentId, params *L
 // `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
 // for the others. The decisions on a proposal (`request_changes`,
 // `reject` and `validate`) are taken by people, never by a service
-// account, and nobody decides on a proposal they own, are a delegate of
-// or created, nor on one whose use case they created (HUM-04): these
-// refusals are `forbidden`. A guard that does not hold answers
-// `conflict`, and the detail names it; getAgentActions tells beforehand
-// which guards refuse. `request_changes`, `reject`, `validate`,
-// `suspend`, `reinstate` and `retire` need a comment, and a request
-// without one is refused (`bad_request`).
+// account, and nobody decides on a proposal they own or are a delegate
+// of, or ever were, nor on one they created or whose use case they
+// created (HUM-04): these refusals are `forbidden`. A guard that does
+// not hold answers `conflict`, and the detail names it; getAgentActions
+// tells beforehand which guards refuse. `request_changes`, `reject`,
+// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
+// request without one is refused (`bad_request`).
 //
 // A use case can justify several agents. `submit`, `withdraw`,
 // `request_changes`, `reject` and `validate` change the agent's use case
@@ -3259,13 +3259,13 @@ func (c *Client) TransitionAgentWithBody(ctx context.Context, id AgentId, params
 // `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
 // for the others. The decisions on a proposal (`request_changes`,
 // `reject` and `validate`) are taken by people, never by a service
-// account, and nobody decides on a proposal they own, are a delegate of
-// or created, nor on one whose use case they created (HUM-04): these
-// refusals are `forbidden`. A guard that does not hold answers
-// `conflict`, and the detail names it; getAgentActions tells beforehand
-// which guards refuse. `request_changes`, `reject`, `validate`,
-// `suspend`, `reinstate` and `retire` need a comment, and a request
-// without one is refused (`bad_request`).
+// account, and nobody decides on a proposal they own or are a delegate
+// of, or ever were, nor on one they created or whose use case they
+// created (HUM-04): these refusals are `forbidden`. A guard that does
+// not hold answers `conflict`, and the detail names it; getAgentActions
+// tells beforehand which guards refuse. `request_changes`, `reject`,
+// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
+// request without one is refused (`bad_request`).
 //
 // A use case can justify several agents. `submit`, `withdraw`,
 // `request_changes`, `reject` and `validate` change the agent's use case
@@ -6799,13 +6799,13 @@ type ClientWithResponsesInterface interface {
 	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
 	// for the others. The decisions on a proposal (`request_changes`,
 	// `reject` and `validate`) are taken by people, never by a service
-	// account, and nobody decides on a proposal they own, are a delegate of
-	// or created, nor on one whose use case they created (HUM-04): these
-	// refusals are `forbidden`. A guard that does not hold answers
-	// `conflict`, and the detail names it; getAgentActions tells beforehand
-	// which guards refuse. `request_changes`, `reject`, `validate`,
-	// `suspend`, `reinstate` and `retire` need a comment, and a request
-	// without one is refused (`bad_request`).
+	// account, and nobody decides on a proposal they own or are a delegate
+	// of, or ever were, nor on one they created or whose use case they
+	// created (HUM-04): these refusals are `forbidden`. A guard that does
+	// not hold answers `conflict`, and the detail names it; getAgentActions
+	// tells beforehand which guards refuse. `request_changes`, `reject`,
+	// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
+	// request without one is refused (`bad_request`).
 	//
 	// A use case can justify several agents. `submit`, `withdraw`,
 	// `request_changes`, `reject` and `validate` change the agent's use case
@@ -6837,13 +6837,13 @@ type ClientWithResponsesInterface interface {
 	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
 	// for the others. The decisions on a proposal (`request_changes`,
 	// `reject` and `validate`) are taken by people, never by a service
-	// account, and nobody decides on a proposal they own, are a delegate of
-	// or created, nor on one whose use case they created (HUM-04): these
-	// refusals are `forbidden`. A guard that does not hold answers
-	// `conflict`, and the detail names it; getAgentActions tells beforehand
-	// which guards refuse. `request_changes`, `reject`, `validate`,
-	// `suspend`, `reinstate` and `retire` need a comment, and a request
-	// without one is refused (`bad_request`).
+	// account, and nobody decides on a proposal they own or are a delegate
+	// of, or ever were, nor on one they created or whose use case they
+	// created (HUM-04): these refusals are `forbidden`. A guard that does
+	// not hold answers `conflict`, and the detail names it; getAgentActions
+	// tells beforehand which guards refuse. `request_changes`, `reject`,
+	// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
+	// request without one is refused (`bad_request`).
 	//
 	// A use case can justify several agents. `submit`, `withdraw`,
 	// `request_changes`, `reject` and `validate` change the agent's use case
@@ -9833,13 +9833,13 @@ func (c *ClientWithResponses) ListAgentTransitionsWithResponse(ctx context.Conte
 // `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
 // for the others. The decisions on a proposal (`request_changes`,
 // `reject` and `validate`) are taken by people, never by a service
-// account, and nobody decides on a proposal they own, are a delegate of
-// or created, nor on one whose use case they created (HUM-04): these
-// refusals are `forbidden`. A guard that does not hold answers
-// `conflict`, and the detail names it; getAgentActions tells beforehand
-// which guards refuse. `request_changes`, `reject`, `validate`,
-// `suspend`, `reinstate` and `retire` need a comment, and a request
-// without one is refused (`bad_request`).
+// account, and nobody decides on a proposal they own or are a delegate
+// of, or ever were, nor on one they created or whose use case they
+// created (HUM-04): these refusals are `forbidden`. A guard that does
+// not hold answers `conflict`, and the detail names it; getAgentActions
+// tells beforehand which guards refuse. `request_changes`, `reject`,
+// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
+// request without one is refused (`bad_request`).
 //
 // A use case can justify several agents. `submit`, `withdraw`,
 // `request_changes`, `reject` and `validate` change the agent's use case
@@ -9877,13 +9877,13 @@ func (c *ClientWithResponses) TransitionAgentWithBodyWithResponse(ctx context.Co
 // `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
 // for the others. The decisions on a proposal (`request_changes`,
 // `reject` and `validate`) are taken by people, never by a service
-// account, and nobody decides on a proposal they own, are a delegate of
-// or created, nor on one whose use case they created (HUM-04): these
-// refusals are `forbidden`. A guard that does not hold answers
-// `conflict`, and the detail names it; getAgentActions tells beforehand
-// which guards refuse. `request_changes`, `reject`, `validate`,
-// `suspend`, `reinstate` and `retire` need a comment, and a request
-// without one is refused (`bad_request`).
+// account, and nobody decides on a proposal they own or are a delegate
+// of, or ever were, nor on one they created or whose use case they
+// created (HUM-04): these refusals are `forbidden`. A guard that does
+// not hold answers `conflict`, and the detail names it; getAgentActions
+// tells beforehand which guards refuse. `request_changes`, `reject`,
+// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
+// request without one is refused (`bad_request`).
 //
 // A use case can justify several agents. `submit`, `withdraw`,
 // `request_changes`, `reject` and `validate` change the agent's use case

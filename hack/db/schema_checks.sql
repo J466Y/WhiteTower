@@ -141,6 +141,14 @@ SELECT pg_temp.must_fail('a halted agent without a halt',
 SELECT pg_temp.must_fail('a lease shorter than 10 seconds',
   $$INSERT INTO whitetower.governance_state (agent_id, lifecycle_state, lease_ttl_seconds, state_version)
     VALUES ('00000000-0000-7000-8000-000000000020', 'draft', 5, 1)$$, '23514');
+-- The history names service accounts as such, and no other kind of actor.
+INSERT INTO whitetower.lifecycle_transitions (id, agent_id, action, from_state, to_state, actor_type, actor_id, state_version)
+  VALUES (gen_random_uuid(), '00000000-0000-7000-8000-000000000020', 'submit', 'draft', 'proposed', 'service_account',
+          '00000000-0000-7000-8000-000000000001', whitetower.next_governance_version());
+SELECT pg_temp.must_fail('a transition by an unknown kind of actor',
+  $$INSERT INTO whitetower.lifecycle_transitions (id, agent_id, action, to_state, actor_type, actor_id, state_version)
+    VALUES (gen_random_uuid(), '00000000-0000-7000-8000-000000000020', 'submit', 'proposed', 'robot',
+            '00000000-0000-7000-8000-000000000001', whitetower.next_governance_version())$$, '23514');
 SELECT pg_temp.must_fail('an agent slug with capitals',
   $$INSERT INTO whitetower.agents (id, slug, name, description, kind, risk_tier, use_case_id, created_by)
     VALUES (gen_random_uuid(), 'Invoice', 'x', 'x', 'in_house', 'low', '00000000-0000-7000-8000-000000000010',
