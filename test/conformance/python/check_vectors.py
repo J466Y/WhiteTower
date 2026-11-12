@@ -45,7 +45,8 @@ CATALOG_SCHEMA = Path(__file__).resolve().parents[3] / "api" / "policy" / "catal
 
 ACTION_RESOURCE = {
     "agent.start": "agent", "input.receive": "agent", "output.emit": "agent", "agent.stop": "agent",
-    "model.invoke": "model", "model.result": "model", "tool.invoke": "tool", "tool.result": "tool",
+    "model.invoke": "model", "model.result": "model", "tool.expose": "tool", "tool.invoke": "tool",
+    "tool.result": "tool",
 }
 RESOURCE_TYPES = {
     "agent": "Agent", "tool": "Tool", "model": "Model", "mcp_server": "McpServer",
@@ -102,9 +103,10 @@ def uid(entity_type: str, entity_id: str) -> dict:
 
 
 def to_cedar(req: dict) -> tuple[dict, list]:
-    """Maps an AuthZEN request of the profile to a cedarpy request and entities (section 6.4). It raises
-    InvalidRequest for a request that breaks a rule the schema does not state: an agent action for another agent, an
-    argument that is not a signed 64-bit integer, or a time that does not exist."""
+    """Maps an AuthZEN request of the profile to a cedarpy request and entities (section 6.7). It raises
+    InvalidRequest for a request that breaks a rule the schema does not state: an agent action for another agent, a
+    tool call whose arguments hold another tool's record, an argument that is not a signed 64-bit integer, or a time
+    that does not exist."""
     action, resource, subject, ctx = req["action"]["name"], req["resource"], req["subject"], req["context"]
     want = ACTION_RESOURCE.get(action)
     if want is None or resource["type"] != want or not resource.get("id"):
@@ -122,26 +124,27 @@ def to_cedar(req: dict) -> tuple[dict, list]:
         if resource["id"] != subject["id"]:
             raise InvalidRequest("an agent action must concern the requesting agent")
     else:
-        attrs = {}
-        if resource["type"] == "tool":
-            if rprops.get("kind") not in ("function", "mcp", "http", "other"):
-                raise InvalidRequest("tool kind")
-            attrs["kind"] = rprops["kind"]
-            if "server" in rprops:
-                attrs["server"] = rprops["server"]
-        elif resource["type"] == "model" and "provider" in rprops:
-            attrs["provider"] = rprops["provider"]
-        entities.append({"uid": uid(RESOURCE_TYPES[resource["type"]], resource["id"]), "attrs": attrs, "parents": []})
+        if resource["type"] == "tool" and rprops.get("kind") not in ("function", "mcp", "builtin", "http", "other"):
+            raise InvalidRequest("tool kind")
+        # A tool's and a model's properties are their attributes, and an MCP tool's parent is its server, so that a
+        # policy can name a whole server.
+        parents = [uid("McpServer", rprops["server"])] if "server" in rprops else []
+        entities.append({"uid": uid(RESOURCE_TYPES[resource["type"]], resource["id"]), "attrs": dict(rprops),
+                         "parents": parents})
     check_time(ctx["time"])
     context = {"time": {"__extn": {"fn": "datetime", "arg": ctx["time"]}}}
-    for key in ("task_id", "trace_id"):
+    for key in ("task_id", "trace_id", "calls_decided", "digest"):
         if key in ctx:
             context[key] = ctx[key]
-    if "args" in ctx:
-        if want != "tool":
-            raise InvalidRequest("args on a non-tool action")
+    # A tool call's arguments are exactly one record, the resource's own, so that an enforcement point that left it
+    # out fails closed: a usage rule whose condition does not match a missing argument would let the call through.
+    if action in ("tool.invoke", "tool.result"):
+        if set(ctx.get("args", {})) != {resource["id"]}:
+            raise InvalidRequest("a tool call whose arguments are not exactly the resource's own record")
         check_integers(ctx["args"])
         context["args"] = ctx["args"]
+    elif "args" in ctx:
+        raise InvalidRequest("args on an action other than tool.invoke and tool.result")
     request = {
         "principal": f'WhiteTower::Agent::"{subject["id"]}"',
         "action": f'WhiteTower::Action::"{action}"',
@@ -149,6 +152,55 @@ def to_cedar(req: dict) -> tuple[dict, list]:
         "context": context,
     }
     return request, entities
+
+
+def tool_args(catalog: dict) -> str:
+    """The ToolArgs that the core declares in a bundle's Cedar schema for a catalog (section 6.7): one optional record
+    per tool that declares arguments, keyed by the tool's key, with each argument under its name and of its type."""
+    def quote(text: str) -> str:
+        return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    records = [quote(t["key"]) + "?: { " + ", ".join(f"{quote(a['name'])}?: {a['type']}" for a in t["args"]) + " }"
+               for t in catalog["tools"] if t.get("args")]
+    return "type ToolArgs = { " + ", ".join(records) + " };"
+
+
+# A value of a tool's record of each type that section 7.7 names, as json.loads reads it: an int is never a bool.
+FITS = {"String": lambda v: type(v) is str, "Long": lambda v: type(v) is int, "Bool": lambda v: type(v) is bool}
+
+
+def fits(value, declared_type: str) -> bool:
+    """Whether a value of a tool's record has the type that section 7.7 names: a set is an array of its elements."""
+    if declared_type.startswith("Set<"):
+        return type(value) is list and all(fits(item, declared_type[4:-1]) for item in value)
+    return FITS[declared_type](value)
+
+
+def catalog_mismatch(catalog: dict, req: dict) -> str | None:
+    """Why a request inside the profile does not take its resource from the catalog, or None: a tool or a model names
+    an entry by its key, with the properties that the catalog gives it (section 6.3), and a tool call's record holds
+    only arguments that the entry declares, each of its declared type (section 6.11)."""
+    resource = req["resource"]
+    if resource["type"] not in ("tool", "model"):
+        return None
+    entry = next((e for e in catalog[resource["type"] + "s"] if e["key"] == resource["id"]), None)
+    if entry is None:
+        return f"the catalog has no {resource['type']} with the key {resource['id']!r}"
+    if resource["type"] == "model":
+        want = {k: entry[k] for k in ("provider", "name", "endpoint")}
+    else:
+        want = {k: entry[k] for k in ("kind", "origin", "name", "read_only", "destructive", "open_world")}
+        if entry["kind"] == "mcp":
+            want["server"] = entry["server"]
+            want["transport"] = next(s["transport"] for s in catalog["servers"] if s["key"] == entry["server"])
+        if entry["kind"] == "builtin":
+            want["provider"] = entry["provider"]
+    if resource["properties"] != want:
+        return f"properties {resource['properties']}, the catalog's {want}"
+    declared = {a["name"]: a["type"] for a in entry.get("args", [])}
+    for name, value in req["context"].get("args", {}).get(resource["id"], {}).items():
+        if name not in declared or not fits(value, declared[name]):
+            return f"the argument {name!r} is not one that the tool declares, of its type"
+    return None
 
 
 class Engine:
@@ -1328,14 +1380,25 @@ def main() -> int:
             print(f"FAIL {name}: reason {got['reason']} with {error}")
 
     request_validator = SchemaValidator(json.loads(REQUEST_SCHEMA.read_text(encoding="utf-8")))
+    catalog_validator = SchemaValidator(json.loads(CATALOG_SCHEMA.read_text(encoding="utf-8")))
+    # The combination vectors' policies are validated against the Cedar schema with the ToolArgs of their catalog, and
+    # each request inside the profile takes its resource from the catalog.
     combination = json.loads((VECTORS / "combination.json").read_text(encoding="utf-8"))
-    schema = CEDAR_SCHEMA.read_text(encoding="utf-8").replace("type ToolArgs = {};", combination["tool_args_extension"], 1)
+    catalog = combination["catalog"]
+    if not catalog_validator.is_valid(catalog):
+        failures += 1
+        print("FAIL combination: the catalog does not match its schema")
+    schema = CEDAR_SCHEMA.read_text(encoding="utf-8").replace("type ToolArgs = {};", tool_args(catalog), 1)
     for case in combination["cases"]:
         for p in case["policies"]:
             passes = cedarpy.validate_policies(p["text"], schema).validation_passed
             if passes != p["valid"]:
                 failures += 1
                 print(f"FAIL {case['id']}: policy {p['id']} validation {passes}, want {p['valid']}")
+        if case["expected"]["reason"] not in ("error.invalid_request", "error.unknown_agent") \
+                and (mismatch := catalog_mismatch(catalog, case["request"])) is not None:
+            failures += 1
+            print(f"FAIL {case['id']}: {mismatch}")
         engine = Engine(combination["agent_id"], VECTOR_BUNDLE_VERSION, case["policies"], request_validator)
         check_response(case["id"], engine.evaluate(case["request"]), case["expected"])
 
@@ -1349,7 +1412,6 @@ def main() -> int:
     # The trusted bundle keys, a JWK Set (section 7.3).
     keys = json.loads((VECTORS / "bundles" / "trusted-keys.json").read_text(encoding="utf-8"))
     trusted = {k["kid"]: key for k in keys["keys"] if (key := trusted_key(k)) is not None}
-    catalog_validator = SchemaValidator(json.loads(CATALOG_SCHEMA.read_text(encoding="utf-8")))
     bundle_cases = sorted(p for p in (VECTORS / "bundles").iterdir() if p.is_dir())
     for case_dir in bundle_cases:
         case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))

@@ -240,7 +240,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
-| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In five parts, 3a-1, 3a-2, 3b, 3c and 3d, which the notes of 2026-11-05 (the review of pull request 2) and 2026-11-06 list | In progress (2 of 5 parts: 3a-1 and 3a-2) |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In seven parts, 3a-1, 3a-2, 3b, 3c, 3d-1, 3d-2 and 3d-3, which the notes of 2026-11-05 (the review of pull request 2), 2026-11-06 and 2026-11-12 list | In progress (5 of 7 parts: 3a-1 to 3d-1) |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -1342,3 +1342,47 @@ The review found the part's code sound, and its vectors checked on both stacks w
 | The JWS header | V2 reads it as I-JSON: a member name twice is `signature`, whichever of the two values a reader keeps |
 
 Section 9.1's count of bundle vectors and appendix A's valid bundle wait for the reviewer's pull request after part 3d, as planned.
+
+### 2026-11-12: step 12, part 3d-1: the request schema, the profile and the combination vectors
+
+Part 3d was more than one part of about 800 lines, so the review of 2026-11-12 split it into three, each after the one before, and answered the questions that each needs. Step 12's pull request 3 now has seven parts:
+
+| Part | What |
+| --- | --- |
+| 3d-1 | The decision request's schema, the Go profile and the Python checker; the combination vectors with a catalog, keys and per-tool records |
+| 3d-2 | The catalog check, with blocks, results and its place among the reasons, and exposure, on both stacks: `catalog-check.json` and `exposure.json` |
+| 3d-3 | The generator of usage rules, and the rules that a decision names, on both stacks: `usage-rules.json` |
+
+The review's answers for 3d-2 and 3d-3 go into the specification in the reviewer's pull request, before 3d-2 starts. This part regenerates no vector.
+
+| What | Change |
+| --- | --- |
+| `decision-request.schema.json` | `tool.expose`, on a tool. A tool has all six of its properties, with `builtin` among the kinds, and an MCP tool its `server` and `transport`, a built-in tool its `provider`, and no tool those of another kind; a model has its `provider`, `name` and `endpoint`. Their bounds are the catalog file's, so that every entry that V7 accepts makes a request inside the profile. `calls_decided` is required on `tool.expose` and refused elsewhere, and `digest` is `model.invoke`'s alone. `tool.invoke` and `tool.result` require `args`, with exactly one record, whose names are those of section 7.7 and whose values are strings, booleans, integers and arrays of strings or of integers, never null or an object |
+| The Go profile | `tool.expose`; a tool's and a model's properties as their entity's attributes, and an MCP tool's server as its parent, `WhiteTower::McpServer::"<key>"`; `calls_decided` and `digest` in the context. `ErrAnotherTool` refuses a tool call whose record is not the resource's own |
+| The Python checker | The same mapping and rule. The combination vectors' policies are validated against the Cedar schema with the `ToolArgs` of their catalog, and their requests are checked against it. It counts 638 vectors |
+| `combination.json` | A catalog file, `catalog`, in place of `tool_args_extension`. Resource IDs are keys, such as `agent/read_invoice` and `openai/gpt-5`, with the properties that the catalog gives each entry, and every tool call carries its record: `recipient_domain` becomes `to:email_domain`, `amount` stays, and the local model is Ollama's. 20 new cases, C-40 to C-59, below: 59 in all |
+| `fail-closed.json` | Its request names `agent/read_invoice` by its key, with its properties and its record |
+| `vectors_test.go` | `TestCombinationVectors` checks the catalog against its schema, generates `ToolArgs` from it as the core does (section 6.7), and checks that each request inside the profile takes its resource from it: the entry's properties, and in the record only arguments that the entry declares, each of its type |
+| `test/contracts` | `TestTheDecisionRequestSchemaRefusesRequestsOutsideTheProfile` checks each new rule of the schema both ways |
+| The stub, the kit and the driver protocol | The decide calls of the stub's tests, of S-01 and S-17, and of the driver protocol's example carry the properties that the valid bundle's catalog file gives `agent/read_invoice`, and its record |
+
+| Case | What it checks |
+| --- | --- |
+| C-40, C-41 | A policy that names an MCP server applies to its tools, and to no other tool |
+| C-42, C-43 | The catalog's classification of a tool, and a built-in tool's provider and origin |
+| C-44 to C-47 | `tool.expose`, with calls decided and not decided, and `calls_decided` missing there or given on a tool call |
+| C-48, C-49 | `digest` on `model.invoke`, and refused on `model.result` |
+| C-50 to C-54 | A tool call without `args`, with no record, with another tool's record (`another_tool`), with two records, and with an object in its record |
+| C-55 to C-58 | A tool without a property, an MCP tool without its transport, a model without its endpoint, and arguments on an exposure |
+| C-59 | A policy that compares an integer argument with a string fails the validator against the generated `ToolArgs`, and its evaluation error denies |
+
+Details the lists do not name:
+
+- **The record of a tool call** (the review of 2026-11-12). `tool.invoke` and `tool.result` carry exactly one record, the resource's own, even an empty one, so that an enforcement point that left it out fails closed: a usage rule whose condition does not match a missing argument writes `else false`, and would let the call through. The schema states what it can: `args` required, with exactly one record. That the record is the resource's own is the profile's rule, `another_tool`, since no schema can tie a member's name to `resource.id`. The cases without `args` and without a record (C-50, C-51) therefore name no rule, as the vectors name only the rules outside the schema.
+- **`ToolArgs` is observable.** Cedar's validator does not type what follows a `has` that cannot hold, so the policies of C-16, C-17 and C-23 to C-25 validate against an empty `ToolArgs` too. C-59 fails the validator only against the `ToolArgs` that the catalog declares.
+- **What no test observes.** The descriptions of the schema, and the error that the profile returns for a tool call without its record: the schema refuses it first.
+
+For the specification, which is the reviewer's:
+
+- Section 6.1's example of a request is a `tool.invoke` without `args`, which the profile now refuses: it needs the tool's record, such as `"args": { "agent/send_email": { "to:email_domain": "example.org" } }`.
+- Section 9.1 counts 59 combination vectors and 18 fail-closed vectors.

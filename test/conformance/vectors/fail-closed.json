@@ -6,7 +6,7 @@
     {
       "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
       "scope": "agent",
-      "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+      "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
       "valid": true
     }
   ],
@@ -34,13 +34,21 @@
     },
     "resource": {
       "type": "tool",
-      "id": "read_invoice",
+      "id": "agent/read_invoice",
       "properties": {
-        "kind": "function"
+        "kind": "function",
+        "origin": "agent",
+        "name": "read_invoice",
+        "read_only": true,
+        "destructive": false,
+        "open_world": false
       }
     },
     "context": {
-      "time": "2026-09-29T10:00:00.000Z"
+      "time": "2026-09-29T10:00:00.000Z",
+      "args": {
+        "agent/read_invoice": {}
+      }
     }
   },
   "cases": [

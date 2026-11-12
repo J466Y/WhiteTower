@@ -149,9 +149,17 @@ func startStub(t *testing.T, ttl time.Duration) (context.Context, *kit.Core, *ki
 		Bundle: b,
 		Ref:    ref,
 		Permitted: kit.DecideRequest{
-			Action:   profile.Action{Name: "tool.invoke"},
-			Resource: profile.Resource{Type: "tool", ID: "agent/read_invoice", Properties: map[string]any{"kind": "function"}},
-			Context:  profile.Context{Time: "2026-09-29T10:00:00.000Z"},
+			Action: profile.Action{Name: "tool.invoke"},
+			// The properties that the valid bundle's catalog file gives the
+			// tool, and its record of arguments (sections 6.3 and 6.4).
+			Resource: profile.Resource{Type: "tool", ID: "agent/read_invoice", Properties: map[string]any{
+				"kind": "function", "origin": "agent", "name": "read_invoice",
+				"read_only": true, "destructive": false, "open_world": false,
+			}},
+			Context: profile.Context{
+				Time: "2026-09-29T10:00:00.000Z",
+				Args: map[string]any{"agent/read_invoice": map[string]any{}},
+			},
 		},
 	}
 }

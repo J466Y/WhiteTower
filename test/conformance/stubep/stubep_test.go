@@ -443,7 +443,7 @@ func TestTheSubjectTakesTheEnvironmentOfTheRegistration(t *testing.T) {
 			e := registered(t, Config{AgentID: agentID}, tc.environment)
 			feed(t, e, snapshot(1, agentState(durationpb.New(time.Minute))), renewal(1, timestamppb.Now()))
 			e.mu.RLock()
-			req, err := e.requestLocked(callWith(`{"time": "2026-09-29T10:00:00.000Z"}`))
+			req, err := e.requestLocked(callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"agent/read_invoice": {}}}`))
 			e.mu.RUnlock()
 			if err != nil {
 				t.Fatal(err)
@@ -538,21 +538,22 @@ func TestTheStubChecksTheBodyAsItIsWritten(t *testing.T) {
 		body []byte
 		want string
 	}{
-		{name: "a call that the bundle permits", body: callWith(`{"time": "2026-09-29T10:00:00.000Z"}`), want: profile.ReasonPermit},
-		{name: "a call without its time, which the stub's clock gives", body: callWith(`{}`), want: profile.ReasonPermit},
+		{name: "a call that the bundle permits", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"agent/read_invoice": {}}}`), want: profile.ReasonPermit},
+		{name: "a call without its time, which the stub's clock gives", body: callWith(`{"args": {"agent/read_invoice": {}}}`), want: profile.ReasonPermit},
 		// A stub that replaced the body's time with its clock would allow it.
-		{name: "a time without milliseconds, outside the profile", body: callWith(`{"time": "2026-09-29T10:00:00Z"}`), want: profile.ReasonInvalidRequest},
-		{name: "an argument of 2^63 - 1", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"amount": 9223372036854775807}}`), want: profile.ReasonPermit},
-		{name: "an argument written with a fraction", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"amount": 2.0}}`), want: profile.ReasonInvalidRequest},
-		{name: "on_behalf_of empty", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "on_behalf_of": ""}`), want: profile.ReasonInvalidRequest},
-		{name: "an unknown member", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "priority": "high"}`), want: profile.ReasonInvalidRequest},
+		{name: "a time without milliseconds, outside the profile", body: callWith(`{"time": "2026-09-29T10:00:00Z", "args": {"agent/read_invoice": {}}}`), want: profile.ReasonInvalidRequest},
+		{name: "an argument of 2^63 - 1", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"agent/read_invoice": {"options.amount": 9223372036854775807}}}`), want: profile.ReasonPermit},
+		{name: "an argument written with a fraction", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"agent/read_invoice": {"options.amount": 2.0}}}`), want: profile.ReasonInvalidRequest},
+		{name: "a call without its record of arguments", body: callWith(`{"time": "2026-09-29T10:00:00.000Z"}`), want: profile.ReasonInvalidRequest},
+		{name: "on_behalf_of empty", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"agent/read_invoice": {}}, "on_behalf_of": ""}`), want: profile.ReasonInvalidRequest},
+		{name: "an unknown member", body: callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"agent/read_invoice": {}}, "priority": "high"}`), want: profile.ReasonInvalidRequest},
 		{name: "a context that is not an object", body: callWith(`"2026-09-29T10:00:00.000Z"`), want: profile.ReasonInvalidRequest},
 		{name: "a body that is not an object", body: []byte(`[]`), want: profile.ReasonInvalidRequest},
 		{name: "a subject for another agent, which the stub replaces", want: profile.ReasonPermit, body: []byte(`{
 			"subject": {"type": "agent", "id": "0192f1c2-7a3b-7c4d-8e5f-000000000002"},
 			"action": {"name": "tool.invoke"},
-			"resource": {"type": "tool", "id": "agent/read_invoice", "properties": {"kind": "function"}},
-			"context": {"time": "2026-09-29T10:00:00.000Z"}
+			"resource": {"type": "tool", "id": "agent/read_invoice", "properties": {"kind": "function", "origin": "agent", "name": "read_invoice", "read_only": true, "destructive": false, "open_world": false}},
+			"context": {"time": "2026-09-29T10:00:00.000Z", "args": {"agent/read_invoice": {}}}
 		}`)},
 	}
 	for _, tc := range cases {
@@ -656,15 +657,16 @@ func waitForReason(ctx context.Context, t *testing.T, e *EP, want string) {
 // decide asks the stub to decide on a call that the valid bundle of the
 // bundle vectors permits.
 func decide(e *EP) profile.Response {
-	return e.Decide(callWith(`{"time": "2026-09-29T10:00:00.000Z"}`))
+	return e.Decide(callWith(`{"time": "2026-09-29T10:00:00.000Z", "args": {"agent/read_invoice": {}}}`))
 }
 
 // callWith returns the body of a decide call on a call that the valid bundle
-// of the bundle vectors permits, with the context given as JSON.
+// of the bundle vectors permits, with the properties that its catalog file
+// gives the tool, and with the context given as JSON.
 func callWith(context string) []byte {
 	return []byte(`{
 		"action": {"name": "tool.invoke"},
-		"resource": {"type": "tool", "id": "agent/read_invoice", "properties": {"kind": "function"}},
+		"resource": {"type": "tool", "id": "agent/read_invoice", "properties": {"kind": "function", "origin": "agent", "name": "read_invoice", "read_only": true, "destructive": false, "open_world": false}},
 		"context": ` + context + `
 	}`)
 }
