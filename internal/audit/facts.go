@@ -71,6 +71,7 @@ var rules = map[string]rule{
 	"whitetower.session.created.v1":          {actor: "actor", fixed: "success"},
 	"whitetower.session.revoked.v1":          {actor: "actor", fixed: "success", reason: "reason"},
 	"whitetower.service_account.created.v1":  {actor: "actor", fixed: "success"},
+	"whitetower.access.revoked_all.v1":       {actor: "actor", fixed: "success", reason: "reason"},
 }
 
 // outcomes maps the outcomes that events tell to those the audit log

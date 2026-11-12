@@ -319,6 +319,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Tokens:        tokenStore,
 		Principals:    principalStore,
 		Exchanger:     exchanger,
+		Revocation:    authn.NewEmergencyRevocation(sessionStore, logger),
 		AuditLog:      auditLog,
 		Inventory: inventory.New(inventory.Options{
 			DB:          database,

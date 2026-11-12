@@ -264,9 +264,10 @@ func TestEveryOperationHasAPermission(t *testing.T) {
 	}
 }
 
-// Security test ST-20: A break-glass session changes nothing: the authorizer
-// refuses it every operation of the document that is not a read, so a new
-// one is covered without a list to keep up to date.
+// Security test ST-20: A break-glass session changes nothing but ending every
+// session and API token (ST-89): the authorizer refuses it every other
+// operation of the document that is not a read, so a new one is covered
+// without a list to keep up to date.
 func TestBreakglassCallsNoOperationThatChangesState(t *testing.T) {
 	az := authz.NewAuthorizer()
 	custodian := &auth.Principal{
@@ -280,10 +281,32 @@ func TestBreakglassCallsNoOperationThatChangesState(t *testing.T) {
 		if op.Public || op.Method == http.MethodGet {
 			continue
 		}
-		if err := az.Authorize(context.Background(), custodian, op.ID); !errors.Is(err, auth.ErrDenied) {
+		err := az.Authorize(context.Background(), custodian, op.ID)
+		if op.ID == "revokeAllSessionsAndTokens" {
+			if err != nil {
+				t.Errorf("%s: break-glass got %v, want allowed", op.ID, err)
+			}
+			continue
+		}
+		if !errors.Is(err, auth.ErrDenied) {
 			t.Errorf("%s: break-glass got %v, want refused", op.ID, err)
 		}
 	}
+}
+
+// Security test ST-89: a request without a session, such as one with an API
+// token, never ends every session and API token, even if the authorizer let
+// it through: the operation refuses it too
+func TestOnlyASessionRevokesEverySessionAndToken(t *testing.T) {
+	opts := options(io.Discard)
+	opts.Authorizer = &allow{ops: map[string]bool{"revokeAllSessionsAndTokens": true}}
+	opts.Authenticator = fixedAuthenticator{auth.Principal{
+		ID: olivia, Kind: auth.Human, Roles: []string{string(authz.RoleAdmin)}, Scopes: []string{string(authz.PermissionIdentityEmergencyRevoke)},
+	}}
+	opts.Revocation = authn.NewEmergencyRevocation(nil, slog.New(slog.DiscardHandler))
+	res := call(Handler(opts), http.MethodPost, "/api/v1/emergency-revocation", "",
+		http.Header{"Content-Type": {"application/json"}}, strings.NewReader(`{"reason":"INC-2041"}`))
+	problemOf(t, res, problem.Forbidden)
 }
 
 func TestUnmatched(t *testing.T) {

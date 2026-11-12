@@ -55,6 +55,8 @@ type Options struct {
 	Principals *authn.PrincipalStore
 	// Exchanger handles CLI ID token exchange for API tokens.
 	Exchanger TokenExchanger
+	// Revocation ends every session and API token at once (HUM-10).
+	Revocation *authn.EmergencyRevocation
 	// AuditLog provides queries and verification for the audit log.
 	AuditLog *audit.Log
 	// Inventory keeps the agents and their use cases (plan P1-04).
@@ -71,16 +73,18 @@ type Server struct {
 	tokens     *authn.TokenStore
 	principals *authn.PrincipalStore
 	exchanger  TokenExchanger
+	revocation *authn.EmergencyRevocation
 	auditLog   *audit.Log
 	inventory  *inventory.Inventory
 }
 
 // NewServer creates a new Server instance.
-func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, exchanger TokenExchanger, auditLog *audit.Log, inv *inventory.Inventory) Server {
+func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, exchanger TokenExchanger, revocation *authn.EmergencyRevocation, auditLog *audit.Log, inv *inventory.Inventory) Server {
 	return Server{
 		tokens:     tokens,
 		principals: principals,
 		exchanger:  exchanger,
+		revocation: revocation,
 		auditLog:   auditLog,
 		inventory:  inv,
 	}
@@ -382,6 +386,46 @@ func (s Server) ListServiceAccounts(ctx context.Context, _ gen.ListServiceAccoun
 	return res, nil
 }
 
+// RevokeAllSessionsAndTokens ends every session and every API token at once,
+// for a reason (HUM-10). The authorizer lets only the platform
+// administrator's session and a break-glass session reach it, and never an
+// API token (ST-89). The caller's own session ends too, unless it is a
+// break-glass session: the answer then clears its cookie, as a sign-out does.
+func (s Server) RevokeAllSessionsAndTokens(ctx context.Context, request gen.RevokeAllSessionsAndTokensRequestObject) (gen.RevokeAllSessionsAndTokensResponseObject, error) {
+	if s.revocation == nil {
+		return nil, problem.New(problem.Internal, "emergency revocation not initialized")
+	}
+	if auth.PrincipalFrom(ctx) == nil {
+		return nil, problem.New(problem.Unauthenticated, "authentication required")
+	}
+	// The authorizer refuses API tokens already; a request without a session
+	// is refused here too, so that no token ever runs it.
+	session := authn.SessionFromContext(ctx)
+	if session == nil {
+		return nil, problem.New(problem.Forbidden, "only a session ends every session and API token")
+	}
+	if request.Body == nil {
+		return nil, problem.New(problem.BadRequest, "request body is required")
+	}
+	revoked, err := s.revocation.Revoke(ctx, session, request.Body.Reason)
+	if errors.Is(err, authn.ErrInvalidReason) {
+		return nil, problem.New(problem.BadRequest, err.Error())
+	}
+	if err != nil {
+		return nil, fmt.Errorf("revoking every session and API token: %w", err)
+	}
+	res := gen.RevokeAllSessionsAndTokens200JSONResponse{Body: gen.EmergencyRevocation{
+		Sessions:  revoked.Sessions,
+		Tokens:    revoked.Tokens,
+		RevokedAt: revoked.At,
+	}}
+	if revoked.SignedOut {
+		cookie := s.revocation.ClearCookie().String()
+		res.Headers.SetCookie = &cookie
+	}
+	return res, nil
+}
+
 // ExchangeToken exchanges an IdP ID token from the CLI's login for a short-lived API token.
 func (s Server) ExchangeToken(ctx context.Context, request gen.ExchangeTokenRequestObject) (gen.ExchangeTokenResponseObject, error) {
 	// A server without OIDC sign-in has no token exchange: the server did not
@@ -431,7 +475,7 @@ func (s Server) ExchangeToken(ctx context.Context, request gen.ExchangeTokenRequ
 func Handler(opts Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET "+BasePath+"/openapi.json", documentHandler())
-	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals, opts.Exchanger, opts.AuditLog, opts.Inventory), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
+	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals, opts.Exchanger, opts.Revocation, opts.AuditLog, opts.Inventory), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
 		gen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  requestError,
 			ResponseErrorHandlerFunc: responseError(opts.Logger),

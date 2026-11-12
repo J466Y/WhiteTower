@@ -989,6 +989,24 @@ type EditUseCaseRequest struct {
 	Title                 *string              `json:"title,omitempty"`
 }
 
+// EmergencyRevocation defines model for EmergencyRevocation.
+type EmergencyRevocation struct {
+	// RevokedAt When it ended them. A session or a token created later was not ended.
+	RevokedAt time.Time `json:"revokedAt"`
+
+	// Sessions How many sessions it revoked, of those not revoked before, expired ones included.
+	Sessions int64 `json:"sessions"`
+
+	// Tokens How many API tokens it revoked, of those not revoked before, expired ones included.
+	Tokens int64 `json:"tokens"`
+}
+
+// EmergencyRevocationRequest defines model for EmergencyRevocationRequest.
+type EmergencyRevocationRequest struct {
+	// Reason Why everything ends, such as a reference to the incident. The audit log keeps it.
+	Reason string `json:"reason"`
+}
+
 // ExchangeTokenRequest defines model for ExchangeTokenRequest.
 type ExchangeTokenRequest struct {
 	// IdToken Raw OpenID Connect ID token obtained by the CLI.
@@ -1838,6 +1856,9 @@ type ReassignAgentOwnerJSONRequestBody = ReassignOwnerRequest
 // TransitionAgentJSONRequestBody defines body for TransitionAgent for application/json ContentType.
 type TransitionAgentJSONRequestBody = TransitionRequest
 
+// RevokeAllSessionsAndTokensJSONRequestBody defines body for RevokeAllSessionsAndTokens for application/json ContentType.
+type RevokeAllSessionsAndTokensJSONRequestBody = EmergencyRevocationRequest
+
 // CompleteReviewJSONRequestBody defines body for CompleteReview for application/json ContentType.
 type CompleteReviewJSONRequestBody = ReviewAttestation
 
@@ -1927,6 +1948,9 @@ type ServerInterface interface {
 	// ListDataCategories List the data categories
 	// (GET /data-categories)
 	ListDataCategories(w http.ResponseWriter, r *http.Request)
+	// RevokeAllSessionsAndTokens End every session and API token at once
+	// (POST /emergency-revocation)
+	RevokeAllSessionsAndTokens(w http.ResponseWriter, r *http.Request)
 	// ListInboxItems List the caller's pending work
 	// (GET /inbox)
 	ListInboxItems(w http.ResponseWriter, r *http.Request, params ListInboxItemsParams)
@@ -3167,6 +3191,20 @@ func (siw *ServerInterfaceWrapper) ListDataCategories(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// RevokeAllSessionsAndTokens operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAllSessionsAndTokens(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeAllSessionsAndTokens(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListInboxItems operation middleware
 func (siw *ServerInterfaceWrapper) ListInboxItems(w http.ResponseWriter, r *http.Request) {
 
@@ -3915,6 +3953,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tokens/exchange", wrapper.ExchangeToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/service-accounts", wrapper.ListServiceAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/service-accounts", wrapper.CreateServiceAccount)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/emergency-revocation", wrapper.RevokeAllSessionsAndTokens)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events", wrapper.GetAuditEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events/{id}", wrapper.GetAuditEvent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/checkpoints", wrapper.GetAuditCheckpoints)
@@ -4943,6 +4982,55 @@ func (response ListDataCategoriesdefaultApplicationProblemPlusJSONResponse) Visi
 	return err
 }
 
+type RevokeAllSessionsAndTokensRequestObject struct {
+	Body *RevokeAllSessionsAndTokensJSONRequestBody
+}
+
+type RevokeAllSessionsAndTokensResponseObject interface {
+	VisitRevokeAllSessionsAndTokensResponse(w http.ResponseWriter) error
+}
+
+type RevokeAllSessionsAndTokens200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type RevokeAllSessionsAndTokens200JSONResponse struct {
+	Body    EmergencyRevocation
+	Headers RevokeAllSessionsAndTokens200ResponseHeaders
+}
+
+func (response RevokeAllSessionsAndTokens200JSONResponse) VisitRevokeAllSessionsAndTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAllSessionsAndTokensdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RevokeAllSessionsAndTokensdefaultApplicationProblemPlusJSONResponse) VisitRevokeAllSessionsAndTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListInboxItemsRequestObject struct {
 	Params ListInboxItemsParams
 }
@@ -5762,6 +5850,9 @@ type StrictServerInterface interface {
 	// ListDataCategories List the data categories
 	// (GET /data-categories)
 	ListDataCategories(ctx context.Context, request ListDataCategoriesRequestObject) (ListDataCategoriesResponseObject, error)
+	// RevokeAllSessionsAndTokens End every session and API token at once
+	// (POST /emergency-revocation)
+	RevokeAllSessionsAndTokens(ctx context.Context, request RevokeAllSessionsAndTokensRequestObject) (RevokeAllSessionsAndTokensResponseObject, error)
 	// ListInboxItems List the caller's pending work
 	// (GET /inbox)
 	ListInboxItems(ctx context.Context, request ListInboxItemsRequestObject) (ListInboxItemsResponseObject, error)
@@ -6494,6 +6585,37 @@ func (sh *strictHandler) ListDataCategories(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListDataCategoriesResponseObject); ok {
 		if err := validResponse.VisitListDataCategoriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeAllSessionsAndTokens operation middleware
+func (sh *strictHandler) RevokeAllSessionsAndTokens(w http.ResponseWriter, r *http.Request) {
+	var request RevokeAllSessionsAndTokensRequestObject
+
+	var body RevokeAllSessionsAndTokensJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeAllSessionsAndTokens(ctx, request.(RevokeAllSessionsAndTokensRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeAllSessionsAndTokens")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeAllSessionsAndTokensResponseObject); ok {
+		if err := validResponse.VisitRevokeAllSessionsAndTokensResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

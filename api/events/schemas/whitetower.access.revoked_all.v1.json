@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Every session and API token revoked",
+  "description": "An emergency revocation ended at once every session and every API token, of people and of service accounts, but the break-glass session that ran it, if one did (HUM-10, ST-89). It records no event per session or token: this event records them all. Every use raises a security alert, as a break-glass use does. It carries no token, nor any hash of one.",
+  "type": "object",
+  "required": [
+    "actor",
+    "reason",
+    "sessions",
+    "tokens"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "actor": {
+      "description": "Who ran it: the platform administrator, from a session, or the break-glass custodian.",
+      "$ref": "common.schema.json#/$defs/actor"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "sessions": {
+      "description": "How many sessions it revoked: those that were not revoked before, expired ones included, since another replica's clock may not have reached their expiry.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "tokens": {
+      "description": "How many API tokens it revoked: those that were not revoked before, expired ones included.",
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
