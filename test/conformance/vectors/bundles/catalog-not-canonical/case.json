@@ -1,0 +1,15 @@
+{
+  "description": "The valid catalog file, indented, with its members in another order: not its own canonical JSON, which the core writes",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "cbb392be26cd3e1733cee8537b89f6eccfb4e0e5e58fc8d26853aa70e4d1aab3",
+    "size_bytes": 9225
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

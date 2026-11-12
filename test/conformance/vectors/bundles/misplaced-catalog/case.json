@@ -1,0 +1,15 @@
+{
+  "description": "The catalog file is not at catalog.json",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "9e7829572bb7e651c227733030c75a1109abc6c005b7bdca21944e52615c8747",
+    "size_bytes": 8813
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

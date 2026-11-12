@@ -32,7 +32,7 @@ Runs one decision through the module's normal path: gate, policies, evidence. Th
 ```json
 {
   "action": { "name": "tool.invoke" },
-  "resource": { "type": "tool", "id": "read_invoice", "properties": { "kind": "function" } },
+  "resource": { "type": "tool", "id": "agent/read_invoice", "properties": { "kind": "function" } },
   "context": { "time": "2026-09-29T10:00:00.000Z" }
 }
 ```

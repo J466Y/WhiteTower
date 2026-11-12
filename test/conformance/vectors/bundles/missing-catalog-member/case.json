@@ -1,0 +1,15 @@
+{
+  "description": "The catalog file's entry has no sha256",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "57353c4a36623fe00180abe975d75d3e9d8a9746255f57d747e495af27a237b8",
+    "size_bytes": 8726
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

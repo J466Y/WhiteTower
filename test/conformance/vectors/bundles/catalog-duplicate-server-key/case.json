@@ -1,0 +1,15 @@
+{
+  "description": "Two servers share the key github, with other references",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "924385dd2e6c851840d661d7547746c7c89f3c0d99efc5fdc946e794275b2e8a",
+    "size_bytes": 8897
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "parse_error"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "description": "An unsupported format, in a manifest with spaces: the canonical form is checked before the format",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "5c71b37ce1fe70d3fadd1a8d6c2ccc4b3e973e97acf4f6eb43430e630b6db3a6",
+    "size_bytes": 8988
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

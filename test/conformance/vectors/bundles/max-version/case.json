@@ -1,0 +1,14 @@
+{
+  "description": "The manifest's version is 2^53 - 1, the largest integer of I-JSON, and governance state names that version",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 9007199254740991,
+    "manifest_sha256": "e227bc857a3cd135fc981bee54c95db006906672fc2f46603a335ea1d4778979",
+    "size_bytes": 8816
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "activated"
+  }
+}

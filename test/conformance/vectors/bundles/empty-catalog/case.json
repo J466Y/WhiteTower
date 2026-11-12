@@ -1,0 +1,14 @@
+{
+  "description": "A catalog file with no entries and no redaction rules",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "adc2e9f1ea5c20c21c09e5b65ff1dccfcbf9df718e0db0041de6bbc278b3708c",
+    "size_bytes": 6854
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "activated"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "description": "A policy's name ends with the escape of a lone surrogate, which I-JSON's strings never hold (RFC 7493)",
+  "obligation": "EP-7",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "ref": {
+    "version": 42,
+    "manifest_sha256": "68a4371d0fa4fea3e501cbc77aa6d83b045e93d6ffc5de3a8b8cef45db16e334",
+    "size_bytes": 8808
+  },
+  "active_version": 41,
+  "expected": {
+    "outcome": "rejected",
+    "reason": "invalid_manifest"
+  }
+}

@@ -1,9 +1,12 @@
-// Cedar schema of the White Tower decision profile, contract v1alpha1 (RFC-0001).
-// Normative text: docs/contracts/module-contract-v0.1.md, section 6.
+// Cedar schema of the White Tower decision profile, contract v1alpha1 (RFC-0001,
+// with the tooling of RFC-0002). Normative text:
+// docs/contracts/module-contract-v0.1.md, section 6.
 //
-// Policies are validated against this schema before approval (POL-07). A
-// deployment may extend ToolArgs with the arguments of its own tools; nothing
-// else may change.
+// The core generates each bundle's schema from this one, declaring in ToolArgs
+// one optional record per tool, with the arguments that the bundle's catalog
+// declares for that tool; nothing else changes. Policies are validated against
+// the bundle's schema before approval (POL-07), and the bundle carries it
+// (section 6.7).
 namespace WhiteTower {
   // The agent that makes the request. Its inventory labels are entity tags:
   //   principal.hasTag("team") && principal.getTag("team") == "finance"
@@ -23,29 +26,57 @@ namespace WhiteTower {
     owner: String
   } tags String;
 
-  // A tool the agent calls. Its ID is the tool's name as the agent sees it.
-  entity Tool {
-    // "function", "mcp", "http" or "other".
-    kind: String,
-    // For MCP tools, the ID of the MCP server that provides the tool.
-    server?: String
-  };
+  // An MCP server, the parent of its tools, so that a policy can name a whole
+  // server: resource in WhiteTower::McpServer::"github". Its ID is its key in
+  // the catalog.
+  entity McpServer;
 
-  // A model the agent calls. Its ID is the model's name, for example "gpt-5".
-  entity Model {
-    // The provider: a value of the table in section 6.3, such as "openai", or,
-    // for any other provider, a lowercase name of its own, such as "ollama".
+  // A tool the agent calls, or that its model provider runs for it. Its ID is
+  // its key in the catalog, such as "github/create_issue" or
+  // "agent/send_email" (section 4.10). Its attributes come from the catalog,
+  // never from the agent (section 6.3).
+  entity Tool in [McpServer] {
+    // "function", "mcp", "builtin", "http" or "other".
+    kind: String,
+    // Who runs the tool: "agent" or "provider".
+    origin: String,
+    // The tool's name.
+    name: String,
+    // The reviewer's classification, from the catalog (section 7.7).
+    read_only: Bool,
+    destructive: Bool,
+    open_world: Bool,
+    // For MCP tools, the key of the server that provides the tool.
+    server?: String,
+    // For MCP tools, "stdio" or "http".
+    transport?: String,
+    // For built-in tools, the model provider that defines the tool.
     provider?: String
   };
 
+  // A model the agent calls. Its ID is its key in the catalog, such as
+  // "gpu-01/llama3.1-8b". Every model has all three attributes, from the
+  // catalog.
+  entity Model {
+    // The provider: a value of the table in section 6.3, such as "openai", or,
+    // for any other provider, a lowercase name of its own, such as "ollama".
+    provider: String,
+    // The model's name, as requested.
+    name: String,
+    // The normalized base URL of the endpoint the agent calls (section 4.10).
+    endpoint: String
+  };
+
   // Reserved for later actions of the profile.
-  entity McpServer;
   entity Dataset;
   entity Skill;
   entity Url;
 
-  // Arguments of tool calls. Empty in the base profile: a deployment declares
-  // the arguments its policies need, and enforcement points fill only those.
+  // The arguments of tool calls, one optional record per tool, keyed by the
+  // tool's key. Empty in the base profile: the core declares, in each bundle's
+  // schema, the arguments that the catalog declares, for example
+  //   type ToolArgs = { "github/create_pull_request"?: { "base"?: String } };
+  // and enforcement points fill only those (section 6.11).
   type ToolArgs = {};
 
   // Context of every request.
@@ -61,7 +92,7 @@ namespace WhiteTower {
     on_behalf_of?: String
   };
 
-  // Context of tool calls: the common context plus the tool's arguments.
+  // Context of tool calls: the common context plus the tools' arguments.
   type ToolContext = {
     time: datetime,
     task_id?: String,
@@ -70,10 +101,33 @@ namespace WhiteTower {
     args?: ToolArgs
   };
 
-  // The eight intervention points of the profile.
+  // Context of the offer of a tool to a model (section 6.10).
+  type ExposeContext = {
+    time: datetime,
+    task_id?: String,
+    trace_id?: String,
+    on_behalf_of?: String,
+    // Whether every call of the tool will be decided as tool.invoke before it
+    // runs.
+    calls_decided: Bool
+  };
+
+  // Context of model calls.
+  type ModelContext = {
+    time: datetime,
+    task_id?: String,
+    trace_id?: String,
+    on_behalf_of?: String,
+    // The digest of the model's weights, when the runtime reports one.
+    digest?: String
+  };
+
+  // The eight intervention points of the profile, and the offer of a tool to
+  // a model.
   action "agent.start" appliesTo { principal: Agent, resource: Agent, context: Context };
   action "input.receive" appliesTo { principal: Agent, resource: Agent, context: Context };
-  action "model.invoke" appliesTo { principal: Agent, resource: Model, context: Context };
+  action "tool.expose" appliesTo { principal: Agent, resource: Tool, context: ExposeContext };
+  action "model.invoke" appliesTo { principal: Agent, resource: Model, context: ModelContext };
   action "model.result" appliesTo { principal: Agent, resource: Model, context: Context };
   action "tool.invoke" appliesTo { principal: Agent, resource: Tool, context: ToolContext };
   action "tool.result" appliesTo { principal: Agent, resource: Tool, context: ToolContext };
