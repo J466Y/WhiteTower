@@ -311,18 +311,18 @@ A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-0
 
 **Pull request 4 in three parts.** The agent of pull request 4 stopped before writing code: the whole of it came to about 2,200 changed lines, generated code aside. The maintainer chose three parts, each from `main` once the part before it is merged (rows 4a, 4b and 4c of the table above). Its two conditions hold: the first pull request of P1-07.1 is merged, and the lifecycle and the requirements say that drills do not suspend.
 
-**The maintainer's decisions of 2026-11-12:**
+**Decisions of 2026-11-12.** The maintainer decided the split and the service accounts; the review answered the other questions:
 
-| Question | Decision |
-| --- | --- |
-| What P1-06's stub answers for `agent_policy_active` (open question of pull request 1) | No agent policy is active until P1-06 lands, so POL-04 holds. No agent reaches `ready` before P1-06, since T7 needs an active agent policy, and the evaluation seed's `doc-indexer`, suspended from `active`, cannot be reinstated: T13 checks the invariants of the state it returns to. Part 4b builds the stub |
-| Separation of duties (open questions of pull requests 1 and 3) | `not_owner_or_creator` refuses the creator of the agent or of its use case, and whoever is or ever was the agent's primary owner or one of its delegates, whether the assignment ended or not. The lifecycle's section 4 says so |
-| Service accounts | A service account takes only T10, suspend, when its roles allow it, and never T9, T13 or T14: retirement cannot be undone, so a stolen automation token must never retire agents. As before, the decisions on a proposal (T4 to T6) are people's. The principal's kind decides, so that a person's own service account is refused too, with `forbidden`. Part 4a refuses service accounts every action but suspend, and part 4b writes the rule beside "People decide on proposals" in the lifecycle |
-| T14's revocation of credentials and retirement of agent-specific policies | P1-05 and P1-06 add their hooks into T14 when they land |
-| The review of T9, and the open review that T14 cancels | Pull request 5, which builds reviews |
-| The advisory committee's inbox item of a submitted proposal | Part 4a adds it at T2 and takes it out at T3 to T6; part 4b, at T14 |
-| The engine's table | A Go table, with a test that parses `agent-lifecycle.yaml` and fails when the two differ |
-| Property tests | 10,000 sequences on the decision core, and about 200 on PostgreSQL, in part 4b |
+| Question | Decided by | Decision |
+| --- | --- | --- |
+| What P1-06's stub answers for `agent_policy_active` (open question of pull request 1) | The review | No agent policy is active until P1-06 lands, so POL-04 holds. No agent reaches `ready` before P1-06, since T7 needs an active agent policy, and the evaluation seed's `doc-indexer`, suspended from `active`, cannot be reinstated: T13 checks the invariants of the state it returns to. Part 4b builds the stub |
+| Separation of duties (open questions of pull requests 1 and 3) | The review | `not_owner_or_creator` refuses the creator of the agent or of its use case, and whoever is or ever was the agent's primary owner or one of its delegates, whether the assignment ended or not. The lifecycle's section 4 says so |
+| Service accounts | The maintainer | A service account takes only T10, suspend, when its roles allow it, and never T9, T13 or T14: retirement cannot be undone, so a stolen automation token must never retire agents. As before, the decisions on a proposal (T4 to T6) are people's. The principal's kind decides, so that a person's own service account is refused too, with `forbidden`. Part 4a refuses service accounts every action but suspend, and part 4b writes the rule beside "People decide on proposals" in the lifecycle |
+| T14's revocation of credentials and retirement of agent-specific policies | The review | P1-05 and P1-06 add their hooks into T14 when they land |
+| The review of T9, and the open review that T14 cancels | The review | Pull request 5, which builds reviews |
+| The advisory committee's inbox item of a submitted proposal | The review | Part 4a adds it at T2 and takes it out at T3 to T6; part 4b, at T14 |
+| The engine's table | The review | A Go table, with a test that parses `agent-lifecycle.yaml` and fails when the two differ |
+| Property tests | The review | 10,000 sequences on the decision core, and about 200 on PostgreSQL, in part 4b |
 
 **What part 4a builds:**
 
