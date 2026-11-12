@@ -165,8 +165,10 @@ func (ts *TokenStore) createWithLifetimeTx(
 	if len(scopes) == 0 {
 		return nil, errors.New("at least one scope is required")
 	}
+	// A permission that no token may use, such as the emergency
+	// revocation's, is refused as any other invalid scope (HUM-10).
 	for _, s := range scopes {
-		if !authz.IsValidPermission(authz.Permission(s)) {
+		if !authz.IsTokenScope(authz.Permission(s)) {
 			return nil, fmt.Errorf("invalid scope %q", s)
 		}
 	}

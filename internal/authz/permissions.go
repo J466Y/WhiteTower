@@ -89,6 +89,12 @@ const (
 	// the service accounts they are responsible for, with
 	// PermissionIdentityMeRead.
 	PermissionIdentityTokensManage Permission = "identity.tokens.manage"
+
+	// PermissionIdentityEmergencyRevoke allows ending every session and every
+	// API token at once (HUM-10). It is no token scope (IsTokenScope): the
+	// authorizer never grants it to an API token, whatever its scopes, and
+	// grants it to a break-glass session.
+	PermissionIdentityEmergencyRevoke Permission = "identity.emergency.revoke"
 )
 
 // allPermissions lists all permissions in deterministic order.
@@ -119,6 +125,7 @@ var allPermissions = []Permission{
 	PermissionSettingsManage,
 	PermissionIdentityMeRead,
 	PermissionIdentityTokensManage,
+	PermissionIdentityEmergencyRevoke,
 }
 
 // AllPermissions returns a copy of all defined permissions.
@@ -129,4 +136,12 @@ func AllPermissions() []Permission {
 // IsValidPermission returns true if p is a defined permission.
 func IsValidPermission(p Permission) bool {
 	return slices.Contains(allPermissions, p)
+}
+
+// IsTokenScope returns true if p may be a scope of an API token: a defined
+// permission other than PermissionIdentityEmergencyRevoke, which the
+// authorizer never grants to a token, so that no token carries a permission
+// that it can never use (HUM-10).
+func IsTokenScope(p Permission) bool {
+	return IsValidPermission(p) && p != PermissionIdentityEmergencyRevoke
 }

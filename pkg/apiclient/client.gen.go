@@ -988,6 +988,24 @@ type EditUseCaseRequest struct {
 	Title                 *string              `json:"title,omitempty"`
 }
 
+// EmergencyRevocation defines model for EmergencyRevocation.
+type EmergencyRevocation struct {
+	// RevokedAt When it ended them. A session or a token created later was not ended.
+	RevokedAt time.Time `json:"revokedAt"`
+
+	// Sessions How many sessions it revoked, of those not revoked before, expired ones included.
+	Sessions int64 `json:"sessions"`
+
+	// Tokens How many API tokens it revoked, of those not revoked before, expired ones included.
+	Tokens int64 `json:"tokens"`
+}
+
+// EmergencyRevocationRequest defines model for EmergencyRevocationRequest.
+type EmergencyRevocationRequest struct {
+	// Reason Why everything ends, such as a reference to the incident. The audit log keeps it.
+	Reason string `json:"reason"`
+}
+
 // ExchangeTokenRequest defines model for ExchangeTokenRequest.
 type ExchangeTokenRequest struct {
 	// IdToken Raw OpenID Connect ID token obtained by the CLI.
@@ -1837,6 +1855,9 @@ type ReassignAgentOwnerJSONRequestBody = ReassignOwnerRequest
 // TransitionAgentJSONRequestBody defines body for TransitionAgent for application/json ContentType.
 type TransitionAgentJSONRequestBody = TransitionRequest
 
+// RevokeAllSessionsAndTokensJSONRequestBody defines body for RevokeAllSessionsAndTokens for application/json ContentType.
+type RevokeAllSessionsAndTokensJSONRequestBody = EmergencyRevocationRequest
+
 // CompleteReviewJSONRequestBody defines body for CompleteReview for application/json ContentType.
 type CompleteReviewJSONRequestBody = ReviewAttestation
 
@@ -2319,6 +2340,58 @@ type ClientInterface interface {
 	// Corresponds with GET /data-categories (the `ListDataCategories` operationId).
 	ListDataCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// RevokeAllSessionsAndTokensWithBody End every session and API token at once
+	//
+	// Ends, at once and for a reason, every session and every API token,
+	// of people and of service accounts, the CLI's tokens included, so that
+	// nothing that a compromised identity provider let someone obtain
+	// outlives it (HUM-10). It revokes every one that is not revoked yet,
+	// expired ones included, since the clock of another replica may not
+	// have reached their expiry. Principals and their roles stay: everyone
+	// signs in again, and the integrations' tokens are created again. The
+	// caller's own session ends too, unless it is a break-glass session:
+	// the answer then clears the session cookie, as a sign-out does. Every
+	// other break-glass session ends.
+	//
+	// The platform administrator runs it, from a session
+	// (`identity.emergency.revoke`), and so does the break-glass custodian.
+	// An API token never does, whatever its scopes: it is `forbidden`. A
+	// missing, blank or longer reason is `bad_request`. The audit log
+	// records it, with how many sessions and tokens it ended, and the
+	// server logs a security alert. A second run ends nothing new, and is
+	// recorded too.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /emergency-revocation (the `RevokeAllSessionsAndTokens` operationId).
+	RevokeAllSessionsAndTokensWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeAllSessionsAndTokens End every session and API token at once
+	//
+	// Ends, at once and for a reason, every session and every API token,
+	// of people and of service accounts, the CLI's tokens included, so that
+	// nothing that a compromised identity provider let someone obtain
+	// outlives it (HUM-10). It revokes every one that is not revoked yet,
+	// expired ones included, since the clock of another replica may not
+	// have reached their expiry. Principals and their roles stay: everyone
+	// signs in again, and the integrations' tokens are created again. The
+	// caller's own session ends too, unless it is a break-glass session:
+	// the answer then clears the session cookie, as a sign-out does. Every
+	// other break-glass session ends.
+	//
+	// The platform administrator runs it, from a session
+	// (`identity.emergency.revoke`), and so does the break-glass custodian.
+	// An API token never does, whatever its scopes: it is `forbidden`. A
+	// missing, blank or longer reason is `bad_request`. The audit log
+	// records it, with how many sessions and tokens it ended, and the
+	// server logs a security alert. A second run ends nothing new, and is
+	// recorded too.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /emergency-revocation (the `RevokeAllSessionsAndTokens` operationId).
+	RevokeAllSessionsAndTokens(ctx context.Context, body RevokeAllSessionsAndTokensJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListInboxItems List the caller's pending work
 	//
 	// Lists the open items addressed to the caller, or to one of the
@@ -2468,6 +2541,8 @@ type ClientInterface interface {
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
+	// No token holds `identity.emergency.revoke`, which no token can use:
+	// that scope is `bad_request`, as an unknown one is.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2485,6 +2560,8 @@ type ClientInterface interface {
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
+	// No token holds `identity.emergency.revoke`, which no token can use:
+	// that scope is `bad_request`, as an unknown one is.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3304,6 +3381,78 @@ func (c *Client) ListDataCategories(ctx context.Context, reqEditors ...RequestEd
 	return c.Client.Do(req)
 }
 
+// RevokeAllSessionsAndTokensWithBody End every session and API token at once
+//
+// Ends, at once and for a reason, every session and every API token,
+// of people and of service accounts, the CLI's tokens included, so that
+// nothing that a compromised identity provider let someone obtain
+// outlives it (HUM-10). It revokes every one that is not revoked yet,
+// expired ones included, since the clock of another replica may not
+// have reached their expiry. Principals and their roles stay: everyone
+// signs in again, and the integrations' tokens are created again. The
+// caller's own session ends too, unless it is a break-glass session:
+// the answer then clears the session cookie, as a sign-out does. Every
+// other break-glass session ends.
+//
+// The platform administrator runs it, from a session
+// (`identity.emergency.revoke`), and so does the break-glass custodian.
+// An API token never does, whatever its scopes: it is `forbidden`. A
+// missing, blank or longer reason is `bad_request`. The audit log
+// records it, with how many sessions and tokens it ended, and the
+// server logs a security alert. A second run ends nothing new, and is
+// recorded too.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /emergency-revocation (the `RevokeAllSessionsAndTokens` operationId).
+func (c *Client) RevokeAllSessionsAndTokensWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeAllSessionsAndTokensRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeAllSessionsAndTokens End every session and API token at once
+//
+// Ends, at once and for a reason, every session and every API token,
+// of people and of service accounts, the CLI's tokens included, so that
+// nothing that a compromised identity provider let someone obtain
+// outlives it (HUM-10). It revokes every one that is not revoked yet,
+// expired ones included, since the clock of another replica may not
+// have reached their expiry. Principals and their roles stay: everyone
+// signs in again, and the integrations' tokens are created again. The
+// caller's own session ends too, unless it is a break-glass session:
+// the answer then clears the session cookie, as a sign-out does. Every
+// other break-glass session ends.
+//
+// The platform administrator runs it, from a session
+// (`identity.emergency.revoke`), and so does the break-glass custodian.
+// An API token never does, whatever its scopes: it is `forbidden`. A
+// missing, blank or longer reason is `bad_request`. The audit log
+// records it, with how many sessions and tokens it ended, and the
+// server logs a security alert. A second run ends nothing new, and is
+// recorded too.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /emergency-revocation (the `RevokeAllSessionsAndTokens` operationId).
+func (c *Client) RevokeAllSessionsAndTokens(ctx context.Context, body RevokeAllSessionsAndTokensJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeAllSessionsAndTokensRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListInboxItems List the caller's pending work
 //
 // Lists the open items addressed to the caller, or to one of the
@@ -3563,6 +3712,8 @@ func (c *Client) ListTokens(ctx context.Context, params *ListTokensParams, reqEd
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
+// No token holds `identity.emergency.revoke`, which no token can use:
+// that scope is `bad_request`, as an unknown one is.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3590,6 +3741,8 @@ func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, bo
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
+// No token holds `identity.emergency.revoke`, which no token can use:
+// that scope is `bad_request`, as an unknown one is.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5332,6 +5485,46 @@ func NewListDataCategoriesRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewRevokeAllSessionsAndTokensRequest calls the generic RevokeAllSessionsAndTokens builder with application/json body
+func NewRevokeAllSessionsAndTokensRequest(server string, body RevokeAllSessionsAndTokensJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRevokeAllSessionsAndTokensRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewRevokeAllSessionsAndTokensRequestWithBody constructs an http.Request for the RevokeAllSessionsAndTokens method, with any body, and a specified content type
+func NewRevokeAllSessionsAndTokensRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/emergency-revocation")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListInboxItemsRequest constructs an http.Request for the ListInboxItems method
 func NewListInboxItemsRequest(server string, params *ListInboxItemsParams) (*http.Request, error) {
 	var err error
@@ -6716,6 +6909,58 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /data-categories (the `ListDataCategories` operationId).
 	ListDataCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListDataCategoriesResponse, error)
 
+	// RevokeAllSessionsAndTokensWithBodyWithResponse End every session and API token at once
+	//
+	// Ends, at once and for a reason, every session and every API token,
+	// of people and of service accounts, the CLI's tokens included, so that
+	// nothing that a compromised identity provider let someone obtain
+	// outlives it (HUM-10). It revokes every one that is not revoked yet,
+	// expired ones included, since the clock of another replica may not
+	// have reached their expiry. Principals and their roles stay: everyone
+	// signs in again, and the integrations' tokens are created again. The
+	// caller's own session ends too, unless it is a break-glass session:
+	// the answer then clears the session cookie, as a sign-out does. Every
+	// other break-glass session ends.
+	//
+	// The platform administrator runs it, from a session
+	// (`identity.emergency.revoke`), and so does the break-glass custodian.
+	// An API token never does, whatever its scopes: it is `forbidden`. A
+	// missing, blank or longer reason is `bad_request`. The audit log
+	// records it, with how many sessions and tokens it ended, and the
+	// server logs a security alert. A second run ends nothing new, and is
+	// recorded too.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /emergency-revocation (the `RevokeAllSessionsAndTokens` operationId).
+	RevokeAllSessionsAndTokensWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RevokeAllSessionsAndTokensResponse, error)
+
+	// RevokeAllSessionsAndTokensWithResponse End every session and API token at once
+	//
+	// Ends, at once and for a reason, every session and every API token,
+	// of people and of service accounts, the CLI's tokens included, so that
+	// nothing that a compromised identity provider let someone obtain
+	// outlives it (HUM-10). It revokes every one that is not revoked yet,
+	// expired ones included, since the clock of another replica may not
+	// have reached their expiry. Principals and their roles stay: everyone
+	// signs in again, and the integrations' tokens are created again. The
+	// caller's own session ends too, unless it is a break-glass session:
+	// the answer then clears the session cookie, as a sign-out does. Every
+	// other break-glass session ends.
+	//
+	// The platform administrator runs it, from a session
+	// (`identity.emergency.revoke`), and so does the break-glass custodian.
+	// An API token never does, whatever its scopes: it is `forbidden`. A
+	// missing, blank or longer reason is `bad_request`. The audit log
+	// records it, with how many sessions and tokens it ended, and the
+	// server logs a security alert. A second run ends nothing new, and is
+	// recorded too.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /emergency-revocation (the `RevokeAllSessionsAndTokens` operationId).
+	RevokeAllSessionsAndTokensWithResponse(ctx context.Context, body RevokeAllSessionsAndTokensJSONRequestBody, reqEditors ...RequestEditorFn) (*RevokeAllSessionsAndTokensResponse, error)
+
 	// ListInboxItemsWithResponse List the caller's pending work
 	//
 	// Lists the open items addressed to the caller, or to one of the
@@ -6879,6 +7124,8 @@ type ClientWithResponsesInterface interface {
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
+	// No token holds `identity.emergency.revoke`, which no token can use:
+	// that scope is `bad_request`, as an unknown one is.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -6896,6 +7143,8 @@ type ClientWithResponsesInterface interface {
 	// creates it: each scope must be a permission of the token's principal
 	// and of the caller, and one of the scopes of the caller's own token when
 	// the caller uses one; otherwise the request is refused (`forbidden`).
+	// No token holds `identity.emergency.revoke`, which no token can use:
+	// that scope is `bad_request`, as an unknown one is.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8178,6 +8427,61 @@ func (r ListDataCategoriesResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListDataCategoriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeAllSessionsAndTokensResponse200Headers the declared response headers of an HTTP 200 response for RevokeAllSessionsAndTokens
+type RevokeAllSessionsAndTokensResponse200Headers struct {
+	SetCookie *string
+}
+
+type RevokeAllSessionsAndTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmergencyRevocation
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RevokeAllSessionsAndTokensResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RevokeAllSessionsAndTokensResponse) GetJSON200() *EmergencyRevocation {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RevokeAllSessionsAndTokensResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeAllSessionsAndTokensResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeAllSessionsAndTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeAllSessionsAndTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeAllSessionsAndTokensResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -9681,6 +9985,70 @@ func (c *ClientWithResponses) ListDataCategoriesWithResponse(ctx context.Context
 	return ParseListDataCategoriesResponse(rsp)
 }
 
+// RevokeAllSessionsAndTokensWithBodyWithResponse End every session and API token at once
+//
+// Ends, at once and for a reason, every session and every API token,
+// of people and of service accounts, the CLI's tokens included, so that
+// nothing that a compromised identity provider let someone obtain
+// outlives it (HUM-10). It revokes every one that is not revoked yet,
+// expired ones included, since the clock of another replica may not
+// have reached their expiry. Principals and their roles stay: everyone
+// signs in again, and the integrations' tokens are created again. The
+// caller's own session ends too, unless it is a break-glass session:
+// the answer then clears the session cookie, as a sign-out does. Every
+// other break-glass session ends.
+//
+// The platform administrator runs it, from a session
+// (`identity.emergency.revoke`), and so does the break-glass custodian.
+// An API token never does, whatever its scopes: it is `forbidden`. A
+// missing, blank or longer reason is `bad_request`. The audit log
+// records it, with how many sessions and tokens it ended, and the
+// server logs a security alert. A second run ends nothing new, and is
+// recorded too.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /emergency-revocation (the `RevokeAllSessionsAndTokens` operationId).
+func (c *ClientWithResponses) RevokeAllSessionsAndTokensWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RevokeAllSessionsAndTokensResponse, error) {
+	rsp, err := c.RevokeAllSessionsAndTokensWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeAllSessionsAndTokensResponse(rsp)
+}
+
+// RevokeAllSessionsAndTokensWithResponse End every session and API token at once
+//
+// Ends, at once and for a reason, every session and every API token,
+// of people and of service accounts, the CLI's tokens included, so that
+// nothing that a compromised identity provider let someone obtain
+// outlives it (HUM-10). It revokes every one that is not revoked yet,
+// expired ones included, since the clock of another replica may not
+// have reached their expiry. Principals and their roles stay: everyone
+// signs in again, and the integrations' tokens are created again. The
+// caller's own session ends too, unless it is a break-glass session:
+// the answer then clears the session cookie, as a sign-out does. Every
+// other break-glass session ends.
+//
+// The platform administrator runs it, from a session
+// (`identity.emergency.revoke`), and so does the break-glass custodian.
+// An API token never does, whatever its scopes: it is `forbidden`. A
+// missing, blank or longer reason is `bad_request`. The audit log
+// records it, with how many sessions and tokens it ended, and the
+// server logs a security alert. A second run ends nothing new, and is
+// recorded too.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /emergency-revocation (the `RevokeAllSessionsAndTokens` operationId).
+func (c *ClientWithResponses) RevokeAllSessionsAndTokensWithResponse(ctx context.Context, body RevokeAllSessionsAndTokensJSONRequestBody, reqEditors ...RequestEditorFn) (*RevokeAllSessionsAndTokensResponse, error) {
+	rsp, err := c.RevokeAllSessionsAndTokens(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeAllSessionsAndTokensResponse(rsp)
+}
+
 // ListInboxItemsWithResponse List the caller's pending work
 //
 // Lists the open items addressed to the caller, or to one of the
@@ -9910,6 +10278,8 @@ func (c *ClientWithResponses) ListTokensWithResponse(ctx context.Context, params
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
+// No token holds `identity.emergency.revoke`, which no token can use:
+// that scope is `bad_request`, as an unknown one is.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -9933,6 +10303,8 @@ func (c *ClientWithResponses) CreateTokenWithBodyWithResponse(ctx context.Contex
 // creates it: each scope must be a permission of the token's principal
 // and of the caller, and one of the scopes of the caller's own token when
 // the caller uses one; otherwise the request is refused (`forbidden`).
+// No token holds `identity.emergency.revoke`, which no token can use:
+// that scope is `bad_request`, as an unknown one is.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10987,6 +11359,52 @@ func ParseListDataCategoriesResponse(rsp *http.Response) (*ListDataCategoriesRes
 		}
 		response.ApplicationproblemJSONDefault = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseRevokeAllSessionsAndTokensResponse parses an HTTP response from a RevokeAllSessionsAndTokensWithResponse call
+func ParseRevokeAllSessionsAndTokensResponse(rsp *http.Response) (*RevokeAllSessionsAndTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeAllSessionsAndTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmergencyRevocation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RevokeAllSessionsAndTokensResponse200Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil

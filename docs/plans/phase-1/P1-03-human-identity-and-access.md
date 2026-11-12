@@ -3,11 +3,11 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress: the erasure of a person, step 13, added on 2026-10-27 (see [progress notes](#progress-notes)) |
+| **Status** | In progress: the erasure of a person, step 13, added on 2026-10-27, is left (see [progress notes](#progress-notes)) |
 | **Size** | M |
 | **Depends on** | P1-01, P1-02 (writer) |
 | **Unblocks** | P1-04, P1-10, P1-11 |
-| **Requirements** | HUM-01 to HUM-09, KIL-08 (break-glass), NFR-12 |
+| **Requirements** | HUM-01 to HUM-10, KIL-08 (break-glass), NFR-12 |
 | **Decisions** | ADR-0009 |
 
 ## Goal
@@ -187,7 +187,7 @@ Added on 2026-11-10 ([progress notes](#progress-notes), decision 9). White Tower
 
 ## Progress notes
 
-The plan landed in six pull requests. The first built the authorization engine and role-to-permission matrix, which API operations and domain services evaluate. A seventh adds the erasure of a person, step 13 (2026-10-27).
+The plan landed in six pull requests. The first built the authorization engine and role-to-permission matrix, which API operations and domain services evaluate. A seventh adds the erasure of a person, step 13 (2026-10-27), and an eighth emergency revocation, step 14 (2026-11-10).
 
 | Pull request | Steps | Status |
 | --- | --- | --- |
@@ -198,7 +198,7 @@ The plan landed in six pull requests. The first built the authorization engine a
 | 5. CLI token exchange and break-glass | 7, 9, ST-20 | Done (PR #40) |
 | 6. SCIM 2.0 deprovisioning and SAML broker guide | 8, 10, ST-21 | Done (PR #41) |
 | 7. Erasure of a person | 13, ST-88 | To do |
-| 8. Emergency revocation | 14, ST-89 | To do |
+| 8. Emergency revocation | 14, ST-89 | Done |
 
 ### 2026-10-14: roles, permissions and authorization engine
 
@@ -778,3 +778,50 @@ The maintainer's decision 8, above (ST-14, ST-19), on the fix that makes the ses
   The configuration reference's `cli_client_id` says that the exchange refuses the ID tokens of any other client. No earlier test relied on the fallback: every exchange in the tests already used the CLI's audience. The new test `TestTheExchangeRefusesAnIDTokenOfTheConsolesClient`, with the other tests of ST-16, checks that the exchange refuses an ID token of the console's client as an invalid token and leaves no principal and no API token, and that the same person's ID token for the CLI's client is exchanged. Break experiment: with the fallback put back, the test fails, and the fallback was taken out again by an edit.
 - **Follow-ups:**
   - The six settings and `cli_client_id` reach the session store, the token store and the OIDC service through structures that `main` fills from `auth.oidc`. The follow-up of 2026-11-09 on a mapping that changes at runtime holds for the token store too.
+
+### 2026-11-11: emergency revocation (PR 8)
+
+Step 14, from the maintainer's decision 9 of 2026-11-10 (HUM-10, ST-89, ST-20).
+
+- **A Must.** The maintainer's decision 10 of 2026-11-11 makes HUM-10 a Must: emergency revocation is the only way to end the API tokens of up to 90 days that an intruder created through a compromised identity provider. ST-89 is thus a release condition. The requirements say so; HUM-06 and KIL-08, break-glass, stay Shoulds.
+- **The operation.** `POST /api/v1/emergency-revocation` (`revokeAllSessionsAndTokens`), with a reason of 1 to 1000 characters, answers how many sessions and API tokens it revoked and when. A blank or longer reason is `bad_request`, and a cookie session needs its CSRF token, as every change does.
+- **Who runs it.** The permission `identity.emergency.revoke`, which only the admin role holds (requirements, section 5.2.1; ST-17, now 27 permissions), and every break-glass session. The authorizer allows it to a break-glass session, whatever its role, and refuses it to every API token, whatever its scopes hold, even an administrator's with every scope. `BreakglassScopes` lists the permission, so that it says what a break-glass session can do. The operation also refuses a request without a session, and `EmergencyRevocation.Revoke` takes the caller's session, from which it reads the actor and whether the session stays: no token runs it, even if the authorizer let one through.
+- **No token carries it.** `authz.IsTokenScope` tells the permissions that an API token may hold: every one but `identity.emergency.revoke`. Creating a token with it is refused as any invalid scope (`bad_request`, `invalid scope "identity.emergency.revoke"`), and the CLI's exchange leaves it out of the permissions of the person's roles that it gives its token. The authorizer refuses to every token a permission that is no token scope, so the rule has one definition.
+- **What it ends,** in one transaction, with the time from `clock.Clock`, in `authn.EmergencyRevocation`, which `main` wires into the API:
+  - every session that is not revoked yet, expired ones and other break-glass sessions included, but the caller's when it is a break-glass session. An administrator's own session ends, and the answer clears its cookie, as a sign-out does;
+  - every API token that is not revoked yet, expired ones included, of people, of service accounts and of the CLI's exchange, whatever sign-in configuration it records.
+
+  It sets `revoked_at`, as the deactivation of a principal does, and the counts say how many it revoked of those not revoked before. Expired ones are revoked too, because a session that has expired on the revoking replica's clock may not have on another's: a request on that replica that read the session just before would slide its idle expiry once the revocation commits, and the session would live on, up to its absolute expiry. The case needs no skew between the clocks; skew widens it. Principals and their role bindings stay.
+- **Audited.** `whitetower.access.revoked_all.v1`, a new core type with every step of AGENTS.md's checklist, records the actor, by principal ID, the reason and the counts, in the same transaction. It records no event per session or token. Once the transaction commits, an `AfterCommit` hook logs `SECURITY ALERT: emergency revocation ended every session and API token` at the error level, as a break-glass use logs its alert, whoever ran it, with the reason through `logging.Sanitize`. A second run ends nothing new, and is recorded and alerted too.
+- **Two replicas at once.** The transaction starts with `LOCK TABLE whitetower.sessions, whitetower.api_tokens IN SHARE ROW EXCLUSIVE MODE`, which conflicts with every insert, update and delete, and with itself. A sign-in or an exchange that has written its session or token on another replica commits before the lock is granted, and the revocation, whose statements take their snapshot after it, revokes it; one that has not written yet waits, and its session or token is created after the revocation, as a new sign-in is. Two revocations at once run one after the other. Nothing is added to the request path: the authenticator reads a session or a token without waiting, and only its writes of a session's idle expiry and of a token's last use wait while a revocation runs, until it commits. No replica caches sessions, tokens or principals: the authenticator reads them at each request.
+- **The order of locks.** The lock takes `sessions`, then `api_tokens`. Two transactions write both tables, and both write `sessions` first: the deactivation of a principal, which SCIM's deprovisioning and its creation of an inactive person run too, revokes the sessions and then the tokens; and a sign-in through the CLI's exchange whose groups changed revokes the person's sessions and then creates its token. No other transaction writes both: a browser's sign-in, break-glass and a sign-out write `sessions` alone, and the creation and revocation of a token `api_tokens` alone; `Get` and `GetByToken` write in statements of their own. So none can deadlock with the revocation. The lock query and the deactivation say so, for the transactions to come.
+- **OIDC off.** The operation does not depend on OIDC: with only break-glass on, the custodian runs it.
+- **The runbook.** `docs/runbooks/identity-provider-compromise.md`, the repository's first, says what to do when the identity provider is compromised: turn OIDC off, revoke, fix the provider, turn OIDC on again, rotate the SCIM token; and that rotating the modules' credentials comes with P1-05. `docs/README.md` lists the folder.
+- **Documents.** The OpenAPI description, the domain model's rows of `sessions` and `api_tokens`, the SAML broker guide's `/me` of an administrator, which lists the new permission, and HUM-10's priority in the requirements.
+- **Tests:**
+  - the matrix gives `identity.emergency.revoke` to the admin role only (ST-17); the authorizer allows the operation and the permission to an administrator's session and to a break-glass session, and refuses them to an administrator's token with every scope, with the permission alone or with none, a service account's token of the admin role, a session without roles, and every other role, with a session or with a token of every scope; every permission but the emergency revocation's is a token scope, and `*` and unknown names are none (ST-89);
+  - ST-20's tests: a break-glass session may run the operation, and still no other operation that changes state;
+  - the operation refuses a request without a session, an administrator's token, even when the authorizer lets it through (ST-89);
+  - through the store: one run ends an administrator's session, an owner's, another break-glass session, a person's token, a service account's and the CLI's, and keeps the break-glass session that runs it; a token revoked before keeps its revocation, principals stay active and a service account keeps its role; a second run ends nothing; an administrator's run ends their own session and the break-glass session; the three runs record the actor, the reason and the counts, and no token or hash of one, and log three alerts (ST-89);
+  - with two fake clocks on one database: a session whose idle expiry and a token whose expiry fall past the revoking store's clock, and not past another store's, are refused by that other store as revoked, and the session's idle expiry is not slid (ST-89);
+  - an administrator's token is refused the permission, alone or with another scope, as an invalid scope, and the exchange gives an administrator's token every other permission of the role (ST-89);
+  - a run whose event cannot be recorded, and a reason that is missing, blank or of 1001 characters, change nothing and log no alert; a reason of 1000 characters is accepted;
+  - across two replicas, with the audit log held: a sign-in and an exchange that wrote their session and token before the revocation are revoked by it, and a sign-in that waits for the revocation is created after it, and stays (ST-89);
+  - through `serve`, two replicas, one without OIDC: the CLI's token of an administrator holds no emergency revocation, and creating a token with it is a `bad_request`; an administrator's token with every other permission they hold and a CLI token are refused, and so are a break-glass session without its CSRF token and a missing, blank or long reason; the break-glass session on the replica without OIDC ends the administrator's session, another break-glass session, the CLI's token, a service account's token and the administrator's token, on both replicas, keeps its own and sets no cookie; a second run ends nothing; the administrator, signed in again, ends their session and the break-glass session, and the answer clears the cookie; each replica logs the alerts of its runs (ST-89).
+- **Break experiments:** each made the tests above fail, and was undone by an edit:
+  - without the table lock, the revocation leaves the session and the token written before it, and the next run counts them;
+  - with no session kept, the break-glass session that runs it ends, the counts and the events change, and through `serve` the custodian's answer clears its cookie;
+  - with the sessions and tokens that expired on the revoking store's clock left alone, the other store accepts them, and slides the session's idle expiry;
+  - with every permission a token scope, the authorizer allows an administrator's tokens and a service account's token, and the test of the token scopes fails;
+  - with the creation of a token accepting the permission, the store creates the token, and through `serve` the creation answers 201;
+  - with the exchange giving every permission of the roles, an administrator's exchange fails, as a 500 through `serve`;
+  - with break-glass refused, the authorizer's test and both tests of ST-20 fail;
+  - with the alert logged in the transaction, a run that cannot be recorded logs it, and the store's test counts six alerts;
+  - without the check of the reason, a blank reason ends everything, the others fail on the event's schema, and through `serve` a blank reason is a 500;
+  - with the caller never signed out, the administrator's answer does not clear the cookie;
+  - without the admin role's grant, the matrix and the administrator's session fail;
+  - without the operation's check of the session, a request without one fails as a 500 rather than being refused.
+- **The review (2026-11-11)** found the design sound, and asked for four changes, made on the same branch: the revocation of expired sessions and tokens, above, since the first version left them and the case above let a session survive; no token scope for the permission, which the first version let a token list while granting nothing; the check of the order of locks; and HUM-10 as a Must.
+- **Follow-ups:**
+  - The console and `wtctl` have no command for it yet: plan P1-10's administration screens and plan P1-11 call the operation; until then the runbook gives a `curl` command.
+  - The [framework mapping](../../security/framework-mapping.md) could name `whitetower.access.revoked_all.v1` as evidence, beside the other events of sessions and tokens.

@@ -1,4 +1,11 @@
 {
+  "whitetower.access.revoked_all.v1": {
+    "action": "access.revoked_all",
+    "actor_id": "00000000-0000-0000-0000-000000000001",
+    "actor_type": "breakglass",
+    "outcome": "success",
+    "reason": "INC-2041: the identity provider was compromised"
+  },
   "whitetower.action.executed.v1": {
     "action": "tool.invoke",
     "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
