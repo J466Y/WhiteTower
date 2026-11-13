@@ -434,7 +434,7 @@ func (inv *Inventory) closeTransfer(ctx context.Context, tx *db.Tx, caller auth.
 		return refuse(Conflict, "the transfer is no longer pending")
 	}
 	if err := q.ResolveInboxItems(ctx, inventorydb.ResolveInboxItemsParams{
-		ResolvedAt: &now, SubjectType: "ownership_transfer", SubjectID: t.ID,
+		ResolvedAt: &now, Kind: "ownership_transfer", SubjectType: "ownership_transfer", SubjectID: t.ID,
 	}); err != nil {
 		return fmt.Errorf("taking the transfer out of the inbox: %w", err)
 	}
@@ -571,7 +571,7 @@ func cancelTransfers(ctx context.Context, q *inventorydb.Queries, agentID uuid.U
 	}
 	for _, id := range ids {
 		if err := q.ResolveInboxItems(ctx, inventorydb.ResolveInboxItemsParams{
-			ResolvedAt: &now, SubjectType: "ownership_transfer", SubjectID: id,
+			ResolvedAt: &now, Kind: "ownership_transfer", SubjectType: "ownership_transfer", SubjectID: id,
 		}); err != nil {
 			return fmt.Errorf("taking the transfer out of the inbox: %w", err)
 		}

@@ -67,6 +67,8 @@ func inventoryError(err error) error {
 		return problem.New(problem.Conflict, r.Detail)
 	case inventory.Stale:
 		return Stale()
+	case inventory.NotBuilt:
+		return problem.New(problem.NotImplemented, r.Detail)
 	default:
 		return err
 	}
@@ -225,14 +227,74 @@ func (Server) GetAgentActions(context.Context, gen.GetAgentActionsRequestObject)
 	return nil, notBuilt()
 }
 
-// ListAgentTransitions lists an agent's lifecycle history (P1-04, step 5).
-func (Server) ListAgentTransitions(context.Context, gen.ListAgentTransitionsRequestObject) (gen.ListAgentTransitionsResponseObject, error) {
-	return nil, notBuilt()
+// ListAgentTransitions lists an agent's lifecycle history, newest first
+// (P1-04, step 5).
+func (s Server) ListAgentTransitions(ctx context.Context, request gen.ListAgentTransitionsRequestObject) (gen.ListAgentTransitionsResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	size, err := PageSize(request.Params.Limit)
+	if err != nil {
+		return nil, err
+	}
+	before, err := beforeOf(request.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	records, more, err := s.inventory.Transitions(ctx, *p, request.Id, before, size)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	res := gen.ListAgentTransitions200JSONResponse{Transitions: make([]gen.Transition, len(records))}
+	for i, r := range records {
+		t := gen.Transition{
+			Id:           r.ID,
+			Transition:   r.Transition,
+			Action:       gen.LifecycleAction(r.Action),
+			ToState:      gen.LifecycleState(r.To),
+			Actor:        gen.Actor{Type: gen.ActorType(r.Actor.Type), Id: r.Actor.ID, DisplayName: optionalText(r.Actor.DisplayName)},
+			Comment:      optionalText(r.Comment),
+			StateVersion: r.StateVersion,
+			OccurredAt:   r.OccurredAt,
+		}
+		if r.From != "" {
+			from := gen.LifecycleState(r.From)
+			t.FromState = &from
+		}
+		if r.Reason != "" {
+			reason := gen.SuspensionReason(r.Reason)
+			t.Reason = &reason
+		}
+		res.Transitions[i] = t
+	}
+	if more {
+		next, err := EncodeCursor(idPosition{Before: records[len(records)-1].ID})
+		if err != nil {
+			return nil, err
+		}
+		res.NextCursor = &next
+	}
+	return res, nil
 }
 
-// TransitionAgent takes a lifecycle action on an agent (P1-04, step 5).
-func (Server) TransitionAgent(context.Context, gen.TransitionAgentRequestObject) (gen.TransitionAgentResponseObject, error) {
-	return nil, notBuilt()
+// TransitionAgent takes a lifecycle action on an agent, at the version that
+// If-Match names (P1-04, step 5). The actions that part 4b of the plan builds
+// answer not_implemented until then.
+func (s Server) TransitionAgent(ctx context.Context, request gen.TransitionAgentRequestObject) (gen.TransitionAgentResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	version, err := IfMatch(value(request.Params.IfMatch))
+	if err != nil {
+		return nil, err
+	}
+	a, err := s.inventory.Transition(ctx, *p, request.Id, version, string(request.Body.Action), value(request.Body.Comment))
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.TransitionAgent200JSONResponse{Body: agentOf(a), Headers: gen.TransitionAgent200ResponseHeaders{ETag: ETag(a.Version)}}, nil
 }
 
 // ListAgentInstances lists the module instances that serve an agent (P1-04,

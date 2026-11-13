@@ -13,23 +13,28 @@ import (
 )
 
 const addInboxItem = `-- name: AddInboxItem :exec
-INSERT INTO whitetower.inbox_items (id, principal_id, kind, subject_type, subject_id, created_at)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO whitetower.inbox_items (id, principal_id, role, kind, subject_type, subject_id, created_at)
+VALUES ($1, $2, $3, $4, $5,
+  $6, $7)
 `
 
 type AddInboxItemParams struct {
 	ID          uuid.UUID
 	PrincipalID *uuid.UUID
+	Role        *string
 	Kind        string
 	SubjectType string
 	SubjectID   uuid.UUID
 	CreatedAt   time.Time
 }
 
+// Adds an item to the inbox of one principal, or of everyone who holds one
+// role.
 func (q *Queries) AddInboxItem(ctx context.Context, arg AddInboxItemParams) error {
 	_, err := q.db.Exec(ctx, addInboxItem,
 		arg.ID,
 		arg.PrincipalID,
+		arg.Role,
 		arg.Kind,
 		arg.SubjectType,
 		arg.SubjectID,
@@ -339,6 +344,26 @@ func (q *Queries) EndAssignment(ctx context.Context, arg EndAssignmentParams) er
 	return err
 }
 
+const everAssigned = `-- name: EverAssigned :one
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.agent_owners WHERE agent_id = $1 AND principal_id = $2
+)
+`
+
+type EverAssignedParams struct {
+	AgentID     uuid.UUID
+	PrincipalID uuid.UUID
+}
+
+// Whether the principal is, or ever was, the agent's primary owner or one of
+// its delegates.
+func (q *Queries) EverAssigned(ctx context.Context, arg EverAssignedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, everAssigned, arg.AgentID, arg.PrincipalID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const fleetHalted = `-- name: FleetHalted :one
 SELECT run_state = 'halted' FROM whitetower.fleet_state WHERE id = 1
 `
@@ -634,6 +659,72 @@ func (q *Queries) ListAssignments(ctx context.Context, arg ListAssignmentsParams
 	return items, nil
 }
 
+const listTransitions = `-- name: ListTransitions :many
+SELECT t.id, t.agent_id, t.action, t.from_state, t.to_state, t.actor_type, t.actor_id, t.reason, t.comment, t.state_version, t.occurred_at, p.display_name
+FROM whitetower.lifecycle_transitions t
+LEFT JOIN whitetower.principals p ON p.id = t.actor_id
+WHERE t.agent_id = $1
+  AND ($2::uuid IS NULL OR t.id < $2::uuid)
+ORDER BY t.id DESC
+LIMIT $3
+`
+
+type ListTransitionsParams struct {
+	AgentID   uuid.UUID
+	Before    *uuid.UUID
+	PageLimit int32
+}
+
+type ListTransitionsRow struct {
+	ID           uuid.UUID
+	AgentID      uuid.UUID
+	Action       string
+	FromState    *string
+	ToState      string
+	ActorType    string
+	ActorID      *uuid.UUID
+	Reason       *string
+	Comment      *string
+	StateVersion int64
+	OccurredAt   time.Time
+	DisplayName  *string
+}
+
+// A page of the agent's lifecycle transitions, newest first, with the display
+// name of whoever took each one; the system has none.
+func (q *Queries) ListTransitions(ctx context.Context, arg ListTransitionsParams) ([]ListTransitionsRow, error) {
+	rows, err := q.db.Query(ctx, listTransitions, arg.AgentID, arg.Before, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTransitionsRow
+	for rows.Next() {
+		var i ListTransitionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AgentID,
+			&i.Action,
+			&i.FromState,
+			&i.ToState,
+			&i.ActorType,
+			&i.ActorID,
+			&i.Reason,
+			&i.Comment,
+			&i.StateVersion,
+			&i.OccurredAt,
+			&i.DisplayName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUseCaseDecisions = `-- name: ListUseCaseDecisions :many
 SELECT id, use_case_id, agent_id, decision, comment, decided_by, decided_at FROM whitetower.use_case_decisions
 WHERE use_case_id = $1
@@ -755,6 +846,34 @@ func (q *Queries) LockGovernanceState(ctx context.Context, agentID uuid.UUID) (u
 	var agent_id uuid.UUID
 	err := row.Scan(&agent_id)
 	return agent_id, err
+}
+
+const lockUseCase = `-- name: LockUseCase :one
+SELECT id, title, description, business_justification, data_categories, affected_persons, ai_act_classification, status, conditions, created_by, created_at, updated_at, version FROM whitetower.use_cases WHERE id = $1 FOR NO KEY UPDATE
+`
+
+// Locks a use case until the transaction ends, then reads it: the decisions
+// on the agents that it justifies happen one after the other, and each sees
+// the status that the one before it left.
+func (q *Queries) LockUseCase(ctx context.Context, id uuid.UUID) (WhitetowerUseCase, error) {
+	row := q.db.QueryRow(ctx, lockUseCase, id)
+	var i WhitetowerUseCase
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Description,
+		&i.BusinessJustification,
+		&i.DataCategories,
+		&i.AffectedPersons,
+		&i.AiActClassification,
+		&i.Status,
+		&i.Conditions,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Version,
+	)
+	return i, err
 }
 
 const pendingTransfers = `-- name: PendingTransfers :many
@@ -912,6 +1031,35 @@ func (q *Queries) PutGovernanceState(ctx context.Context, arg PutGovernanceState
 	return err
 }
 
+const recordDecision = `-- name: RecordDecision :exec
+INSERT INTO whitetower.use_case_decisions (id, use_case_id, agent_id, decision, comment, decided_by, decided_at)
+VALUES ($1, $2, $3, $4, $5,
+  $6, $7)
+`
+
+type RecordDecisionParams struct {
+	ID        uuid.UUID
+	UseCaseID uuid.UUID
+	AgentID   *uuid.UUID
+	Decision  string
+	Comment   string
+	DecidedBy uuid.UUID
+	DecidedAt time.Time
+}
+
+func (q *Queries) RecordDecision(ctx context.Context, arg RecordDecisionParams) error {
+	_, err := q.db.Exec(ctx, recordDecision,
+		arg.ID,
+		arg.UseCaseID,
+		arg.AgentID,
+		arg.Decision,
+		arg.Comment,
+		arg.DecidedBy,
+		arg.DecidedAt,
+	)
+	return err
+}
+
 const recordTransition = `-- name: RecordTransition :exec
 INSERT INTO whitetower.lifecycle_transitions (
   id, agent_id, action, from_state, to_state, actor_type, actor_id, reason, comment,
@@ -956,18 +1104,72 @@ func (q *Queries) RecordTransition(ctx context.Context, arg RecordTransitionPara
 
 const resolveInboxItems = `-- name: ResolveInboxItems :exec
 UPDATE whitetower.inbox_items SET resolved_at = $1
-WHERE subject_type = $2 AND subject_id = $3 AND resolved_at IS NULL
+WHERE kind = $2 AND subject_type = $3 AND subject_id = $4
+  AND resolved_at IS NULL
 `
 
 type ResolveInboxItemsParams struct {
 	ResolvedAt  *time.Time
+	Kind        string
 	SubjectType string
 	SubjectID   uuid.UUID
 }
 
-// Takes the items about a subject out of every inbox.
+// Takes the items of one kind about a subject out of every inbox.
 func (q *Queries) ResolveInboxItems(ctx context.Context, arg ResolveInboxItemsParams) error {
-	_, err := q.db.Exec(ctx, resolveInboxItems, arg.ResolvedAt, arg.SubjectType, arg.SubjectID)
+	_, err := q.db.Exec(ctx, resolveInboxItems,
+		arg.ResolvedAt,
+		arg.Kind,
+		arg.SubjectType,
+		arg.SubjectID,
+	)
+	return err
+}
+
+const setLifecycleState = `-- name: SetLifecycleState :execrows
+UPDATE whitetower.agents
+SET lifecycle_state = $1, updated_at = $2, version = version + 1
+WHERE id = $3 AND version = $4
+`
+
+type SetLifecycleStateParams struct {
+	LifecycleState string
+	UpdatedAt      time.Time
+	ID             uuid.UUID
+	Version        int64
+}
+
+// Moves an agent to another state of its lifecycle, if it is still at the
+// version the caller read.
+func (q *Queries) SetLifecycleState(ctx context.Context, arg SetLifecycleStateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setLifecycleState,
+		arg.LifecycleState,
+		arg.UpdatedAt,
+		arg.ID,
+		arg.Version,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setUseCaseStatus = `-- name: SetUseCaseStatus :exec
+UPDATE whitetower.use_cases
+SET status = $1, updated_at = $2, version = version + 1
+WHERE id = $3 AND status NOT IN ('validated', 'rejected')
+`
+
+type SetUseCaseStatusParams struct {
+	Status    string
+	UpdatedAt time.Time
+	ID        uuid.UUID
+}
+
+// Moves a use case that no decision has made final to another status. A
+// validated or rejected use case never changes.
+func (q *Queries) SetUseCaseStatus(ctx context.Context, arg SetUseCaseStatusParams) error {
+	_, err := q.db.Exec(ctx, setUseCaseStatus, arg.Status, arg.UpdatedAt, arg.ID)
 	return err
 }
 
