@@ -54,6 +54,7 @@
           "enum": [
             "agent.start",
             "input.receive",
+            "tool.expose",
             "model.invoke",
             "model.result",
             "tool.invoke",
@@ -80,13 +81,33 @@
             "required": ["properties"],
             "properties": {
               "properties": {
+                "description": "From the catalog, never from the agent, and all required (section 6.3): an MCP tool also has its server and its transport, and a built-in tool its provider, and no tool has those of another kind, as in the catalog file. The bounds are the catalog file's, so that every entry that step V7 accepts makes a request inside the profile.",
                 "type": "object",
-                "required": ["kind"],
+                "required": ["kind", "origin", "name", "read_only", "destructive", "open_world"],
                 "additionalProperties": false,
                 "properties": {
-                  "kind": { "enum": ["function", "mcp", "http", "other"] },
-                  "server": { "type": "string", "minLength": 1 }
-                }
+                  "kind": { "enum": ["function", "mcp", "builtin", "http", "other"] },
+                  "origin": { "enum": ["agent", "provider"] },
+                  "name": { "type": "string", "minLength": 1 },
+                  "read_only": { "type": "boolean" },
+                  "destructive": { "type": "boolean" },
+                  "open_world": { "type": "boolean" },
+                  "server": { "description": "The key of the MCP server that provides the tool.", "type": "string", "pattern": "^[a-z0-9-]{1,63}$" },
+                  "transport": { "enum": ["stdio", "http"] },
+                  "provider": { "description": "The model provider that defines a built-in tool.", "type": "string", "minLength": 1 }
+                },
+                "allOf": [
+                  {
+                    "if": { "properties": { "kind": { "const": "mcp" } } },
+                    "then": { "required": ["server", "transport"] },
+                    "else": { "not": { "anyOf": [{ "required": ["server"] }, { "required": ["transport"] }] } }
+                  },
+                  {
+                    "if": { "properties": { "kind": { "const": "builtin" } } },
+                    "then": { "required": ["provider"] },
+                    "else": { "not": { "required": ["provider"] } }
+                  }
+                ]
               }
             }
           }
@@ -94,11 +115,18 @@
         {
           "if": { "properties": { "type": { "const": "model" } } },
           "then": {
+            "required": ["properties"],
             "properties": {
               "properties": {
+                "description": "From the catalog, and all required (section 6.3), with the catalog file's bounds.",
                 "type": "object",
+                "required": ["provider", "name", "endpoint"],
                 "additionalProperties": false,
-                "properties": { "provider": { "type": "string", "minLength": 1 } }
+                "properties": {
+                  "provider": { "type": "string", "minLength": 1 },
+                  "name": { "type": "string", "minLength": 1 },
+                  "endpoint": { "description": "The normalized base URL of the endpoint the agent calls (section 4.10).", "type": "string", "minLength": 1 }
+                }
               }
             }
           }
@@ -122,9 +150,20 @@
           "not": {}
         },
         "args": {
-          "description": "Tool arguments declared by the deployment's extension of ToolArgs. Tool actions only. Its values are never null, at any depth (section 6.4).",
+          "description": "tool.invoke and tool.result only, and required there: exactly one record, the resource's own, keyed by the tool's key, with the arguments that its catalog entry declares (sections 6.4 and 6.11). That the record is the resource's own, which no schema can express, is a rule of the profile.",
           "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/notNull" }
+          "minProperties": 1,
+          "maxProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/toolRecord" }
+        },
+        "calls_decided": {
+          "description": "tool.expose only, and required there: whether every call of the tool will be decided as tool.invoke before it runs (section 6.10).",
+          "type": "boolean"
+        },
+        "digest": {
+          "description": "model.invoke only: the digest of the model's weights, when the runtime reports one (section 6.9).",
+          "type": "string",
+          "minLength": 1
         }
       }
     }
@@ -139,9 +178,22 @@
       "then": { "properties": { "resource": { "properties": { "type": { "const": "model" } } } } }
     },
     {
+      "if": { "properties": { "action": { "properties": { "name": { "enum": ["tool.expose", "tool.invoke", "tool.result"] } } } } },
+      "then": { "properties": { "resource": { "properties": { "type": { "const": "tool" } } } } }
+    },
+    {
       "if": { "properties": { "action": { "properties": { "name": { "enum": ["tool.invoke", "tool.result"] } } } } },
-      "then": { "properties": { "resource": { "properties": { "type": { "const": "tool" } } } } },
+      "then": { "properties": { "context": { "required": ["args"] } } },
       "else": { "properties": { "context": { "not": { "required": ["args"] } } } }
+    },
+    {
+      "if": { "properties": { "action": { "properties": { "name": { "const": "tool.expose" } } } } },
+      "then": { "properties": { "context": { "required": ["calls_decided"] } } },
+      "else": { "properties": { "context": { "not": { "required": ["calls_decided"] } } } }
+    },
+    {
+      "if": { "properties": { "action": { "properties": { "name": { "const": "model.invoke" } } } } },
+      "else": { "properties": { "context": { "not": { "required": ["digest"] } } } }
     }
   ],
   "$defs": {
@@ -151,11 +203,17 @@
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
     },
-    "notNull": {
-      "description": "Any JSON value but null, holding no null inside it at any depth.",
-      "not": { "type": "null" },
-      "items": { "$ref": "#/$defs/notNull" },
-      "additionalProperties": { "$ref": "#/$defs/notNull" }
+    "toolRecord": {
+      "description": "A tool's record: each declared argument, under its name, which is its path, the property names joined by ., followed by : and its transform when it has one (section 7.7). Its value is a string, a boolean, an integer, or an array of strings or of integers, which Cedar reads as a set; never null or an object (section 6.4).",
+      "type": "object",
+      "propertyNames": { "pattern": "^[^.:]*(\\.[^.:]*)*(:(lowercase|path|url_host|email_domain))?$" },
+      "additionalProperties": {
+        "anyOf": [
+          { "type": ["string", "boolean", "integer"] },
+          { "type": "array", "items": { "type": "string" } },
+          { "type": "array", "items": { "type": "integer" } }
+        ]
+      }
     }
   }
 }

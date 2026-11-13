@@ -1,8 +1,157 @@
 {
-  "description": "Combination semantics of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6). Each case is one bundle for agent_id holding the listed policies, one AuthZEN request and the expected response. The response carries bundle_version, the version of the case's bundle, with policy.permit, policy.forbid, policy.no_permit and error.evaluation, and may carry it or not with error.unknown_agent and error.invalid_request (section 6.6). valid says whether the policy passes the validator against the profile's Cedar schema, extended with tool_args_extension. A request that a case refuses with error.invalid_request does not match decision-request.schema.json, unless the case's rule names the rule of the profile, outside the schema, that refuses it: another_agent, an agent action that names another agent (section 6.3); not_an_integer, an argument that is not a signed 64-bit integer written without a fraction or an exponent (section 6.4); or invalid_time, a time that does not exist (section 1).",
+  "description": "Combination semantics of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6). Each case is one bundle for agent_id holding the listed policies and the catalog file catalog (section 7.7), one AuthZEN request and the expected response. A request inside the profile whose resource is a tool or a model names an entry of the catalog by its key, with the properties that the catalog gives it (section 6.3), and the record of a tool call holds only arguments that the entry declares, each of its declared type (section 6.11). The response carries bundle_version, the version of the case's bundle, with policy.permit, policy.forbid, policy.no_permit and error.evaluation, and may carry it or not with error.unknown_agent and error.invalid_request (section 6.6). valid says whether the policy passes the validator against the profile's Cedar schema, with the ToolArgs that the core generates from the catalog: one optional record per tool that declares arguments, keyed by the tool's key, with each argument under its name and of its type (section 6.7). A request that a case refuses with error.invalid_request does not match decision-request.schema.json, unless the case's rule names the rule of the profile, outside the schema, that refuses it: another_agent, an agent action that names another agent (section 6.3); another_tool, a tool call whose arguments hold another tool's record rather than its own (section 6.4); not_an_integer, an argument that is not a signed 64-bit integer written without a fraction or an exponent (section 6.4); or invalid_time, a time that does not exist (section 1).",
   "profile": "v1alpha1",
   "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
-  "tool_args_extension": "type ToolArgs = { recipient_domain?: String, amount?: Long };",
+  "catalog": {
+    "format": "whitetower.catalog.v1",
+    "redaction": {
+      "url_prefixes": [],
+      "flags": []
+    },
+    "servers": [
+      {
+        "key": "github",
+        "reference": "https://api.githubcopilot.com/mcp/",
+        "transport": "http",
+        "status": "approved"
+      }
+    ],
+    "tools": [
+      {
+        "key": "agent/read_invoice",
+        "name": "read_invoice",
+        "kind": "function",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "3f8193bc50d39be0c9796897617ce0c3cd0459da9a4d0dff0ebb2c7c6e5dffcd",
+        "read_only": true,
+        "destructive": false,
+        "open_world": false
+      },
+      {
+        "key": "agent/send_email",
+        "name": "send_email",
+        "kind": "function",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "ca286f9b48ded0dc5f0dc66db79d92a5d06a907959c4c3fd5c77cf6db44f417c",
+        "read_only": false,
+        "destructive": true,
+        "open_world": true,
+        "args": [
+          {
+            "name": "to:email_domain",
+            "path": [
+              "to"
+            ],
+            "transform": "email_domain",
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "key": "agent/delete_database",
+        "name": "delete_database",
+        "kind": "function",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "cbf8b64c504306b731bb352a799ffddb9563f1d77c9f5c0c7968a806f5b77ad7",
+        "read_only": false,
+        "destructive": true,
+        "open_world": false
+      },
+      {
+        "key": "agent/post_ledger",
+        "name": "post_ledger",
+        "kind": "function",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "b518ad84235861ba5e4a0c3a65ff6e896ed438c819c177344f2d8be8c5e9c397",
+        "read_only": false,
+        "destructive": false,
+        "open_world": false,
+        "args": [
+          {
+            "name": "amount",
+            "path": [
+              "amount"
+            ],
+            "type": "Long"
+          }
+        ]
+      },
+      {
+        "key": "agent/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+        "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+        "kind": "function",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "8ef2ed07428b7d48b78e6dc41bef3fa72b2cf73d3ced7ee4a8fff332034d1de1",
+        "read_only": true,
+        "destructive": false,
+        "open_world": false
+      },
+      {
+        "key": "github/create_pull_request",
+        "server": "github",
+        "name": "create_pull_request",
+        "kind": "mcp",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "ecf0b7c4bd22e7746f890de6b2734855f8f64d649507882b7015eecfb9efdef3",
+        "read_only": false,
+        "destructive": false,
+        "open_world": true,
+        "args": [
+          {
+            "name": "base",
+            "path": [
+              "base"
+            ],
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "key": "provider.openai/web_search",
+        "provider": "openai",
+        "type": "web_search",
+        "name": "web_search",
+        "kind": "builtin",
+        "origin": "provider",
+        "status": "approved",
+        "enabled": true,
+        "read_only": true,
+        "destructive": false,
+        "open_world": true
+      }
+    ],
+    "models": [
+      {
+        "key": "openai/gpt-5",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5",
+        "status": "approved",
+        "enabled": true
+      },
+      {
+        "key": "gpu-01/llama-4",
+        "provider": "ollama",
+        "endpoint": "http://gpu-01.internal:11434/",
+        "name": "llama-4",
+        "status": "approved",
+        "enabled": true,
+        "digest": "sha256:8754b77c7eee26e4145b5d20073c32e595c3ecb1a1a7d257df257479ab27c7cf"
+      }
+    ]
+  },
   "cases": [
     {
       "id": "C-01",
@@ -12,7 +161,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -40,13 +189,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
         }
       },
       "expected": {
@@ -115,13 +272,13 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
           "scope": "global",
-          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\");",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/send_email\");",
           "valid": true
         },
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000202",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource)\nwhen { [WhiteTower::Tool::\"read_invoice\", WhiteTower::Tool::\"send_email\"].contains(resource) };",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource)\nwhen { [WhiteTower::Tool::\"agent/read_invoice\", WhiteTower::Tool::\"agent/send_email\"].contains(resource) };",
           "valid": true
         }
       ],
@@ -149,13 +306,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "send_email",
+          "id": "agent/send_email",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "send_email",
+            "read_only": false,
+            "destructive": true,
+            "open_world": true
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/send_email": {}
+          }
         }
       },
       "expected": {
@@ -180,7 +345,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000203",
           "scope": "agent",
-          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nwhen { resource has provider && resource.provider != \"local\" };",
+          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nwhen { resource.provider != \"ollama\" };",
           "valid": true
         }
       ],
@@ -208,9 +373,11 @@
         },
         "resource": {
           "type": "model",
-          "id": "gpt-5",
+          "id": "openai/gpt-5",
           "properties": {
-            "provider": "openai"
+            "provider": "openai",
+            "name": "gpt-5",
+            "endpoint": "https://api.openai.com/v1"
           }
         },
         "context": {
@@ -233,7 +400,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -261,13 +428,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "delete_database",
+          "id": "agent/delete_database",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "delete_database",
+            "read_only": false,
+            "destructive": true,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/delete_database": {}
+          }
         }
       },
       "expected": {
@@ -284,7 +459,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -312,13 +487,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
         }
       },
       "expected": {
@@ -341,7 +524,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -369,13 +552,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
         }
       },
       "expected": {
@@ -400,7 +591,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000104",
           "scope": "global",
-          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nwhen { principal.data_categories.contains(\"customer data\") && !(resource has provider && resource.provider == \"local\") };",
+          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nwhen { principal.data_categories.contains(\"customer data\") && resource.provider != \"ollama\" };",
           "valid": true
         }
       ],
@@ -428,9 +619,11 @@
         },
         "resource": {
           "type": "model",
-          "id": "gpt-5",
+          "id": "openai/gpt-5",
           "properties": {
-            "provider": "openai"
+            "provider": "openai",
+            "name": "gpt-5",
+            "endpoint": "https://api.openai.com/v1"
           }
         },
         "context": {
@@ -459,7 +652,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000104",
           "scope": "global",
-          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nwhen { principal.data_categories.contains(\"customer data\") && !(resource has provider && resource.provider == \"local\") };",
+          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nwhen { principal.data_categories.contains(\"customer data\") && resource.provider != \"ollama\" };",
           "valid": true
         }
       ],
@@ -487,9 +680,11 @@
         },
         "resource": {
           "type": "model",
-          "id": "llama-4",
+          "id": "gpu-01/llama-4",
           "properties": {
-            "provider": "local"
+            "provider": "ollama",
+            "name": "llama-4",
+            "endpoint": "http://gpu-01.internal:11434/"
           }
         },
         "context": {
@@ -512,7 +707,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000204",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { principal.hasTag(\"team\") && principal.getTag(\"team\") == \"finance\" };",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen { principal.hasTag(\"team\") && principal.getTag(\"team\") == \"finance\" };",
           "valid": true
         }
       ],
@@ -540,13 +735,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/post_ledger": {}
+          }
         }
       },
       "expected": {
@@ -565,7 +768,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000205",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
           "valid": true
         }
       ],
@@ -593,13 +796,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/post_ledger": {}
+          }
         }
       },
       "expected": {
@@ -618,7 +829,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000205",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
           "valid": true
         }
       ],
@@ -646,13 +857,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T20:30:00.000Z"
+          "time": "2026-09-29T20:30:00.000Z",
+          "args": {
+            "agent/post_ledger": {}
+          }
         }
       },
       "expected": {
@@ -669,7 +888,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         },
         {
@@ -703,13 +922,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
         }
       },
       "expected": {
@@ -735,7 +962,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -763,13 +990,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
         }
       },
       "expected": {
@@ -788,13 +1023,13 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000107",
           "scope": "global",
-          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { principal.environment == \"non_production\" };",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen { principal.environment == \"non_production\" };",
           "valid": true
         },
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000207",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\");",
           "valid": true
         }
       ],
@@ -822,13 +1057,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/post_ledger": {}
+          }
         }
       },
       "expected": {
@@ -841,19 +1084,19 @@
     },
     {
       "id": "C-16",
-      "description": "Tool arguments declared by the deployment: forbidden value",
+      "description": "A tool's argument that the catalog declares, in the tool's record: forbidden value",
       "section": "6.4",
       "policies": [
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000108",
           "scope": "global",
-          "text": "// Needs the deployment extension ToolArgs = { recipient_domain?: String }.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\")\nwhen { context has args && context.args has recipient_domain && context.args.recipient_domain != \"example.org\" };",
+          "text": "// Reads the argument that the catalog declares for the tool, in the tool's record.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/send_email\")\nwhen {\n  context has args && context.args has \"agent/send_email\" && context.args[\"agent/send_email\"] has \"to:email_domain\" &&\n  context.args[\"agent/send_email\"][\"to:email_domain\"] != \"example.org\"\n};",
           "valid": true
         },
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000208",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/send_email\");",
           "valid": true
         }
       ],
@@ -881,15 +1124,22 @@
         },
         "resource": {
           "type": "tool",
-          "id": "send_email",
+          "id": "agent/send_email",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "send_email",
+            "read_only": false,
+            "destructive": true,
+            "open_world": true
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
           "args": {
-            "recipient_domain": "evil.test"
+            "agent/send_email": {
+              "to:email_domain": "evil.test"
+            }
           }
         }
       },
@@ -903,19 +1153,19 @@
     },
     {
       "id": "C-17",
-      "description": "Tool arguments declared by the deployment: permitted value",
+      "description": "A tool's argument that the catalog declares, in the tool's record: permitted value",
       "section": "6.4",
       "policies": [
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000108",
           "scope": "global",
-          "text": "// Needs the deployment extension ToolArgs = { recipient_domain?: String }.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\")\nwhen { context has args && context.args has recipient_domain && context.args.recipient_domain != \"example.org\" };",
+          "text": "// Reads the argument that the catalog declares for the tool, in the tool's record.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/send_email\")\nwhen {\n  context has args && context.args has \"agent/send_email\" && context.args[\"agent/send_email\"] has \"to:email_domain\" &&\n  context.args[\"agent/send_email\"][\"to:email_domain\"] != \"example.org\"\n};",
           "valid": true
         },
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000208",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/send_email\");",
           "valid": true
         }
       ],
@@ -943,15 +1193,22 @@
         },
         "resource": {
           "type": "tool",
-          "id": "send_email",
+          "id": "agent/send_email",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "send_email",
+            "read_only": false,
+            "destructive": true,
+            "open_world": true
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
           "args": {
-            "recipient_domain": "example.org"
+            "agent/send_email": {
+              "to:email_domain": "example.org"
+            }
           }
         }
       },
@@ -971,7 +1228,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -999,13 +1256,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
         }
       },
       "expected": {
@@ -1022,7 +1287,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         },
         {
@@ -1056,13 +1321,18 @@
         },
         "resource": {
           "type": "model",
-          "id": "gpt-5",
+          "id": "openai/gpt-5",
           "properties": {
-            "provider": "openai"
+            "provider": "openai",
+            "name": "gpt-5",
+            "endpoint": "https://api.openai.com/v1"
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "openai/gpt-5": {}
+          }
         }
       },
       "expected": {
@@ -1128,7 +1398,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000205",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
           "valid": true
         }
       ],
@@ -1156,13 +1426,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00Z"
+          "time": "2026-09-29T10:00:00Z",
+          "args": {
+            "agent/post_ledger": {}
+          }
         }
       },
       "expected": {
@@ -1179,7 +1457,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000205",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
           "valid": true
         }
       ],
@@ -1207,13 +1485,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T12:00:00.000+02:00"
+          "time": "2026-09-29T12:00:00.000+02:00",
+          "args": {
+            "agent/post_ledger": {}
+          }
         }
       },
       "expected": {
@@ -1231,13 +1517,13 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000109",
           "scope": "global",
-          "text": "// Needs the deployment extension ToolArgs = { amount?: Long }.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context has args && context.args has amount && context.args.amount > 1000 };",
+          "text": "// Reads the argument that the catalog declares for the tool, in the tool's record.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen {\n  context has args && context.args has \"agent/post_ledger\" && context.args[\"agent/post_ledger\"] has \"amount\" &&\n  context.args[\"agent/post_ledger\"][\"amount\"] > 1000\n};",
           "valid": true
         },
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000207",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\");",
           "valid": true
         }
       ],
@@ -1265,15 +1551,22 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
           "args": {
-            "amount": 2.0
+            "agent/post_ledger": {
+              "amount": 2.0
+            }
           }
         }
       },
@@ -1291,13 +1584,13 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000109",
           "scope": "global",
-          "text": "// Needs the deployment extension ToolArgs = { amount?: Long }.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context has args && context.args has amount && context.args.amount > 1000 };",
+          "text": "// Reads the argument that the catalog declares for the tool, in the tool's record.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen {\n  context has args && context.args has \"agent/post_ledger\" && context.args[\"agent/post_ledger\"] has \"amount\" &&\n  context.args[\"agent/post_ledger\"][\"amount\"] > 1000\n};",
           "valid": true
         },
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000207",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\");",
           "valid": true
         }
       ],
@@ -1325,15 +1618,22 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
           "args": {
-            "amount": 9223372036854775807
+            "agent/post_ledger": {
+              "amount": 9223372036854775807
+            }
           }
         }
       },
@@ -1354,13 +1654,13 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000109",
           "scope": "global",
-          "text": "// Needs the deployment extension ToolArgs = { amount?: Long }.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context has args && context.args has amount && context.args.amount > 1000 };",
+          "text": "// Reads the argument that the catalog declares for the tool, in the tool's record.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen {\n  context has args && context.args has \"agent/post_ledger\" && context.args[\"agent/post_ledger\"] has \"amount\" &&\n  context.args[\"agent/post_ledger\"][\"amount\"] > 1000\n};",
           "valid": true
         },
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000207",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\");",
           "valid": true
         }
       ],
@@ -1388,15 +1688,22 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
           "args": {
-            "amount": 9223372036854775808
+            "agent/post_ledger": {
+              "amount": 9223372036854775808
+            }
           }
         }
       },
@@ -1414,7 +1721,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -1442,13 +1749,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          },
           "priority": "high"
         }
       },
@@ -1466,7 +1781,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -1494,13 +1809,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          },
           "on_behalf_of": "0192f1c2-7a3b-7c4d-8e5f-0000000000a2"
         }
       },
@@ -1518,7 +1841,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -1546,13 +1869,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          },
           "on_behalf_of": ""
         }
       },
@@ -1570,7 +1901,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -1598,13 +1929,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          },
           "on_behalf_of": null
         }
       },
@@ -1622,7 +1961,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         },
         {
@@ -1656,13 +1995,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
         }
       },
       "expected": {
@@ -1681,7 +2028,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
           "scope": "global",
-          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"send_email\");",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/send_email\");",
           "valid": true
         },
         {
@@ -1715,13 +2062,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "send_email",
+          "id": "agent/send_email",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "send_email",
+            "read_only": false,
+            "destructive": true,
+            "open_world": true
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/send_email": {}
+          }
         }
       },
       "expected": {
@@ -1746,7 +2101,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -1774,13 +2129,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
         }
       },
       "expected": {
@@ -1800,7 +2163,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -1828,13 +2191,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          },
           "priority": "high"
         }
       },
@@ -1852,7 +2223,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -1880,13 +2251,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-09-29T10:00:00.000Z"
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
         }
       },
       "expected": {
@@ -1904,7 +2283,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000205",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen { context.time.toTime() >= duration(\"7h\") && context.time.toTime() < duration(\"19h\") };",
           "valid": true
         }
       ],
@@ -1932,13 +2311,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "post_ledger",
+          "id": "agent/post_ledger",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
-          "time": "2026-02-29T10:00:00.000Z"
+          "time": "2026-02-29T10:00:00.000Z",
+          "args": {
+            "agent/post_ledger": {}
+          }
         }
       },
       "expected": {
@@ -1955,7 +2342,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -1983,13 +2370,21 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
           "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          },
           "trace_id": "0af7651916cd43dd8448eb211c80319c\n"
         }
       },
@@ -2007,7 +2402,7 @@
         {
           "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
           "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"read_invoice\");",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
           "valid": true
         }
       ],
@@ -2035,9 +2430,14 @@
         },
         "resource": {
           "type": "tool",
-          "id": "read_invoice",
+          "id": "agent/read_invoice",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         }
       },
@@ -2049,7 +2449,7 @@
     },
     {
       "id": "C-38",
-      "description": "A resource ID of 513 characters is outside the profile: 512 letters a, then U+1D49C",
+      "description": "A resource ID of 513 characters is outside the profile: agent/, 506 letters a, then U+1D49C",
       "section": "6.3",
       "policies": [
         {
@@ -2083,9 +2483,523 @@
         },
         "resource": {
           "type": "tool",
-          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+          "id": "agent/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
           "properties": {
-            "kind": "function"
+            "kind": "function",
+            "origin": "agent",
+            "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c": {}
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-39",
+      "description": "A resource ID of 512 characters is inside the profile: agent/, 505 letters a, then U+1D49C, which takes 4 bytes in UTF-8 and 2 code units in UTF-16, so that a stack that counts 515 bytes or 513 code units refuses it",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c": {}
+          }
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
+      }
+    },
+    {
+      "id": "C-40",
+      "description": "A policy names a whole MCP server: an MCP tool is in its server",
+      "section": "6.7",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource in WhiteTower::McpServer::\"github\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "github/create_pull_request",
+          "properties": {
+            "kind": "mcp",
+            "origin": "agent",
+            "name": "create_pull_request",
+            "read_only": false,
+            "destructive": false,
+            "open_world": true,
+            "server": "github",
+            "transport": "http"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "github/create_pull_request": {
+              "base": "main"
+            }
+          }
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
+      }
+    },
+    {
+      "id": "C-41",
+      "description": "A tool that no MCP server provides is in no server",
+      "section": "6.7",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource in WhiteTower::McpServer::\"github\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/read_invoice",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.no_permit",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-42",
+      "description": "The catalog's classification of a tool decides: a destructive tool that is not read-only is forbidden",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
+          "scope": "global",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource)\nwhen { resource.destructive && !resource.read_only };",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/delete_database",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "delete_database",
+            "read_only": false,
+            "destructive": true,
+            "open_world": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/delete_database": {}
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.forbid",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000101"
+        ]
+      }
+    },
+    {
+      "id": "C-43",
+      "description": "A built-in tool has its provider, and the origin of a provider-run tool",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource)\nwhen { resource.kind == \"builtin\" && resource.origin == \"provider\" && resource has provider && resource.provider == \"openai\" };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "provider.openai/web_search",
+          "properties": {
+            "kind": "builtin",
+            "origin": "provider",
+            "name": "web_search",
+            "read_only": true,
+            "destructive": false,
+            "open_world": true,
+            "provider": "openai"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "provider.openai/web_search": {}
+          }
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
+      }
+    },
+    {
+      "id": "C-44",
+      "description": "An exposure whose calls are not decided is forbidden by a policy that needs them decided",
+      "section": "6.10",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.expose\", resource == WhiteTower::Tool::\"github/create_pull_request\")\nunless { context.calls_decided };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.expose"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "github/create_pull_request",
+          "properties": {
+            "kind": "mcp",
+            "origin": "agent",
+            "name": "create_pull_request",
+            "read_only": false,
+            "destructive": false,
+            "open_world": true,
+            "server": "github",
+            "transport": "http"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "calls_decided": false
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.forbid",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+        ]
+      }
+    },
+    {
+      "id": "C-45",
+      "description": "An exposure whose calls are decided is permitted by the global permit",
+      "section": "6.10",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.expose\", resource == WhiteTower::Tool::\"github/create_pull_request\")\nunless { context.calls_decided };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.expose"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "github/create_pull_request",
+          "properties": {
+            "kind": "mcp",
+            "origin": "agent",
+            "name": "create_pull_request",
+            "read_only": false,
+            "destructive": false,
+            "open_world": true,
+            "server": "github",
+            "transport": "http"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "calls_decided": true
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000101"
+        ]
+      }
+    },
+    {
+      "id": "C-46",
+      "description": "An exposure without calls_decided is outside the profile",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.expose"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "github/create_pull_request",
+          "properties": {
+            "kind": "mcp",
+            "origin": "agent",
+            "name": "create_pull_request",
+            "read_only": false,
+            "destructive": false,
+            "open_world": true,
+            "server": "github",
+            "transport": "http"
           }
         },
         "context": {
@@ -2099,14 +3013,14 @@
       }
     },
     {
-      "id": "C-39",
-      "description": "A resource ID of 512 characters is inside the profile: 511 letters a, then U+1D49C, which takes 4 bytes in UTF-8 and 2 code units in UTF-16, so that a stack that counts 515 bytes or 513 code units refuses it",
-      "section": "6.3",
+      "id": "C-47",
+      "description": "calls_decided on a tool call is outside the profile",
+      "section": "6.4",
       "policies": [
         {
-          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
-          "scope": "agent",
-          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource);",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
           "valid": true
         }
       ],
@@ -2134,9 +3048,192 @@
         },
         "resource": {
           "type": "tool",
-          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud835\udc9c",
+          "id": "github/create_pull_request",
           "properties": {
-            "kind": "function"
+            "kind": "mcp",
+            "origin": "agent",
+            "name": "create_pull_request",
+            "read_only": false,
+            "destructive": false,
+            "open_world": true,
+            "server": "github",
+            "transport": "http"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "github/create_pull_request": {}
+          },
+          "calls_decided": true
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-48",
+      "description": "A model call carries the digest that the runtime reports",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000102",
+          "scope": "global",
+          "text": "permit (principal, action == WhiteTower::Action::\"model.invoke\", resource);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "forbid (principal, action == WhiteTower::Action::\"model.invoke\", resource)\nunless { context has digest && context.digest == \"sha256:8754b77c7eee26e4145b5d20073c32e595c3ecb1a1a7d257df257479ab27c7cf\" };",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "model.invoke"
+        },
+        "resource": {
+          "type": "model",
+          "id": "gpu-01/llama-4",
+          "properties": {
+            "provider": "ollama",
+            "name": "llama-4",
+            "endpoint": "http://gpu-01.internal:11434/"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "digest": "sha256:8754b77c7eee26e4145b5d20073c32e595c3ecb1a1a7d257df257479ab27c7cf"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000102"
+        ]
+      }
+    },
+    {
+      "id": "C-49",
+      "description": "A digest on a model's result is outside the profile",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "model.result"
+        },
+        "resource": {
+          "type": "model",
+          "id": "gpu-01/llama-4",
+          "properties": {
+            "provider": "ollama",
+            "name": "llama-4",
+            "endpoint": "http://gpu-01.internal:11434/"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "digest": "sha256:8754b77c7eee26e4145b5d20073c32e595c3ecb1a1a7d257df257479ab27c7cf"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-50",
+      "description": "A tool call without its arguments is outside the profile: an enforcement point that left its record out fails closed",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/read_invoice",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
           }
         },
         "context": {
@@ -2144,10 +3241,551 @@
         }
       },
       "expected": {
-        "decision": true,
-        "reason": "policy.permit",
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-51",
+      "description": "A tool call whose arguments hold no record is outside the profile",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/read_invoice",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {}
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-52",
+      "description": "A tool call whose arguments hold another tool's record, and not its own, is outside the profile",
+      "section": "6.4",
+      "rule": "another_tool",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/read_invoice",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/send_email": {
+              "to:email_domain": "example.org"
+            }
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-53",
+      "description": "A tool call whose arguments hold another tool's record beside its own is outside the profile",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/read_invoice",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false,
+            "open_world": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {},
+            "agent/send_email": {}
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-54",
+      "description": "A record that holds an object is outside the profile: its values are strings, booleans, integers and sets",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/post_ledger",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/post_ledger": {
+              "amount": {
+                "value": 5
+              }
+            }
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-55",
+      "description": "A tool without a property that the catalog gives every tool is outside the profile",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/read_invoice\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/read_invoice",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "read_invoice",
+            "read_only": true,
+            "destructive": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/read_invoice": {}
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-56",
+      "description": "An MCP tool without its transport is outside the profile",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000201",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource in WhiteTower::McpServer::\"github\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "github/create_pull_request",
+          "properties": {
+            "kind": "mcp",
+            "origin": "agent",
+            "name": "create_pull_request",
+            "read_only": false,
+            "destructive": false,
+            "open_world": true,
+            "server": "github"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "github/create_pull_request": {}
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-57",
+      "description": "A model without its endpoint is outside the profile",
+      "section": "6.3",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000102",
+          "scope": "global",
+          "text": "permit (principal, action == WhiteTower::Action::\"model.invoke\", resource);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "model.invoke"
+        },
+        "resource": {
+          "type": "model",
+          "id": "openai/gpt-5",
+          "properties": {
+            "provider": "openai",
+            "name": "gpt-5"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-58",
+      "description": "Arguments on an exposure are outside the profile",
+      "section": "6.4",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000101",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.expose"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "github/create_pull_request",
+          "properties": {
+            "kind": "mcp",
+            "origin": "agent",
+            "name": "create_pull_request",
+            "read_only": false,
+            "destructive": false,
+            "open_world": true,
+            "server": "github",
+            "transport": "http"
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "github/create_pull_request": {}
+          },
+          "calls_decided": true
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": []
+      }
+    },
+    {
+      "id": "C-59",
+      "description": "A policy that compares a declared argument with a value of another type fails the validator, against the ToolArgs generated from the catalog, and its evaluation error denies",
+      "section": "6.5 (4), 6.7",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000109",
+          "scope": "global",
+          "text": "// Compares an integer argument with a string: the validator rejects this\n// policy before approval, and its evaluation fails.\nforbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\")\nwhen {\n  context has args && context.args has \"agent/post_ledger\" && context.args[\"agent/post_ledger\"] has \"amount\" &&\n  context.args[\"agent/post_ledger\"][\"amount\"] > \"1000\"\n};",
+          "valid": false
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000207",
+          "scope": "agent",
+          "text": "permit (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/post_ledger\");",
+          "valid": true
+        }
+      ],
+      "request": {
+        "subject": {
+          "type": "agent",
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+          "properties": {
+            "slug": "invoice-triage",
+            "kind": "in_house",
+            "risk_tier": "high",
+            "environment": "production",
+            "data_categories": [
+              "customer data",
+              "financial data"
+            ],
+            "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+            "labels": {
+              "team": "finance"
+            }
+          }
+        },
+        "action": {
+          "name": "tool.invoke"
+        },
+        "resource": {
+          "type": "tool",
+          "id": "agent/post_ledger",
+          "properties": {
+            "kind": "function",
+            "origin": "agent",
+            "name": "post_ledger",
+            "read_only": false,
+            "destructive": false,
+            "open_world": false
+          }
+        },
+        "context": {
+          "time": "2026-09-29T10:00:00.000Z",
+          "args": {
+            "agent/post_ledger": {
+              "amount": 5000
+            }
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.evaluation",
         "policies": [
-          "0192f1c2-7a3b-7c4d-8e5f-000000000201"
+          "0192f1c2-7a3b-7c4d-8e5f-000000000109"
         ]
       }
     }

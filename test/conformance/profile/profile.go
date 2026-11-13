@@ -82,10 +82,16 @@ type Resource struct {
 // Context is the request's context. It has no on_behalf_of: a v1alpha1
 // request never carries it (section 6.4).
 type Context struct {
-	Time    string         `json:"time"`
-	TaskID  string         `json:"task_id,omitempty"`
-	TraceID string         `json:"trace_id,omitempty"`
-	Args    map[string]any `json:"args,omitempty"`
+	Time    string `json:"time"`
+	TaskID  string `json:"task_id,omitempty"`
+	TraceID string `json:"trace_id,omitempty"`
+	// Args holds, for tool.invoke and tool.result, exactly one record: the
+	// resource's own, keyed by its ID (section 6.4).
+	Args map[string]any `json:"args,omitempty"`
+	// CallsDecided is tool.expose's, and required there (section 6.10).
+	CallsDecided *bool `json:"calls_decided,omitempty"`
+	// Digest is model.invoke's, when the runtime reports one (section 6.9).
+	Digest string `json:"digest,omitempty"`
 }
 
 // TimeLayout is the form of the context's time: RFC 3339, in UTC, with
@@ -101,6 +107,10 @@ var (
 	// ErrAnotherAgent refuses an agent action whose resource is not the
 	// requesting agent (section 6.3).
 	ErrAnotherAgent = errors.New("an agent action names another agent (section 6.3)")
+	// ErrAnotherTool refuses a tool.invoke or tool.result whose arguments
+	// hold another tool's record: context.args holds exactly one record, the
+	// resource's own (section 6.4).
+	ErrAnotherTool = errors.New("the arguments hold another tool's record (section 6.4)")
 	// ErrNotAnInteger refuses a number of the arguments that is not a signed
 	// 64-bit integer written without a fraction or an exponent (sections 6.4
 	// and 6.7).
@@ -282,6 +292,7 @@ func DecodeRequest(data []byte) (Request, error) {
 var actionResource = map[string]string{
 	"agent.start":   "agent",
 	"input.receive": "agent",
+	"tool.expose":   "tool",
 	"model.invoke":  "model",
 	"model.result":  "model",
 	"tool.invoke":   "tool",
@@ -304,7 +315,7 @@ var resourceTypes = map[string]types.EntityType{
 // ToCedar maps a request of the profile to a Cedar request and the entities it
 // needs (section 6.7). It refuses a request that breaks a rule the schema does
 // not state with an error that wraps the rule: ErrAnotherAgent,
-// ErrNotAnInteger or ErrTime.
+// ErrAnotherTool, ErrNotAnInteger or ErrTime.
 func ToCedar(req Request) (cedar.Request, cedar.EntityMap, error) {
 	want, ok := actionResource[req.Action.Name]
 	if !ok {
@@ -356,20 +367,21 @@ func ToCedar(req Request) (cedar.Request, cedar.EntityMap, error) {
 		}
 	case "tool":
 		kind, _ := req.Resource.Properties["kind"].(string)
-		if !slices.Contains([]string{"function", "mcp", "http", "other"}, kind) {
+		if !slices.Contains([]string{"function", "mcp", "builtin", "http", "other"}, kind) {
 			return cedar.Request{}, nil, fmt.Errorf("tool kind %q", kind)
 		}
-		attrs["kind"] = types.String(kind)
-		if server, ok := req.Resource.Properties["server"].(string); ok {
-			attrs["server"] = types.String(server)
-		}
+		copyAttributes(attrs, req.Resource.Properties)
 	case "model":
-		if provider, ok := req.Resource.Properties["provider"].(string); ok {
-			attrs["provider"] = types.String(provider)
-		}
+		copyAttributes(attrs, req.Resource.Properties)
 	}
 	if req.Resource.Type != "agent" {
-		entities[resourceUID] = types.Entity{UID: resourceUID, Attributes: types.NewRecord(attrs)}
+		entity := types.Entity{UID: resourceUID, Attributes: types.NewRecord(attrs)}
+		// An MCP tool's parent is its server, so that a policy can name a
+		// whole server (section 6.7).
+		if server, ok := req.Resource.Properties["server"].(string); ok {
+			entity.Parents = types.NewEntityUIDSet(types.NewEntityUID("WhiteTower::McpServer", types.String(server)))
+		}
+		entities[resourceUID] = entity
 	}
 
 	ctx := types.RecordMap{"time": types.NewDatetime(at.UTC())}
@@ -379,10 +391,27 @@ func ToCedar(req Request) (cedar.Request, cedar.EntityMap, error) {
 	if req.Context.TraceID != "" {
 		ctx["trace_id"] = types.String(req.Context.TraceID)
 	}
-	if req.Context.Args != nil {
-		if want != "tool" {
-			return cedar.Request{}, nil, errors.New("args are allowed on tool actions only")
+	if req.Context.CallsDecided != nil {
+		ctx["calls_decided"] = types.Boolean(*req.Context.CallsDecided)
+	}
+	if req.Context.Digest != "" {
+		ctx["digest"] = types.String(req.Context.Digest)
+	}
+	// A tool call's arguments are exactly one record, the resource's own,
+	// so that an enforcement point that left it out fails closed: a usage
+	// rule whose condition does not match a missing argument would let the
+	// call through (section 6.11).
+	_, own := req.Context.Args[req.Resource.ID]
+	switch {
+	case req.Action.Name != "tool.invoke" && req.Action.Name != "tool.result":
+		if req.Context.Args != nil {
+			return cedar.Request{}, nil, errors.New("args are allowed on tool.invoke and tool.result only")
 		}
+	case len(req.Context.Args) == 0:
+		return cedar.Request{}, nil, errors.New("a tool call without its record of arguments")
+	case !own || len(req.Context.Args) > 1:
+		return cedar.Request{}, nil, ErrAnotherTool
+	default:
 		args, err := toValue(req.Context.Args)
 		if err != nil {
 			return cedar.Request{}, nil, fmt.Errorf("context.args: %w", err)
@@ -396,6 +425,20 @@ func ToCedar(req Request) (cedar.Request, cedar.EntityMap, error) {
 		Resource:  resourceUID,
 		Context:   types.NewRecord(ctx),
 	}, entities, nil
+}
+
+// copyAttributes copies a resource's properties into the attributes of its
+// Cedar entity: strings as strings and booleans as booleans, the only types of
+// a tool's and a model's properties (section 6.3).
+func copyAttributes(attrs types.RecordMap, properties map[string]any) {
+	for name, v := range properties {
+		switch x := v.(type) {
+		case string:
+			attrs[types.String(name)] = types.String(x)
+		case bool:
+			attrs[types.String(name)] = types.Boolean(x)
+		}
+	}
 }
 
 // toValue converts a JSON value that DecodeRequest decoded to a Cedar value.

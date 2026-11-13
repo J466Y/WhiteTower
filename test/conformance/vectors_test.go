@@ -78,8 +78,8 @@ func validateJSON(sch *jsonschema.Schema, v any) error {
 	return sch.Validate(inst)
 }
 
-// cedarValidator returns a validator for the profile's Cedar schema, with a
-// deployment's ToolArgs extension when one is given.
+// cedarValidator returns a validator for the profile's Cedar schema, with the
+// ToolArgs that a bundle's schema declares when one is given (section 6.7).
 func cedarValidator(t *testing.T, toolArgs string) *validate.Validator {
 	t.Helper()
 	text, err := os.ReadFile("../../api/policy/whitetower.cedarschema")
@@ -174,6 +174,7 @@ func checkBundleVersion(t *testing.T, got profile.Response) {
 // the names that the combination vectors give them.
 var namedRules = map[string]error{
 	"another_agent":  profile.ErrAnotherAgent,
+	"another_tool":   profile.ErrAnotherTool,
 	"not_an_integer": profile.ErrNotAnInteger,
 	"invalid_time":   profile.ErrTime,
 }
@@ -208,15 +209,151 @@ func checkRefusal(t *testing.T, requestSchema *jsonschema.Schema, request json.R
 	}
 }
 
+// vectorCatalog is what the combination vectors read of their catalog file
+// (section 7.7): what makes up a resource's properties, and the arguments
+// that each tool declares.
+type vectorCatalog struct {
+	Servers []struct {
+		Key       string `json:"key"`
+		Transport string `json:"transport"`
+	} `json:"servers"`
+	Tools []struct {
+		Key         string             `json:"key"`
+		Server      string             `json:"server"`
+		Provider    string             `json:"provider"`
+		Name        string             `json:"name"`
+		Kind        string             `json:"kind"`
+		Origin      string             `json:"origin"`
+		ReadOnly    bool               `json:"read_only"`
+		Destructive bool               `json:"destructive"`
+		OpenWorld   bool               `json:"open_world"`
+		Args        []tooling.Argument `json:"args"`
+	} `json:"tools"`
+	Models []struct {
+		Key      string `json:"key"`
+		Provider string `json:"provider"`
+		Endpoint string `json:"endpoint"`
+		Name     string `json:"name"`
+	} `json:"models"`
+}
+
+// toolArgs returns the ToolArgs that the core declares in a bundle's Cedar
+// schema for the catalog (section 6.7): one optional record per tool that
+// declares arguments, keyed by the tool's key, with each argument under its
+// name and of its type.
+func (c vectorCatalog) toolArgs() string {
+	quote := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+	var records []string
+	for _, tool := range c.Tools {
+		if len(tool.Args) == 0 {
+			continue
+		}
+		attrs := make([]string, 0, len(tool.Args))
+		for _, a := range tool.Args {
+			attrs = append(attrs, `"`+quote.Replace(a.Name)+`"?: `+a.Type)
+		}
+		records = append(records, `"`+quote.Replace(tool.Key)+`"?: { `+strings.Join(attrs, ", ")+" }")
+	}
+	return "type ToolArgs = { " + strings.Join(records, ", ") + " };"
+}
+
+// entry returns the properties that the catalog gives a resource, and the
+// types of the arguments that a tool declares, by their names (sections 6.3
+// and 7.7).
+func (c vectorCatalog) entry(r profile.Resource) (map[string]any, map[string]string, error) {
+	for _, m := range c.Models {
+		if r.Type == "model" && m.Key == r.ID {
+			return map[string]any{"provider": m.Provider, "name": m.Name, "endpoint": m.Endpoint}, nil, nil
+		}
+	}
+	for _, tool := range c.Tools {
+		if r.Type != "tool" || tool.Key != r.ID {
+			continue
+		}
+		properties := map[string]any{
+			"kind": tool.Kind, "origin": tool.Origin, "name": tool.Name,
+			"read_only": tool.ReadOnly, "destructive": tool.Destructive, "open_world": tool.OpenWorld,
+		}
+		switch tool.Kind {
+		case "mcp":
+			properties["server"] = tool.Server
+			for _, s := range c.Servers {
+				if s.Key == tool.Server {
+					properties["transport"] = s.Transport
+				}
+			}
+		case "builtin":
+			properties["provider"] = tool.Provider
+		}
+		declared := map[string]string{}
+		for _, a := range tool.Args {
+			declared[a.Name] = a.Type
+		}
+		return properties, declared, nil
+	}
+	return nil, nil, fmt.Errorf("the catalog has no %s with the key %q", r.Type, r.ID)
+}
+
+// check checks that a request inside the profile takes its resource from the
+// catalog: a tool or a model names an entry by its key, with the properties
+// that the catalog gives it (section 6.3), and a tool call's record holds only
+// arguments that the entry declares, each of its declared type (section
+// 6.11).
+func (c vectorCatalog) check(request json.RawMessage) error {
+	req, err := profile.DecodeRequest(request)
+	if err != nil {
+		return err
+	}
+	if req.Resource.Type != "tool" && req.Resource.Type != "model" {
+		return nil
+	}
+	properties, declared, err := c.entry(req.Resource)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(req.Resource.Properties, properties) {
+		return fmt.Errorf("properties %s, the catalog's %s", show(req.Resource.Properties), show(properties))
+	}
+	record, _ := req.Context.Args[req.Resource.ID].(map[string]any)
+	for name, v := range record {
+		if typ, ok := declared[name]; !ok || !fits(v, typ) {
+			return fmt.Errorf("the argument %q is not one that the tool declares, of its type", name)
+		}
+	}
+	return nil
+}
+
+// fits reports whether a value of a record, as DecodeRequest decodes it, has
+// the type that section 7.7 names.
+func fits(v any, typ string) bool {
+	if item, ok := strings.CutPrefix(typ, "Set<"); ok {
+		item = strings.TrimSuffix(item, ">")
+		items, isArray := v.([]any)
+		return isArray && !slices.ContainsFunc(items, func(x any) bool { return !fits(x, item) })
+	}
+	switch x := v.(type) {
+	case string:
+		return typ == "String"
+	case bool:
+		return typ == "Bool"
+	case json.Number:
+		_, err := x.Int64()
+		return typ == "Long" && err == nil
+	}
+	return false
+}
+
 // TestCombinationVectors runs the combination vectors against the reference
 // implementation of the decision profile, on cedar-go.
 func TestCombinationVectors(t *testing.T) {
 	var file struct {
-		Description       string `json:"description"`
-		Profile           string `json:"profile"`
-		AgentID           string `json:"agent_id"`
-		ToolArgsExtension string `json:"tool_args_extension"`
-		Cases             []struct {
+		Description string `json:"description"`
+		Profile     string `json:"profile"`
+		AgentID     string `json:"agent_id"`
+		// The agent's catalog file, from which the requests take their
+		// resources. It is read as text, and then for what the test needs.
+		Catalog json.RawMessage `json:"catalog"`
+		Cases   []struct {
 			ID          string `json:"id"`
 			Description string `json:"description"`
 			Section     string `json:"section"`
@@ -237,7 +374,14 @@ func TestCombinationVectors(t *testing.T) {
 	if len(file.Cases) == 0 {
 		t.Fatal("no cases")
 	}
-	validator := cedarValidator(t, file.ToolArgsExtension)
+	if err := validateJSON(compileSchema(t, "../../api/policy/catalog.schema.json"), file.Catalog); err != nil {
+		t.Fatalf("the catalog does not match its schema: %v", err)
+	}
+	var catalog vectorCatalog
+	if err := json.Unmarshal(file.Catalog, &catalog); err != nil {
+		t.Fatal(err)
+	}
+	validator := cedarValidator(t, catalog.toolArgs())
 	for _, c := range file.Cases {
 		t.Run(c.ID, func(t *testing.T) {
 			for _, p := range c.Policies {
@@ -248,7 +392,8 @@ func TestCombinationVectors(t *testing.T) {
 			// A request refused as outside the profile fails the schema, or
 			// breaks the rule that its case names. One refused for another
 			// agent may be outside the profile too, since that reason comes
-			// first (section 6.6). Every other request matches the schema.
+			// first (section 6.6). Every other request matches the schema,
+			// and takes its resource from the catalog.
 			switch {
 			case c.Expected.Reason == profile.ReasonInvalidRequest:
 				checkRefusal(t, requestSchema, c.Request, c.Rule)
@@ -258,6 +403,9 @@ func TestCombinationVectors(t *testing.T) {
 			default:
 				if err := validateJSON(requestSchema, c.Request); err != nil {
 					t.Errorf("request does not match the profile's schema: %v", err)
+				}
+				if err := catalog.check(c.Request); err != nil {
+					t.Errorf("the request does not take its resource from the catalog: %v", err)
 				}
 			}
 			engine, err := profile.NewEngine(file.AgentID, vectorBundleVersion, policies(c.Policies))
