@@ -219,3 +219,14 @@ The plan lands in six pull requests.
 | 4. Bundles | 5, with P1-06; needs P0-03 step 12 | Not started |
 | 5. Usage rules | 6, with P1-06 | Not started |
 | 6. Blocks and metrics | 7, 8; ST-80, ST-81 for unblocking; needs P1-07's blocks record and the accepted design | Not started |
+
+### 2026-11-16: what P0-03 step 12 leaves to this plan
+
+The reviews of P0-03 step 12's parts left these to P1-16. Each keeps what the core writes into a catalog file, or into a usage rule, within what enforcement points accept, so that no report can block an agent's bundles:
+
+| From | What P1-16 does |
+| --- | --- |
+| Part 3c (2026-11-11) | Refuses a lone surrogate or a noncharacter where a report brings a string, since a catalog file is I-JSON and step V7 refuses one that holds them |
+| Part 3c | Refuses to approve a tool that is not built-in without its definition hash, which the catalog file's schema requires of an approved tool |
+| Part 3d-2 (2026-11-16) | Decides how a catalog entry's `origin` is set, since who runs a remote MCP server's tool can differ from one agent to another. Policies on whether calls are decided read `calls_decided`, never `origin` (contracts, section 6.10) |
+| Part 3d-3 (2026-11-16) | Refuses a control character (U+0000 to U+001F, U+007F) where a report brings a tool's name or an argument's path, since the generator of usage rules refuses one in a tool key or an argument name (contracts, section 6.11) |
