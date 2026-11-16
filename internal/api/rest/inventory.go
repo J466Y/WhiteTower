@@ -67,8 +67,6 @@ func inventoryError(err error) error {
 		return problem.New(problem.Conflict, r.Detail)
 	case inventory.Stale:
 		return Stale()
-	case inventory.NotBuilt:
-		return problem.New(problem.NotImplemented, r.Detail)
 	default:
 		return err
 	}
@@ -223,8 +221,26 @@ func (s Server) EditAgent(ctx context.Context, request gen.EditAgentRequestObjec
 
 // GetAgentActions says which lifecycle actions the caller may take on an
 // agent, and what refuses the others (P1-04, step 5).
-func (Server) GetAgentActions(context.Context, gen.GetAgentActionsRequestObject) (gen.GetAgentActionsResponseObject, error) {
-	return nil, notBuilt()
+func (s Server) GetAgentActions(ctx context.Context, request gen.GetAgentActionsRequestObject) (gen.GetAgentActionsResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	state, actions, err := s.inventory.Actions(ctx, *p, request.Id)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	res := gen.GetAgentActions200JSONResponse{LifecycleState: gen.LifecycleState(state), Actions: make([]gen.AgentAction, len(actions))}
+	for i, a := range actions {
+		res.Actions[i] = gen.AgentAction{
+			Action:          gen.RequestedAction(a.Action),
+			Transition:      a.Transition,
+			Available:       len(a.RefusedBy) == 0,
+			CommentRequired: a.CommentRequired,
+			RefusedBy:       a.RefusedBy,
+		}
+	}
+	return res, nil
 }
 
 // ListAgentTransitions lists an agent's lifecycle history, newest first
@@ -279,8 +295,7 @@ func (s Server) ListAgentTransitions(ctx context.Context, request gen.ListAgentT
 }
 
 // TransitionAgent takes a lifecycle action on an agent, at the version that
-// If-Match names (P1-04, step 5). The actions that part 4b of the plan builds
-// answer not_implemented until then.
+// If-Match names (P1-04, step 5).
 func (s Server) TransitionAgent(ctx context.Context, request gen.TransitionAgentRequestObject) (gen.TransitionAgentResponseObject, error) {
 	p, err := s.inventoryCaller(ctx)
 	if err != nil {

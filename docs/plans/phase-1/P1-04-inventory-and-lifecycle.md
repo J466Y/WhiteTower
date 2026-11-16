@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (4 of 10 pull requests) |
+| **Status** | In progress (5 of 10 pull requests) |
 | **Size** | L |
 | **Depends on** | P1-03 (and the P1-02 writer); the first pull request of P1-07.1 for pull requests 4 to 8 |
 | **Unblocks** | P1-05, P1-06, P1-08, P1-10.2, P1-16 (steps 1 to 4) |
@@ -166,7 +166,7 @@ The plan lands in ten pull requests, the fourth in three parts (the maintainer's
 | 2. Use cases and agents | 2, 4; the data categories; the ownership check that P1-16 reuses; each new agent's governance state, through P1-07's interface, stubbed | Done |
 | 3. Ownership | 3; the inbox items of transfers | Done |
 | 4a. Lifecycle engine: the proposal phase | 5 for T2 to T6, with `transitionAgent` and `listAgentTransitions`; the check of the engine's table against `agent-lifecycle.yaml`; ST-23 for their guards; a token without the action's scope is refused (ST-19); separation of duties over past assignments; `service_account` in `lifecycle_transitions.actor_type`; the advisory committee's inbox item of a submitted proposal; a rejection cancels the pending ownership transfer | Done |
-| 4b. Lifecycle engine: into and out of service | 5 for T9, T10, T13 and T14, through P1-06's interface, stubbed: no agent policy is active; `getAgentActions`; the property tests, 10,000 sequences on the decision core and about 200 on PostgreSQL; ST-23 for activation without the invariant; service accounts take only T10, which the lifecycle says beside "People decide on proposals"; T14 cancels the pending ownership transfer and takes the proposal out of the advisory committee's inbox | Not started |
+| 4b. Lifecycle engine: into and out of service | 5 for T9, T10, T13 and T14, through P1-06's interface, stubbed: no agent policy is active; `getAgentActions`; the property tests, 10,000 sequences on the decision core and about 200 on PostgreSQL; ST-23 for activation without the invariant; service accounts take only T10, which the lifecycle says beside "People decide on proposals"; T14 cancels the pending ownership transfer and takes the proposal out of the advisory committee's inbox | Done |
 | 4c. Lifecycle engine: the transitions White Tower makes | 5 for T7, T8, T11 and T12: the entry point for the transitions White Tower makes, where T12 skips drills, and T7 when an edit declares a harness; the active selector halts in every write of the state record, through P1-08's interface, stubbed; the shared form of the selector halts' advisory lock, with the key of `internal/govstate`, taken first in T1 and `editAgent`; `state_version` in `whitetower.agent.updated.v1` when a change concerns what enforcement points see ([design note](P1-08-kill-switch.md#progress-notes), sections 8, 13 and 14) | Not started |
 | 5. Reviews and the lifecycle guard job | 6, 7, through P1-16's interface, stubbed; the guard job suspends one agent per transaction | Not started |
 | 6. Coverage, instances, search and export | 8, 9; ST-24, with cells that start after a `;` or with a tab or a carriage return; C3 through P1-08's interface, stubbed | Not started |
@@ -362,3 +362,41 @@ A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-0
 - P1-05 and P1-06 add their hooks into T14: the revocation of the agent's credentials and the retirement of its agent-specific policies.
 - Pull request 5 schedules the first review at T9, and cancels the open review at T14.
 - The notifications to the owner of T4 to T6 (`notify_owner`) wait for pull request 7, with the inbox.
+
+### 2026-11-16: lifecycle engine, into and out of service (PR 4b)
+
+**What part 4b builds:**
+
+- **`transitionAgent` for T9, T10, T13 and T14:** activate, suspend, reinstate and retire, with the permissions `agent.activate`, `agent.suspend`, `agent.reinstate` and `agent.retire`. Every action that people take is now built, so the engine's `not_implemented` refusal is gone.
+- **The guards of these transitions** (lifecycle, section 4):
+
+  | Guard | How the engine reads it |
+  | --- | --- |
+  | `use_case_validated` | The status of the agent's use case |
+  | `agent_policy_active` | P1-06's interface, `inventory.AgentPolicies`, asked in the transaction. `cmd/whitetower/main.go` wires `inventory.NoAgentPolicies`, which answers that no agent has one, so POL-04 holds: no agent becomes active, and none is reinstated to `ready` or `active` |
+  | `harness_declared` | The agent's harness. A ready agent always has one, since the database refuses one without it (`agents_ready_needs_harness`) |
+  | `not_halted` | The effective run state: the agent's own halts and selector halts in its governance state, and the fleet's |
+  | `review_not_overdue` | No open review of the agent, scheduled or awaiting a sign-off, whose grace period ended before the application's clock. It holds while no review exists, until pull request 5 schedules them |
+  | `previous_state_invariants_hold` | What the remembered state needs: `validated` a validated use case, and `ready` and `active` also an active agent-specific policy and a declared harness. T13 checks the owner and the run state with guards of their own |
+
+- **Suspension and reinstatement.** T10 records the state it comes from, the reason `manual` and its time from the clock; the transition's row and its event carry the reason. T13 returns the agent to that state and clears the suspension. T9 records `activated_at`, and T14 `retired_at`; a suspended agent that retires keeps no suspension, as the database requires.
+- **Service accounts take only T10**, judged by the principal's kind, so a person's own service account is refused T9, T13 and T14 with `forbidden` too. The lifecycle says so beside "People decide on proposals".
+- **T14** cancels the agent's pending ownership transfer and takes a retired proposal out of the advisory committee's inbox. The lifecycle does not say what it does to the submitted use case of a proposed agent, so it does what T3 does: the use case goes back to a draft once no agent that it justifies waits for a decision.
+- **The order of a transition.** It locks the agent's row, then its governance state, both before its checks, as section 2 of the [design note](P1-08-kill-switch.md#progress-notes) orders them, then the use case's row, then takes its version. The run state that `not_halted` reads therefore holds until it commits: an agent or selector halt, which locks the state of the agents it covers, either committed before and shows, or waits. A fleet halt locks only `fleet_state`, which the transition reads without a lock: a fleet halt that commits during an activation does not refuse it, and the fleet's run state stops the agent anyway. Locking `fleet_state` would make fleet halts wait for transitions (NFR-03).
+- **`getAgentActions`** (`Inventory.Actions`): the actions that people take which the agent's state allows, in the order of the lifecycle, each with its transition, whether it needs a comment, and what refuses it to the caller: `permission`, when their kind, roles, grant's scope, token's scopes or break-glass session do not allow it, then each guard that does not hold, but the comment. It reads in one transaction, without locks; whoever may not see the agent gets `not_found`.
+
+**Tests:** activation by the owner and by an operator, with its version, event and history; each guard of T9 refused with `conflict` and its name, a halted fleet included; suspension from `validated`, `ready` and `active` by a service account, and reinstatement back there; each guard of T13, a review whose grace period has not ended, the owner refused; a retired proposal, out of the inbox, with its use case withdrawn and its transfer cancelled, and a retired suspended agent; every refused caller, service accounts of the operator and advisory roles, another owner, the advisory committee activating, a break-glass session, a token without the action's scope (ST-19) and a user; the actions and their refusals for an owner, the advisory committee and a service account; an activation that waits for a halt under way, which sees it; and the same through the API, each guard of T13 refused with `conflict` and its name, and `activate` refused with `agent_policy_active` and every other guard that does not hold, under the stub that `main.go` wires (ST-23).
+
+**Property tests:**
+
+- **On the decision core,** 10,000 random sequences of 24 steps over the nine actions that people take, by callers of every role and kind. The facts follow a model from step to step: the owner leaves and comes back, policies and halts come and go, a harness is declared, a review lapses, a decision on another agent makes the use case final, and White Tower takes T7 and T8 as part 4c will. Each move is checked against the lifecycle's rules, and the test fails unless every state and every transition that people take is reached.
+- **On PostgreSQL,** 200 random sequences of 10 steps through `Inventory.Transition`, with a model of the lifecycle written apart from the engine. After each step, the refusal is the one the model expects, and the database agrees with the model: the agent's state, the state it remembers and its reason, its use case, its activation and retirement, its governance state, its history, its audit events and the advisory committee's inbox. It runs in about 40 seconds on Docker Desktop.
+
+**Differences from the plan:** none. The tests move agents to `ready` with SQL, as T7 will, until part 4c builds it.
+
+**Follow-ups:**
+
+- Part 4c, as its row says.
+- P1-06 implements `inventory.AgentPolicies` and wires it in place of `NoAgentPolicies`. A transition asks it under the agent's row lock, which the entry point of part 4c also takes when a policy is activated or retired.
+- Pull request 5 schedules the first review at T9 and cancels the open review at T14; P1-05 and P1-06 add their hooks into T14.
+- Open question: the lifecycle's section 6 says that owners cannot reinstate their own agents. The owner role lacks `agent.reinstate`, but T13 has no guard `not_owner_or_creator`, so an operator or an advisory member who is also the agent's owner or delegate may reinstate it. Whether T13 should refuse them is the maintainer's decision.

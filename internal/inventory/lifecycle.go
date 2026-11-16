@@ -92,13 +92,16 @@ var lifecycle = []transition{
 
 // permissions are what each action that people take needs besides
 // inventory.view, which the API checks (the description of transitionAgent).
-// Part 4b of plan P1-04 builds activate, suspend, reinstate and retire.
 var permissions = map[string]authz.Permission{
 	"submit":          authz.PermissionAgentPropose,
 	"withdraw":        authz.PermissionAgentPropose,
 	"request_changes": authz.PermissionUsecaseValidate,
 	"reject":          authz.PermissionUsecaseValidate,
 	"validate":        authz.PermissionUsecaseValidate,
+	"activate":        authz.PermissionAgentActivate,
+	"suspend":         authz.PermissionAgentSuspend,
+	"reinstate":       authz.PermissionAgentReinstate,
+	"retire":          authz.PermissionAgentRetire,
 }
 
 // decisions are the use case decisions that the advisory committee's actions
@@ -109,7 +112,7 @@ var decisions = map[string]string{
 	"validate":        "validated",
 }
 
-// facts are what the guards read of an agent, its use case and the caller.
+// facts are what a decision reads of an agent, its use case and the caller.
 type facts struct {
 	metadataComplete bool
 	ownerActive      bool
@@ -118,18 +121,69 @@ type facts struct {
 	commentGiven     bool
 	// conflicted is true when the caller created the agent or its use case,
 	// or is or ever was its primary owner or one of its delegates.
-	conflicted bool
+	conflicted      bool
+	policyActive    bool // an agent-specific policy has an active version
+	harnessDeclared bool
+	halted          bool // the effective run state
+	reviewOverdue   bool // an open review is past its grace period
+	// previous is the state that a suspended agent returns to.
+	previous string
+	// person is false for a service account; permitted is true when the
+	// caller's roles grant the action's permission on the agent, within
+	// their token's scopes; own is true for the agent's primary owner and
+	// its delegates.
+	person, permitted, own bool
 }
 
-// guards tells whether each guard that the built transitions read holds
-// (docs/architecture/lifecycle.md, section 4).
+// guards tells whether each guard that the transitions people take read
+// holds (docs/architecture/lifecycle.md, section 4).
 var guards = map[string]func(facts) bool{
-	"metadata_complete":       func(f facts) bool { return f.metadataComplete },
-	"owner_active":            func(f facts) bool { return f.ownerActive },
-	"use_case_not_rejected":   func(f facts) bool { return f.useCaseStatus != "rejected" },
-	"use_case_not_prohibited": func(f facts) bool { return !f.prohibited },
-	"not_owner_or_creator":    func(f facts) bool { return !f.conflicted },
-	"comment_given":           func(f facts) bool { return f.commentGiven },
+	"metadata_complete":              func(f facts) bool { return f.metadataComplete },
+	"owner_active":                   func(f facts) bool { return f.ownerActive },
+	"use_case_not_rejected":          func(f facts) bool { return f.useCaseStatus != "rejected" },
+	"use_case_not_prohibited":        func(f facts) bool { return !f.prohibited },
+	"use_case_validated":             useCaseValidated,
+	"not_owner_or_creator":           func(f facts) bool { return !f.conflicted },
+	"comment_given":                  func(f facts) bool { return f.commentGiven },
+	"agent_policy_active":            func(f facts) bool { return f.policyActive },
+	"harness_declared":               func(f facts) bool { return f.harnessDeclared },
+	"not_halted":                     func(f facts) bool { return !f.halted },
+	"review_not_overdue":             func(f facts) bool { return !f.reviewOverdue },
+	"previous_state_invariants_hold": func(f facts) bool { holds, ok := invariants[f.previous]; return ok && holds(f) },
+}
+
+// invariants tell whether an agent meets what each state that a suspension
+// remembers needs, so that a reinstatement keeps it (the lifecycle, sections
+// 1, 5 and 6): a validated use case, and for ready and active also an active
+// agent-specific policy and a declared harness. T13 checks the owner and the
+// run state itself.
+var invariants = map[string]func(facts) bool{
+	"validated": useCaseValidated,
+	"ready":     servable,
+	"active":    servable,
+}
+
+func useCaseValidated(f facts) bool { return f.useCaseStatus == "validated" }
+
+func servable(f facts) bool { return useCaseValidated(f) && f.policyActive && f.harnessDeclared }
+
+// allows refuses the caller an action that the facts say they may not take:
+// only a person takes an action other than suspend (HUM-04, the maintainer's
+// decision of 2026-11-12), with the action's permission within its scope,
+// and only the agent's owners take the actions that only they take. The
+// principal's kind decides, so that a person's own service account is
+// refused too: an automation never puts an agent into service, nor retires
+// it.
+func (t transition) allows(f facts) error {
+	switch {
+	case !f.person && t.action != "suspend":
+		return refuse(Forbidden, "only a person may %s an agent", t.action)
+	case !f.permitted:
+		return refuse(Forbidden, "your roles do not permit this")
+	case t.ownersOnly() && !f.own:
+		return refuse(Forbidden, "only the agent's primary owner and its delegates may %s it", t.action)
+	}
+	return nil
 }
 
 // unmet returns the guards of t that do not hold, in the table's order.
@@ -159,9 +213,6 @@ func requested(action string) (transition, error) {
 	case slices.Contains(lifecycle[i].actors, "system"):
 		return transition{}, refuse(Invalid, "White Tower takes the action %s itself", action)
 	}
-	if _, built := permissions[action]; !built {
-		return transition{}, refuse(NotBuilt, "the action %s is agreed but not built yet", action)
-	}
 	return lifecycle[i], nil
 }
 
@@ -187,47 +238,41 @@ func (inv *Inventory) Transition(ctx context.Context, caller auth.Principal, age
 	}
 	err = inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := inventorydb.New(tx)
-		a, err := inv.lockAgent(ctx, q, agentID)
+		// The agent's row, then its governance state, as every writer of what
+		// enforcement points see locks them before it takes its version (the
+		// design of the halt path, section 2). The run state that the guards
+		// read holds until the transition commits: an agent or selector halt,
+		// which locks the state of the agents it covers, either committed
+		// before and shows, or waits.
+		if _, err := q.LockAgent(ctx, agentID); err != nil {
+			return notFound(err, "agent")
+		}
+		if err := lockState(ctx, q, agentID); err != nil {
+			return err
+		}
+		a, err := inv.load(ctx, q, agentID)
 		if err != nil {
 			return err
 		}
 		if !seesAll(caller) && a.LifecycleState != "active" {
 			return refuse(NotFound, "no agent has this ID")
 		}
-		// Service accounts take no action but suspend (T10), the maintainer's
-		// decision of 2026-11-12: people decide on proposals (HUM-04), and an
-		// automation never puts an agent into service or retires it. The kind
-		// is judged, not the principal, so that a person's own service account
-		// is refused too.
-		if caller.Kind != auth.Human && t.action != "suspend" {
-			return refuse(Forbidden, "only a person may %s an agent", t.action)
-		}
 		own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: agentID, PrincipalID: actor})
 		if err != nil {
 			return fmt.Errorf("reading the agent's owners: %w", err)
 		}
-		if err := inv.authorize(ctx, caller, permissions[t.action], authz.Relationship{IsOwner: own}); err != nil {
+		f := facts{person: caller.Kind == auth.Human, own: own, permitted: inv.permits(ctx, caller, t.action, own)}
+		if err := t.allows(f); err != nil {
 			return err
-		}
-		if t.ownersOnly() && !own {
-			return refuse(Forbidden, "only the agent's primary owner and its delegates may %s it", t.action)
 		}
 		uc, err := q.LockUseCase(ctx, a.UseCaseID)
 		if err != nil {
 			return fmt.Errorf("reading the agent's use case: %w", err)
 		}
-		ever, err := q.EverAssigned(ctx, inventorydb.EverAssignedParams{AgentID: agentID, PrincipalID: actor})
-		if err != nil {
-			return fmt.Errorf("reading the agent's owners: %w", err)
+		if err := inv.readFacts(ctx, tx, &f, actor, a, uc); err != nil {
+			return err
 		}
-		f := facts{
-			metadataComplete: a.validate() == nil,
-			ownerActive:      a.PrimaryOwner.Status == "active",
-			useCaseStatus:    uc.Status,
-			prohibited:       uc.AiActClassification == "prohibited",
-			commentGiven:     comment != "",
-			conflicted:       ever || a.CreatedBy.ID == actor || uc.CreatedBy == actor,
-		}
+		f.commentGiven = comment != ""
 		if err := t.check(a, version, f); err != nil {
 			return err
 		}
@@ -237,6 +282,103 @@ func (inv *Inventory) Transition(ctx context.Context, caller auth.Principal, age
 		return nil, err
 	}
 	return inv.load(ctx, inventorydb.New(inv.db), agentID)
+}
+
+// Action is a lifecycle action that an agent's state allows, as the caller
+// may take it now.
+type Action struct {
+	Action string
+	// Transition is the transition's ID in the lifecycle, T2 to T14.
+	Transition      string
+	CommentRequired bool
+	// RefusedBy names what refuses the action to the caller, empty when they
+	// may take it: permission, when their kind, roles or scopes do not allow
+	// it, then each guard of the lifecycle that does not hold.
+	RefusedBy []string
+}
+
+// Actions returns the lifecycle state of an agent that the caller may see,
+// and the actions that people take which that state allows, in the order of
+// the lifecycle, each with what refuses it to the caller now (UI-03, the
+// console's disabled actions). Transition checks everything again.
+func (inv *Inventory) Actions(ctx context.Context, caller auth.Principal, agentID uuid.UUID) (string, []Action, error) {
+	actor, err := uuid.Parse(caller.ID)
+	if err != nil {
+		return "", nil, fmt.Errorf("the caller's ID %q: %w", caller.ID, err)
+	}
+	var state string
+	var actions []Action
+	err = inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
+		q := inventorydb.New(tx)
+		a, err := inv.load(ctx, q, agentID)
+		if err != nil {
+			return err
+		}
+		if !seesAll(caller) && a.LifecycleState != "active" {
+			return refuse(NotFound, "no agent has this ID")
+		}
+		own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: agentID, PrincipalID: actor})
+		if err != nil {
+			return fmt.Errorf("reading the agent's owners: %w", err)
+		}
+		uc, err := q.GetUseCase(ctx, a.UseCaseID)
+		if err != nil {
+			return fmt.Errorf("reading the agent's use case: %w", err)
+		}
+		f := facts{person: caller.Kind == auth.Human, own: own}
+		if err := inv.readFacts(ctx, tx, &f, actor, a, uc); err != nil {
+			return err
+		}
+		state, actions = a.LifecycleState, []Action{}
+		for _, t := range lifecycle {
+			if _, people := permissions[t.action]; !people || !slices.Contains(t.from, a.LifecycleState) {
+				continue
+			}
+			f.permitted = inv.permits(ctx, caller, t.action, own)
+			actions = append(actions, Action{
+				Action: t.action, Transition: t.id, CommentRequired: slices.Contains(t.guards, "comment_given"), RefusedBy: t.refusals(f),
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	return state, actions, nil
+}
+
+// permits reports whether the caller's roles grant the action's permission on
+// an agent that they own or not. The Authorizer also applies the scopes of an
+// API token (ST-19) and the limits of a break-glass session.
+func (inv *Inventory) permits(ctx context.Context, caller auth.Principal, action string, own bool) bool {
+	return inv.authorize(ctx, caller, permissions[action], authz.Relationship{IsOwner: own}) == nil
+}
+
+// readFacts adds to f what the guards read of the agent and its use case, in
+// tx, as they concern the caller.
+func (inv *Inventory) readFacts(ctx context.Context, tx *db.Tx, f *facts, actor uuid.UUID, a *Agent, uc inventorydb.WhitetowerUseCase) error {
+	q := inventorydb.New(tx)
+	ever, err := q.EverAssigned(ctx, inventorydb.EverAssignedParams{AgentID: a.ID, PrincipalID: actor})
+	if err != nil {
+		return fmt.Errorf("reading the agent's owners: %w", err)
+	}
+	if f.policyActive, err = inv.policies.Active(ctx, tx, a.ID); err != nil {
+		return fmt.Errorf("reading the agent's policies: %w", err)
+	}
+	if f.reviewOverdue, err = q.ReviewOverdue(ctx, inventorydb.ReviewOverdueParams{AgentID: a.ID, Now: inv.clk.Now().UTC()}); err != nil {
+		return fmt.Errorf("reading the agent's reviews: %w", err)
+	}
+	f.metadataComplete = a.validate() == nil
+	f.ownerActive = a.PrimaryOwner.Status == "active"
+	f.useCaseStatus = uc.Status
+	f.prohibited = uc.AiActClassification == "prohibited"
+	f.conflicted = ever || a.CreatedBy.ID == actor || uc.CreatedBy == actor
+	f.harnessDeclared = a.Harness != nil
+	f.halted = a.Halted
+	if a.Suspension != nil {
+		f.previous = a.Suspension.From
+	}
+	return nil
 }
 
 // TransitionRecord is one transition of an agent's lifecycle, as its history
@@ -322,21 +464,65 @@ func (t transition) check(a *Agent, version int64, f facts) error {
 	return nil
 }
 
+// refusals names what refuses t to the caller, as getAgentActions tells it
+// beforehand: permission, then each guard that does not hold but the
+// comment, which only the request brings.
+func (t transition) refusals(f facts) []string {
+	refused := []string{}
+	if t.allows(f) != nil {
+		refused = append(refused, "permission")
+	}
+	for _, g := range t.unmet(f) {
+		if g != "comment_given" {
+			refused = append(refused, g)
+		}
+	}
+	return refused
+}
+
+// move returns the agent as t leaves it at the time given: in its new state,
+// suspended with the state it came from, back in that state once reinstated,
+// and with the times of its activation and of its retirement. People suspend
+// an agent only by hand (T10).
+func (t transition) move(a Agent, now time.Time) Agent {
+	b := a
+	b.LifecycleState, b.Suspension = t.to, nil
+	switch t.to {
+	case previousState:
+		b.LifecycleState = a.Suspension.From
+	case "suspended":
+		b.Suspension = &Suspension{From: a.LifecycleState, Reason: "manual", At: now}
+	case "active":
+		b.ActivatedAt = &now
+	case "retired":
+		b.RetiredAt = &now
+	}
+	return b
+}
+
 // apply moves the agent along t, with its effects on the use case, the
-// decisions and the inbox, and records the transition at the agent's new
-// governance state version.
+// decisions, the inbox and the pending ownership transfer, and records the
+// transition at the agent's new governance state version.
 func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principal, actor uuid.UUID, t transition, a *Agent, uc inventorydb.WhitetowerUseCase, comment string) error {
 	q := inventorydb.New(tx)
 	now := inv.clk.Now().UTC()
 	from := a.LifecycleState
-	n, err := q.SetLifecycleState(ctx, inventorydb.SetLifecycleStateParams{LifecycleState: t.to, UpdatedAt: now, ID: a.ID, Version: a.Version})
+	moved := t.move(*a, now)
+	set := inventorydb.SetLifecycleStateParams{
+		LifecycleState: moved.LifecycleState, ActivatedAt: moved.ActivatedAt, RetiredAt: moved.RetiredAt,
+		UpdatedAt: now, ID: a.ID, Version: a.Version,
+	}
+	if s := moved.Suspension; s != nil {
+		set.SuspendedFrom, set.SuspensionReason, set.SuspendedAt = &s.From, &s.Reason, &s.At
+	}
+	n, err := q.SetLifecycleState(ctx, set)
 	if err != nil {
 		return fmt.Errorf("moving the agent: %w", err)
 	}
 	if n == 0 {
 		return refuse(Stale, "the agent changed since you read it: read it again, then retry")
 	}
-	a.LifecycleState = t.to
+	*a = moved
 	if err := affectUseCase(ctx, q, t.action, uc, now); err != nil {
 		return err
 	}
@@ -354,9 +540,9 @@ func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principa
 	if err := affectInbox(ctx, q, t.action, a.ID, now); err != nil {
 		return err
 	}
-	// A rejected agent no longer changes, so its pending ownership transfer
-	// could never be accepted.
-	if t.to == "rejected" {
+	// A rejected or retired agent no longer changes, so its pending ownership
+	// transfer could never be accepted.
+	if t.to == "rejected" || t.to == "retired" {
 		if err := cancelTransfers(ctx, q, a.ID, now); err != nil {
 			return err
 		}
@@ -370,24 +556,24 @@ func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principa
 		return fmt.Errorf("generating the transition's ID: %w", err)
 	}
 	if err := q.RecordTransition(ctx, inventorydb.RecordTransitionParams{
-		ID: id, AgentID: a.ID, Action: t.action, FromState: &from, ToState: t.to,
-		ActorType: actorType(caller), ActorID: &actor, Comment: nonEmpty(comment), StateVersion: version, OccurredAt: now,
+		ID: id, AgentID: a.ID, Action: t.action, FromState: &from, ToState: a.LifecycleState, ActorType: actorType(caller),
+		ActorID: &actor, Reason: set.SuspensionReason, Comment: nonEmpty(comment), StateVersion: version, OccurredAt: now,
 	}); err != nil {
 		return fmt.Errorf("recording the transition: %w", err)
 	}
-	if err := inv.writer.Record(ctx, tx, audit.Event{
-		Type:    "whitetower.agent.lifecycle_changed.v1",
-		Subject: a.ID.String(),
-		Data: map[string]any{
-			"transition":    t.id,
-			"action":        t.action,
-			"from":          from,
-			"to":            t.to,
-			"comment_given": comment != "",
-			"actor":         actorOf(caller),
-			"state_version": version,
-		},
-	}); err != nil {
+	data := map[string]any{
+		"transition":    t.id,
+		"action":        t.action,
+		"from":          from,
+		"to":            a.LifecycleState,
+		"comment_given": comment != "",
+		"actor":         actorOf(caller),
+		"state_version": version,
+	}
+	if a.Suspension != nil {
+		data["suspension_reason"] = a.Suspension.Reason
+	}
+	if err := inv.writer.Record(ctx, tx, audit.Event{Type: "whitetower.agent.lifecycle_changed.v1", Subject: a.ID.String(), Data: data}); err != nil {
 		return fmt.Errorf("recording the agent's transition: %w", err)
 	}
 	return nil
@@ -396,6 +582,8 @@ func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principa
 // affectUseCase applies the effect of a decision on a proposal to its use
 // case, which a decision has not made final: submitting it, withdrawing it
 // once no agent that it justifies waits for the committee, or deciding on it.
+// The lifecycle does not say what retiring a proposal does to its use case,
+// so the retirement withdraws it, as T3 does.
 func affectUseCase(ctx context.Context, q *inventorydb.Queries, action string, uc inventorydb.WhitetowerUseCase, now time.Time) error {
 	if uc.Status == "validated" || uc.Status == "rejected" {
 		return nil
@@ -404,7 +592,7 @@ func affectUseCase(ctx context.Context, q *inventorydb.Queries, action string, u
 	switch action {
 	case "submit":
 		status = "submitted"
-	case "withdraw":
+	case "withdraw", "retire":
 		awaits, err := q.UseCaseAwaitsDecision(ctx, uc.ID)
 		if err != nil {
 			return fmt.Errorf("reading the use case's agents: %w", err)
@@ -427,7 +615,7 @@ func affectUseCase(ctx context.Context, q *inventorydb.Queries, action string, u
 }
 
 // affectInbox puts a submitted proposal in the advisory committee's inbox,
-// and takes it out once it is withdrawn or decided on.
+// and takes it out once it is withdrawn, decided on or retired.
 func affectInbox(ctx context.Context, q *inventorydb.Queries, action string, agentID uuid.UUID, now time.Time) error {
 	const kind, subject = "use_case_validation", "agent"
 	switch action {
@@ -442,7 +630,7 @@ func affectInbox(ctx context.Context, q *inventorydb.Queries, action string, age
 		}); err != nil {
 			return fmt.Errorf("adding the proposal to the advisory committee's inbox: %w", err)
 		}
-	case "withdraw", "request_changes", "reject", "validate":
+	case "withdraw", "request_changes", "reject", "validate", "retire":
 		if err := q.ResolveInboxItems(ctx, inventorydb.ResolveInboxItemsParams{
 			ResolvedAt: &now, Kind: kind, SubjectType: subject, SubjectID: agentID,
 		}); err != nil {

@@ -1126,24 +1126,65 @@ func (q *Queries) ResolveInboxItems(ctx context.Context, arg ResolveInboxItemsPa
 	return err
 }
 
+const reviewOverdue = `-- name: ReviewOverdue :one
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.reviews
+  WHERE agent_id = $1 AND status IN ('scheduled', 'awaiting_signoff')
+    AND grace_ends_at < $2
+)
+`
+
+type ReviewOverdueParams struct {
+	AgentID uuid.UUID
+	Now     time.Time
+}
+
+// Whether an open review of the agent is past its grace period at the time
+// given, which comes from the application's clock.
+func (q *Queries) ReviewOverdue(ctx context.Context, arg ReviewOverdueParams) (bool, error) {
+	row := q.db.QueryRow(ctx, reviewOverdue, arg.AgentID, arg.Now)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const setLifecycleState = `-- name: SetLifecycleState :execrows
-UPDATE whitetower.agents
-SET lifecycle_state = $1, updated_at = $2, version = version + 1
-WHERE id = $3 AND version = $4
+UPDATE whitetower.agents SET
+  lifecycle_state = $1,
+  suspended_from = $2,
+  suspension_reason = $3,
+  suspended_at = $4,
+  activated_at = $5,
+  retired_at = $6,
+  updated_at = $7,
+  version = version + 1
+WHERE id = $8 AND version = $9
 `
 
 type SetLifecycleStateParams struct {
-	LifecycleState string
-	UpdatedAt      time.Time
-	ID             uuid.UUID
-	Version        int64
+	LifecycleState   string
+	SuspendedFrom    *string
+	SuspensionReason *string
+	SuspendedAt      *time.Time
+	ActivatedAt      *time.Time
+	RetiredAt        *time.Time
+	UpdatedAt        time.Time
+	ID               uuid.UUID
+	Version          int64
 }
 
-// Moves an agent to another state of its lifecycle, if it is still at the
-// version the caller read.
+// Moves an agent to another state of its lifecycle, with what that state
+// records, if the agent is still at the version the caller read: where a
+// suspension came from, why and when, and when the agent was activated and
+// retired.
 func (q *Queries) SetLifecycleState(ctx context.Context, arg SetLifecycleStateParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setLifecycleState,
 		arg.LifecycleState,
+		arg.SuspendedFrom,
+		arg.SuspensionReason,
+		arg.SuspendedAt,
+		arg.ActivatedAt,
+		arg.RetiredAt,
 		arg.UpdatedAt,
 		arg.ID,
 		arg.Version,
