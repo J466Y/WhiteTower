@@ -318,7 +318,8 @@ class Engine:
                 return {**deny("error.invalid_request"), **named}
         elif call["action"] == "tool.expose":
             # Every call of the tool is decided when the agent runs it, or while the provider submits each of its calls
-            # for approval (section 6.10).
+            # for approval (section 6.10): who runs it when it is offered decides, never the origin that the catalog
+            # records, which stays the resource's property.
             context["calls_decided"] = call["origin"] == "agent" or call["approval"]
         elif call["action"] == "model.invoke" and call["digest"] is not None:
             context["digest"] = call["digest"]
@@ -1651,17 +1652,18 @@ def main() -> int:
         want = None if case["record"] is None else canonical_json(case["record"])
         check(f"record {case['id']}", {"record": got}, {"record": want})
 
-    # The catalog check and exposure (sections 6.9 and 6.10): each case decided once the gate is open, with what its
-    # decision names, every block that covers the call compared as a set, and calls_decided on an exposure.
+    # The catalog check and exposure (sections 6.9 and 6.10): each case decided once the gate is open, on its own
+    # catalog file when it gives one, with what its decision names, every block that covers the call compared as a set,
+    # and, on an exposure that policies decided, calls_decided and the resource's origin property.
     calls_cases = 0
     for name in ("catalog-check.json", "exposure.json"):
         calls = json.loads((VECTORS / name).read_text(encoding="utf-8"))
-        catalog = calls["catalog"]
-        if not catalog_validator.is_valid(catalog):
-            failures += 1
-            print(f"FAIL {name}: the catalog does not match its schema")
-        schema = CEDAR_SCHEMA.read_text(encoding="utf-8").replace("type ToolArgs = {};", tool_args(catalog), 1)
         for case in calls["cases"]:
+            catalog = case.get("catalog", calls["catalog"])
+            if not catalog_validator.is_valid(catalog):
+                failures += 1
+                print(f"FAIL {case['id']}: the catalog does not match its schema")
+            schema = CEDAR_SCHEMA.read_text(encoding="utf-8").replace("type ToolArgs = {};", tool_args(catalog), 1)
             policies = case.get("policies", calls["policies"])
             for p in policies:
                 passes = cedarpy.validate_policies(p["text"], schema).validation_passed
@@ -1691,13 +1693,18 @@ def main() -> int:
                 got = engine.decide(bundle_catalog, blocks, call)
             want = case["expected"]
             check_response(case["id"], got, {k: want[k] for k in ("decision", "reason", "policies")})
+            request = got.get("request")
+            exposure = request if request is not None and request["action"]["name"] == "tool.expose" \
+                else {"resource": {"properties": {}}, "context": {}}
             check(case["id"], {
                 "resource_id": got.get("resource_id"), "reference_sha256": got.get("reference_sha256"),
                 "block_ids": sorted(got.get("block_ids", [])),
-                "calls_decided": got.get("request", {}).get("context", {}).get("calls_decided"),
+                "calls_decided": exposure["context"].get("calls_decided"),
+                "origin": exposure["resource"]["properties"].get("origin"),
             }, {
                 "resource_id": want.get("resource_id"), "reference_sha256": want.get("reference_sha256"),
                 "block_ids": sorted(want.get("block_ids", [])), "calls_decided": want.get("calls_decided"),
+                "origin": want.get("origin"),
             })
         calls_cases += len(calls["cases"])
 

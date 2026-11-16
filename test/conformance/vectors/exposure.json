@@ -1,5 +1,5 @@
 {
-  "description": "Exposure in the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6.10): tool.expose decisions alone, the offer of a tool to a model, which what an enforcement point does with a denied tool (EP-17) leaves to scenario S-22. The cases have the form of catalog-check.json, whose description says how each is decided: the catalog check, rows 1 to 5, then the policies, those of the case when it gives them, otherwise the file's, wt-catalog. calls_decided, which the request's context carries, follows from the tool's origin, who runs it as the agent has it, and from approval: it is true for a tool that the agent runs, and for a provider-run tool only while the provider submits each of its calls to the agent for approval (EP-18). The expected decision gives calls_decided once policies decided. A case with a usage rule takes its tool.expose statement as section 6.11's example writes it, for github/push_files, which forbids exposing the tool while its calls are not decided.",
+  "description": "Exposure in the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6.10): tool.expose decisions alone, the offer of a tool to a model, which what an enforcement point does with a denied tool (EP-17) leaves to scenario S-22. The cases have the form of catalog-check.json, whose description says how each is decided: the catalog check, rows 1 to 5, on the case's catalog file when it gives one, otherwise the file's, then the policies, those of the case when it gives them, otherwise the file's, wt-catalog. calls_decided, which the request's context carries, follows from who runs the tool when it is offered, the case's origin, and from approval: it is true for a tool that the agent runs, and for a provider-run tool only while the provider submits each of its calls to the agent for approval (EP-18). It never follows from the origin that the catalog records, which stays the resource's origin property (section 6.3, the review of 2026-11-16). Once policies decided, the expected decision gives calls_decided, and origin, the resource's origin property in the request that they decided. A case with a usage rule takes its tool.expose statement as section 6.11's example writes it, for github/push_files, which forbids exposing the tool while its calls are not decided.",
   "profile": "v1alpha1",
   "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
   "subject": {
@@ -432,7 +432,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000901"
         ],
         "resource_id": "filesystem/read_file",
-        "calls_decided": true
+        "calls_decided": true,
+        "origin": "agent"
       }
     },
     {
@@ -454,7 +455,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000901"
         ],
         "resource_id": "agent/send_email",
-        "calls_decided": true
+        "calls_decided": true,
+        "origin": "agent"
       }
     },
     {
@@ -477,7 +479,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000901"
         ],
         "resource_id": "provider.openai/web_search",
-        "calls_decided": false
+        "calls_decided": false,
+        "origin": "provider"
       }
     },
     {
@@ -500,7 +503,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000901"
         ],
         "resource_id": "provider.openai/web_search",
-        "calls_decided": true
+        "calls_decided": true,
+        "origin": "provider"
       }
     },
     {
@@ -526,7 +530,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000901"
         ],
         "resource_id": "github/create_issue",
-        "calls_decided": false
+        "calls_decided": false,
+        "origin": "provider"
       }
     },
     {
@@ -552,7 +557,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000901"
         ],
         "resource_id": "github/create_issue",
-        "calls_decided": true
+        "calls_decided": true,
+        "origin": "provider"
       }
     },
     {
@@ -592,7 +598,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000903"
         ],
         "resource_id": "github/push_files",
-        "calls_decided": false
+        "calls_decided": false,
+        "origin": "provider"
       }
     },
     {
@@ -632,7 +639,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000901"
         ],
         "resource_id": "github/push_files",
-        "calls_decided": true
+        "calls_decided": true,
+        "origin": "provider"
       }
     },
     {
@@ -672,7 +680,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000901"
         ],
         "resource_id": "github/create_issue",
-        "calls_decided": false
+        "calls_decided": false,
+        "origin": "provider"
       }
     },
     {
@@ -716,7 +725,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000901"
         ],
         "resource_id": "filesystem/read_file",
-        "calls_decided": true
+        "calls_decided": true,
+        "origin": "agent"
       }
     },
     {
@@ -835,7 +845,8 @@
           "0192f1c2-7a3b-7c4d-8e5f-000000000903"
         ],
         "resource_id": "github/push_files",
-        "calls_decided": false
+        "calls_decided": false,
+        "origin": "provider"
       }
     },
     {
@@ -867,7 +878,8 @@
         "reason": "policy.no_permit",
         "policies": [],
         "resource_id": "github/push_files",
-        "calls_decided": true
+        "calls_decided": true,
+        "origin": "provider"
       }
     },
     {
@@ -887,7 +899,211 @@
         "reason": "policy.no_permit",
         "policies": [],
         "resource_id": "agent/send_email",
-        "calls_decided": true
+        "calls_decided": true,
+        "origin": "agent"
+      }
+    },
+    {
+      "id": "X-25",
+      "description": "The catalog records the tool as run by the agent, but the provider runs it without submitting its calls: not decided, and the usage rule forbids its exposure; the resource keeps the catalog's origin",
+      "section": "6.3, 6.10, 6.11",
+      "catalog": {
+        "format": "whitetower.catalog.v1",
+        "redaction": {
+          "url_prefixes": [],
+          "flags": []
+        },
+        "servers": [
+          {
+            "key": "github",
+            "reference": "https://api.githubcopilot.com/mcp/",
+            "transport": "http",
+            "status": "approved"
+          }
+        ],
+        "tools": [
+          {
+            "key": "github/push_files",
+            "server": "github",
+            "name": "push_files",
+            "kind": "mcp",
+            "origin": "agent",
+            "status": "approved",
+            "enabled": true,
+            "definition": "d64d1be83b5c1826cc880c028514e9a4c2a38c1fb78571379fbc91781c80dd88",
+            "read_only": false,
+            "destructive": true,
+            "open_world": true,
+            "args": [
+              {
+                "name": "branch",
+                "path": [
+                  "branch"
+                ],
+                "type": "String"
+              }
+            ]
+          }
+        ],
+        "models": []
+      },
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000901",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000903",
+          "scope": "global",
+          "text": "@rule(\"{\\\"description\\\":\\\"Pushes to main go through pull requests\\\",\\\"id\\\":\\\"no-push-to-main\\\",\\\"tool\\\":\\\"github/push_files\\\",\\\"when\\\":[{\\\"arg\\\":\\\"branch\\\",\\\"op\\\":\\\"in\\\",\\\"values\\\":[\\\"main\\\",\\\"master\\\"]}]}\")\nforbid (\n  principal,\n  action == WhiteTower::Action::\"tool.expose\",\n  resource == WhiteTower::Tool::\"github/push_files\"\n) unless {\n  context.calls_decided\n};",
+          "valid": true
+        }
+      ],
+      "action": "tool.expose",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "push_files"
+      },
+      "origin": "provider",
+      "definition": "d64d1be83b5c1826cc880c028514e9a4c2a38c1fb78571379fbc91781c80dd88",
+      "approval": false,
+      "expected": {
+        "decision": false,
+        "reason": "policy.forbid",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000903"
+        ],
+        "resource_id": "github/push_files",
+        "calls_decided": false,
+        "origin": "agent"
+      }
+    },
+    {
+      "id": "X-26",
+      "description": "The catalog records the tool as run by the provider, but the agent runs it: decided, and the usage rule lets it be exposed",
+      "section": "6.3, 6.10, 6.11",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000901",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000903",
+          "scope": "global",
+          "text": "@rule(\"{\\\"description\\\":\\\"Pushes to main go through pull requests\\\",\\\"id\\\":\\\"no-push-to-main\\\",\\\"tool\\\":\\\"github/push_files\\\",\\\"when\\\":[{\\\"arg\\\":\\\"branch\\\",\\\"op\\\":\\\"in\\\",\\\"values\\\":[\\\"main\\\",\\\"master\\\"]}]}\")\nforbid (\n  principal,\n  action == WhiteTower::Action::\"tool.expose\",\n  resource == WhiteTower::Tool::\"github/push_files\"\n) unless {\n  context.calls_decided\n};",
+          "valid": true
+        }
+      ],
+      "action": "tool.expose",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "push_files"
+      },
+      "origin": "agent",
+      "definition": "d64d1be83b5c1826cc880c028514e9a4c2a38c1fb78571379fbc91781c80dd88",
+      "approval": false,
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "github/push_files",
+        "calls_decided": true,
+        "origin": "provider"
+      }
+    },
+    {
+      "id": "X-27",
+      "description": "The catalog records the tool as run by the agent, and the provider runs it, submitting each call for approval: decided",
+      "section": "6.3, 6.10, 6.11, EP-18",
+      "catalog": {
+        "format": "whitetower.catalog.v1",
+        "redaction": {
+          "url_prefixes": [],
+          "flags": []
+        },
+        "servers": [
+          {
+            "key": "github",
+            "reference": "https://api.githubcopilot.com/mcp/",
+            "transport": "http",
+            "status": "approved"
+          }
+        ],
+        "tools": [
+          {
+            "key": "github/push_files",
+            "server": "github",
+            "name": "push_files",
+            "kind": "mcp",
+            "origin": "agent",
+            "status": "approved",
+            "enabled": true,
+            "definition": "d64d1be83b5c1826cc880c028514e9a4c2a38c1fb78571379fbc91781c80dd88",
+            "read_only": false,
+            "destructive": true,
+            "open_world": true,
+            "args": [
+              {
+                "name": "branch",
+                "path": [
+                  "branch"
+                ],
+                "type": "String"
+              }
+            ]
+          }
+        ],
+        "models": []
+      },
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000901",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000903",
+          "scope": "global",
+          "text": "@rule(\"{\\\"description\\\":\\\"Pushes to main go through pull requests\\\",\\\"id\\\":\\\"no-push-to-main\\\",\\\"tool\\\":\\\"github/push_files\\\",\\\"when\\\":[{\\\"arg\\\":\\\"branch\\\",\\\"op\\\":\\\"in\\\",\\\"values\\\":[\\\"main\\\",\\\"master\\\"]}]}\")\nforbid (\n  principal,\n  action == WhiteTower::Action::\"tool.expose\",\n  resource == WhiteTower::Tool::\"github/push_files\"\n) unless {\n  context.calls_decided\n};",
+          "valid": true
+        }
+      ],
+      "action": "tool.expose",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "push_files"
+      },
+      "origin": "provider",
+      "definition": "d64d1be83b5c1826cc880c028514e9a4c2a38c1fb78571379fbc91781c80dd88",
+      "approval": true,
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "github/push_files",
+        "calls_decided": true,
+        "origin": "agent"
       }
     }
   ]

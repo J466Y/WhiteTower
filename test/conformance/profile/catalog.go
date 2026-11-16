@@ -53,7 +53,9 @@ type Tooling struct {
 	// endpoint, normalized and redacted, empty when it makes none.
 	Provider string
 	Endpoint string
-	// Origin is who runs a tool: agent or provider.
+	// Origin is who runs a tool at the time of the call: agent or provider.
+	// It can differ from the origin that the catalog records, which stays
+	// the resource's property (section 6.3).
 	Origin string
 	// Definition is the hash of a tool's definition as the agent has it now,
 	// empty when it has none.
@@ -184,7 +186,8 @@ func (e *Engine) Decide(catalog *tooling.Catalog, blocks []Block, call Call) Dec
 	case "tool.expose":
 		// Every call of the tool is decided when the agent runs it, or
 		// while the provider submits each of its calls for approval
-		// (section 6.10).
+		// (section 6.10): who runs it when it is offered decides, never
+		// the origin that the catalog records.
 		decided := t.Origin == "agent" || call.Approval
 		req.Context.CallsDecided = &decided
 	case "model.invoke":

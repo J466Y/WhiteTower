@@ -476,6 +476,8 @@ type callsFile struct {
 		State *profile.GateState `json:"state"`
 		// A subject other than the file's.
 		Subject *profile.Subject `json:"subject"`
+		// A catalog file other than the file's.
+		Catalog json.RawMessage `json:"catalog"`
 		// The bundle carries no catalog file.
 		WithoutCatalog bool          `json:"without_catalog"`
 		Blocks         []blockVector `json:"blocks"`
@@ -498,7 +500,10 @@ type callsFile struct {
 			ResourceID      string   `json:"resource_id"`
 			ReferenceSHA256 string   `json:"reference_sha256"`
 			BlockIDs        []string `json:"block_ids"`
-			CallsDecided    *bool    `json:"calls_decided"`
+			// An exposure's calls_decided, and the resource's origin
+			// property, in the request that policies decided.
+			CallsDecided *bool  `json:"calls_decided"`
+			Origin       string `json:"origin"`
 		} `json:"expected"`
 	} `json:"cases"`
 }
@@ -532,18 +537,23 @@ func resolve(t *testing.T, e referenceEntry, rules tooling.Rules) profile.Toolin
 // testCalls decides the cases of catalog-check.json or exposure.json with the
 // reference implementation, and checks what each decision names: the
 // resource, the reference of tooling that the catalog does not list, every
-// block that covers the call, and calls_decided on an exposure.
+// block that covers the call, and, on an exposure that policies decided,
+// calls_decided and the resource's origin property.
 func testCalls(t *testing.T, path string) {
 	var file callsFile
 	loadJSON(t, path, &file)
 	if len(file.Cases) == 0 {
 		t.Fatal("no cases")
 	}
-	catalog := readCatalog(t, file.Catalog)
-	validator := cedarValidator(t, toolArgs(catalog))
+	fileCatalog := readCatalog(t, file.Catalog)
 	responseSchema := compileSchema(t, "../../api/policy/decision-response.schema.json")
 	for _, c := range file.Cases {
 		t.Run(c.ID, func(t *testing.T) {
+			catalog := fileCatalog
+			if c.Catalog != nil {
+				catalog = readCatalog(t, c.Catalog)
+			}
+			validator := cedarValidator(t, toolArgs(catalog))
 			policyVectors := file.Policies
 			if c.Policies != nil {
 				policyVectors = c.Policies
@@ -598,14 +608,17 @@ func testCalls(t *testing.T, path string) {
 				t.Errorf("response does not match the profile's schema: %v", err)
 			}
 			var decided *bool
-			if got.Request != nil {
+			var origin string
+			if got.Request != nil && got.Request.Action.Name == "tool.expose" {
 				decided = got.Request.Context.CallsDecided
+				origin, _ = got.Request.Resource.Properties["origin"].(string)
 			}
 			if got.ResourceID != want.ResourceID || got.ReferenceSHA256 != want.ReferenceSHA256 ||
-				!slices.Equal(set(got.BlockIDs), set(want.BlockIDs)) || show(decided) != show(want.CallsDecided) {
-				t.Errorf("got resource %q, reference_sha256 %q, blocks %v, calls_decided %s; want %q, %q, %v, %s",
-					got.ResourceID, got.ReferenceSHA256, got.BlockIDs, show(decided),
-					want.ResourceID, want.ReferenceSHA256, want.BlockIDs, show(want.CallsDecided))
+				!slices.Equal(set(got.BlockIDs), set(want.BlockIDs)) || show(decided) != show(want.CallsDecided) ||
+				origin != want.Origin {
+				t.Errorf("got resource %q, reference_sha256 %q, blocks %v, calls_decided %s, origin %q; want %q, %q, %v, %s, %q",
+					got.ResourceID, got.ReferenceSHA256, got.BlockIDs, show(decided), origin,
+					want.ResourceID, want.ReferenceSHA256, want.BlockIDs, show(want.CallsDecided), want.Origin)
 			}
 		})
 	}
@@ -620,7 +633,8 @@ func TestCatalogCheckVectors(t *testing.T) {
 
 // TestExposureVectors runs the exposure vectors (section 6.10): tool.expose
 // through the catalog check, then policies with calls_decided, which follows
-// from the tool's origin and from approval (EP-18).
+// from who runs the tool when it is offered and from approval (EP-18), never
+// from the origin that the catalog records.
 func TestExposureVectors(t *testing.T) {
 	testCalls(t, "vectors/exposure.json")
 }
