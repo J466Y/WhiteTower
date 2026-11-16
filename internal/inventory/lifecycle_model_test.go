@@ -27,10 +27,12 @@ type model struct {
 }
 
 // caller is a principal, with the actions that their kind, roles and
-// relationship to Olivia's agents let them take.
+// relationship to Olivia's agents let them take, and whether separation of
+// duties refuses them the decisions on the agents and their reinstatement.
 type caller struct {
-	p   auth.Principal
-	may []string
+	p          auth.Principal
+	may        []string
+	conflicted bool
 }
 
 // starts holds the states that each action that people take starts from,
@@ -42,20 +44,22 @@ var (
 		"reinstate": {"suspended"}, "retire": {"draft", "proposed", "validated", "ready", "active", "suspended"},
 	}
 	commented = []string{"request_changes", "reject", "validate", "suspend", "reinstate", "retire"}
+	// duties are the actions that separation of duties refuses to whoever
+	// owns the agent, ever did, or created it or its use case.
+	duties = []string{"request_changes", "reject", "validate", "reinstate"}
 	// further is the action that takes an agent in each state further.
 	further = map[string]string{
 		"draft": "submit", "proposed": "validate", "validated": "suspend", "ready": "activate", "active": "suspend", "suspended": "reinstate",
 	}
 )
 
-// expect returns the refusal that the model expects when a caller who may
-// take the actions given, and who sees only active agents or every agent,
-// asks for one; or none, and the state it leads to.
-func (m model) expect(may []string, activeOnly bool, action string, comment bool) (inventory.RefusalKind, string) {
+// expect returns the refusal that the model expects when the caller asks for
+// an action; or none, and the state it leads to.
+func (m model) expect(c caller, action string, comment bool) (inventory.RefusalKind, string) {
 	switch {
-	case activeOnly && m.state != "active":
+	case slices.Equal(c.p.Roles, []string{"user"}) && m.state != "active":
 		return inventory.NotFound, ""
-	case !slices.Contains(may, action):
+	case !slices.Contains(c.may, action), c.conflicted && slices.Contains(duties, action):
 		return inventory.Forbidden, ""
 	case !slices.Contains(starts[action], m.state):
 		return inventory.Conflict, ""
@@ -151,13 +155,18 @@ func TestTheDatabaseFollowsAModelOfTheLifecycle(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	r := rand.New(rand.NewPCG(16, 11)) //nolint:gosec // G404: a fixed seed keeps the test deterministic
+	// Olivia owns every agent and created its use case. operatorOlivia is
+	// Olivia with the operator role as well, which grants agent.reinstate.
+	operatorOlivia := f.olivia
+	operatorOlivia.Name, operatorOlivia.Roles = "Olivia Operator", []string{"owner", "operator"}
 	callers := []caller{
-		{f.olivia, []string{"submit", "withdraw", "activate", "suspend", "retire"}},
-		{f.otto, nil},
-		{f.alex, []string{"request_changes", "reject", "validate", "suspend", "reinstate", "retire"}},
-		{f.omar, []string{"activate", "suspend", "reinstate", "retire"}},
-		{f.uma, nil},
-		{f.serviceAccount(t, "operator"), []string{"suspend"}},
+		{f.olivia, []string{"submit", "withdraw", "activate", "suspend", "retire"}, true},
+		{operatorOlivia, []string{"submit", "withdraw", "activate", "suspend", "reinstate", "retire"}, true},
+		{f.otto, nil, false},
+		{f.alex, []string{"request_changes", "reject", "validate", "suspend", "reinstate", "retire"}, false},
+		{f.omar, []string{"activate", "suspend", "reinstate", "retire"}, false},
+		{f.uma, nil, false},
+		{f.serviceAccount(t, "operator"), []string{"suspend"}, false},
 	}
 	actions := slices.Sorted(maps.Keys(starts))
 	past := f.clk.Now().Add(-time.Hour)
@@ -228,7 +237,7 @@ func TestTheDatabaseFollowsAModelOfTheLifecycle(t *testing.T) {
 				c = may[r.IntN(len(may))]
 			}
 			comment := map[bool]string{true: "Because.", false: ""}[r.IntN(5) > 0]
-			want, to := m.expect(c.may, slices.Equal(c.p.Roles, []string{"user"}), action, comment != "")
+			want, to := m.expect(c, action, comment != "")
 
 			_, err := f.inv.Transition(ctx, c.p, a.ID, version, action, comment)
 			var refusal *inventory.Refusal

@@ -259,6 +259,34 @@ func TestReinstatementChecksTheConditionsOfThePreviousState(t *testing.T) {
 	}
 }
 
+// Security test ST-18: Nobody reinstates an agent that they own, delegate for, ever did, or created, nor one whose use case they created
+func TestNobodyReinstatesAnAgentTheyOwnOwnedOrCreated(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	a := f.inState(t, "invoice-triage", "suspended from validated")
+	assign := func(p auth.Principal, role, ended string) {
+		f.set(t, `INSERT INTO whitetower.agent_owners (id, agent_id, principal_id, role, assigned_by, ended_at, ended_by, end_reason)
+			VALUES ($1, $2, $3, $4, $3, `+ended+`)`, uuid.Must(uuid.NewV7()), a.ID, uuid.MustParse(p.ID), role)
+	}
+	delegate := f.person(t, "Dora Operator", "operator")
+	delegate.Roles = []string{"operator", "owner"}
+	assign(delegate, "delegate", "NULL, NULL, NULL")
+	formerOwner := f.person(t, "Fiona Advisory", "advisory")
+	assign(formerOwner, "primary", "now(), $3, 'moved on'")
+	creator := f.person(t, "Carl Advisory", "advisory")
+	f.set(t, `UPDATE whitetower.use_cases SET created_by = $2 WHERE id = $1`, a.UseCaseID, uuid.MustParse(creator.ID))
+	for _, p := range []auth.Principal{delegate, formerOwner, creator} {
+		_, err := f.act(p, a, "reinstate", "Back to work.")
+		refused(t, err, inventory.Forbidden)
+		if _, actions, err := f.inv.Actions(ctx, p, a.ID); err != nil || fmt.Sprint(actions[0]) != "{reinstate T13 true [not_owner_or_creator]}" {
+			t.Errorf("%s: actions %+v, %v", p.Name, actions, err)
+		}
+	}
+	if a, err := f.act(f.omar, a, "reinstate", "Back to work."); err != nil || a.LifecycleState != "validated" {
+		t.Fatalf("another operator: %+v, %v", a, err)
+	}
+}
+
 // Retiring a proposal takes it out of the advisory committee's inbox,
 // withdraws its use case as T3 does, and cancels its pending ownership
 // transfer. A retired agent never changes again.

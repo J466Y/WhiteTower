@@ -399,4 +399,9 @@ A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-0
 - Part 4c, as its row says.
 - P1-06 implements `inventory.AgentPolicies` and wires it in place of `NoAgentPolicies`. A transition asks it under the agent's row lock, which the entry point of part 4c also takes when a policy is activated or retired.
 - Pull request 5 schedules the first review at T9 and cancels the open review at T14; P1-05 and P1-06 add their hooks into T14.
-- Open question: the lifecycle's section 6 says that owners cannot reinstate their own agents. The owner role lacks `agent.reinstate`, but T13 has no guard `not_owner_or_creator`, so an operator or an advisory member who is also the agent's owner or delegate may reinstate it. Whether T13 should refuse them is the maintainer's decision.
+
+**The review of 2026-11-16.** The review accepted the part as one pull request, and answered its open question: the lifecycle's section 6 says that owners cannot reinstate their own agents, which the table did not enforce, since the owner role lacks `agent.reinstate` but an operator or an advisory member may also own an agent.
+
+- T13 gains the guard `not_owner_or_creator`, as T4 to T6 have it. An operator or an advisory member who is or ever was the agent's primary owner or one of its delegates, or who created the agent or its use case, is refused reinstatement with `forbidden`; another operator or advisory member reinstates it. Putting an agent back into service is the decision of someone independent.
+- `agent-lifecycle.yaml`, the lifecycle's T13 row and the description of `transitionAgent` say so.
+- Tests: an operator who is a delegate, an advisory member who was once the primary owner and the creator of the agent's use case are refused, `getAgentActions` names the guard for each of them, and another operator reinstates the agent (ST-18). Both property tests have callers whom separation of duties refuses, and the decision core's fails unless some sequence asks one of them to reinstate the agent.

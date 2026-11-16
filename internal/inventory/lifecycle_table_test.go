@@ -73,7 +73,7 @@ func TestRandomSequencesKeepTheLifecyclesRules(t *testing.T) {
 	r := rand.New(rand.NewPCG(4, 23)) //nolint:gosec // G404: a fixed seed keeps the test deterministic
 	actions := slices.Sorted(maps.Keys(permissions))
 	// The callers: their roles, whether they are people, whether they own the
-	// agent, and whether they had a part in its proposal.
+	// agent, and whether they own it, ever did, or created it or its use case.
 	callers := []struct {
 		roles                   []string
 		person, own, conflicted bool
@@ -82,12 +82,15 @@ func TestRandomSequencesKeepTheLifecyclesRules(t *testing.T) {
 		{[]string{"owner"}, true, false, false},
 		{[]string{"advisory"}, true, false, false},
 		{[]string{"advisory", "owner"}, true, true, true},
+		{[]string{"advisory"}, true, false, true},
 		{[]string{"operator"}, true, false, false},
+		{[]string{"operator", "owner"}, true, true, true},
 		{[]string{"user"}, true, false, false},
 		{[]string{"operator"}, false, false, false},
 		{[]string{"advisory"}, false, false, false},
 	}
 	reached, taken := map[string]int{}, map[string]int{}
+	recused := 0 // reinstatements refused to an owner or a creator
 	for range 10_000 {
 		a := Agent{LifecycleState: "draft", Version: 1}
 		w := facts{metadataComplete: true, ownerActive: true, useCaseStatus: "draft", harnessDeclared: r.IntN(2) == 0}
@@ -165,6 +168,9 @@ func TestRandomSequencesKeepTheLifecyclesRules(t *testing.T) {
 				t.Fatal(err)
 			}
 			if err != nil {
+				if tr.action == "reinstate" && f.conflicted && tr.allows(f) == nil {
+					recused++
+				}
 				continue
 			}
 			b := tr.move(a, epoch)
@@ -186,7 +192,10 @@ func TestRandomSequencesKeepTheLifecyclesRules(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("steps in each state %v; transitions taken %v", reached, taken)
+	t.Logf("steps in each state %v; transitions taken %v; reinstatements refused to an owner or a creator %d", reached, taken, recused)
+	if recused == 0 {
+		t.Error("no sequence asked an owner or a creator to reinstate the agent")
+	}
 	for _, s := range []string{"draft", "proposed", "validated", "ready", "active", "suspended", "retired", "rejected"} {
 		if reached[s] == 0 {
 			t.Errorf("no sequence reached %s", s)
@@ -214,8 +223,8 @@ func broken(tr transition, a, b Agent, f facts) string {
 		return "was taken without the permission on an agent that was"
 	case slices.Contains(tr.guards, "comment_given") && !f.commentGiven:
 		return "was taken without a comment on an agent that was"
-	case decisions[tr.action] != "" && f.conflicted:
-		return "was decided by someone with a part in the proposal of an agent that was"
+	case (decisions[tr.action] != "" || tr.action == "reinstate") && f.conflicted:
+		return "was taken by someone who owns, owned or created the agent or its use case, on an agent that was"
 	case to == "proposed" && (!f.metadataComplete || !f.ownerActive || f.useCaseStatus == "rejected"):
 		return "submitted an agent that was"
 	case tr.action == "validate" && (f.prohibited || f.useCaseStatus == "rejected" || !f.ownerActive):

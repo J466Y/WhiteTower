@@ -82,7 +82,7 @@ var lifecycle = []transition{
 	},
 	{
 		id: "T13", action: "reinstate", from: []string{"suspended"}, to: previousState, actors: []string{"advisory", "operator"},
-		guards: []string{"comment_given", "owner_active", "review_not_overdue", "not_halted", "previous_state_invariants_hold"},
+		guards: []string{"not_owner_or_creator", "comment_given", "owner_active", "review_not_overdue", "not_halted", "previous_state_invariants_hold"},
 	},
 	{
 		id: "T14", action: "retire", from: []string{"draft", "proposed", "validated", "ready", "active", "suspended"}, to: "retired",
@@ -451,7 +451,7 @@ func (t transition) check(a *Agent, version int64, f facts) error {
 	failed := t.unmet(f)
 	switch {
 	case slices.Contains(failed, "not_owner_or_creator"):
-		return refuse(Forbidden, "separation of duties: nobody decides on a proposal they own, delegate for, ever did, or created, nor on one whose use case they created (HUM-04)")
+		return refuse(Forbidden, "separation of duties: nobody may %s an agent they own, delegate for, ever did, or created, nor one whose use case they created (HUM-04)", t.action)
 	case a.Version != version:
 		return refuse(Stale, "the agent changed since you read it: read it again, then retry")
 	case !slices.Contains(t.from, a.LifecycleState):

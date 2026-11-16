@@ -2241,11 +2241,12 @@ type ClientInterface interface {
 	// for the others. A service account takes only `suspend`: the decisions
 	// on a proposal (`request_changes`, `reject` and `validate`),
 	// `activate`, `reinstate` and `retire` are taken by people, whatever
-	// roles the service account holds. Nobody decides on a proposal they own
-	// or are a delegate of, or ever were, nor on one they created or whose
-	// use case they created (HUM-04). These refusals are `forbidden`. A
-	// guard that does not hold answers `conflict`, and the detail names it;
-	// getAgentActions tells beforehand which guards refuse.
+	// roles the service account holds. Nobody decides on a proposal, nor
+	// reinstates an agent, that they own or are a delegate of, or ever
+	// were, nor one they created or whose use case they created (HUM-04).
+	// These refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse.
 	// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
 	// `retire` need a comment, and a request without one is refused
 	// (`bad_request`).
@@ -2293,11 +2294,12 @@ type ClientInterface interface {
 	// for the others. A service account takes only `suspend`: the decisions
 	// on a proposal (`request_changes`, `reject` and `validate`),
 	// `activate`, `reinstate` and `retire` are taken by people, whatever
-	// roles the service account holds. Nobody decides on a proposal they own
-	// or are a delegate of, or ever were, nor on one they created or whose
-	// use case they created (HUM-04). These refusals are `forbidden`. A
-	// guard that does not hold answers `conflict`, and the detail names it;
-	// getAgentActions tells beforehand which guards refuse.
+	// roles the service account holds. Nobody decides on a proposal, nor
+	// reinstates an agent, that they own or are a delegate of, or ever
+	// were, nor one they created or whose use case they created (HUM-04).
+	// These refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse.
 	// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
 	// `retire` need a comment, and a request without one is refused
 	// (`bad_request`).
@@ -3240,11 +3242,12 @@ func (c *Client) ListAgentTransitions(ctx context.Context, id AgentId, params *L
 // for the others. A service account takes only `suspend`: the decisions
 // on a proposal (`request_changes`, `reject` and `validate`),
 // `activate`, `reinstate` and `retire` are taken by people, whatever
-// roles the service account holds. Nobody decides on a proposal they own
-// or are a delegate of, or ever were, nor on one they created or whose
-// use case they created (HUM-04). These refusals are `forbidden`. A
-// guard that does not hold answers `conflict`, and the detail names it;
-// getAgentActions tells beforehand which guards refuse.
+// roles the service account holds. Nobody decides on a proposal, nor
+// reinstates an agent, that they own or are a delegate of, or ever
+// were, nor one they created or whose use case they created (HUM-04).
+// These refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse.
 // `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
 // `retire` need a comment, and a request without one is refused
 // (`bad_request`).
@@ -3302,11 +3305,12 @@ func (c *Client) TransitionAgentWithBody(ctx context.Context, id AgentId, params
 // for the others. A service account takes only `suspend`: the decisions
 // on a proposal (`request_changes`, `reject` and `validate`),
 // `activate`, `reinstate` and `retire` are taken by people, whatever
-// roles the service account holds. Nobody decides on a proposal they own
-// or are a delegate of, or ever were, nor on one they created or whose
-// use case they created (HUM-04). These refusals are `forbidden`. A
-// guard that does not hold answers `conflict`, and the detail names it;
-// getAgentActions tells beforehand which guards refuse.
+// roles the service account holds. Nobody decides on a proposal, nor
+// reinstates an agent, that they own or are a delegate of, or ever
+// were, nor one they created or whose use case they created (HUM-04).
+// These refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse.
 // `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
 // `retire` need a comment, and a request without one is refused
 // (`bad_request`).
@@ -6856,11 +6860,12 @@ type ClientWithResponsesInterface interface {
 	// for the others. A service account takes only `suspend`: the decisions
 	// on a proposal (`request_changes`, `reject` and `validate`),
 	// `activate`, `reinstate` and `retire` are taken by people, whatever
-	// roles the service account holds. Nobody decides on a proposal they own
-	// or are a delegate of, or ever were, nor on one they created or whose
-	// use case they created (HUM-04). These refusals are `forbidden`. A
-	// guard that does not hold answers `conflict`, and the detail names it;
-	// getAgentActions tells beforehand which guards refuse.
+	// roles the service account holds. Nobody decides on a proposal, nor
+	// reinstates an agent, that they own or are a delegate of, or ever
+	// were, nor one they created or whose use case they created (HUM-04).
+	// These refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse.
 	// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
 	// `retire` need a comment, and a request without one is refused
 	// (`bad_request`).
@@ -6908,11 +6913,12 @@ type ClientWithResponsesInterface interface {
 	// for the others. A service account takes only `suspend`: the decisions
 	// on a proposal (`request_changes`, `reject` and `validate`),
 	// `activate`, `reinstate` and `retire` are taken by people, whatever
-	// roles the service account holds. Nobody decides on a proposal they own
-	// or are a delegate of, or ever were, nor on one they created or whose
-	// use case they created (HUM-04). These refusals are `forbidden`. A
-	// guard that does not hold answers `conflict`, and the detail names it;
-	// getAgentActions tells beforehand which guards refuse.
+	// roles the service account holds. Nobody decides on a proposal, nor
+	// reinstates an agent, that they own or are a delegate of, or ever
+	// were, nor one they created or whose use case they created (HUM-04).
+	// These refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse.
 	// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
 	// `retire` need a comment, and a request without one is refused
 	// (`bad_request`).
@@ -9918,11 +9924,12 @@ func (c *ClientWithResponses) ListAgentTransitionsWithResponse(ctx context.Conte
 // for the others. A service account takes only `suspend`: the decisions
 // on a proposal (`request_changes`, `reject` and `validate`),
 // `activate`, `reinstate` and `retire` are taken by people, whatever
-// roles the service account holds. Nobody decides on a proposal they own
-// or are a delegate of, or ever were, nor on one they created or whose
-// use case they created (HUM-04). These refusals are `forbidden`. A
-// guard that does not hold answers `conflict`, and the detail names it;
-// getAgentActions tells beforehand which guards refuse.
+// roles the service account holds. Nobody decides on a proposal, nor
+// reinstates an agent, that they own or are a delegate of, or ever
+// were, nor one they created or whose use case they created (HUM-04).
+// These refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse.
 // `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
 // `retire` need a comment, and a request without one is refused
 // (`bad_request`).
@@ -9976,11 +9983,12 @@ func (c *ClientWithResponses) TransitionAgentWithBodyWithResponse(ctx context.Co
 // for the others. A service account takes only `suspend`: the decisions
 // on a proposal (`request_changes`, `reject` and `validate`),
 // `activate`, `reinstate` and `retire` are taken by people, whatever
-// roles the service account holds. Nobody decides on a proposal they own
-// or are a delegate of, or ever were, nor on one they created or whose
-// use case they created (HUM-04). These refusals are `forbidden`. A
-// guard that does not hold answers `conflict`, and the detail names it;
-// getAgentActions tells beforehand which guards refuse.
+// roles the service account holds. Nobody decides on a proposal, nor
+// reinstates an agent, that they own or are a delegate of, or ever
+// were, nor one they created or whose use case they created (HUM-04).
+// These refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse.
 // `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
 // `retire` need a comment, and a request without one is refused
 // (`bad_request`).
