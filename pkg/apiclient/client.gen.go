@@ -2238,15 +2238,18 @@ type ClientInterface interface {
 	// as the agent's primary owner or one of its delegates;
 	// `usecase.validate` to request changes, reject or validate; and
 	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
-	// for the others. The decisions on a proposal (`request_changes`,
-	// `reject` and `validate`) are taken by people, never by a service
-	// account, and nobody decides on a proposal they own or are a delegate
-	// of, or ever were, nor on one they created or whose use case they
-	// created (HUM-04): these refusals are `forbidden`. A guard that does
-	// not hold answers `conflict`, and the detail names it; getAgentActions
-	// tells beforehand which guards refuse. `request_changes`, `reject`,
-	// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
-	// request without one is refused (`bad_request`).
+	// for the others. A service account takes only `suspend`: the decisions
+	// on a proposal (`request_changes`, `reject` and `validate`),
+	// `activate`, `reinstate` and `retire` are taken by people, whatever
+	// roles the service account holds. Nobody decides on a proposal, nor
+	// reinstates an agent, that they own or are a delegate of, or ever
+	// were, nor one they created or whose use case they created (HUM-04).
+	// These refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse.
+	// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
+	// `retire` need a comment, and a request without one is refused
+	// (`bad_request`).
 	//
 	// A use case can justify several agents. `submit`, `withdraw`,
 	// `request_changes`, `reject` and `validate` change the agent's use case
@@ -2256,6 +2259,18 @@ type ClientInterface interface {
 	// changes state. While the agent's use case is rejected, `submit` and
 	// `validate` are refused (`conflict`): the owner takes the agent back to
 	// a draft and links another use case.
+	//
+	// `activate` needs an active owner, a validated use case, an active
+	// agent-specific policy (POL-04), a declared harness and no halt. Until
+	// plan P1-06 brings policies, no agent-specific policy is active, so
+	// `activate` is refused with `agent_policy_active`. `suspend` remembers
+	// the state the agent was in, and `reinstate` takes it back there once
+	// its owner is active, no review is overdue, no halt covers it and the
+	// conditions of that state hold again: an agent suspended from `ready`
+	// or `active` needs an active agent-specific policy. `retire` cancels
+	// the agent's pending ownership transfer; retiring a proposal also takes
+	// it out of the advisory committee's inbox and withdraws its use case,
+	// as `withdraw` does.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2276,15 +2291,18 @@ type ClientInterface interface {
 	// as the agent's primary owner or one of its delegates;
 	// `usecase.validate` to request changes, reject or validate; and
 	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
-	// for the others. The decisions on a proposal (`request_changes`,
-	// `reject` and `validate`) are taken by people, never by a service
-	// account, and nobody decides on a proposal they own or are a delegate
-	// of, or ever were, nor on one they created or whose use case they
-	// created (HUM-04): these refusals are `forbidden`. A guard that does
-	// not hold answers `conflict`, and the detail names it; getAgentActions
-	// tells beforehand which guards refuse. `request_changes`, `reject`,
-	// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
-	// request without one is refused (`bad_request`).
+	// for the others. A service account takes only `suspend`: the decisions
+	// on a proposal (`request_changes`, `reject` and `validate`),
+	// `activate`, `reinstate` and `retire` are taken by people, whatever
+	// roles the service account holds. Nobody decides on a proposal, nor
+	// reinstates an agent, that they own or are a delegate of, or ever
+	// were, nor one they created or whose use case they created (HUM-04).
+	// These refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse.
+	// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
+	// `retire` need a comment, and a request without one is refused
+	// (`bad_request`).
 	//
 	// A use case can justify several agents. `submit`, `withdraw`,
 	// `request_changes`, `reject` and `validate` change the agent's use case
@@ -2294,6 +2312,18 @@ type ClientInterface interface {
 	// changes state. While the agent's use case is rejected, `submit` and
 	// `validate` are refused (`conflict`): the owner takes the agent back to
 	// a draft and links another use case.
+	//
+	// `activate` needs an active owner, a validated use case, an active
+	// agent-specific policy (POL-04), a declared harness and no halt. Until
+	// plan P1-06 brings policies, no agent-specific policy is active, so
+	// `activate` is refused with `agent_policy_active`. `suspend` remembers
+	// the state the agent was in, and `reinstate` takes it back there once
+	// its owner is active, no review is overdue, no halt covers it and the
+	// conditions of that state hold again: an agent suspended from `ready`
+	// or `active` needs an active agent-specific policy. `retire` cancels
+	// the agent's pending ownership transfer; retiring a proposal also takes
+	// it out of the advisory committee's inbox and withdraws its use case,
+	// as `withdraw` does.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3209,15 +3239,18 @@ func (c *Client) ListAgentTransitions(ctx context.Context, id AgentId, params *L
 // as the agent's primary owner or one of its delegates;
 // `usecase.validate` to request changes, reject or validate; and
 // `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
-// for the others. The decisions on a proposal (`request_changes`,
-// `reject` and `validate`) are taken by people, never by a service
-// account, and nobody decides on a proposal they own or are a delegate
-// of, or ever were, nor on one they created or whose use case they
-// created (HUM-04): these refusals are `forbidden`. A guard that does
-// not hold answers `conflict`, and the detail names it; getAgentActions
-// tells beforehand which guards refuse. `request_changes`, `reject`,
-// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
-// request without one is refused (`bad_request`).
+// for the others. A service account takes only `suspend`: the decisions
+// on a proposal (`request_changes`, `reject` and `validate`),
+// `activate`, `reinstate` and `retire` are taken by people, whatever
+// roles the service account holds. Nobody decides on a proposal, nor
+// reinstates an agent, that they own or are a delegate of, or ever
+// were, nor one they created or whose use case they created (HUM-04).
+// These refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse.
+// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
+// `retire` need a comment, and a request without one is refused
+// (`bad_request`).
 //
 // A use case can justify several agents. `submit`, `withdraw`,
 // `request_changes`, `reject` and `validate` change the agent's use case
@@ -3227,6 +3260,18 @@ func (c *Client) ListAgentTransitions(ctx context.Context, id AgentId, params *L
 // changes state. While the agent's use case is rejected, `submit` and
 // `validate` are refused (`conflict`): the owner takes the agent back to
 // a draft and links another use case.
+//
+// `activate` needs an active owner, a validated use case, an active
+// agent-specific policy (POL-04), a declared harness and no halt. Until
+// plan P1-06 brings policies, no agent-specific policy is active, so
+// `activate` is refused with `agent_policy_active`. `suspend` remembers
+// the state the agent was in, and `reinstate` takes it back there once
+// its owner is active, no review is overdue, no halt covers it and the
+// conditions of that state hold again: an agent suspended from `ready`
+// or `active` needs an active agent-specific policy. `retire` cancels
+// the agent's pending ownership transfer; retiring a proposal also takes
+// it out of the advisory committee's inbox and withdraws its use case,
+// as `withdraw` does.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3257,15 +3302,18 @@ func (c *Client) TransitionAgentWithBody(ctx context.Context, id AgentId, params
 // as the agent's primary owner or one of its delegates;
 // `usecase.validate` to request changes, reject or validate; and
 // `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
-// for the others. The decisions on a proposal (`request_changes`,
-// `reject` and `validate`) are taken by people, never by a service
-// account, and nobody decides on a proposal they own or are a delegate
-// of, or ever were, nor on one they created or whose use case they
-// created (HUM-04): these refusals are `forbidden`. A guard that does
-// not hold answers `conflict`, and the detail names it; getAgentActions
-// tells beforehand which guards refuse. `request_changes`, `reject`,
-// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
-// request without one is refused (`bad_request`).
+// for the others. A service account takes only `suspend`: the decisions
+// on a proposal (`request_changes`, `reject` and `validate`),
+// `activate`, `reinstate` and `retire` are taken by people, whatever
+// roles the service account holds. Nobody decides on a proposal, nor
+// reinstates an agent, that they own or are a delegate of, or ever
+// were, nor one they created or whose use case they created (HUM-04).
+// These refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse.
+// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
+// `retire` need a comment, and a request without one is refused
+// (`bad_request`).
 //
 // A use case can justify several agents. `submit`, `withdraw`,
 // `request_changes`, `reject` and `validate` change the agent's use case
@@ -3275,6 +3323,18 @@ func (c *Client) TransitionAgentWithBody(ctx context.Context, id AgentId, params
 // changes state. While the agent's use case is rejected, `submit` and
 // `validate` are refused (`conflict`): the owner takes the agent back to
 // a draft and links another use case.
+//
+// `activate` needs an active owner, a validated use case, an active
+// agent-specific policy (POL-04), a declared harness and no halt. Until
+// plan P1-06 brings policies, no agent-specific policy is active, so
+// `activate` is refused with `agent_policy_active`. `suspend` remembers
+// the state the agent was in, and `reinstate` takes it back there once
+// its owner is active, no review is overdue, no halt covers it and the
+// conditions of that state hold again: an agent suspended from `ready`
+// or `active` needs an active agent-specific policy. `retire` cancels
+// the agent's pending ownership transfer; retiring a proposal also takes
+// it out of the advisory committee's inbox and withdraws its use case,
+// as `withdraw` does.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6797,15 +6857,18 @@ type ClientWithResponsesInterface interface {
 	// as the agent's primary owner or one of its delegates;
 	// `usecase.validate` to request changes, reject or validate; and
 	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
-	// for the others. The decisions on a proposal (`request_changes`,
-	// `reject` and `validate`) are taken by people, never by a service
-	// account, and nobody decides on a proposal they own or are a delegate
-	// of, or ever were, nor on one they created or whose use case they
-	// created (HUM-04): these refusals are `forbidden`. A guard that does
-	// not hold answers `conflict`, and the detail names it; getAgentActions
-	// tells beforehand which guards refuse. `request_changes`, `reject`,
-	// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
-	// request without one is refused (`bad_request`).
+	// for the others. A service account takes only `suspend`: the decisions
+	// on a proposal (`request_changes`, `reject` and `validate`),
+	// `activate`, `reinstate` and `retire` are taken by people, whatever
+	// roles the service account holds. Nobody decides on a proposal, nor
+	// reinstates an agent, that they own or are a delegate of, or ever
+	// were, nor one they created or whose use case they created (HUM-04).
+	// These refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse.
+	// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
+	// `retire` need a comment, and a request without one is refused
+	// (`bad_request`).
 	//
 	// A use case can justify several agents. `submit`, `withdraw`,
 	// `request_changes`, `reject` and `validate` change the agent's use case
@@ -6815,6 +6878,18 @@ type ClientWithResponsesInterface interface {
 	// changes state. While the agent's use case is rejected, `submit` and
 	// `validate` are refused (`conflict`): the owner takes the agent back to
 	// a draft and links another use case.
+	//
+	// `activate` needs an active owner, a validated use case, an active
+	// agent-specific policy (POL-04), a declared harness and no halt. Until
+	// plan P1-06 brings policies, no agent-specific policy is active, so
+	// `activate` is refused with `agent_policy_active`. `suspend` remembers
+	// the state the agent was in, and `reinstate` takes it back there once
+	// its owner is active, no review is overdue, no halt covers it and the
+	// conditions of that state hold again: an agent suspended from `ready`
+	// or `active` needs an active agent-specific policy. `retire` cancels
+	// the agent's pending ownership transfer; retiring a proposal also takes
+	// it out of the advisory committee's inbox and withdraws its use case,
+	// as `withdraw` does.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -6835,15 +6910,18 @@ type ClientWithResponsesInterface interface {
 	// as the agent's primary owner or one of its delegates;
 	// `usecase.validate` to request changes, reject or validate; and
 	// `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
-	// for the others. The decisions on a proposal (`request_changes`,
-	// `reject` and `validate`) are taken by people, never by a service
-	// account, and nobody decides on a proposal they own or are a delegate
-	// of, or ever were, nor on one they created or whose use case they
-	// created (HUM-04): these refusals are `forbidden`. A guard that does
-	// not hold answers `conflict`, and the detail names it; getAgentActions
-	// tells beforehand which guards refuse. `request_changes`, `reject`,
-	// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
-	// request without one is refused (`bad_request`).
+	// for the others. A service account takes only `suspend`: the decisions
+	// on a proposal (`request_changes`, `reject` and `validate`),
+	// `activate`, `reinstate` and `retire` are taken by people, whatever
+	// roles the service account holds. Nobody decides on a proposal, nor
+	// reinstates an agent, that they own or are a delegate of, or ever
+	// were, nor one they created or whose use case they created (HUM-04).
+	// These refusals are `forbidden`. A guard that does not hold answers
+	// `conflict`, and the detail names it; getAgentActions tells beforehand
+	// which guards refuse.
+	// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
+	// `retire` need a comment, and a request without one is refused
+	// (`bad_request`).
 	//
 	// A use case can justify several agents. `submit`, `withdraw`,
 	// `request_changes`, `reject` and `validate` change the agent's use case
@@ -6853,6 +6931,18 @@ type ClientWithResponsesInterface interface {
 	// changes state. While the agent's use case is rejected, `submit` and
 	// `validate` are refused (`conflict`): the owner takes the agent back to
 	// a draft and links another use case.
+	//
+	// `activate` needs an active owner, a validated use case, an active
+	// agent-specific policy (POL-04), a declared harness and no halt. Until
+	// plan P1-06 brings policies, no agent-specific policy is active, so
+	// `activate` is refused with `agent_policy_active`. `suspend` remembers
+	// the state the agent was in, and `reinstate` takes it back there once
+	// its owner is active, no review is overdue, no halt covers it and the
+	// conditions of that state hold again: an agent suspended from `ready`
+	// or `active` needs an active agent-specific policy. `retire` cancels
+	// the agent's pending ownership transfer; retiring a proposal also takes
+	// it out of the advisory committee's inbox and withdraws its use case,
+	// as `withdraw` does.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -9831,15 +9921,18 @@ func (c *ClientWithResponses) ListAgentTransitionsWithResponse(ctx context.Conte
 // as the agent's primary owner or one of its delegates;
 // `usecase.validate` to request changes, reject or validate; and
 // `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
-// for the others. The decisions on a proposal (`request_changes`,
-// `reject` and `validate`) are taken by people, never by a service
-// account, and nobody decides on a proposal they own or are a delegate
-// of, or ever were, nor on one they created or whose use case they
-// created (HUM-04): these refusals are `forbidden`. A guard that does
-// not hold answers `conflict`, and the detail names it; getAgentActions
-// tells beforehand which guards refuse. `request_changes`, `reject`,
-// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
-// request without one is refused (`bad_request`).
+// for the others. A service account takes only `suspend`: the decisions
+// on a proposal (`request_changes`, `reject` and `validate`),
+// `activate`, `reinstate` and `retire` are taken by people, whatever
+// roles the service account holds. Nobody decides on a proposal, nor
+// reinstates an agent, that they own or are a delegate of, or ever
+// were, nor one they created or whose use case they created (HUM-04).
+// These refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse.
+// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
+// `retire` need a comment, and a request without one is refused
+// (`bad_request`).
 //
 // A use case can justify several agents. `submit`, `withdraw`,
 // `request_changes`, `reject` and `validate` change the agent's use case
@@ -9849,6 +9942,18 @@ func (c *ClientWithResponses) ListAgentTransitionsWithResponse(ctx context.Conte
 // changes state. While the agent's use case is rejected, `submit` and
 // `validate` are refused (`conflict`): the owner takes the agent back to
 // a draft and links another use case.
+//
+// `activate` needs an active owner, a validated use case, an active
+// agent-specific policy (POL-04), a declared harness and no halt. Until
+// plan P1-06 brings policies, no agent-specific policy is active, so
+// `activate` is refused with `agent_policy_active`. `suspend` remembers
+// the state the agent was in, and `reinstate` takes it back there once
+// its owner is active, no review is overdue, no halt covers it and the
+// conditions of that state hold again: an agent suspended from `ready`
+// or `active` needs an active agent-specific policy. `retire` cancels
+// the agent's pending ownership transfer; retiring a proposal also takes
+// it out of the advisory committee's inbox and withdraws its use case,
+// as `withdraw` does.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -9875,15 +9980,18 @@ func (c *ClientWithResponses) TransitionAgentWithBodyWithResponse(ctx context.Co
 // as the agent's primary owner or one of its delegates;
 // `usecase.validate` to request changes, reject or validate; and
 // `agent.activate`, `agent.suspend`, `agent.reinstate` or `agent.retire`
-// for the others. The decisions on a proposal (`request_changes`,
-// `reject` and `validate`) are taken by people, never by a service
-// account, and nobody decides on a proposal they own or are a delegate
-// of, or ever were, nor on one they created or whose use case they
-// created (HUM-04): these refusals are `forbidden`. A guard that does
-// not hold answers `conflict`, and the detail names it; getAgentActions
-// tells beforehand which guards refuse. `request_changes`, `reject`,
-// `validate`, `suspend`, `reinstate` and `retire` need a comment, and a
-// request without one is refused (`bad_request`).
+// for the others. A service account takes only `suspend`: the decisions
+// on a proposal (`request_changes`, `reject` and `validate`),
+// `activate`, `reinstate` and `retire` are taken by people, whatever
+// roles the service account holds. Nobody decides on a proposal, nor
+// reinstates an agent, that they own or are a delegate of, or ever
+// were, nor one they created or whose use case they created (HUM-04).
+// These refusals are `forbidden`. A guard that does not hold answers
+// `conflict`, and the detail names it; getAgentActions tells beforehand
+// which guards refuse.
+// `request_changes`, `reject`, `validate`, `suspend`, `reinstate` and
+// `retire` need a comment, and a request without one is refused
+// (`bad_request`).
 //
 // A use case can justify several agents. `submit`, `withdraw`,
 // `request_changes`, `reject` and `validate` change the agent's use case
@@ -9893,6 +10001,18 @@ func (c *ClientWithResponses) TransitionAgentWithBodyWithResponse(ctx context.Co
 // changes state. While the agent's use case is rejected, `submit` and
 // `validate` are refused (`conflict`): the owner takes the agent back to
 // a draft and links another use case.
+//
+// `activate` needs an active owner, a validated use case, an active
+// agent-specific policy (POL-04), a declared harness and no halt. Until
+// plan P1-06 brings policies, no agent-specific policy is active, so
+// `activate` is refused with `agent_policy_active`. `suspend` remembers
+// the state the agent was in, and `reinstate` takes it back there once
+// its owner is active, no review is overdue, no halt covers it and the
+// conditions of that state hold again: an agent suspended from `ready`
+// or `active` needs an active agent-specific policy. `retire` cancels
+// the agent's pending ownership transfer; retiring a proposal also takes
+// it out of the advisory committee's inbox and withdraws its use case,
+// as `withdraw` does.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

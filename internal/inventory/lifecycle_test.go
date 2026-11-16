@@ -304,8 +304,6 @@ func TestATransitionStartsFromTheVersionAndTheStateTheCallerRead(t *testing.T) {
 		"dance":        inventory.Invalid,
 		"create":       inventory.Invalid,
 		"halt_suspend": inventory.Invalid,
-		"activate":     inventory.NotBuilt,
-		"retire":       inventory.NotBuilt,
 	} {
 		_, err := f.act(f.olivia, a, action, "A comment.")
 		refused(t, err, kind)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/J466Y/WhiteTower/internal/govstate"
@@ -31,16 +32,24 @@ type StateVersions interface {
 // version of tx, which it returns. It locks the agent's record before it
 // takes the version, so that a writer that holds the version counter never
 // waits for a record that another writer locked first; the caller has locked
-// the agent's row before. Every agent has its record from T1, so a missing
-// record fails the change.
+// the agent's row before.
 func (inv *Inventory) publishState(ctx context.Context, tx *db.Tx, a *Agent, now time.Time) (int64, error) {
-	if _, err := inventorydb.New(tx).LockGovernanceState(ctx, a.ID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, fmt.Errorf("agent %s has no governance state", a.ID)
-		}
-		return 0, fmt.Errorf("locking the agent's governance state: %w", err)
+	if err := lockState(ctx, inventorydb.New(tx), a.ID); err != nil {
+		return 0, err
 	}
 	return inv.putState(ctx, tx, a, now)
+}
+
+// lockState locks the agent's governance state until the transaction ends.
+// Every agent has its record from T1, so a missing record fails the change.
+func lockState(ctx context.Context, q *inventorydb.Queries, agentID uuid.UUID) error {
+	if _, err := q.LockGovernanceState(ctx, agentID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("agent %s has no governance state", agentID)
+		}
+		return fmt.Errorf("locking the agent's governance state: %w", err)
+	}
+	return nil
 }
 
 // putState writes what enforcement points know of the agent, at the version

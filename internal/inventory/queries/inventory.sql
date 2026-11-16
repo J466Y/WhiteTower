@@ -150,11 +150,29 @@ SELECT EXISTS (
 );
 
 -- name: SetLifecycleState :execrows
--- Moves an agent to another state of its lifecycle, if it is still at the
--- version the caller read.
-UPDATE whitetower.agents
-SET lifecycle_state = sqlc.arg(lifecycle_state), updated_at = sqlc.arg(updated_at), version = version + 1
+-- Moves an agent to another state of its lifecycle, with what that state
+-- records, if the agent is still at the version the caller read: where a
+-- suspension came from, why and when, and when the agent was activated and
+-- retired.
+UPDATE whitetower.agents SET
+  lifecycle_state = sqlc.arg(lifecycle_state),
+  suspended_from = sqlc.narg(suspended_from),
+  suspension_reason = sqlc.narg(suspension_reason),
+  suspended_at = sqlc.narg(suspended_at),
+  activated_at = sqlc.narg(activated_at),
+  retired_at = sqlc.narg(retired_at),
+  updated_at = sqlc.arg(updated_at),
+  version = version + 1
 WHERE id = sqlc.arg(id) AND version = sqlc.arg(version);
+
+-- name: ReviewOverdue :one
+-- Whether an open review of the agent is past its grace period at the time
+-- given, which comes from the application's clock.
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.reviews
+  WHERE agent_id = sqlc.arg(agent_id) AND status IN ('scheduled', 'awaiting_signoff')
+    AND grace_ends_at < sqlc.arg(now)
+);
 
 -- name: ListTransitions :many
 -- A page of the agent's lifecycle transitions, newest first, with the display

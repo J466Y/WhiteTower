@@ -133,7 +133,7 @@ transitions:
     from: [suspended]
     to: previous_state
     actors: [advisory, operator]
-    guards: [comment_given, owner_active, review_not_overdue, not_halted, previous_state_invariants_hold]
+    guards: [not_owner_or_creator, comment_given, owner_active, review_not_overdue, not_halted, previous_state_invariants_hold]
     effects: [clear_suspension]
     audit: whitetower.agent.lifecycle_changed.v1
 

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Status** | Accepted v0.1, 2026-09-29 (plan [P0-02](../plans/phase-0/P0-02-domain-and-data-model.md), step 4) |
-| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)); sections 3 and 4 updated on 2026-10-19 for shared use cases and the decisions on proposals (the maintainer's decisions, plan P1-04); sections 2, 3, 4 and 7 updated on 2026-10-20 for the design of the halt path and the maintainer's decisions on it (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes)); sections 1 and 9 updated on 2026-10-22 for the gate in production (the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)); the normative note and section 4 updated on 2026-11-12 for the engine's table and for separation of duties over past assignments (the review of plan P1-04's pull request 4) |
+| **Date** | 2026-09-29; sections 1, 8, 9 and 10 updated on 2026-10-19 for the agents' tooling ([RFC-0002](../rfcs/0002-mcp-servers-tools-and-models.md)); sections 3 and 4 updated on 2026-10-19 for shared use cases and the decisions on proposals (the maintainer's decisions, plan P1-04); sections 2, 3, 4 and 7 updated on 2026-10-20 for the design of the halt path and the maintainer's decisions on it (plan [P1-08](../plans/phase-1/P1-08-kill-switch.md#progress-notes)); sections 1 and 9 updated on 2026-10-22 for the gate in production (the review of [RFC-0001](../rfcs/0001-module-contracts-v0.1.md)); the normative note and section 4 updated on 2026-11-12 for the engine's table and for separation of duties over past assignments (the review of plan P1-04's pull request 4); section 3 updated on 2026-11-16 for service accounts (the maintainer's decision of 2026-11-12, plan P1-04); section 3 updated on 2026-11-16: T13 checks separation of duties, as section 6 says (the review of plan P1-04's part 4b) |
 | **Normative** | Yes. The machine-readable form is [agent-lifecycle.yaml](agent-lifecycle.yaml); plan P1-04's lifecycle engine holds the same table, which a test keeps equal to it, and the two must never disagree |
 | **Related** | [Requirements 5.1.1](../requirements/mvp-requirements.md#511-agent-lifecycle-initial-proposal-refined-in-plan-p0-02), [domain model](domain-model.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md) |
 
@@ -52,12 +52,14 @@ The actors are the roles of the [permission matrix](../requirements/mvp-requirem
 | T10 | suspend | validated, ready, active | suspended | primary owner, delegate, advisory, operator | comment given | Remembers the previous state; reason `manual` |
 | T11 | auto_suspend | validated, ready, active | suspended | system | owner inactive, or review overdue past its grace period | Remembers the previous state; reason `owner_inactive` or `review_overdue`; notifies advisory and operators |
 | T12 | halt_suspend | validated, ready, active | suspended | system | an agent halt that is not a drill is issued for this agent | Remembers the previous state; reason `halt` |
-| T13 | reinstate | suspended | previous state | advisory, operator | comment given, owner active, review not overdue, not halted, the previous state's invariants hold | Clears the suspension |
+| T13 | reinstate | suspended | previous state | advisory, operator | not owner or creator, comment given, owner active, review not overdue, not halted, the previous state's invariants hold | Clears the suspension |
 | T14 | retire | draft, proposed, validated, ready, active, suspended | retired | primary owner, delegate, advisory, operator | comment given | Revokes every credential; retires the agent-specific policies; cancels the open review; sets `retired_at` |
 
 **Use cases shared by several agents.** The effects of T2 to T6 on the use case apply only while the use case is neither validated nor rejected. A validated or rejected use case never changes, because other agents may rely on it: a later decision is recorded with its agent, and only the agent changes state. An agent whose use case is rejected is neither submitted nor validated: its owner links another use case while the agent is a draft.
 
 **People decide on proposals.** The decisions on a proposal (T4, T5 and T6) are taken by people: a service account that holds the advisory role is refused (HUM-04). Every decision records its comment, the validation included.
+
+**Service accounts only suspend.** Of the transitions that people ask for, a service account takes only T10, suspend, when its roles allow it. Putting an agent into service (T9) or back into service (T13) is a person's conscious decision, and a retirement (T14) cannot be undone, so a stolen automation token must never retire agents. The principal's kind decides, so a person's own service account is refused too.
 
 Every transition:
 

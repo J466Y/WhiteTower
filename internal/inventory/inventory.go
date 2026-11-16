@@ -35,6 +35,9 @@ type Options struct {
 	Authorizer auth.Authorizer
 	// Versions numbers the changes of the governance state.
 	Versions StateVersions
+	// Policies tells whether an agent has an active agent-specific policy,
+	// which activation needs.
+	Policies AgentPolicies
 	// RoleMapping maps IdP groups to roles, as the authentication does: it
 	// tells who holds the owner role, which owning an agent needs.
 	RoleMapping map[string]string
@@ -47,6 +50,7 @@ type Inventory struct {
 	writer      *audit.Writer
 	authorizer  auth.Authorizer
 	versions    StateVersions
+	policies    AgentPolicies
 	roleMapping map[string]string
 }
 
@@ -58,6 +62,7 @@ func New(opts Options) *Inventory {
 		writer:      opts.Writer,
 		authorizer:  opts.Authorizer,
 		versions:    opts.Versions,
+		policies:    opts.Policies,
 		roleMapping: opts.RoleMapping,
 	}
 }
@@ -79,9 +84,6 @@ const (
 	// Stale is a change to a version of the resource that is no longer
 	// current.
 	Stale
-	// NotBuilt is a request that the API agreed on, which the inventory does
-	// not take yet: a lifecycle action of a later part of plan P1-04.
-	NotBuilt
 )
 
 // Refusal is a request that the inventory refuses. Its detail tells the

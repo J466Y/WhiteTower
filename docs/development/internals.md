@@ -90,7 +90,7 @@ func TestProposeAnAgent(t *testing.T) {
 	pool := dbtest.New(t).Open(t)
 	inv := inventory.New(inventory.Options{
 		DB: pool, Clock: clk, Writer: writer, Authorizer: authz.NewAuthorizer(),
-		Versions: govstate.NewVersions(notify.NewMemory(), logger),
+		Versions: govstate.NewVersions(notify.NewMemory(), logger), Policies: inventory.NoAgentPolicies{},
 	})
 	api := resttest.New(t, rest.Options{Inventory: inv})
 	resp, err := api.Client.ProposeAgentWithResponse(context.Background(), agent, resttest.As(owner))

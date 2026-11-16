@@ -76,6 +76,7 @@ func inventoryStore(t *testing.T, people map[string]string) (Options, *db.DB) {
 	opts.Inventory = inventory.New(inventory.Options{
 		DB: pool, Clock: clk, Writer: audit.NewWriter(catalog, clk), Authorizer: opts.Authorizer,
 		Versions:    govstate.NewVersions(notify.NewMemory(), opts.Logger),
+		Policies:    inventory.NoAgentPolicies{},
 		RoleMapping: map[string]string{"wt-owner": "owner"},
 	})
 	return opts, pool
@@ -97,7 +98,7 @@ func ifMatch(etag string) http.Header { return http.Header{"If-Match": []string{
 // unbuilt lists the operations of plan P1-04 whose server side is not built
 // yet. The pull request that builds one removes it from here.
 var unbuilt = []string{
-	"exportAgents", "getAgentActions", "listAgentInstances",
+	"exportAgents", "listAgentInstances",
 	"listAgentReviews", "listReviews", "getReview", "completeReview", "signOffReview", "listInboxItems",
 }
 
@@ -428,10 +429,10 @@ func TestTheProposalPhaseThroughTheAPI(t *testing.T) {
 	guard(asAlex, validate, "use_case_not_rejected", rejected, `UPDATE whitetower.use_cases SET status = 'submitted' WHERE id = $1`, uc.Id)
 	guard(asAlex, validate, "owner_active", inactive, active, olivia)
 
-	// Actions that the agent's state, White Tower or a later part take.
+	// Actions that the agent's state refuses, or that White Tower takes.
 	problemOf(t, send(http.MethodPost, transitions, olivia, submit, etag()), problem.Conflict)
 	problemOf(t, send(http.MethodPost, transitions, olivia, `{"action":"mark_ready"}`, etag()), problem.BadRequest)
-	problemOf(t, send(http.MethodPost, transitions, olivia, `{"action":"activate"}`, etag()), problem.NotImplemented)
+	problemOf(t, send(http.MethodPost, transitions, olivia, `{"action":"activate"}`, etag()), problem.Conflict)
 	if res = asAlex(http.MethodPost, transitions, "", validate, etag()); res.status != http.StatusOK ||
 		!strings.Contains(string(res.body), `"lifecycleState":"validated"`) {
 		t.Fatalf("validate: %d %s", res.status, res.body)
@@ -455,4 +456,115 @@ func TestTheProposalPhaseThroughTheAPI(t *testing.T) {
 		t.Fatalf("listAgentTransitions, last page: %d %s", res.status, res.body)
 	}
 	problemOf(t, send(http.MethodGet, "/agents/"+uuid.NewString()+"/transitions", olivia, "", nil), problem.NotFound)
+}
+
+// Security test ST-23: Activation without the invariant of active, and reinstatement without its conditions, are refused through the API, each guard named
+func TestIntoAndOutOfServiceThroughTheAPI(t *testing.T) {
+	opts, pool := inventoryStore(t, map[string]string{olivia: "Olivia Owner", alex: "Alex Advisory", omar: "Omar Operator"})
+	send := sender(Handler(opts))
+	as := func(p auth.Principal) func(method, path, as, body string, header http.Header) result {
+		o := opts
+		o.Authenticator = fixedAuthenticator{p: p}
+		return sender(Handler(o))
+	}
+	asAlex := as(auth.Principal{ID: alex, Kind: auth.Human, Name: "Alex Advisory", Roles: []string{"advisory"}})
+	asOmar := as(auth.Principal{ID: omar, Kind: auth.Human, Name: "Omar Operator", Roles: []string{"operator"}})
+	asBot := as(auth.Principal{ID: uuid.NewString(), Kind: auth.ServiceAccount, Name: "Deploy bot", Roles: []string{"operator"}})
+	set := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(context.Background(), sql, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	res := send(http.MethodPost, "/use-cases", olivia, useCaseJSON, nil)
+	var uc gen.UseCase
+	if res.status != http.StatusCreated || json.Unmarshal(res.body, &uc) != nil {
+		t.Fatalf("createUseCase: %d %s", res.status, res.body)
+	}
+	res = send(http.MethodPost, "/agents", olivia, proposalJSON(uc.Id), nil)
+	var agent gen.Agent
+	if res.status != http.StatusCreated || json.Unmarshal(res.body, &agent) != nil {
+		t.Fatalf("proposeAgent: %d %s", res.status, res.body)
+	}
+	path := "/agents/" + agent.Id.String()
+	transitions := path + "/transitions"
+	etag := func() http.Header { return ifMatch(send(http.MethodGet, path, olivia, "", nil).header.Get("ETag")) }
+	take := func(send func(method, path, as, body string, header http.Header) result, action, state string) {
+		t.Helper()
+		body := fmt.Sprintf(`{"action":%q,"comment":"Reviewed."}`, action)
+		if res := send(http.MethodPost, transitions, olivia, body, etag()); res.status != http.StatusOK ||
+			!strings.Contains(string(res.body), `"lifecycleState":"`+state+`"`) {
+			t.Fatalf("%s: %d %s", action, res.status, res.body)
+		}
+	}
+	// refusedBy checks that the action is refused, and that the detail names
+	// each guard, while the rows that spoil changes break them.
+	refusedBy := func(send func(method, path, as, body string, header http.Header) result, action string, guards []string, spoil, restore string, arg any) {
+		t.Helper()
+		if spoil != "" {
+			set(spoil, arg)
+			defer set(restore, arg)
+		}
+		p := problemOf(t, send(http.MethodPost, transitions, olivia, `{"action":"`+action+`","comment":"Reviewed."}`, etag()), problem.Conflict)
+		for _, g := range guards {
+			if !strings.Contains(p.Detail, g) {
+				t.Errorf("%s: the detail %q does not name the guard %s", action, p.Detail, g)
+			}
+		}
+	}
+	actions := func(send func(method, path, as, body string, header http.Header) result, want string) {
+		t.Helper()
+		res := send(http.MethodGet, path+"/actions", olivia, "", nil)
+		var got gen.AgentActions
+		if res.status != http.StatusOK || json.Unmarshal(res.body, &got) != nil {
+			t.Fatalf("getAgentActions: %d %s", res.status, res.body)
+		}
+		if s := fmt.Sprint(got.LifecycleState, " ", got.Actions); s != want {
+			t.Errorf("getAgentActions: %s, want %s", s, want)
+		}
+	}
+	inactive, active := `UPDATE whitetower.principals SET status = 'inactive' WHERE id = $1`, `UPDATE whitetower.principals SET status = 'active' WHERE id = $1`
+	halted := `UPDATE whitetower.governance_state SET run_state = 'halted', agent_halt_ids = ARRAY[gen_random_uuid()],
+		state_version = whitetower.next_governance_version() WHERE agent_id = $1`
+	running := `UPDATE whitetower.governance_state SET run_state = 'running', agent_halt_ids = '{}',
+		state_version = whitetower.next_governance_version() WHERE agent_id = $1`
+
+	take(send, "submit", "proposed")
+	take(asAlex, "validate", "validated")
+	actions(send, "validated [{suspend true true [] T10} {retire true true [] T14}]")
+	actions(asBot, "validated [{suspend true true [] T10} {retire false true [permission] T14}]")
+
+	// T13 needs an active owner, no overdue review and no halt.
+	take(asOmar, "suspend", "suspended")
+	problemOf(t, send(http.MethodPost, transitions, olivia, `{"action":"reinstate","comment":"My own."}`, etag()), problem.Forbidden)
+	refusedBy(asAlex, "reinstate", []string{"owner_active"}, inactive, active, olivia)
+	refusedBy(asAlex, "reinstate", []string{"review_not_overdue"},
+		`INSERT INTO whitetower.reviews (id, agent_id, due_at, grace_ends_at, signoff_required)
+		 VALUES (gen_random_uuid(), $1, '2026-01-01', '2026-01-01', false)`,
+		`UPDATE whitetower.reviews SET status = 'cancelled' WHERE agent_id = $1`, agent.Id)
+	refusedBy(asAlex, "reinstate", []string{"not_halted"}, halted, running, agent.Id)
+	take(asAlex, "reinstate", "validated")
+
+	// The agent becomes ready, as T7 will make it (part 4c). No agent policy
+	// is active until plan P1-06 brings policies, so T9 is refused, with every
+	// other guard of the invariant of active that does not hold; a ready agent
+	// always has its harness.
+	set(`UPDATE whitetower.agents SET harness = '{"description": "A container."}', lifecycle_state = 'ready', version = version + 1 WHERE id = $1`, agent.Id)
+	problemOf(t, asBot(http.MethodPost, transitions, "", `{"action":"activate"}`, etag()), problem.Forbidden)
+	refusedBy(send, "activate", []string{"agent_policy_active"}, "", "", nil)
+	refusedBy(send, "activate", []string{"agent_policy_active", "owner_active"}, inactive, active, olivia)
+	refusedBy(asOmar, "activate", []string{"agent_policy_active", "use_case_validated"},
+		`UPDATE whitetower.use_cases SET status = 'submitted' WHERE id = $1`, `UPDATE whitetower.use_cases SET status = 'validated' WHERE id = $1`, uc.Id)
+	refusedBy(asOmar, "activate", []string{"agent_policy_active", "not_halted"}, halted, running, agent.Id)
+	actions(asOmar, "ready [{activate false false [agent_policy_active] T9} {suspend true true [] T10} {retire true true [] T14}]")
+
+	// An agent suspended from ready returns there only with an active agent
+	// policy.
+	take(asOmar, "suspend", "suspended")
+	refusedBy(asAlex, "reinstate", []string{"previous_state_invariants_hold"}, "", "", nil)
+	actions(asAlex, "suspended [{reinstate false true [previous_state_invariants_hold] T13} {retire true true [] T14}]")
+	take(asAlex, "retire", "retired")
+	actions(send, "retired []")
+	problemOf(t, send(http.MethodGet, "/agents/"+uuid.NewString()+"/actions", olivia, "", nil), problem.NotFound)
 }

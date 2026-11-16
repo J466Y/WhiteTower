@@ -328,6 +328,9 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			Authorizer:  authorizer,
 			Versions:    versions,
 			RoleMapping: cfg.Auth.OIDC.RoleMapping,
+			// Until plan P1-06 brings policies, no agent has an active
+			// agent-specific policy, so none becomes active (POL-04).
+			Policies: inventory.NoAgentPolicies{},
 		}),
 	})
 	drain := server.NewDrain()

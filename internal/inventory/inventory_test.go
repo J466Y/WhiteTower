@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,9 +28,10 @@ var epoch = time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)
 // fixture is an inventory on a database of its own, with people who hold the
 // roles that the tests need.
 type fixture struct {
-	pool *db.DB
-	inv  *inventory.Inventory
-	clk  *clocktest.Fake
+	pool     *db.DB
+	inv      *inventory.Inventory
+	clk      *clocktest.Fake
+	policies *policies
 	// olivia and otto are owners, alex is on the advisory committee, omar is
 	// an operator and uma a user.
 	olivia, otto, alex, omar, uma auth.Principal
@@ -43,15 +45,18 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	clk := clocktest.New(epoch)
+	active := &policies{active: map[uuid.UUID]bool{}}
 	f := &fixture{
-		pool: pool,
-		clk:  clk,
+		pool:     pool,
+		clk:      clk,
+		policies: active,
 		inv: inventory.New(inventory.Options{
 			DB:         pool,
 			Clock:      clk,
 			Writer:     audit.NewWriter(catalog, clk),
 			Authorizer: authz.NewAuthorizer(),
 			Versions:   govstate.NewVersions(notify.NewMemory(), slog.New(slog.DiscardHandler)),
+			Policies:   active,
 			RoleMapping: map[string]string{
 				"wt-owner": "owner", "wt-advisory": "advisory", "wt-operator": "operator", "wt-user": "user",
 			},
@@ -63,6 +68,26 @@ func setup(t *testing.T) *fixture {
 	f.omar = f.person(t, "Omar Operator", "operator")
 	f.uma = f.person(t, "Uma User", "user")
 	return f
+}
+
+// policies stands for plan P1-06: the agents it holds have an active
+// agent-specific policy, and no other agent has one.
+type policies struct {
+	mu     sync.Mutex
+	active map[uuid.UUID]bool
+}
+
+func (p *policies) Active(_ context.Context, _ *db.Tx, agentID uuid.UUID) (bool, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.active[agentID], nil
+}
+
+// set gives the agent an active agent-specific policy, or takes it away.
+func (p *policies) set(agentID uuid.UUID, active bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.active[agentID] = active
 }
 
 // person stores a human principal in the IdP group of the role given, and
