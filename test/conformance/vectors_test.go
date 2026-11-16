@@ -155,6 +155,14 @@ var withBundleVersion = map[string]bool{
 	profile.ReasonLifecycle:       false,
 	profile.ReasonNoBundle:        false,
 	profile.ReasonEvidenceFull:    false,
+
+	// The catalog is part of the bundle (EP-16).
+	profile.ReasonBlocked:           true,
+	profile.ReasonUnknown:           true,
+	profile.ReasonNotApproved:       true,
+	profile.ReasonNotEnabled:        true,
+	profile.ReasonDefinitionChanged: true,
+	profile.ReasonDigestMismatch:    true,
 }
 
 // checkBundleVersion checks a response's bundle_version by its reason.
@@ -209,39 +217,11 @@ func checkRefusal(t *testing.T, requestSchema *jsonschema.Schema, request json.R
 	}
 }
 
-// vectorCatalog is what the combination vectors read of their catalog file
-// (section 7.7): what makes up a resource's properties, and the arguments
-// that each tool declares.
-type vectorCatalog struct {
-	Servers []struct {
-		Key       string `json:"key"`
-		Transport string `json:"transport"`
-	} `json:"servers"`
-	Tools []struct {
-		Key         string             `json:"key"`
-		Server      string             `json:"server"`
-		Provider    string             `json:"provider"`
-		Name        string             `json:"name"`
-		Kind        string             `json:"kind"`
-		Origin      string             `json:"origin"`
-		ReadOnly    bool               `json:"read_only"`
-		Destructive bool               `json:"destructive"`
-		OpenWorld   bool               `json:"open_world"`
-		Args        []tooling.Argument `json:"args"`
-	} `json:"tools"`
-	Models []struct {
-		Key      string `json:"key"`
-		Provider string `json:"provider"`
-		Endpoint string `json:"endpoint"`
-		Name     string `json:"name"`
-	} `json:"models"`
-}
-
 // toolArgs returns the ToolArgs that the core declares in a bundle's Cedar
 // schema for the catalog (section 6.7): one optional record per tool that
 // declares arguments, keyed by the tool's key, with each argument under its
 // name and of its type.
-func (c vectorCatalog) toolArgs() string {
+func toolArgs(c tooling.Catalog) string {
 	quote := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
 	var records []string
 	for _, tool := range c.Tools {
@@ -257,61 +237,51 @@ func (c vectorCatalog) toolArgs() string {
 	return "type ToolArgs = { " + strings.Join(records, ", ") + " };"
 }
 
-// entry returns the properties that the catalog gives a resource, and the
-// types of the arguments that a tool declares, by their names (sections 6.3
-// and 7.7).
-func (c vectorCatalog) entry(r profile.Resource) (map[string]any, map[string]string, error) {
-	for _, m := range c.Models {
-		if r.Type == "model" && m.Key == r.ID {
-			return map[string]any{"provider": m.Provider, "name": m.Name, "endpoint": m.Endpoint}, nil, nil
-		}
+// readCatalog reads a vector file's catalog file, after checking it against
+// its schema.
+func readCatalog(t *testing.T, data json.RawMessage) tooling.Catalog {
+	t.Helper()
+	if err := validateJSON(compileSchema(t, "../../api/policy/catalog.schema.json"), data); err != nil {
+		t.Fatalf("the catalog does not match its schema: %v", err)
 	}
-	for _, tool := range c.Tools {
-		if r.Type != "tool" || tool.Key != r.ID {
-			continue
-		}
-		properties := map[string]any{
-			"kind": tool.Kind, "origin": tool.Origin, "name": tool.Name,
-			"read_only": tool.ReadOnly, "destructive": tool.Destructive, "open_world": tool.OpenWorld,
-		}
-		switch tool.Kind {
-		case "mcp":
-			properties["server"] = tool.Server
-			for _, s := range c.Servers {
-				if s.Key == tool.Server {
-					properties["transport"] = s.Transport
-				}
-			}
-		case "builtin":
-			properties["provider"] = tool.Provider
-		}
-		declared := map[string]string{}
-		for _, a := range tool.Args {
-			declared[a.Name] = a.Type
-		}
-		return properties, declared, nil
+	var c tooling.Catalog
+	if err := json.Unmarshal(data, &c); err != nil {
+		t.Fatal(err)
 	}
-	return nil, nil, fmt.Errorf("the catalog has no %s with the key %q", r.Type, r.ID)
+	return c
 }
 
-// check checks that a request inside the profile takes its resource from the
-// catalog: a tool or a model names an entry by its key, with the properties
-// that the catalog gives it (section 6.3), and a tool call's record holds only
-// arguments that the entry declares, each of its declared type (section
-// 6.11).
-func (c vectorCatalog) check(request json.RawMessage) error {
+// checkFromCatalog checks that a request inside the profile takes its
+// resource from the catalog: a tool or a model names an entry by its key,
+// with the properties that the catalog gives it (section 6.3), and a tool
+// call's record holds only arguments that the entry declares, each of its
+// declared type (section 6.11).
+func checkFromCatalog(c *tooling.Catalog, request json.RawMessage) error {
 	req, err := profile.DecodeRequest(request)
 	if err != nil {
 		return err
 	}
-	if req.Resource.Type != "tool" && req.Resource.Type != "model" {
+	var properties map[string]any
+	declared := map[string]string{}
+	for i, m := range c.Models {
+		if req.Resource.Type == "model" && m.Key == req.Resource.ID {
+			properties = profile.ModelProperties(&c.Models[i])
+		}
+	}
+	for i, tool := range c.Tools {
+		if req.Resource.Type == "tool" && tool.Key == req.Resource.ID {
+			properties = profile.ToolProperties(c, &c.Tools[i])
+			for _, a := range tool.Args {
+				declared[a.Name] = a.Type
+			}
+		}
+	}
+	switch {
+	case req.Resource.Type != "tool" && req.Resource.Type != "model":
 		return nil
-	}
-	properties, declared, err := c.entry(req.Resource)
-	if err != nil {
-		return err
-	}
-	if !reflect.DeepEqual(req.Resource.Properties, properties) {
+	case properties == nil:
+		return fmt.Errorf("the catalog has no %s with the key %q", req.Resource.Type, req.Resource.ID)
+	case !reflect.DeepEqual(req.Resource.Properties, properties):
 		return fmt.Errorf("properties %s, the catalog's %s", show(req.Resource.Properties), show(properties))
 	}
 	record, _ := req.Context.Args[req.Resource.ID].(map[string]any)
@@ -374,14 +344,8 @@ func TestCombinationVectors(t *testing.T) {
 	if len(file.Cases) == 0 {
 		t.Fatal("no cases")
 	}
-	if err := validateJSON(compileSchema(t, "../../api/policy/catalog.schema.json"), file.Catalog); err != nil {
-		t.Fatalf("the catalog does not match its schema: %v", err)
-	}
-	var catalog vectorCatalog
-	if err := json.Unmarshal(file.Catalog, &catalog); err != nil {
-		t.Fatal(err)
-	}
-	validator := cedarValidator(t, catalog.toolArgs())
+	catalog := readCatalog(t, file.Catalog)
+	validator := cedarValidator(t, toolArgs(catalog))
 	for _, c := range file.Cases {
 		t.Run(c.ID, func(t *testing.T) {
 			for _, p := range c.Policies {
@@ -404,7 +368,7 @@ func TestCombinationVectors(t *testing.T) {
 				if err := validateJSON(requestSchema, c.Request); err != nil {
 					t.Errorf("request does not match the profile's schema: %v", err)
 				}
-				if err := catalog.check(c.Request); err != nil {
+				if err := checkFromCatalog(&catalog, c.Request); err != nil {
 					t.Errorf("the request does not take its resource from the catalog: %v", err)
 				}
 			}
@@ -481,6 +445,184 @@ func TestFailClosedVectors(t *testing.T) {
 			}
 		})
 	}
+}
+
+// blockVector is an active block as a vector gives it (section 5.10).
+type blockVector struct {
+	BlockID string `json:"block_id"`
+	Kind    string `json:"kind"`
+	// Covers is the string form of what the block covers, for the vector's
+	// readers: the block carries its SHA-256 alone.
+	Covers        string `json:"covers"`
+	CoveredSHA256 string `json:"covered_sha256"`
+}
+
+// callsFile is catalog-check.json or exposure.json: tool and model actions,
+// each decided once the gate is open, in the order of section 6.6.
+type callsFile struct {
+	Description string          `json:"description"`
+	Profile     string          `json:"profile"`
+	AgentID     string          `json:"agent_id"`
+	Subject     profile.Subject `json:"subject"`
+	Time        string          `json:"time"`
+	// The bundle's catalog file and policies, unless a case says otherwise.
+	Catalog  json.RawMessage `json:"catalog"`
+	Policies []policyVector  `json:"policies"`
+	Cases    []struct {
+		ID          string `json:"id"`
+		Description string `json:"description"`
+		Section     string `json:"section"`
+		// The gate's state, when the case closes it.
+		State *profile.GateState `json:"state"`
+		// A subject other than the file's.
+		Subject *profile.Subject `json:"subject"`
+		// The bundle carries no catalog file.
+		WithoutCatalog bool          `json:"without_catalog"`
+		Blocks         []blockVector `json:"blocks"`
+		// The bundle's policies, in place of the file's.
+		Policies []policyVector `json:"policies"`
+		Action   string         `json:"action"`
+		// The tool or the model as the agent has it, from which the
+		// enforcement point computes its references with the catalog's
+		// redaction rules.
+		Tooling    referenceEntry `json:"tooling"`
+		Origin     string         `json:"origin"`
+		Definition string         `json:"definition"`
+		Digest     string         `json:"digest"`
+		Approval   bool           `json:"approval"`
+		// A tool call's arguments as a JSON value or as text, or neither.
+		Arguments     json.RawMessage `json:"arguments"`
+		ArgumentsText *string         `json:"arguments_text"`
+		Expected      struct {
+			expectation
+			ResourceID      string   `json:"resource_id"`
+			ReferenceSHA256 string   `json:"reference_sha256"`
+			BlockIDs        []string `json:"block_ids"`
+			CallsDecided    *bool    `json:"calls_decided"`
+		} `json:"expected"`
+	} `json:"cases"`
+}
+
+// resolve returns a tool or a model as an enforcement point has it, its
+// strings computed with the redaction rules given (sections 4.10 and 5.10).
+func resolve(t *testing.T, e referenceEntry, rules tooling.Rules) profile.Tooling {
+	t.Helper()
+	got := profile.Tooling{Name: e.Name}
+	ref, err := reference(t, e, rules)
+	switch {
+	case err == nil:
+		got.Reference = ref
+	case !errors.Is(err, tooling.ErrNoReference):
+		t.Fatal(err)
+	}
+	switch e.Kind {
+	case "mcp_tool":
+		if server, err := reference(t, *e.Server, rules); err == nil {
+			got.Server = server
+		}
+	case "model":
+		got.Provider = e.Provider
+		if endpoint, err := tooling.NormalizedURL(e.Endpoint, rules); err == nil {
+			got.Endpoint = endpoint
+		}
+	}
+	return got
+}
+
+// testCalls decides the cases of catalog-check.json or exposure.json with the
+// reference implementation, and checks what each decision names: the
+// resource, the reference of tooling that the catalog does not list, every
+// block that covers the call, and calls_decided on an exposure.
+func testCalls(t *testing.T, path string) {
+	var file callsFile
+	loadJSON(t, path, &file)
+	if len(file.Cases) == 0 {
+		t.Fatal("no cases")
+	}
+	catalog := readCatalog(t, file.Catalog)
+	validator := cedarValidator(t, toolArgs(catalog))
+	responseSchema := compileSchema(t, "../../api/policy/decision-response.schema.json")
+	for _, c := range file.Cases {
+		t.Run(c.ID, func(t *testing.T) {
+			policyVectors := file.Policies
+			if c.Policies != nil {
+				policyVectors = c.Policies
+			}
+			for _, p := range policyVectors {
+				if err := validatePolicy(validator, p.ID, p.Text); (err == nil) != p.Valid {
+					t.Errorf("policy %s: validator says %v, the vector says valid=%v", p.ID, err, p.Valid)
+				}
+			}
+			blocks := make([]profile.Block, 0, len(c.Blocks))
+			for _, b := range c.Blocks {
+				if sum := sha256.Sum256([]byte(b.Covers)); hex.EncodeToString(sum[:]) != b.CoveredSHA256 {
+					t.Errorf("block %s: covered_sha256 is not the SHA-256 of what it covers", b.BlockID)
+				}
+				blocks = append(blocks, profile.Block{ID: b.BlockID, Kind: b.Kind, CoveredSHA256: b.CoveredSHA256})
+			}
+			// Without a catalog file, the enforcement point has no redaction
+			// rules, and an empty catalog.
+			bundleCatalog, rules := &catalog, catalog.Redaction
+			if c.WithoutCatalog {
+				bundleCatalog, rules = nil, tooling.Rules{}
+			}
+			call := profile.Call{Subject: file.Subject, Action: c.Action, Time: file.Time, Approval: c.Approval}
+			if c.Subject != nil {
+				call.Subject = *c.Subject
+			}
+			call.Tooling = resolve(t, c.Tooling, rules)
+			call.Tooling.Origin, call.Tooling.Definition, call.Tooling.Digest = c.Origin, c.Definition, c.Digest
+			switch {
+			case c.Arguments != nil && c.ArgumentsText != nil:
+				t.Fatal("the case gives its arguments both as a value and as text")
+			case c.Arguments != nil:
+				call.Arguments = c.Arguments
+			case c.ArgumentsText != nil:
+				call.Arguments = []byte(*c.ArgumentsText)
+			}
+
+			var got profile.Decision
+			if c.State != nil && profile.GateReason(*c.State) != "" {
+				got.Response = profile.Deny(profile.GateReason(*c.State))
+			} else {
+				engine, err := profile.NewEngine(file.AgentID, vectorBundleVersion, policies(policyVectors))
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = engine.Decide(bundleCatalog, blocks, call)
+			}
+			want := c.Expected
+			checkResponse(t, got.Response, want.expectation)
+			checkBundleVersion(t, got.Response)
+			if err := validateJSON(responseSchema, got.Response); err != nil {
+				t.Errorf("response does not match the profile's schema: %v", err)
+			}
+			var decided *bool
+			if got.Request != nil {
+				decided = got.Request.Context.CallsDecided
+			}
+			if got.ResourceID != want.ResourceID || got.ReferenceSHA256 != want.ReferenceSHA256 ||
+				!slices.Equal(set(got.BlockIDs), set(want.BlockIDs)) || show(decided) != show(want.CallsDecided) {
+				t.Errorf("got resource %q, reference_sha256 %q, blocks %v, calls_decided %s; want %q, %q, %v, %s",
+					got.ResourceID, got.ReferenceSHA256, got.BlockIDs, show(decided),
+					want.ResourceID, want.ReferenceSHA256, want.BlockIDs, show(want.CallsDecided))
+			}
+		})
+	}
+}
+
+// TestCatalogCheckVectors runs the vectors of the catalog check (section
+// 6.9): blocks of each kind, tooling that the catalog does not list, rows 3
+// to 6, results, and the check's place among the reasons.
+func TestCatalogCheckVectors(t *testing.T) {
+	testCalls(t, "vectors/catalog-check.json")
+}
+
+// TestExposureVectors runs the exposure vectors (section 6.10): tool.expose
+// through the catalog check, then policies with calls_decided, which follows
+// from the tool's origin and from approval (EP-18).
+func TestExposureVectors(t *testing.T) {
+	testCalls(t, "vectors/exposure.json")
 }
 
 // hashedArguments is what a decision event records of a call's arguments in
