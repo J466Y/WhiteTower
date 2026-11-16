@@ -1,0 +1,2069 @@
+{
+  "description": "The catalog check of the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6.9) and its place among the reasons (section 6.6). Each case is one call of a tool or a model by agent_id, whose bundle holds the catalog file catalog (section 7.7) and the policies, those of the case when it gives them, otherwise the file's: wt-catalog, the global policy that section 6.9 seeds. A case without_catalog has a bundle without a catalog file, which reads as an empty catalog. blocks are the active blocks (section 5.10): each covers the string covers, which the block carries as covered_sha256, its SHA-256; a block of a kind that section 5.10 does not name covers every tool and every model, wherever row 1 applies (EP-10, EP-15, the review of 2026-11-16). tooling is the tool or the model as the agent has it, as tooling.json writes an entry: the enforcement point computes its reference, an MCP tool's server's, and a model's endpoint, normalized, with the catalog's redaction rules (sections 4.10 and 5.10). definition is the hash of the tool's definition as the agent has it now, absent when it has none; digest is the model's digest as the runtime reports it, absent when it reports none; arguments, or arguments_text, are a tool call's arguments, absent when it has none; origin and approval are an exposure's (section 6.10). The decision comes, in this order, from the gate, whose state a case gives when it closes it; error.unknown_agent, for the case's subject when it gives one; the catalog check, rows 1 to 6 for tool.invoke, tool.expose and model.invoke, and row 1 alone for tool.result and model.result; EP-19's record of a tool call's arguments (error.invalid_request); then the policies, on the request whose resource is the catalog's entry, by its key and with its properties (section 6.3), and whose context carries the time, the record, calls_decided and digest. The expected decision names the resource by resource_id once the catalog check ran: the entry's key or, for tooling that the catalog does not list, its name as the agent sees it, with reference_sha256, the SHA-256 of its reference, absent when it makes none (EP-16, section 8.3). block_ids lists every block that covers the call, and a catalog.blocked decision names any one of them (EP-16). A response with a catalog.* reason carries bundle_version and no determining policies (section 6.6).",
+  "profile": "v1alpha1",
+  "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "subject": {
+    "type": "agent",
+    "id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "properties": {
+      "slug": "invoice-triage",
+      "kind": "in_house",
+      "risk_tier": "high",
+      "environment": "production",
+      "data_categories": [
+        "customer data",
+        "financial data"
+      ],
+      "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+      "labels": {
+        "team": "finance"
+      }
+    }
+  },
+  "time": "2026-09-29T10:00:00.000Z",
+  "catalog": {
+    "format": "whitetower.catalog.v1",
+    "redaction": {
+      "url_prefixes": [
+        "https://mcp.example.net/s/",
+        "https://llm.example.net/t/"
+      ],
+      "flags": [
+        "pat"
+      ]
+    },
+    "servers": [
+      {
+        "key": "github",
+        "reference": "https://api.githubcopilot.com/mcp/",
+        "transport": "http",
+        "status": "approved"
+      },
+      {
+        "key": "zapier",
+        "reference": "https://mcp.example.net/s/<redacted>/mcp",
+        "transport": "http",
+        "status": "approved"
+      },
+      {
+        "key": "filesystem",
+        "reference": "stdio:[\"npx\",\"-y\",\"@modelcontextprotocol/server-filesystem\",\"/srv/data\"]",
+        "transport": "stdio",
+        "status": "approved"
+      },
+      {
+        "key": "jira",
+        "reference": "https://jira.example.com/mcp/",
+        "transport": "http",
+        "status": "discovered"
+      }
+    ],
+    "tools": [
+      {
+        "key": "github/create_pull_request",
+        "server": "github",
+        "name": "create_pull_request",
+        "kind": "mcp",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "8134973657d556d40b0a38efe70bf4403bcc07be353525c3c37ea7ba5e11da4f",
+        "read_only": false,
+        "destructive": false,
+        "open_world": true,
+        "args": [
+          {
+            "name": "base",
+            "path": [
+              "base"
+            ],
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "key": "github/delete_repository",
+        "server": "github",
+        "name": "delete_repository",
+        "kind": "mcp",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": false,
+        "definition": "ce56398c65afe13e0810e53df9c7ed2b3e45bb3ecb900837bb7fece54f30bb51",
+        "read_only": false,
+        "destructive": true,
+        "open_world": true
+      },
+      {
+        "key": "github/merge_pull_request",
+        "server": "github",
+        "name": "merge_pull_request",
+        "kind": "mcp",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "96f770ffc6d31b3d5abf8872b790531ebcb65cd24a7d90742f7461a2e01b8a25",
+        "read_only": false,
+        "destructive": true,
+        "open_world": true
+      },
+      {
+        "key": "jira/create_issue",
+        "server": "jira",
+        "name": "create_issue",
+        "kind": "mcp",
+        "origin": "agent",
+        "status": "discovered",
+        "enabled": false,
+        "read_only": false,
+        "destructive": true,
+        "open_world": true
+      },
+      {
+        "key": "zapier/send_slack_message",
+        "server": "zapier",
+        "name": "send_slack_message",
+        "kind": "mcp",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "8528685e9aac249d5798b29658437deff6157ba8f8dcd476b0f0c35626e874fe",
+        "read_only": false,
+        "destructive": false,
+        "open_world": true
+      },
+      {
+        "key": "filesystem/read_file",
+        "server": "filesystem",
+        "name": "read_file",
+        "kind": "mcp",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "ea0313d8e9c14fa632c52d8c7c6e05110fdd6f093f9926f4ccbe60a88ab2cf3a",
+        "read_only": true,
+        "destructive": false,
+        "open_world": false,
+        "args": [
+          {
+            "name": "path:path",
+            "path": [
+              "path"
+            ],
+            "transform": "path",
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "key": "agent/send_email",
+        "name": "send_email",
+        "kind": "function",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "875834e8591f589f91a8c5d8af7f609e0a7df31741cd3c4cc4db585f561910a9",
+        "read_only": false,
+        "destructive": true,
+        "open_world": true,
+        "args": [
+          {
+            "name": "to:email_domain",
+            "path": [
+              "to"
+            ],
+            "transform": "email_domain",
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "key": "agent/read_invoice",
+        "name": "read_invoice",
+        "kind": "function",
+        "origin": "agent",
+        "status": "approved",
+        "enabled": true,
+        "definition": "2872cc9cad942bb5aafcb3a2241a8a8a2999f993a5c3f2470d76bac2db099fb3",
+        "read_only": true,
+        "destructive": false,
+        "open_world": false
+      },
+      {
+        "key": "provider.openai/web_search",
+        "provider": "openai",
+        "type": "web_search",
+        "name": "web_search",
+        "kind": "builtin",
+        "origin": "provider",
+        "status": "approved",
+        "enabled": true,
+        "read_only": true,
+        "destructive": false,
+        "open_world": true
+      }
+    ],
+    "models": [
+      {
+        "key": "openai/gpt-5",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5",
+        "status": "approved",
+        "enabled": true
+      },
+      {
+        "key": "openai/gpt-4o",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-4o",
+        "status": "approved",
+        "enabled": false
+      },
+      {
+        "key": "gpu-01/llama-4",
+        "provider": "ollama",
+        "endpoint": "http://gpu-01.internal:11434/",
+        "name": "llama-4",
+        "status": "approved",
+        "enabled": true,
+        "digest": "sha256:8754b77c7eee26e4145b5d20073c32e595c3ecb1a1a7d257df257479ab27c7cf"
+      },
+      {
+        "key": "mistral-ai/mistral-large",
+        "provider": "mistral_ai",
+        "endpoint": "https://api.mistral.ai/v1",
+        "name": "mistral-large",
+        "status": "discovered",
+        "enabled": false
+      },
+      {
+        "key": "llm-example/gpt-5",
+        "provider": "azure.ai.openai",
+        "endpoint": "https://llm.example.net/t/<redacted>/v1",
+        "name": "gpt-5",
+        "status": "approved",
+        "enabled": true
+      }
+    ]
+  },
+  "policies": [
+    {
+      "id": "0192f1c2-7a3b-7c4d-8e5f-000000000901",
+      "scope": "global",
+      "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+      "valid": true
+    }
+  ],
+  "cases": [
+    {
+      "id": "K-01",
+      "description": "A server block covers a tool of the server that the catalog lists, named by its key",
+      "section": "5.10, 6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0001",
+          "kind": "server",
+          "covers": "https://api.githubcopilot.com/mcp/",
+          "covered_sha256": "ca602dd499edea084d35bd6584aea648dec2778e67b48e10ab008ae0c1d06284"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "create_pull_request"
+      },
+      "definition": "8134973657d556d40b0a38efe70bf4403bcc07be353525c3c37ea7ba5e11da4f",
+      "arguments": {
+        "base": "main"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "github/create_pull_request",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0001"
+        ]
+      }
+    },
+    {
+      "id": "K-02",
+      "description": "A server block covers a tool of the server that the catalog does not list, named by its name with the SHA-256 of its reference",
+      "section": "5.10, 6.9 (1), EP-16",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0001",
+          "kind": "server",
+          "covers": "https://api.githubcopilot.com/mcp/",
+          "covered_sha256": "ca602dd499edea084d35bd6584aea648dec2778e67b48e10ab008ae0c1d06284"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "fork_repository"
+      },
+      "definition": "58918bd67c1fc0737a28990234cd8a7aeffdbe8fa5ba32da958b104396f739db",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "fork_repository",
+        "reference_sha256": "e8b2d6e36fa045fa384d1cfce3168d4d75ab34b3888952bf7453bb3f0c0e017e",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0001"
+        ]
+      }
+    },
+    {
+      "id": "K-03",
+      "description": "A tool block covers one of the agent's own tools, by its name",
+      "section": "5.10, 6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0002",
+          "kind": "tool",
+          "covers": "{\"name\":\"send_email\"}",
+          "covered_sha256": "6d0893badcfaba13ed9c219bad4b1dca3542a8513d0f0833259eb8d11b7020d3"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "send_email"
+      },
+      "definition": "875834e8591f589f91a8c5d8af7f609e0a7df31741cd3c4cc4db585f561910a9",
+      "arguments": {
+        "to": "alice@example.org"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "agent/send_email",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0002"
+        ]
+      }
+    },
+    {
+      "id": "K-04",
+      "description": "A server block and a tool block both cover the call: the decision names either",
+      "section": "5.10, EP-16",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0004",
+          "kind": "server",
+          "covers": "https://api.githubcopilot.com/mcp/",
+          "covered_sha256": "ca602dd499edea084d35bd6584aea648dec2778e67b48e10ab008ae0c1d06284"
+        },
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0003",
+          "kind": "tool",
+          "covers": "{\"name\":\"create_pull_request\",\"server\":\"https://api.githubcopilot.com/mcp/\"}",
+          "covered_sha256": "85baf1bd4d9096425c48c11c3dacd1dd9c78f69d342e54699f46eeaf8a6f17d7"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "create_pull_request"
+      },
+      "definition": "8134973657d556d40b0a38efe70bf4403bcc07be353525c3c37ea7ba5e11da4f",
+      "arguments": {
+        "base": "main"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "github/create_pull_request",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0004",
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0003"
+        ]
+      }
+    },
+    {
+      "id": "K-05",
+      "description": "Blocks of another server and of another tool cover nothing of the call",
+      "section": "5.10, 6.9",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0005",
+          "kind": "server",
+          "covers": "https://mcp.example.net/s/<redacted>/mcp",
+          "covered_sha256": "6eabedc4935f5d4c3f30324d16bc346a538985a80df8fc9aa47ceff1d9de1471"
+        },
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0006",
+          "kind": "tool",
+          "covers": "{\"name\":\"read_invoice\"}",
+          "covered_sha256": "2d5051051a0dea68f80a6774819facc1f8a74846b7509edede54b82416576fac"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "create_pull_request"
+      },
+      "definition": "8134973657d556d40b0a38efe70bf4403bcc07be353525c3c37ea7ba5e11da4f",
+      "arguments": {
+        "base": "main"
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "github/create_pull_request"
+      }
+    },
+    {
+      "id": "K-06",
+      "description": "A tool block covers a built-in tool, by its provider and its type",
+      "section": "5.10, 6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0007",
+          "kind": "tool",
+          "covers": "{\"provider\":\"openai\",\"type\":\"web_search\"}",
+          "covered_sha256": "ef40d907e12a5561b9c863fb3d0ae9b0f88c15a941ad7338a9c2492fa0ee98cb"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "builtin_tool",
+        "provider": "openai",
+        "type": "web_search",
+        "name": "web_search"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "provider.openai/web_search",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0007"
+        ]
+      }
+    },
+    {
+      "id": "K-07",
+      "description": "A provider block covers models only: the provider's built-in tool passes",
+      "section": "5.10, 6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0008",
+          "kind": "provider",
+          "covers": "openai",
+          "covered_sha256": "7d3194f79e645c42e4396dda38be04766810ec6a00d00aced3ffc2a0a1f1a9ef"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "builtin_tool",
+        "provider": "openai",
+        "type": "web_search",
+        "name": "web_search"
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "provider.openai/web_search"
+      }
+    },
+    {
+      "id": "K-08",
+      "description": "A model block covers the model, by its reference",
+      "section": "5.10, 6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0009",
+          "kind": "model",
+          "covers": "{\"endpoint\":\"https://api.openai.com/v1\",\"name\":\"gpt-5\",\"provider\":\"openai\"}",
+          "covered_sha256": "f41295bc0b51d1bf67c09d1ba49155f21a3ee444d1cee85dc195cb0bd77fb1d8"
+        }
+      ],
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "openai/gpt-5",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0009"
+        ]
+      }
+    },
+    {
+      "id": "K-09",
+      "description": "A provider block covers every model of the provider",
+      "section": "5.10, 6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0010",
+          "kind": "provider",
+          "covers": "openai",
+          "covered_sha256": "7d3194f79e645c42e4396dda38be04766810ec6a00d00aced3ffc2a0a1f1a9ef"
+        }
+      ],
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "openai/gpt-5",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0010"
+        ]
+      }
+    },
+    {
+      "id": "K-10",
+      "description": "A provider block covers a model that the catalog does not list, named by its name with the SHA-256 of its reference",
+      "section": "5.10, 6.9 (1), EP-16",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0010",
+          "kind": "provider",
+          "covers": "openai",
+          "covered_sha256": "7d3194f79e645c42e4396dda38be04766810ec6a00d00aced3ffc2a0a1f1a9ef"
+        }
+      ],
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5-mini"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "gpt-5-mini",
+        "reference_sha256": "042c8ef814fcd7286d839090dc63c0599be90e0ad976e55ef40f273d0a129c5e",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0010"
+        ]
+      }
+    },
+    {
+      "id": "K-11",
+      "description": "An endpoint block covers every model of the endpoint",
+      "section": "5.10, 6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0011",
+          "kind": "endpoint",
+          "covers": "http://gpu-01.internal:11434/",
+          "covered_sha256": "a6b7464dbc3542a4928b894d1a0ba3a295f31cda2fb745485e28c1c0ca331b83"
+        }
+      ],
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "ollama",
+        "endpoint": "http://gpu-01.internal:11434/",
+        "name": "llama-4"
+      },
+      "digest": "sha256:8754b77c7eee26e4145b5d20073c32e595c3ecb1a1a7d257df257479ab27c7cf",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "gpu-01/llama-4",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0011"
+        ]
+      }
+    },
+    {
+      "id": "K-12",
+      "description": "An endpoint block covers the endpoint as the model's reference writes it, normalized and then redacted with the deployment's rules",
+      "section": "5.10, EP-14",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0012",
+          "kind": "endpoint",
+          "covers": "https://llm.example.net/t/<redacted>/v1",
+          "covered_sha256": "f3c88082f66d7a015be0dbae952b7288e8bd4eadc6cb73f15bc49200ee1fbad8"
+        }
+      ],
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "azure.ai.openai",
+        "endpoint": "https://llm.example.net/t/tenant-42/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "llm-example/gpt-5",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0012"
+        ]
+      }
+    },
+    {
+      "id": "K-13",
+      "description": "An endpoint block of the endpoint as the agent writes it, before redaction, covers nothing",
+      "section": "5.10, EP-14",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0013",
+          "kind": "endpoint",
+          "covers": "https://llm.example.net/t/tenant-42/v1",
+          "covered_sha256": "2e5d46582ad0ac53d123044f364af6587b1600d1f97c5baa2d14e10f3fa02728"
+        }
+      ],
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "azure.ai.openai",
+        "endpoint": "https://llm.example.net/t/tenant-42/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "llm-example/gpt-5"
+      }
+    },
+    {
+      "id": "K-14",
+      "description": "Blocks cover by their kind: a tool block of the model's reference, and a model block of a tool's, cover nothing",
+      "section": "5.10",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0014",
+          "kind": "tool",
+          "covers": "{\"endpoint\":\"https://api.openai.com/v1\",\"name\":\"gpt-5\",\"provider\":\"openai\"}",
+          "covered_sha256": "f41295bc0b51d1bf67c09d1ba49155f21a3ee444d1cee85dc195cb0bd77fb1d8"
+        },
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0015",
+          "kind": "model",
+          "covers": "{\"name\":\"send_email\"}",
+          "covered_sha256": "6d0893badcfaba13ed9c219bad4b1dca3542a8513d0f0833259eb8d11b7020d3"
+        }
+      ],
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "openai/gpt-5"
+      }
+    },
+    {
+      "id": "K-15",
+      "description": "A block of a kind that the enforcement point does not know covers every tool: tool.invoke",
+      "section": "EP-10, EP-15",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0016",
+          "kind": "unspecified",
+          "covers": "anything",
+          "covered_sha256": "ee0874170b7f6f32b8c2ac9573c428d35b575270a66b757c2c0185d2bd09718d"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "read_invoice"
+      },
+      "definition": "2872cc9cad942bb5aafcb3a2241a8a8a2999f993a5c3f2470d76bac2db099fb3",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "agent/read_invoice",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0016"
+        ]
+      }
+    },
+    {
+      "id": "K-16",
+      "description": "A block of an unknown kind covers every tool: tool.expose",
+      "section": "EP-10, EP-15",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0017",
+          "kind": "unspecified",
+          "covers": "anything",
+          "covered_sha256": "ee0874170b7f6f32b8c2ac9573c428d35b575270a66b757c2c0185d2bd09718d"
+        }
+      ],
+      "action": "tool.expose",
+      "tooling": {
+        "kind": "tool",
+        "name": "read_invoice"
+      },
+      "origin": "agent",
+      "definition": "2872cc9cad942bb5aafcb3a2241a8a8a2999f993a5c3f2470d76bac2db099fb3",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "agent/read_invoice",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0017"
+        ]
+      }
+    },
+    {
+      "id": "K-17",
+      "description": "A block of an unknown kind covers every tool: tool.result",
+      "section": "EP-10, EP-15",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0018",
+          "kind": "unspecified",
+          "covers": "anything",
+          "covered_sha256": "ee0874170b7f6f32b8c2ac9573c428d35b575270a66b757c2c0185d2bd09718d"
+        }
+      ],
+      "action": "tool.result",
+      "tooling": {
+        "kind": "tool",
+        "name": "read_invoice"
+      },
+      "definition": "2872cc9cad942bb5aafcb3a2241a8a8a2999f993a5c3f2470d76bac2db099fb3",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "agent/read_invoice",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0018"
+        ]
+      }
+    },
+    {
+      "id": "K-18",
+      "description": "A block of an unknown kind covers every model: model.invoke",
+      "section": "EP-10, EP-15",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0019",
+          "kind": "unspecified",
+          "covers": "anything",
+          "covered_sha256": "ee0874170b7f6f32b8c2ac9573c428d35b575270a66b757c2c0185d2bd09718d"
+        }
+      ],
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "openai/gpt-5",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0019"
+        ]
+      }
+    },
+    {
+      "id": "K-19",
+      "description": "A block of an unknown kind covers every model: model.result",
+      "section": "EP-10, EP-15",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0019",
+          "kind": "unspecified",
+          "covers": "anything",
+          "covered_sha256": "ee0874170b7f6f32b8c2ac9573c428d35b575270a66b757c2c0185d2bd09718d"
+        }
+      ],
+      "action": "model.result",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "openai/gpt-5",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0019"
+        ]
+      }
+    },
+    {
+      "id": "K-20",
+      "description": "A block of an unknown kind and a tool block both cover the call: the decision names either",
+      "section": "EP-15, EP-16",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0020",
+          "kind": "unspecified",
+          "covers": "anything",
+          "covered_sha256": "ee0874170b7f6f32b8c2ac9573c428d35b575270a66b757c2c0185d2bd09718d"
+        },
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0025",
+          "kind": "tool",
+          "covers": "{\"name\":\"send_email\"}",
+          "covered_sha256": "6d0893badcfaba13ed9c219bad4b1dca3542a8513d0f0833259eb8d11b7020d3"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "send_email"
+      },
+      "definition": "875834e8591f589f91a8c5d8af7f609e0a7df31741cd3c4cc4db585f561910a9",
+      "arguments": {
+        "to": "alice@example.org"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "agent/send_email",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0020",
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0025"
+        ]
+      }
+    },
+    {
+      "id": "K-21",
+      "description": "A block of an unknown kind covers a tool that the catalog does not list: catalog.blocked, not catalog.unknown",
+      "section": "EP-15, 6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0021",
+          "kind": "unspecified",
+          "covers": "anything",
+          "covered_sha256": "ee0874170b7f6f32b8c2ac9573c428d35b575270a66b757c2c0185d2bd09718d"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "wire_money"
+      },
+      "definition": "348d8356e5ba506cf8856f4cf4df16daa1aebfa7f5f0efba49456b5d68689034",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "wire_money",
+        "reference_sha256": "db123e2c87765e356bec7ad6a011fd4d7472c2875fb1e88f1bb64823be8f7de9",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0021"
+        ]
+      }
+    },
+    {
+      "id": "K-22",
+      "description": "A tool of a listed server that the catalog does not list",
+      "section": "6.9 (2), EP-16",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "fork_repository"
+      },
+      "definition": "58918bd67c1fc0737a28990234cd8a7aeffdbe8fa5ba32da958b104396f739db",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "fork_repository",
+        "reference_sha256": "e8b2d6e36fa045fa384d1cfce3168d4d75ab34b3888952bf7453bb3f0c0e017e"
+      }
+    },
+    {
+      "id": "K-23",
+      "description": "A listed tool's name on another server: tools resolve by their reference, never by their name alone",
+      "section": "6.9 (2), EP-16",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://gitlab.example.com/mcp/"
+        },
+        "name": "create_pull_request"
+      },
+      "definition": "8134973657d556d40b0a38efe70bf4403bcc07be353525c3c37ea7ba5e11da4f",
+      "arguments": {
+        "base": "main"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "create_pull_request",
+        "reference_sha256": "995884038468826caed0612e988e74f2a129e9f061421ba09879d9acbe0a12a2"
+      }
+    },
+    {
+      "id": "K-24",
+      "description": "One of the agent's own tools that the catalog does not list",
+      "section": "6.9 (2)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "wire_money"
+      },
+      "definition": "348d8356e5ba506cf8856f4cf4df16daa1aebfa7f5f0efba49456b5d68689034",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "wire_money",
+        "reference_sha256": "db123e2c87765e356bec7ad6a011fd4d7472c2875fb1e88f1bb64823be8f7de9"
+      }
+    },
+    {
+      "id": "K-25",
+      "description": "A built-in tool that the catalog does not list",
+      "section": "6.9 (2)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "builtin_tool",
+        "provider": "openai",
+        "type": "code_interpreter",
+        "name": "code_interpreter"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "code_interpreter",
+        "reference_sha256": "9be26d930cdd1ab8142666a82c34ce1596647c2ce85ea998d35b4c0d73138e52"
+      }
+    },
+    {
+      "id": "K-26",
+      "description": "A listed built-in tool's type of another provider",
+      "section": "6.9 (2)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "builtin_tool",
+        "provider": "anthropic",
+        "type": "web_search",
+        "name": "web_search"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "web_search",
+        "reference_sha256": "c166745407c8c3b229a32be492b8cd2feacb7157e05583268e05bc44e1663d62"
+      }
+    },
+    {
+      "id": "K-27",
+      "description": "A listed model's name on another endpoint",
+      "section": "6.9 (2), EP-16",
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://proxy.example.com/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "gpt-5",
+        "reference_sha256": "b4ec014e3f4c2c7949a476a2c78d21edf0628bbfceded73dc630c7afc284933d"
+      }
+    },
+    {
+      "id": "K-28",
+      "description": "A server whose URL url_host cannot read makes no reference: catalog.unknown without a SHA-256, and the server block of the host that a parser would read covers nothing",
+      "section": "4.10, 6.9 (2), EP-16",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0027",
+          "kind": "server",
+          "covers": "https://api.githubcopilot.com/mcp/",
+          "covered_sha256": "ca602dd499edea084d35bd6584aea648dec2778e67b48e10ab008ae0c1d06284"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://evil.example\\@api.githubcopilot.com/mcp/"
+        },
+        "name": "create_pull_request"
+      },
+      "definition": "8134973657d556d40b0a38efe70bf4403bcc07be353525c3c37ea7ba5e11da4f",
+      "arguments": {
+        "base": "main"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "create_pull_request"
+      }
+    },
+    {
+      "id": "K-29",
+      "description": "A model whose endpoint url_host cannot read makes no reference: catalog.unknown without a SHA-256",
+      "section": "4.10, 6.9 (2)",
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "api.openai.com/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "gpt-5"
+      }
+    },
+    {
+      "id": "K-30",
+      "description": "A provider block covers a model whose endpoint makes no reference, by its provider",
+      "section": "5.10, 6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0024",
+          "kind": "provider",
+          "covers": "openai",
+          "covered_sha256": "7d3194f79e645c42e4396dda38be04766810ec6a00d00aced3ffc2a0a1f1a9ef"
+        }
+      ],
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "api.openai.com/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "gpt-5",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0024"
+        ]
+      }
+    },
+    {
+      "id": "K-31",
+      "description": "What a reference leaves out, user information, query, fragment, case and the default port, resolves to the listed server",
+      "section": "4.10, 6.9",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "HTTPS://user:pw@API.githubcopilot.com:443/mcp/?tenant=acme#tools"
+        },
+        "name": "create_pull_request"
+      },
+      "definition": "8134973657d556d40b0a38efe70bf4403bcc07be353525c3c37ea7ba5e11da4f",
+      "arguments": {
+        "base": "main"
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "github/create_pull_request"
+      }
+    },
+    {
+      "id": "K-32",
+      "description": "A URL with a secret path segment resolves, once redacted with the deployment's rules, to the listed server",
+      "section": "4.10, EP-14, 6.9",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://mcp.example.net/s/9f3kQ2secret/mcp"
+        },
+        "name": "send_slack_message"
+      },
+      "definition": "8528685e9aac249d5798b29658437deff6157ba8f8dcd476b0f0c35626e874fe",
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "zapier/send_slack_message"
+      }
+    },
+    {
+      "id": "K-33",
+      "description": "A server block covers the server by its redacted reference",
+      "section": "5.10, EP-14",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0022",
+          "kind": "server",
+          "covers": "https://mcp.example.net/s/<redacted>/mcp",
+          "covered_sha256": "6eabedc4935f5d4c3f30324d16bc346a538985a80df8fc9aa47ceff1d9de1471"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://mcp.example.net/s/9f3kQ2secret/mcp"
+        },
+        "name": "send_slack_message"
+      },
+      "definition": "8528685e9aac249d5798b29658437deff6157ba8f8dcd476b0f0c35626e874fe",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "zapier/send_slack_message",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0022"
+        ]
+      }
+    },
+    {
+      "id": "K-34",
+      "description": "A local server resolves by its command line",
+      "section": "4.10, 6.9",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "local_server",
+          "command": [
+            "npx",
+            "-y",
+            "@modelcontextprotocol/server-filesystem",
+            "/srv/data"
+          ]
+        },
+        "name": "read_file"
+      },
+      "definition": "ea0313d8e9c14fa632c52d8c7c6e05110fdd6f093f9926f4ccbe60a88ab2cf3a",
+      "arguments": {
+        "path": "/srv/data/../data/report.txt"
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "filesystem/read_file"
+      }
+    },
+    {
+      "id": "K-35",
+      "description": "The same local server launched with another root is another server",
+      "section": "4.10, 6.9 (2)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "local_server",
+          "command": [
+            "npx",
+            "-y",
+            "@modelcontextprotocol/server-filesystem",
+            "/home"
+          ]
+        },
+        "name": "read_file"
+      },
+      "definition": "ea0313d8e9c14fa632c52d8c7c6e05110fdd6f093f9926f4ccbe60a88ab2cf3a",
+      "arguments": {
+        "path": "/home/report.txt"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "read_file",
+        "reference_sha256": "9463d1db2a903f6413f8ae9c566c3f50d8dae362de934536825cf38d29a55e2e"
+      }
+    },
+    {
+      "id": "K-36",
+      "description": "A bundle without a catalog file reads as an empty catalog: a tool is catalog.unknown",
+      "section": "7.7",
+      "without_catalog": true,
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "read_invoice"
+      },
+      "definition": "2872cc9cad942bb5aafcb3a2241a8a8a2999f993a5c3f2470d76bac2db099fb3",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "read_invoice",
+        "reference_sha256": "2d5051051a0dea68f80a6774819facc1f8a74846b7509edede54b82416576fac"
+      }
+    },
+    {
+      "id": "K-37",
+      "description": "A bundle without a catalog file: a model is catalog.unknown",
+      "section": "7.7",
+      "without_catalog": true,
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "gpt-5",
+        "reference_sha256": "f41295bc0b51d1bf67c09d1ba49155f21a3ee444d1cee85dc195cb0bd77fb1d8"
+      }
+    },
+    {
+      "id": "K-38",
+      "description": "A bundle without a catalog file: blocks still cover",
+      "section": "5.10, 7.7",
+      "without_catalog": true,
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0023",
+          "kind": "tool",
+          "covers": "{\"name\":\"read_invoice\"}",
+          "covered_sha256": "2d5051051a0dea68f80a6774819facc1f8a74846b7509edede54b82416576fac"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "read_invoice"
+      },
+      "definition": "2872cc9cad942bb5aafcb3a2241a8a8a2999f993a5c3f2470d76bac2db099fb3",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "read_invoice",
+        "reference_sha256": "2d5051051a0dea68f80a6774819facc1f8a74846b7509edede54b82416576fac",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0023"
+        ]
+      }
+    },
+    {
+      "id": "K-39",
+      "description": "A discovered tool, also not enabled: row 3 comes first",
+      "section": "6.9 (3)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://jira.example.com/mcp/"
+        },
+        "name": "create_issue"
+      },
+      "definition": "e3fa828b4a47051306c09db024b8b16d07a49d7c254bafba027d6056d64d4f43",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.not_approved",
+        "policies": [],
+        "resource_id": "jira/create_issue"
+      }
+    },
+    {
+      "id": "K-40",
+      "description": "A discovered model",
+      "section": "6.9 (3)",
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "mistral_ai",
+        "endpoint": "https://api.mistral.ai/v1",
+        "name": "mistral-large"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.not_approved",
+        "policies": [],
+        "resource_id": "mistral-ai/mistral-large"
+      }
+    },
+    {
+      "id": "K-41",
+      "description": "An approved tool that is not enabled for the agent",
+      "section": "6.9 (4)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "delete_repository"
+      },
+      "definition": "ce56398c65afe13e0810e53df9c7ed2b3e45bb3ecb900837bb7fece54f30bb51",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.not_enabled",
+        "policies": [],
+        "resource_id": "github/delete_repository"
+      }
+    },
+    {
+      "id": "K-42",
+      "description": "An approved model that is not enabled for the agent",
+      "section": "6.9 (4)",
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-4o"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.not_enabled",
+        "policies": [],
+        "resource_id": "openai/gpt-4o"
+      }
+    },
+    {
+      "id": "K-43",
+      "description": "A tool that is not enabled, whose definition also changed: row 4 comes first",
+      "section": "6.9 (4)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "delete_repository"
+      },
+      "definition": "da49b4807415b66d426ea3bf14b1dcae53b984e00c5c25dd92ec7f93acc67b72",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.not_enabled",
+        "policies": [],
+        "resource_id": "github/delete_repository"
+      }
+    },
+    {
+      "id": "K-44",
+      "description": "A tool whose definition differs from the pinned one",
+      "section": "6.9 (5)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "merge_pull_request"
+      },
+      "definition": "da49b4807415b66d426ea3bf14b1dcae53b984e00c5c25dd92ec7f93acc67b72",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.definition_changed",
+        "policies": [],
+        "resource_id": "github/merge_pull_request"
+      }
+    },
+    {
+      "id": "K-45",
+      "description": "A tool whose definition, as the agent has it now, has no hash",
+      "section": "4.10, 6.9 (5)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "merge_pull_request"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.definition_changed",
+        "policies": [],
+        "resource_id": "github/merge_pull_request"
+      }
+    },
+    {
+      "id": "K-46",
+      "description": "A built-in tool has no definition: row 5 does not apply",
+      "section": "4.10, 6.9 (5)",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "builtin_tool",
+        "provider": "openai",
+        "type": "web_search",
+        "name": "web_search"
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "provider.openai/web_search"
+      }
+    },
+    {
+      "id": "K-47",
+      "description": "A model whose runtime digest differs from the pinned one",
+      "section": "6.9 (6)",
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "ollama",
+        "endpoint": "http://gpu-01.internal:11434/",
+        "name": "llama-4"
+      },
+      "digest": "sha256:0d1f5c3e9a7b2c4d6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.digest_mismatch",
+        "policies": [],
+        "resource_id": "gpu-01/llama-4"
+      }
+    },
+    {
+      "id": "K-48",
+      "description": "A model with a pinned digest, whose runtime reports none",
+      "section": "6.9 (6)",
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "ollama",
+        "endpoint": "http://gpu-01.internal:11434/",
+        "name": "llama-4"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.digest_mismatch",
+        "policies": [],
+        "resource_id": "gpu-01/llama-4"
+      }
+    },
+    {
+      "id": "K-49",
+      "description": "A model whose runtime digest is the pinned one",
+      "section": "6.9 (6), 6.4",
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "ollama",
+        "endpoint": "http://gpu-01.internal:11434/",
+        "name": "llama-4"
+      },
+      "digest": "sha256:8754b77c7eee26e4145b5d20073c32e595c3ecb1a1a7d257df257479ab27c7cf",
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "gpu-01/llama-4"
+      }
+    },
+    {
+      "id": "K-50",
+      "description": "A model without a pinned digest passes whatever digest its runtime reports",
+      "section": "6.9 (6), 6.4",
+      "action": "model.invoke",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5"
+      },
+      "digest": "sha256:0d1f5c3e9a7b2c4d6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d",
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "openai/gpt-5"
+      }
+    },
+    {
+      "id": "K-51",
+      "description": "The result of a tool that is not enabled passes the catalog check, and policies decide",
+      "section": "6.9",
+      "action": "tool.result",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "delete_repository"
+      },
+      "definition": "ce56398c65afe13e0810e53df9c7ed2b3e45bb3ecb900837bb7fece54f30bb51",
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "github/delete_repository"
+      }
+    },
+    {
+      "id": "K-52",
+      "description": "The result of a discovered tool passes the catalog check",
+      "section": "6.9",
+      "action": "tool.result",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://jira.example.com/mcp/"
+        },
+        "name": "create_issue"
+      },
+      "definition": "e3fa828b4a47051306c09db024b8b16d07a49d7c254bafba027d6056d64d4f43",
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "jira/create_issue"
+      }
+    },
+    {
+      "id": "K-53",
+      "description": "The result of a tool whose definition changed passes the catalog check",
+      "section": "6.9",
+      "action": "tool.result",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "merge_pull_request"
+      },
+      "definition": "da49b4807415b66d426ea3bf14b1dcae53b984e00c5c25dd92ec7f93acc67b72",
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "github/merge_pull_request"
+      }
+    },
+    {
+      "id": "K-54",
+      "description": "The result of a tool that the catalog does not list has no properties: error.invalid_request",
+      "section": "6.3, 6.9",
+      "action": "tool.result",
+      "tooling": {
+        "kind": "tool",
+        "name": "wire_money"
+      },
+      "definition": "348d8356e5ba506cf8856f4cf4df16daa1aebfa7f5f0efba49456b5d68689034",
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": [],
+        "resource_id": "wire_money",
+        "reference_sha256": "db123e2c87765e356bec7ad6a011fd4d7472c2875fb1e88f1bb64823be8f7de9"
+      }
+    },
+    {
+      "id": "K-55",
+      "description": "A block keeps a tool's result from the agent",
+      "section": "6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0028",
+          "kind": "tool",
+          "covers": "{\"name\":\"send_email\"}",
+          "covered_sha256": "6d0893badcfaba13ed9c219bad4b1dca3542a8513d0f0833259eb8d11b7020d3"
+        }
+      ],
+      "action": "tool.result",
+      "tooling": {
+        "kind": "tool",
+        "name": "send_email"
+      },
+      "definition": "875834e8591f589f91a8c5d8af7f609e0a7df31741cd3c4cc4db585f561910a9",
+      "arguments": {
+        "to": "alice@example.org"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "agent/send_email",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0028"
+        ]
+      }
+    },
+    {
+      "id": "K-56",
+      "description": "The result of a model whose digest differs passes the catalog check",
+      "section": "6.9",
+      "action": "model.result",
+      "tooling": {
+        "kind": "model",
+        "provider": "ollama",
+        "endpoint": "http://gpu-01.internal:11434/",
+        "name": "llama-4"
+      },
+      "digest": "sha256:0d1f5c3e9a7b2c4d6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d",
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "gpu-01/llama-4"
+      }
+    },
+    {
+      "id": "K-57",
+      "description": "The result of a model that is not enabled passes the catalog check",
+      "section": "6.9",
+      "action": "model.result",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-4o"
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "openai/gpt-4o"
+      }
+    },
+    {
+      "id": "K-58",
+      "description": "The result of a model that the catalog does not list has no properties: error.invalid_request",
+      "section": "6.3, 6.9",
+      "action": "model.result",
+      "tooling": {
+        "kind": "model",
+        "provider": "openai",
+        "endpoint": "https://api.openai.com/v1",
+        "name": "gpt-5-mini"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": [],
+        "resource_id": "gpt-5-mini",
+        "reference_sha256": "042c8ef814fcd7286d839090dc63c0599be90e0ad976e55ef40f273d0a129c5e"
+      }
+    },
+    {
+      "id": "K-59",
+      "description": "A block keeps a model's result from the agent",
+      "section": "6.9 (1)",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0026",
+          "kind": "endpoint",
+          "covers": "http://gpu-01.internal:11434/",
+          "covered_sha256": "a6b7464dbc3542a4928b894d1a0ba3a295f31cda2fb745485e28c1c0ca331b83"
+        }
+      ],
+      "action": "model.result",
+      "tooling": {
+        "kind": "model",
+        "provider": "ollama",
+        "endpoint": "http://gpu-01.internal:11434/",
+        "name": "llama-4"
+      },
+      "digest": "sha256:8754b77c7eee26e4145b5d20073c32e595c3ecb1a1a7d257df257479ab27c7cf",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "gpu-01/llama-4",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0026"
+        ]
+      }
+    },
+    {
+      "id": "K-60",
+      "description": "The gate comes before the catalog check",
+      "section": "6.6",
+      "state": {
+        "state_received": true,
+        "agent_in_state": true,
+        "lease_valid": true,
+        "agent_halted": true,
+        "fleet_halted": false,
+        "lifecycle_state": "active",
+        "environment": "production",
+        "bundle_active": true,
+        "evidence_buffer_full": false
+      },
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0029",
+          "kind": "server",
+          "covers": "https://api.githubcopilot.com/mcp/",
+          "covered_sha256": "ca602dd499edea084d35bd6584aea648dec2778e67b48e10ab008ae0c1d06284"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "create_pull_request"
+      },
+      "definition": "8134973657d556d40b0a38efe70bf4403bcc07be353525c3c37ea7ba5e11da4f",
+      "arguments": {
+        "base": "main"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "gate.halted",
+        "policies": []
+      }
+    },
+    {
+      "id": "K-61",
+      "description": "error.unknown_agent comes before the catalog check",
+      "section": "6.6",
+      "subject": {
+        "type": "agent",
+        "id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",
+        "properties": {
+          "slug": "invoice-triage",
+          "kind": "in_house",
+          "risk_tier": "high",
+          "environment": "production",
+          "data_categories": [
+            "customer data",
+            "financial data"
+          ],
+          "owner": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1",
+          "labels": {
+            "team": "finance"
+          }
+        }
+      },
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0029",
+          "kind": "server",
+          "covers": "https://api.githubcopilot.com/mcp/",
+          "covered_sha256": "ca602dd499edea084d35bd6584aea648dec2778e67b48e10ab008ae0c1d06284"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "create_pull_request"
+      },
+      "definition": "8134973657d556d40b0a38efe70bf4403bcc07be353525c3c37ea7ba5e11da4f",
+      "arguments": {
+        "base": "main"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.unknown_agent",
+        "policies": []
+      }
+    },
+    {
+      "id": "K-62",
+      "description": "A block comes before the arguments: an address that email_domain cannot read",
+      "section": "6.6, 6.9, EP-19",
+      "blocks": [
+        {
+          "block_id": "0192f1c2-7a3b-7c4d-8e5f-0000000b0002",
+          "kind": "tool",
+          "covers": "{\"name\":\"send_email\"}",
+          "covered_sha256": "6d0893badcfaba13ed9c219bad4b1dca3542a8513d0f0833259eb8d11b7020d3"
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "send_email"
+      },
+      "definition": "875834e8591f589f91a8c5d8af7f609e0a7df31741cd3c4cc4db585f561910a9",
+      "arguments": {
+        "to": "Alice<alice@example.org>"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "catalog.blocked",
+        "policies": [],
+        "resource_id": "agent/send_email",
+        "block_ids": [
+          "0192f1c2-7a3b-7c4d-8e5f-0000000b0002"
+        ]
+      }
+    },
+    {
+      "id": "K-63",
+      "description": "catalog.unknown comes before the arguments: arguments that are not an object",
+      "section": "6.6, 6.9, EP-19",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "wire_money"
+      },
+      "definition": "348d8356e5ba506cf8856f4cf4df16daa1aebfa7f5f0efba49456b5d68689034",
+      "arguments": [
+        1
+      ],
+      "expected": {
+        "decision": false,
+        "reason": "catalog.unknown",
+        "policies": [],
+        "resource_id": "wire_money",
+        "reference_sha256": "db123e2c87765e356bec7ad6a011fd4d7472c2875fb1e88f1bb64823be8f7de9"
+      }
+    },
+    {
+      "id": "K-64",
+      "description": "catalog.not_enabled comes before the arguments",
+      "section": "6.6, 6.9, EP-19",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "mcp_tool",
+        "server": {
+          "kind": "remote_server",
+          "url": "https://api.githubcopilot.com/mcp/"
+        },
+        "name": "delete_repository"
+      },
+      "definition": "ce56398c65afe13e0810e53df9c7ed2b3e45bb3ecb900837bb7fece54f30bb51",
+      "arguments": "not an object",
+      "expected": {
+        "decision": false,
+        "reason": "catalog.not_enabled",
+        "policies": [],
+        "resource_id": "github/delete_repository"
+      }
+    },
+    {
+      "id": "K-65",
+      "description": "An enabled tool whose argument does not fit its declaration: error.invalid_request (EP-19)",
+      "section": "6.6, EP-19",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "send_email"
+      },
+      "definition": "875834e8591f589f91a8c5d8af7f609e0a7df31741cd3c4cc4db585f561910a9",
+      "arguments": {
+        "to": "Alice<alice@example.org>"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": [],
+        "resource_id": "agent/send_email"
+      }
+    },
+    {
+      "id": "K-66",
+      "description": "An enabled tool whose arguments repeat a member name: error.invalid_request (EP-19)",
+      "section": "6.6, EP-19",
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "send_email"
+      },
+      "definition": "875834e8591f589f91a8c5d8af7f609e0a7df31741cd3c4cc4db585f561910a9",
+      "arguments_text": "{\"to\": \"alice@example.org\", \"to\": \"bob@competitor.example\"}",
+      "expected": {
+        "decision": false,
+        "reason": "error.invalid_request",
+        "policies": [],
+        "resource_id": "agent/send_email"
+      }
+    },
+    {
+      "id": "K-67",
+      "description": "Then policies: a policy reads the record that EP-19 filled, the transform applied, and forbids",
+      "section": "6.5, 6.11",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000901",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000902",
+          "scope": "agent",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/send_email\")\nwhen {\n  context has args && context.args has \"agent/send_email\" && context.args[\"agent/send_email\"] has \"to:email_domain\" &&\n  context.args[\"agent/send_email\"][\"to:email_domain\"] == \"competitor.example\"\n};",
+          "valid": true
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "send_email"
+      },
+      "definition": "875834e8591f589f91a8c5d8af7f609e0a7df31741cd3c4cc4db585f561910a9",
+      "arguments": {
+        "to": "Bob <bob@Competitor.Example>"
+      },
+      "expected": {
+        "decision": false,
+        "reason": "policy.forbid",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000902"
+        ],
+        "resource_id": "agent/send_email"
+      }
+    },
+    {
+      "id": "K-68",
+      "description": "Then policies: the same policy does not apply to another domain, and wt-catalog permits",
+      "section": "6.5, 6.11",
+      "policies": [
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000901",
+          "scope": "global",
+          "text": "permit (\n  principal,\n  action in [\n    WhiteTower::Action::\"tool.expose\", WhiteTower::Action::\"tool.invoke\", WhiteTower::Action::\"tool.result\",\n    WhiteTower::Action::\"model.invoke\", WhiteTower::Action::\"model.result\"\n  ],\n  resource\n);",
+          "valid": true
+        },
+        {
+          "id": "0192f1c2-7a3b-7c4d-8e5f-000000000902",
+          "scope": "agent",
+          "text": "forbid (principal, action == WhiteTower::Action::\"tool.invoke\", resource == WhiteTower::Tool::\"agent/send_email\")\nwhen {\n  context has args && context.args has \"agent/send_email\" && context.args[\"agent/send_email\"] has \"to:email_domain\" &&\n  context.args[\"agent/send_email\"][\"to:email_domain\"] == \"competitor.example\"\n};",
+          "valid": true
+        }
+      ],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "send_email"
+      },
+      "definition": "875834e8591f589f91a8c5d8af7f609e0a7df31741cd3c4cc4db585f561910a9",
+      "arguments": {
+        "to": "alice@example.org"
+      },
+      "expected": {
+        "decision": true,
+        "reason": "policy.permit",
+        "policies": [
+          "0192f1c2-7a3b-7c4d-8e5f-000000000901"
+        ],
+        "resource_id": "agent/send_email"
+      }
+    },
+    {
+      "id": "K-69",
+      "description": "Then policies: without wt-catalog, no policy permits an enabled tool",
+      "section": "6.5, 6.9",
+      "policies": [],
+      "action": "tool.invoke",
+      "tooling": {
+        "kind": "tool",
+        "name": "read_invoice"
+      },
+      "definition": "2872cc9cad942bb5aafcb3a2241a8a8a2999f993a5c3f2470d76bac2db099fb3",
+      "expected": {
+        "decision": false,
+        "reason": "policy.no_permit",
+        "policies": [],
+        "resource_id": "agent/read_invoice"
+      }
+    }
+  ]
+}

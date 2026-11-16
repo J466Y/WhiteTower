@@ -1,8 +1,8 @@
 // Package profile implements the White Tower decision profile v1alpha1 for
 // Cedar: it checks that an AuthZEN evaluation request is inside the profile,
 // maps it to a Cedar request, applies the contract's rules on top of Cedar's,
-// and computes the gate (docs/contracts/module-contract-v0.1.md, sections 5
-// and 6).
+// and computes the gate and the catalog check
+// (docs/contracts/module-contract-v0.1.md, sections 5 and 6).
 //
 // It is the reference the conformance vectors are checked against, and a
 // starting point for enforcement points written in Go.
@@ -217,7 +217,9 @@ func compileRequestSchema() (*jsonschema.Schema, error) {
 // error.unknown_agent, for a request whose subject is not the bundle's agent
 // or cannot be read; error.invalid_request, for a request outside the
 // profile, which does not match decision-request.schema.json or breaks a rule
-// that the schema does not state; then rules 1 to 4.
+// that the schema does not state; then rules 1 to 4. For the tool and model
+// actions, Decide runs the catalog check of section 6.9 before it, and builds
+// the request that it evaluates.
 func (e *Engine) Evaluate(data []byte) Response {
 	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
 	if err != nil || !e.isFor(doc) {
