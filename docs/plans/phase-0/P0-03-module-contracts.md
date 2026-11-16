@@ -240,7 +240,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
-| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In seven parts, 3a-1, 3a-2, 3b, 3c, 3d-1, 3d-2 and 3d-3, which the notes of 2026-11-05 (the review of pull request 2), 2026-11-06 and 2026-11-12 list | In progress (5 of 7 parts: 3a-1 to 3d-1) |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In seven parts, 3a-1, 3a-2, 3b, 3c, 3d-1, 3d-2 and 3d-3, which the notes of 2026-11-05 (the review of pull request 2), 2026-11-06 and 2026-11-12 list | In progress (6 of 7 parts: 3a-1 to 3d-2) |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -1386,3 +1386,46 @@ For the specification, which is the reviewer's:
 
 - Section 6.1's example of a request is a `tool.invoke` without `args`, which the profile now refuses: it needs the tool's record, such as `"args": { "agent/send_email": { "to:email_domain": "example.org" } }`.
 - Section 9.1 counts 59 combination vectors and 18 fail-closed vectors.
+
+### 2026-11-16: step 12, part 3d-2: the catalog check and exposure
+
+Part 3d-2 brings the catalog check of section 6.9, with blocks, results and its place among the reasons, and exposure (section 6.10) to both stacks, in two new vector files. No generated vector changes.
+
+| What | Change |
+| --- | --- |
+| `test/conformance/tooling` | `Catalog`, with `CatalogServer`, `CatalogTool` and `CatalogModel`: the catalog file, which the bundle verifier and the catalog check now share, in place of the verifier's partial type and the combination vectors' test-local one. `ToolReference` and `ModelReference` give an entry's reference, as step V7 and the check compute it |
+| `test/conformance/bundle` | V7's check of entries reads a `tooling.Catalog`, with no change of behavior |
+| `test/conformance/profile` | `Engine.Decide` decides a tool or model action once the gate is open, in the order of section 6.6: `error.unknown_agent`; the catalog check, on the bundle's catalog and the active blocks (`Block`); EP-19's record of a tool call's arguments; then `Evaluate`, on the request whose resource is the catalog's entry. A `Call` carries the tool or the model as the agent has it (`Tooling`), and a `Decision` what its event names: the resource's ID, the `reference_sha256` of tooling that the catalog does not list, and every block that covers the call. Also the six `catalog.*` reasons, and `ToolProperties` and `ModelProperties`, which the combination vectors' test also reads |
+| `catalog-check.json` | New: 69 cases, K-01 to K-69, below |
+| `exposure.json` | New: 27 cases, X-01 to X-27, below |
+| `vectors_test.go` | `TestCatalogCheckVectors` and `TestExposureVectors` read both files with one type, in which a case can give a catalog file of its own. They check each block's `covered_sha256` against the string it covers, each policy against the validator with its catalog's `ToolArgs`, and what each decision names: on an exposure that policies decided, also `calls_decided` and the resource's `origin` in the request evaluated. The catalog's reasons always carry the bundle version |
+| The Python checker | The same `decide`, with `covering`, `resolve` and `find_entry`, and `entry_properties`, which the combination vectors' check now shares. It counts 734 vectors |
+
+| Cases | What they check |
+| --- | --- |
+| K-01 to K-14 | Each kind of block: a server block on the server's tools, listed and not; a tool block on one of the agent's own tools and on a built-in tool; two blocks that cover one call; a provider block that covers the provider's models and not its built-in tools; an endpoint block on the endpoint normalized and redacted, and not on the endpoint as the agent writes it; and blocks that cover by their kind only |
+| K-15 to K-21 | A block of an unknown kind, once per action, beside a known block, and on a tool that the catalog does not list |
+| K-22 to K-38 | Tooling that the catalog does not list: a tool of a listed server, a listed tool's name on another server, the agent's own tools, built-in tools, a model on another endpoint, and a server URL and an endpoint that `url_host` cannot read, without `reference_sha256`; what a reference leaves out, a secret path segment redacted with the deployment's rules, and local servers by their command lines; and a bundle without a catalog file |
+| K-39 to K-50 | Rows 3 to 6, and their order: discovered, not enabled, a changed definition or none, a built-in tool, and digests that differ, are unknown, match, or are not pinned |
+| K-51 to K-59 | Results, row 1 only. Tooling that is not enabled, discovered, changed or with another digest passes, and policies decide; tooling that the catalog does not list is `error.invalid_request`; a block keeps a result from the agent |
+| K-60 to K-69 | The check's place among the reasons: the gate and `error.unknown_agent` before it; blocks, `catalog.unknown` and `catalog.not_enabled` before the arguments; then EP-19's record, and the policies, which read the record with its transform applied |
+| X-01 to X-09 | `tool.expose` through rows 1 to 5, among them a provider-run MCP tool whose definition a response listed otherwise (EP-18) |
+| X-10 to X-15 | `calls_decided`: true for a tool that the agent runs, and for a provider-run tool whose calls the provider submits for approval, false otherwise, with `wt-catalog` permitting either way |
+| X-16 to X-24 | The `tool.expose` statement of section 6.11's example: it forbids exposing its tool while the tool's calls are not decided, and only its tool; the catalog check comes before it; alone, it forbids and never permits |
+| X-25 to X-27 | Who runs the tool differs from the origin that the catalog records: recorded as the agent's and run by the provider without approval, not decided, and the usage rule forbids; recorded as the provider's and run by the agent, decided; recorded as the agent's and run by the provider with approval, decided. The resource keeps the catalog's `origin` in each |
+
+Details the lists do not name:
+
+- **Blocks of an unknown kind** (the review of 2026-11-16). A block of a kind that the enforcement point does not know covers every tool and every model, wherever row 1 applies: `tool.invoke`, `tool.expose`, `model.invoke` and both results. The decision is `catalog.blocked`, and names that block like any other. It denies in place of every later row, so tooling that the catalog does not list is `catalog.blocked`, not `catalog.unknown` (K-21). The reviewer writes it in EP-10 and EP-15.
+- **What each block covers.** A server block covers an MCP tool's server, a tool block the tool, a model block the model, a provider block a model's provider, and an endpoint block a model's endpoint, each by the string form that its hash covers, computed with the catalog's redaction rules. A provider block covers models only, as the review accepted, and covers a model whose endpoint makes no reference, since its provider is known (K-30). A server or a tool that makes no reference is covered by no block of a known kind.
+- **Which block a decision names.** The vectors list every block that covers the call, and accept any one. Both stacks compute every one and compare them with the list as a set, which also checks that the list is complete.
+- **Resolution** is by reference, never by name alone, with the catalog's redaction rules. The reference of a model's entry is computed with the file's own rules, as V7 computes it. A bundle without a catalog file reads as an empty catalog, with no redaction rules (section 7.7).
+- **Results** of tooling that the catalog does not list have no properties, so the profile refuses their request (`error.invalid_request`), and the decision still names the tooling with its `reference_sha256` (section 8.3).
+- **`calls_decided` follows who runs the tool when it is offered** (the review of 2026-11-16), a case's `origin`, and `approval`, whether the provider submits each call of the tool for approval: it is true when the agent runs the tool or `approval` is true. The resource's `origin` property is the catalog's (section 6.3), whoever runs the tool. An enforcement point that read the catalog's `origin` would fail open whenever the catalog says `agent` while the provider runs the tool without approval: X-25 to X-27, whose bundles record `github/push_files` otherwise than the file's catalog, catch it, and X-25 shows the request carrying the catalog's `origin` with `calls_decided` false. The reviewer adds a sentence to section 6.10.
+- **Row 5 and built-in tools.** A built-in tool has no definition, in the catalog or as the agent has it, so row 5 never denies it, without a test of its kind.
+- **The usage rule and `wt-catalog`** are copied from the examples of sections 6.11 and 6.9, and were compared with the specification's text. Part 3d-3 checks that the generator writes the rule's statement, and adds the rules that a decision names.
+- **What no test observes.** `Decide`'s refusal of an action that is not a tool or model action; its error for a request that does not encode, which cannot happen; and, of the request that a decision evaluated, all but an exposure's `calls_decided` and its resource's `origin`.
+
+A follow-up for P1-16: a remote MCP server has one reference whether the agent or its model provider calls it (section 4.10), so the catalog has one entry for each of its tools, with one `origin`, while who runs the tool can differ from one agent to another. P1-16 decides how the entry's `origin` is set. Policies on whether a tool's calls are decided read `calls_decided`, never `origin`.
+
+For the specification, which is the reviewer's: section 9.1 counts 69 vectors in `catalog-check.json` and 27 in `exposure.json`.

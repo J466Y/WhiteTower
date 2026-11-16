@@ -436,39 +436,11 @@ func parseCatalog(data []byte) error {
 	if err := compiled.Validate(inst); err != nil {
 		return err
 	}
-	var c catalogFile
+	var c tooling.Catalog
 	if err := json.Unmarshal(data, &c); err != nil {
 		return err
 	}
 	return checkEntries(&c)
-}
-
-// catalogFile is what step V7 reads of a catalog file that matches its
-// schema, to check what the schema cannot: its keys, references, servers and
-// argument names (section 7.7).
-type catalogFile struct {
-	Redaction tooling.Rules `json:"redaction"`
-	Servers   []struct {
-		Key       string `json:"key"`
-		Reference string `json:"reference"`
-		Status    string `json:"status"`
-	} `json:"servers"`
-	Tools []struct {
-		Key      string             `json:"key"`
-		Server   string             `json:"server"`
-		Provider string             `json:"provider"`
-		Type     string             `json:"type"`
-		Name     string             `json:"name"`
-		Kind     string             `json:"kind"`
-		Status   string             `json:"status"`
-		Args     []tooling.Argument `json:"args"`
-	} `json:"tools"`
-	Models []struct {
-		Key      string `json:"key"`
-		Provider string `json:"provider"`
-		Endpoint string `json:"endpoint"`
-		Name     string `json:"name"`
-	} `json:"models"`
 }
 
 // distinct holds the values of one list that are already taken.
@@ -491,30 +463,22 @@ func (d distinct) take(v string) bool {
 // References are computed as section 4.10 says, a model's with the file's
 // own redaction rules, and a model whose reference cannot be computed is
 // refused.
-func checkEntries(c *catalogFile) error {
+func checkEntries(c *tooling.Catalog) error {
 	keys, refs := distinct{}, distinct{}
-	servers := map[string]int{}
-	for i, s := range c.Servers {
+	for _, s := range c.Servers {
 		if !keys.take(s.Key) || !refs.take(s.Reference) {
 			return fmt.Errorf("server %q: a key or a reference that another server has", s.Key)
 		}
-		servers[s.Key] = i
 	}
 	keys, refs = distinct{}, distinct{}
-	for _, t := range c.Tools {
-		ref := tooling.ToolReference(t.Name)
-		switch t.Kind {
-		case "mcp":
-			i, ok := servers[t.Server]
-			if !ok {
-				return fmt.Errorf("tool %q: no server has the key %q", t.Key, t.Server)
-			}
-			if t.Status == "approved" && c.Servers[i].Status != "approved" {
-				return fmt.Errorf("tool %q is approved, and its server is not", t.Key)
-			}
-			ref = tooling.MCPToolReference(c.Servers[i].Reference, t.Name)
-		case "builtin":
-			ref = tooling.BuiltinToolReference(t.Provider, t.Type)
+	for i := range c.Tools {
+		t := &c.Tools[i]
+		ref, ok := c.ToolReference(t)
+		if !ok {
+			return fmt.Errorf("tool %q: no server has the key %q", t.Key, t.Server)
+		}
+		if t.Kind == "mcp" && t.Status == "approved" && c.Server(t.Server).Status != "approved" {
+			return fmt.Errorf("tool %q is approved, and its server is not", t.Key)
 		}
 		if !keys.take(t.Key) || !refs.take(ref) {
 			return fmt.Errorf("tool %q: a key or a reference that another tool has", t.Key)
@@ -531,8 +495,9 @@ func checkEntries(c *catalogFile) error {
 		}
 	}
 	keys, refs = distinct{}, distinct{}
-	for _, m := range c.Models {
-		ref, err := tooling.ModelReference(m.Provider, m.Endpoint, m.Name, c.Redaction)
+	for i := range c.Models {
+		m := &c.Models[i]
+		ref, err := c.ModelReference(m)
 		if err != nil {
 			return fmt.Errorf("model %q: %w", m.Key, err)
 		}

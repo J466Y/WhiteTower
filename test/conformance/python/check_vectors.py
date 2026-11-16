@@ -175,6 +175,21 @@ def fits(value, declared_type: str) -> bool:
     return FITS[declared_type](value)
 
 
+def entry_properties(catalog: dict, resource_type: str, entry: dict) -> dict:
+    """The properties that an entry of the catalog gives the resource of a request (section 6.3): a model's provider,
+    name and endpoint; a tool's kind, origin, name and classification, an MCP tool's server, by its key, and the
+    server's transport, and a built-in tool's provider."""
+    if resource_type == "model":
+        return {k: entry[k] for k in ("provider", "name", "endpoint")}
+    properties = {k: entry[k] for k in ("kind", "origin", "name", "read_only", "destructive", "open_world")}
+    if entry["kind"] == "mcp":
+        properties["server"] = entry["server"]
+        properties["transport"] = next(s["transport"] for s in catalog["servers"] if s["key"] == entry["server"])
+    if entry["kind"] == "builtin":
+        properties["provider"] = entry["provider"]
+    return properties
+
+
 def catalog_mismatch(catalog: dict, req: dict) -> str | None:
     """Why a request inside the profile does not take its resource from the catalog, or None: a tool or a model names
     an entry by its key, with the properties that the catalog gives it (section 6.3), and a tool call's record holds
@@ -185,15 +200,7 @@ def catalog_mismatch(catalog: dict, req: dict) -> str | None:
     entry = next((e for e in catalog[resource["type"] + "s"] if e["key"] == resource["id"]), None)
     if entry is None:
         return f"the catalog has no {resource['type']} with the key {resource['id']!r}"
-    if resource["type"] == "model":
-        want = {k: entry[k] for k in ("provider", "name", "endpoint")}
-    else:
-        want = {k: entry[k] for k in ("kind", "origin", "name", "read_only", "destructive", "open_world")}
-        if entry["kind"] == "mcp":
-            want["server"] = entry["server"]
-            want["transport"] = next(s["transport"] for s in catalog["servers"] if s["key"] == entry["server"])
-        if entry["kind"] == "builtin":
-            want["provider"] = entry["provider"]
+    want = entry_properties(catalog, resource["type"], entry)
     if resource["properties"] != want:
         return f"properties {resource['properties']}, the catalog's {want}"
     declared = {a["name"]: a["type"] for a in entry.get("args", [])}
@@ -252,8 +259,72 @@ class Engine:
         return self.decided(False, "policy.no_permit", [])
 
     def decided(self, decision: bool, reason: str, policies: list[str]) -> dict:
-        """A decision of the bundle's policies, which carries the version of the bundle that decided (section 6.6)."""
+        """A decision of the bundle's policies, or of its catalog, which carries the version of the bundle that decided
+        (section 6.6)."""
         return {"decision": decision, "reason": reason, "policies": policies, "bundle_version": self.bundle_version}
+
+    def decide(self, catalog: dict | None, blocks: list[dict], call: dict) -> dict:
+        """Decides a tool or model action once the gate is open, in the order of section 6.6: error.unknown_agent; the
+        catalog check of section 6.9, on the bundle's catalog, None when the bundle has none, which reads as an empty
+        catalog, and the active blocks, rows 1 to 6 for tool.expose, tool.invoke and model.invoke and row 1 alone for
+        the results; for a tool call, EP-19's record of its arguments (error.invalid_request); then evaluate, on the
+        request whose resource is the catalog's entry (section 6.3). The decision also gives what its event names: the
+        resource's ID, the SHA-256 of the reference of tooling that the catalog does not list, every block that covers
+        the call (EP-16), and the request evaluated."""
+        subject = call["subject"]
+        if subject.get("type") != "agent" or subject.get("id") != self.agent_id:
+            return deny("error.unknown_agent")
+        resource_type = ACTION_RESOURCE.get(call["action"])
+        if resource_type not in ("tool", "model"):
+            return deny("error.invalid_request")
+        if catalog is None:
+            catalog = {"redaction": {}, "servers": [], "tools": [], "models": []}
+        tooling = call["tooling"]
+        named = {"block_ids": covering(blocks, resource_type, tooling)}
+        entry = find_entry(catalog, resource_type, tooling["reference"])
+        if entry is None:
+            resource = {"type": resource_type, "id": tooling["name"]}
+            reason = "catalog.unknown"
+            if tooling["reference"] is not None:
+                named["reference_sha256"] = hashlib.sha256(tooling["reference"].encode()).hexdigest()
+        else:
+            resource = {"type": resource_type, "id": entry["key"],
+                        "properties": entry_properties(catalog, resource_type, entry)}
+            if entry["status"] != "approved":
+                reason = "catalog.not_approved"
+            elif not entry["enabled"]:
+                reason = "catalog.not_enabled"
+            elif resource_type == "tool" and entry.get("definition") != call["definition"]:
+                # A built-in tool has no definition, in the catalog or as the agent has it, so row 5 never denies it.
+                reason = "catalog.definition_changed"
+            elif resource_type == "model" and "digest" in entry and entry["digest"] != call["digest"]:
+                reason = "catalog.digest_mismatch"
+            else:
+                reason = None
+        named["resource_id"] = resource["id"]
+        if named["block_ids"]:
+            reason = "catalog.blocked"
+        elif call["action"] in ("tool.result", "model.result"):
+            # Only row 1 applies to results: a result of tooling that the catalog does not list has no properties, and
+            # the profile refuses its request.
+            reason = None
+        if reason is not None:
+            return {**self.decided(False, reason, []), **named}
+        context = {"time": call["time"]}
+        if call["action"] in ("tool.invoke", "tool.result"):
+            try:
+                context["args"] = {resource["id"]: tool_record(call["arguments"], (entry or {}).get("args", []))}
+            except InvalidArgument:
+                return {**deny("error.invalid_request"), **named}
+        elif call["action"] == "tool.expose":
+            # Every call of the tool is decided when the agent runs it, or while the provider submits each of its calls
+            # for approval (section 6.10): who runs it when it is offered decides, never the origin that the catalog
+            # records, which stays the resource's property.
+            context["calls_decided"] = call["origin"] == "agent" or call["approval"]
+        elif call["action"] == "model.invoke" and call["digest"] is not None:
+            context["digest"] = call["digest"]
+        request = {"subject": subject, "action": {"name": call["action"]}, "resource": resource, "context": context}
+        return {**self.evaluate(request), **named, "request": request}
 
 
 def deny(reason: str) -> dict:
@@ -262,9 +333,83 @@ def deny(reason: str) -> dict:
     return {"decision": False, "reason": reason, "policies": []}
 
 
+# The kinds of blocks that section 5.10 names. A block of any other kind covers every tool and every model (EP-10,
+# EP-15).
+BLOCK_KINDS = {"server", "tool", "model", "provider", "endpoint"}
+
+
+def covering(blocks: list[dict], resource_type: str, tooling: dict) -> list[str]:
+    """The IDs of the blocks that cover a tool or a model, in their order: a server block covers an MCP tool's server
+    and a tool block the tool; a model block covers the model, and a provider or an endpoint block its provider or its
+    endpoint. A block of a kind that section 5.10 does not name covers every tool and every model."""
+    if resource_type == "tool":
+        covered = {"server": tooling["server"], "tool": tooling["reference"]}
+    else:
+        covered = {"model": tooling["reference"], "provider": tooling["provider"], "endpoint": tooling["endpoint"]}
+    return [b["block_id"] for b in blocks if b["kind"] not in BLOCK_KINDS or covered.get(b["kind"]) is not None
+            and hashlib.sha256(covered[b["kind"]].encode()).hexdigest() == b["covered_sha256"]]
+
+
+def resolve(entry: dict, rules: dict) -> dict:
+    """A tool or a model, given as tooling.json writes an entry, as an enforcement point has it, with the redaction
+    rules given (sections 4.10 and 5.10): its name as the agent sees it, its reference, an MCP tool's server's
+    reference, and a model's provider and endpoint, normalized and redacted; None for what makes no reference."""
+    def reference_or_none(e: dict) -> str | None:
+        try:
+            return reference(e, rules)
+        except NoReference:
+            return None
+    tooling = {"name": entry["name"], "reference": reference_or_none(entry), "server": None, "provider": None,
+               "endpoint": None}
+    if entry["kind"] == "mcp_tool":
+        tooling["server"] = reference_or_none(entry["server"])
+    if entry["kind"] == "model":
+        tooling["provider"] = entry["provider"]
+        try:
+            tooling["endpoint"] = normalized_url(entry["endpoint"], rules)
+        except NoReference:
+            pass
+    return tooling
+
+
+def tool_reference_entry(servers: dict, tool: dict) -> dict | None:
+    """What makes up the reference of a catalog file's tool, as reference reads an entry: an MCP tool's server, as the
+    reference that the file gives it, and its name; a built-in tool's provider and type; and any other tool's name.
+    None for an MCP tool whose server is not in the file."""
+    if tool["kind"] == "mcp":
+        server = servers.get(tool["server"])
+        return None if server is None else {"kind": "mcp_tool", "name": tool["name"], "server": server["reference"]}
+    if tool["kind"] == "builtin":
+        return {"kind": "builtin_tool", "provider": tool["provider"], "type": tool["type"]}
+    return {"kind": "tool", "name": tool["name"]}
+
+
+def model_reference_entry(model: dict) -> dict:
+    """What makes up the reference of a catalog file's model, as reference reads an entry."""
+    return {"kind": "model", "provider": model["provider"], "endpoint": model["endpoint"], "name": model["name"]}
+
+
+def find_entry(catalog: dict, resource_type: str, ref: str | None) -> dict | None:
+    """The catalog's tool or model whose reference is the one given, or None: tooling is resolved by its reference,
+    never by its name alone (EP-16), and a model's reference is computed with the file's own redaction rules."""
+    if ref is None:
+        return None
+    servers = {s["key"]: s for s in catalog["servers"]}
+    for entry in catalog[resource_type + "s"]:
+        e = tool_reference_entry(servers, entry) if resource_type == "tool" else model_reference_entry(entry)
+        try:
+            if e is not None and reference(e, catalog["redaction"]) == ref:
+                return entry
+        except NoReference:
+            pass
+    return None
+
+
 # The reasons with which a response always carries the version of the bundle that decided, and those with which it
 # never does (section 6.6). It may carry it, or not, with error.timeout, error.unknown_agent and error.invalid_request.
-ALWAYS_BUNDLE_VERSION = {"policy.permit", "policy.forbid", "policy.no_permit", "error.evaluation"}
+ALWAYS_BUNDLE_VERSION = {"policy.permit", "policy.forbid", "policy.no_permit", "error.evaluation", "catalog.blocked",
+                         "catalog.unknown", "catalog.not_approved", "catalog.not_enabled",
+                         "catalog.definition_changed", "catalog.digest_mismatch"}
 NEVER_BUNDLE_VERSION = {"gate.no_state", "gate.lease_expired", "gate.halted", "gate.fleet_halted", "gate.lifecycle",
                         "gate.no_bundle", "gate.evidence_full"}
 
@@ -590,15 +735,10 @@ def catalog_entries_hold(catalog: dict) -> bool:
     servers = {s["key"]: s for s in catalog["servers"]}
     tool_references = []
     for t in catalog["tools"]:
-        if t["kind"] == "mcp":
-            server = servers.get(t["server"])
-            if server is None or (t["status"] == "approved" and server["status"] != "approved"):
-                return False
-            entry = {"kind": "mcp_tool", "name": t["name"], "server": server["reference"]}
-        elif t["kind"] == "builtin":
-            entry = {"kind": "builtin_tool", "provider": t["provider"], "type": t["type"]}
-        else:
-            entry = {"kind": "tool", "name": t["name"]}
+        entry = tool_reference_entry(servers, t)
+        if entry is None or (t["kind"] == "mcp" and t["status"] == "approved"
+                             and servers[t["server"]]["status"] != "approved"):
+            return False
         tool_references.append(reference(entry, rules))
         names = [a["name"] for a in t.get("args", [])]
         if len(set(names)) != len(names) or any(
@@ -606,8 +746,7 @@ def catalog_entries_hold(catalog: dict) -> bool:
                 for a in t.get("args", [])):
             return False
     try:
-        model_references = [reference({"kind": "model", "provider": m["provider"], "endpoint": m["endpoint"],
-                                       "name": m["name"]}, rules) for m in catalog["models"]]
+        model_references = [reference(model_reference_entry(m), rules) for m in catalog["models"]]
     except NoReference:
         return False
     return all(len(set(values)) == len(values) for values in (
@@ -1513,9 +1652,65 @@ def main() -> int:
         want = None if case["record"] is None else canonical_json(case["record"])
         check(f"record {case['id']}", {"record": got}, {"record": want})
 
+    # The catalog check and exposure (sections 6.9 and 6.10): each case decided once the gate is open, on its own
+    # catalog file when it gives one, with what its decision names, every block that covers the call compared as a set,
+    # and, on an exposure that policies decided, calls_decided and the resource's origin property.
+    calls_cases = 0
+    for name in ("catalog-check.json", "exposure.json"):
+        calls = json.loads((VECTORS / name).read_text(encoding="utf-8"))
+        for case in calls["cases"]:
+            catalog = case.get("catalog", calls["catalog"])
+            if not catalog_validator.is_valid(catalog):
+                failures += 1
+                print(f"FAIL {case['id']}: the catalog does not match its schema")
+            schema = CEDAR_SCHEMA.read_text(encoding="utf-8").replace("type ToolArgs = {};", tool_args(catalog), 1)
+            policies = case.get("policies", calls["policies"])
+            for p in policies:
+                passes = cedarpy.validate_policies(p["text"], schema).validation_passed
+                if passes != p["valid"]:
+                    failures += 1
+                    print(f"FAIL {case['id']}: policy {p['id']} validation {passes}, want {p['valid']}")
+            blocks = case.get("blocks", [])
+            for b in blocks:
+                if hashlib.sha256(b["covers"].encode()).hexdigest() != b["covered_sha256"]:
+                    failures += 1
+                    print(f"FAIL {case['id']}: block {b['block_id']}: covered_sha256 is not the SHA-256 of covers")
+            if "state" in case and (reason := gate_reason(case["state"])):
+                got = deny(reason)
+            else:
+                # Without a catalog file, the enforcement point has no redaction rules, and an empty catalog.
+                bundle_catalog = None if case.get("without_catalog") else catalog
+                rules = bundle_catalog["redaction"] if bundle_catalog else {}
+                call = {
+                    "subject": case.get("subject", calls["subject"]), "action": case["action"], "time": calls["time"],
+                    "tooling": resolve(case["tooling"], rules), "origin": case.get("origin"),
+                    "definition": case.get("definition"), "digest": case.get("digest"),
+                    "approval": case.get("approval", False),
+                    "arguments": read_json(case["arguments_text"]) if "arguments_text" in case
+                    else case.get("arguments", {}),
+                }
+                engine = Engine(calls["agent_id"], VECTOR_BUNDLE_VERSION, policies, request_validator)
+                got = engine.decide(bundle_catalog, blocks, call)
+            want = case["expected"]
+            check_response(case["id"], got, {k: want[k] for k in ("decision", "reason", "policies")})
+            request = got.get("request")
+            exposure = request if request is not None and request["action"]["name"] == "tool.expose" \
+                else {"resource": {"properties": {}}, "context": {}}
+            check(case["id"], {
+                "resource_id": got.get("resource_id"), "reference_sha256": got.get("reference_sha256"),
+                "block_ids": sorted(got.get("block_ids", [])),
+                "calls_decided": exposure["context"].get("calls_decided"),
+                "origin": exposure["resource"]["properties"].get("origin"),
+            }, {
+                "resource_id": want.get("resource_id"), "reference_sha256": want.get("reference_sha256"),
+                "block_ids": sorted(want.get("block_ids", [])), "calls_decided": want.get("calls_decided"),
+                "origin": want.get("origin"),
+            })
+        calls_cases += len(calls["cases"])
+
     total = (len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases)
              + len(documents) + len(hashed["cases"]) + len(tooling["definitions"]) + len(tooling["urls"])
-             + len(tooling["references"]) + len(arguments["transforms"]) + len(arguments["records"]))
+             + len(tooling["references"]) + len(arguments["transforms"]) + len(arguments["records"]) + calls_cases)
     print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML, jsonschema, idna)")
     return 1 if failures else 0
 
