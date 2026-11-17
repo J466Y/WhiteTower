@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Periodic review changed",
+  "description": "An agent's periodic review was scheduled, completed by its owner, signed off by the advisory committee, or cancelled when the agent was retired (INV-06; plan P1-04, step 6). A scheduled review carries the terms that the settings gave it. A completion carries the owner's attestation: its five statements, which are all true, and the keys of the candidates to disable that the owner keeps. The comment that the owner writes stays in the inventory.",
+  "type": "object",
+  "required": [
+    "change",
+    "review_id",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "change": {
+            "const": "scheduled"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "due_at",
+          "grace_ends_at",
+          "signoff_required"
+        ]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "due_at"
+              ]
+            },
+            {
+              "required": [
+                "grace_ends_at"
+              ]
+            },
+            {
+              "required": [
+                "signoff_required"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "change": {
+            "const": "completed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "status",
+          "attestation"
+        ]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "status"
+              ]
+            },
+            {
+              "required": [
+                "attestation"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "properties": {
+    "change": {
+      "enum": [
+        "scheduled",
+        "completed",
+        "signed_off",
+        "cancelled"
+      ]
+    },
+    "review_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "due_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "grace_ends_at": {
+      "description": "When the grace period after the due date ends, and the agent is suspended if the review is still open.",
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "signoff_required": {
+      "type": "boolean"
+    },
+    "status": {
+      "description": "Where the completion left the review: completed, or waiting for the advisory committee's sign-off.",
+      "enum": [
+        "completed",
+        "awaiting_signoff"
+      ]
+    },
+    "attestation": {
+      "type": "object",
+      "required": [
+        "still_needed",
+        "owner_still_right",
+        "data_categories_current",
+        "policy_adequate",
+        "tooling_still_needed",
+        "kept_tooling"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "still_needed": {
+          "const": true
+        },
+        "owner_still_right": {
+          "const": true
+        },
+        "data_categories_current": {
+          "const": true
+        },
+        "policy_adequate": {
+          "const": true
+        },
+        "tooling_still_needed": {
+          "const": true
+        },
+        "kept_tooling": {
+          "description": "The keys of the candidates to disable that the owner keeps (CAT-09).",
+          "type": "array",
+          "maxItems": 500,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        }
+      }
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    }
+  }
+}

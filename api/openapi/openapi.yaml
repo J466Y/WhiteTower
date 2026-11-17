@@ -1190,12 +1190,14 @@ paths:
         Records the owner's attestation (INV-06): the agent is still needed,
         its owner is still right, its data categories are current, its policy
         is still adequate and its enabled tooling is still needed. The
-        attestation names the candidates to disable that the owner keeps; the
-        owner disables the others in the agent's tooling (plan P1-16). The
-        agent's primary owner or a delegate completes it (`agent.review`).
-        When the review needs a sign-off (`signoffRequired`), it then waits
-        for one; otherwise it is completed and the next review is scheduled.
-        It needs If-Match with the review's ETag.
+        attestation names the candidates to disable that the owner keeps,
+        among those the review lists now; the owner disables the others in
+        the agent's tooling (plan P1-16). A person who is the agent's primary
+        owner or a delegate completes it (`agent.review`), while the agent is
+        active or suspended. When the review needs a sign-off
+        (`signoffRequired`), it then waits for one; otherwise it is completed
+        and the next review is scheduled. It needs If-Match with the review's
+        ETag.
       tags: [inventory]
       parameters:
         - $ref: "#/components/parameters/ReviewId"
@@ -1226,10 +1228,11 @@ paths:
         A member of the advisory committee signs off a review that waits for
         it, whatever the agent's risk tier: the review's `signoffRequired`,
         set from the setting `lifecycle.review_signoff_risk_tiers`, decides
-        (`agent.review`). The signer is a person, neither the one who
-        completed the review nor one of the agent's owners (HUM-04). The
-        review is then completed, and the next one scheduled. It needs
-        If-Match with the review's ETag.
+        (`agent.review`). The signer is a person, and neither the one who
+        completed the review, nor anyone who is or ever was the agent's
+        primary owner or one of its delegates, nor the creator of the agent
+        or of its use case (HUM-04). The review is then completed, and the
+        next one scheduled. It needs If-Match with the review's ETag.
       tags: [inventory]
       parameters:
         - $ref: "#/components/parameters/ReviewId"

@@ -334,6 +334,9 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			// Until plan P1-08 brings selector halts, none is active for a
 			// write of an agent's governance state to add.
 			SelectorHalts: inventory.NoSelectorHalts{},
+			// Until plan P1-16 brings the agents' tooling, a review lists no
+			// candidate to disable.
+			Tooling: inventory.NoTooling{},
 		}),
 	})
 	drain := server.NewDrain()

@@ -94,6 +94,33 @@ func (q *Queries) AgentHaltIssued(ctx context.Context, arg AgentHaltIssuedParams
 	return exists, err
 }
 
+const cancelOpenReviews = `-- name: CancelOpenReviews :many
+UPDATE whitetower.reviews SET status = 'cancelled', version = version + 1
+WHERE agent_id = $1 AND status IN ('scheduled', 'awaiting_signoff')
+RETURNING id
+`
+
+// Cancels the agent's open review, if it has one, and returns its ID.
+func (q *Queries) CancelOpenReviews(ctx context.Context, agentID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, cancelOpenReviews, agentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const cancelPendingTransfers = `-- name: CancelPendingTransfers :many
 UPDATE whitetower.ownership_transfers SET status = 'cancelled', decided_at = $1
 WHERE agent_id = $2 AND status = 'pending'
@@ -124,6 +151,43 @@ func (q *Queries) CancelPendingTransfers(ctx context.Context, arg CancelPendingT
 		return nil, err
 	}
 	return items, nil
+}
+
+const completeReview = `-- name: CompleteReview :execrows
+UPDATE whitetower.reviews SET
+  status = $1,
+  attestation = $2,
+  completed_by = $3,
+  completed_at = $4,
+  version = version + 1
+WHERE id = $5 AND version = $6 AND status = 'scheduled'
+`
+
+type CompleteReviewParams struct {
+	Status      string
+	Attestation []byte
+	CompletedBy *uuid.UUID
+	CompletedAt *time.Time
+	ID          uuid.UUID
+	Version     int64
+}
+
+// Records the owner's attestation of a scheduled review, if it is still at
+// the version the caller read: the review is then completed, or waits for a
+// sign-off.
+func (q *Queries) CompleteReview(ctx context.Context, arg CompleteReviewParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeReview,
+		arg.Status,
+		arg.Attestation,
+		arg.CompletedBy,
+		arg.CompletedAt,
+		arg.ID,
+		arg.Version,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const createAgent = `-- name: CreateAgent :exec
@@ -439,6 +503,32 @@ func (q *Queries) GetAgent(ctx context.Context, id uuid.UUID) (WhitetowerAgent, 
 	return i, err
 }
 
+const getReview = `-- name: GetReview :one
+SELECT id, agent_id, due_at, grace_ends_at, status, attestation, completed_by, completed_at, signoff_required, signed_off_by, signed_off_at, last_reminder_at, created_at, version FROM whitetower.reviews WHERE id = $1
+`
+
+func (q *Queries) GetReview(ctx context.Context, id uuid.UUID) (WhitetowerReview, error) {
+	row := q.db.QueryRow(ctx, getReview, id)
+	var i WhitetowerReview
+	err := row.Scan(
+		&i.ID,
+		&i.AgentID,
+		&i.DueAt,
+		&i.GraceEndsAt,
+		&i.Status,
+		&i.Attestation,
+		&i.CompletedBy,
+		&i.CompletedAt,
+		&i.SignoffRequired,
+		&i.SignedOffBy,
+		&i.SignedOffAt,
+		&i.LastReminderAt,
+		&i.CreatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const getSetting = `-- name: GetSetting :one
 SELECT value FROM whitetower.settings WHERE key = $1
 `
@@ -527,6 +617,20 @@ func (q *Queries) HaltedAgents(ctx context.Context, agentIds []uuid.UUID) ([]uui
 	return items, nil
 }
 
+const hasOpenReview = `-- name: HasOpenReview :one
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.reviews WHERE agent_id = $1 AND status IN ('scheduled', 'awaiting_signoff')
+)
+`
+
+// Whether the agent has a review that is scheduled or waits for a sign-off.
+func (q *Queries) HasOpenReview(ctx context.Context, agentID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasOpenReview, agentID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const isOwner = `-- name: IsOwner :one
 SELECT EXISTS (
   SELECT 1 FROM whitetower.agent_owners
@@ -545,6 +649,63 @@ func (q *Queries) IsOwner(ctx context.Context, arg IsOwnerParams) (bool, error) 
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const listAgentReviews = `-- name: ListAgentReviews :many
+SELECT id, agent_id, due_at, grace_ends_at, status, attestation, completed_by, completed_at, signoff_required, signed_off_by, signed_off_at, last_reminder_at, created_at, version FROM whitetower.reviews
+WHERE agent_id = $1
+  AND ($2::timestamptz IS NULL
+       OR (due_at, id) < ($2::timestamptz, $3::uuid))
+ORDER BY due_at DESC, id DESC
+LIMIT $4
+`
+
+type ListAgentReviewsParams struct {
+	AgentID   uuid.UUID
+	BeforeDue *time.Time
+	BeforeID  *uuid.UUID
+	PageLimit int32
+}
+
+// A page of the agent's reviews, the latest due first.
+func (q *Queries) ListAgentReviews(ctx context.Context, arg ListAgentReviewsParams) ([]WhitetowerReview, error) {
+	rows, err := q.db.Query(ctx, listAgentReviews,
+		arg.AgentID,
+		arg.BeforeDue,
+		arg.BeforeID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhitetowerReview
+	for rows.Next() {
+		var i WhitetowerReview
+		if err := rows.Scan(
+			&i.ID,
+			&i.AgentID,
+			&i.DueAt,
+			&i.GraceEndsAt,
+			&i.Status,
+			&i.Attestation,
+			&i.CompletedBy,
+			&i.CompletedAt,
+			&i.SignoffRequired,
+			&i.SignedOffBy,
+			&i.SignedOffAt,
+			&i.LastReminderAt,
+			&i.CreatedAt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAgents = `-- name: ListAgents :many
@@ -672,6 +833,76 @@ func (q *Queries) ListAssignments(ctx context.Context, arg ListAssignmentsParams
 			&i.EndReason,
 			&i.DisplayName,
 			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReviews = `-- name: ListReviews :many
+SELECT r.id, r.agent_id, r.due_at, r.grace_ends_at, r.status, r.attestation, r.completed_by, r.completed_at, r.signoff_required, r.signed_off_by, r.signed_off_at, r.last_reminder_at, r.created_at, r.version FROM whitetower.reviews r
+JOIN whitetower.agents a ON a.id = r.agent_id
+WHERE (NOT $1::boolean OR a.lifecycle_state = 'active')
+  AND (cardinality($2::text[]) = 0 OR r.status = ANY($2::text[]))
+  AND ($3::boolean IS NULL
+       OR (r.status IN ('scheduled', 'awaiting_signoff') AND r.due_at < $4) = $3::boolean)
+  AND ($5::timestamptz IS NULL
+       OR (r.due_at, r.id) > ($5::timestamptz, $6::uuid))
+ORDER BY r.due_at, r.id
+LIMIT $7
+`
+
+type ListReviewsParams struct {
+	ActiveOnly bool
+	Statuses   []string
+	Overdue    *bool
+	Now        time.Time
+	AfterDue   *time.Time
+	AfterID    *uuid.UUID
+	PageLimit  int32
+}
+
+// A page of the reviews in any of the statuses given (all with none), the
+// earliest due first. With active_only, only those of active agents. With
+// overdue, only the open reviews past their due date at the time given, or
+// only the others.
+func (q *Queries) ListReviews(ctx context.Context, arg ListReviewsParams) ([]WhitetowerReview, error) {
+	rows, err := q.db.Query(ctx, listReviews,
+		arg.ActiveOnly,
+		arg.Statuses,
+		arg.Overdue,
+		arg.Now,
+		arg.AfterDue,
+		arg.AfterID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhitetowerReview
+	for rows.Next() {
+		var i WhitetowerReview
+		if err := rows.Scan(
+			&i.ID,
+			&i.AgentID,
+			&i.DueAt,
+			&i.GraceEndsAt,
+			&i.Status,
+			&i.Attestation,
+			&i.CompletedBy,
+			&i.CompletedAt,
+			&i.SignoffRequired,
+			&i.SignedOffBy,
+			&i.SignedOffAt,
+			&i.LastReminderAt,
+			&i.CreatedAt,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -870,6 +1101,34 @@ func (q *Queries) LockGovernanceState(ctx context.Context, agentID uuid.UUID) (u
 	var agent_id uuid.UUID
 	err := row.Scan(&agent_id)
 	return agent_id, err
+}
+
+const lockReview = `-- name: LockReview :one
+SELECT id, agent_id, due_at, grace_ends_at, status, attestation, completed_by, completed_at, signoff_required, signed_off_by, signed_off_at, last_reminder_at, created_at, version FROM whitetower.reviews WHERE id = $1 FOR NO KEY UPDATE
+`
+
+// Locks a review until the transaction ends, then reads it. The caller has
+// locked the review's agent before.
+func (q *Queries) LockReview(ctx context.Context, id uuid.UUID) (WhitetowerReview, error) {
+	row := q.db.QueryRow(ctx, lockReview, id)
+	var i WhitetowerReview
+	err := row.Scan(
+		&i.ID,
+		&i.AgentID,
+		&i.DueAt,
+		&i.GraceEndsAt,
+		&i.Status,
+		&i.Attestation,
+		&i.CompletedBy,
+		&i.CompletedAt,
+		&i.SignoffRequired,
+		&i.SignedOffBy,
+		&i.SignedOffAt,
+		&i.LastReminderAt,
+		&i.CreatedAt,
+		&i.Version,
+	)
+	return i, err
 }
 
 const lockUseCase = `-- name: LockUseCase :one
@@ -1183,6 +1442,36 @@ func (q *Queries) ReviewOverdue(ctx context.Context, arg ReviewOverdueParams) (b
 	return exists, err
 }
 
+const scheduleReview = `-- name: ScheduleReview :exec
+INSERT INTO whitetower.reviews (id, agent_id, due_at, grace_ends_at, signoff_required, created_at)
+VALUES ($1, $2, $3, $4, $5,
+  $6)
+`
+
+type ScheduleReviewParams struct {
+	ID              uuid.UUID
+	AgentID         uuid.UUID
+	DueAt           time.Time
+	GraceEndsAt     time.Time
+	SignoffRequired bool
+	CreatedAt       time.Time
+}
+
+// Schedules a review, with the terms that the settings gave when it was
+// scheduled: its due date, the end of its grace period and whether it needs a
+// sign-off.
+func (q *Queries) ScheduleReview(ctx context.Context, arg ScheduleReviewParams) error {
+	_, err := q.db.Exec(ctx, scheduleReview,
+		arg.ID,
+		arg.AgentID,
+		arg.DueAt,
+		arg.GraceEndsAt,
+		arg.SignoffRequired,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const setLifecycleState = `-- name: SetLifecycleState :execrows
 UPDATE whitetower.agents SET
   lifecycle_state = $1,
@@ -1284,6 +1573,37 @@ SELECT pg_advisory_xact_lock_shared($1::bigint)
 func (q *Queries) ShareSelectorHaltsLock(ctx context.Context, lockKey int64) error {
 	_, err := q.db.Exec(ctx, shareSelectorHaltsLock, lockKey)
 	return err
+}
+
+const signOffReview = `-- name: SignOffReview :execrows
+UPDATE whitetower.reviews SET
+  status = 'completed',
+  signed_off_by = $1,
+  signed_off_at = $2,
+  version = version + 1
+WHERE id = $3 AND version = $4 AND status = 'awaiting_signoff'
+`
+
+type SignOffReviewParams struct {
+	SignedOffBy *uuid.UUID
+	SignedOffAt *time.Time
+	ID          uuid.UUID
+	Version     int64
+}
+
+// Completes a review that waits for a sign-off, if it is still at the version
+// the caller read.
+func (q *Queries) SignOffReview(ctx context.Context, arg SignOffReviewParams) (int64, error) {
+	result, err := q.db.Exec(ctx, signOffReview,
+		arg.SignedOffBy,
+		arg.SignedOffAt,
+		arg.ID,
+		arg.Version,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const touchAgent = `-- name: TouchAgent :execrows

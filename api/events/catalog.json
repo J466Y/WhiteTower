@@ -156,6 +156,16 @@
       "example": "examples/whitetower.use_case.updated.v1.json"
     },
     {
+      "type": "whitetower.review.changed.v1",
+      "summary": "An agent's periodic review was scheduled, completed, signed off or cancelled (INV-06).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "required",
+      "schema": "schemas/whitetower.review.changed.v1.json",
+      "example": "examples/whitetower.review.changed.v1.json"
+    },
+    {
       "type": "whitetower.policy.version_approved.v1",
       "summary": "A committee approved a policy version. The subject is the agent for agent-specific policies.",
       "emitters": [
