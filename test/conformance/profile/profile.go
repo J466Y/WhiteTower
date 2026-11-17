@@ -1,7 +1,8 @@
 // Package profile implements the White Tower decision profile v1alpha1 for
 // Cedar: it checks that an AuthZEN evaluation request is inside the profile,
 // maps it to a Cedar request, applies the contract's rules on top of Cedar's,
-// and computes the gate and the catalog check
+// computes the gate and the catalog check, and writes the statements of usage
+// rules and checks generated text, as the core does
 // (docs/contracts/module-contract-v0.1.md, sections 5 and 6).
 //
 // It is the reference the conformance vectors are checked against, and a
@@ -10,10 +11,12 @@ package profile
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/cedar-policy/cedar-go"
@@ -158,6 +161,9 @@ type Engine struct {
 	bundleVersion uint64
 	set           *cedar.PolicySet
 	owners        map[cedar.PolicyID]string
+	// rules holds the ID of the usage rule that each statement's @rule
+	// annotation reads as, for the statements whose annotation reads as one.
+	rules map[cedar.PolicyID]string
 	// schema is decision-request.schema.json, compiled.
 	schema *jsonschema.Schema
 }
@@ -178,6 +184,7 @@ func NewEngine(agentID string, bundleVersion uint64, policies []Policy) (*Engine
 		bundleVersion: bundleVersion,
 		set:           cedar.NewPolicySet(),
 		owners:        map[cedar.PolicyID]string{},
+		rules:         map[cedar.PolicyID]string{},
 		schema:        schema,
 	}
 	for _, p := range policies {
@@ -189,6 +196,9 @@ func NewEngine(agentID string, bundleVersion uint64, policies []Policy) (*Engine
 			id := cedar.PolicyID(fmt.Sprintf("%s#%d", p.ID, i))
 			e.set.Add(id, statement)
 			e.owners[id] = p.ID
+			if rule := statementRule(statement); rule != "" {
+				e.rules[id] = rule
+			}
 		}
 	}
 	return e, nil
@@ -221,23 +231,33 @@ func compileRequestSchema() (*jsonschema.Schema, error) {
 // actions, Decide runs the catalog check of section 6.9 before it, and builds
 // the request that it evaluates.
 func (e *Engine) Evaluate(data []byte) Response {
+	resp, _ := e.evaluate(data)
+	return resp
+}
+
+// evaluate decides a request as Evaluate does, and also returns the usage
+// rules that a policy.forbid decision names: each distinct pair of policy ID
+// and rule ID among the forbidding statements whose annotation reads as a
+// rule, in ascending order (section 6.11).
+func (e *Engine) evaluate(data []byte) (Response, []NamedRule) {
 	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
 	if err != nil || !e.isFor(doc) {
-		return Deny(ReasonUnknownAgent)
+		return Deny(ReasonUnknownAgent), nil
 	}
 	if err := e.schema.Validate(doc); err != nil {
-		return Deny(ReasonInvalidRequest)
+		return Deny(ReasonInvalidRequest), nil
 	}
 	req, err := DecodeRequest(data)
 	if err != nil {
-		return Deny(ReasonInvalidRequest)
+		return Deny(ReasonInvalidRequest), nil
 	}
 	creq, entities, err := ToCedar(req)
 	if err != nil {
-		return Deny(ReasonInvalidRequest)
+		return Deny(ReasonInvalidRequest), nil
 	}
 	decision, diag := cedar.Authorize(e.set, entities, creq)
 	resp := Response{Context: ResponseContext{Policies: []string{}, BundleVersion: e.bundleVersion}}
+	var rules []NamedRule
 	switch {
 	case len(diag.Errors) > 0:
 		// Cedar skips a policy that fails and decides with the others. The
@@ -256,13 +276,21 @@ func (e *Engine) Evaluate(data []byte) Response {
 		resp.Context.Reason = ReasonForbid
 		for _, d := range diag.Reasons {
 			resp.Context.Policies = append(resp.Context.Policies, e.owners[d.PolicyID])
+			if rule, ok := e.rules[d.PolicyID]; ok {
+				rules = append(rules, NamedRule{PolicyID: e.owners[d.PolicyID], RuleID: rule})
+			}
 		}
 	default:
 		resp.Context.Reason = ReasonNoPermit
 	}
 	slices.Sort(resp.Context.Policies)
 	resp.Context.Policies = slices.Compact(resp.Context.Policies)
-	return resp
+	// The pairs sort by code point, as Go compares strings, policy ID first,
+	// then rule ID (the review of 2026-11-16).
+	slices.SortFunc(rules, func(a, b NamedRule) int {
+		return cmp.Or(strings.Compare(a.PolicyID, b.PolicyID), strings.Compare(a.RuleID, b.RuleID))
+	})
+	return resp, slices.Compact(rules)
 }
 
 // isFor reports whether a request, decoded as jsonschema.UnmarshalJSON
