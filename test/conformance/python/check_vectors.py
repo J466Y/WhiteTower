@@ -1,6 +1,7 @@
 """Checks the conformance vectors with Python: cedarpy for Cedar, cryptography for Ed25519, PyYAML for manifests,
 jsonschema for the request schema and the catalog file, idna for the hosts of URLs and addresses, and the standard
-library's json, hashlib and hmac for canonical JSON, I-JSON, definition hashes and hashed arguments.
+library's json, hashlib and hmac for canonical JSON, I-JSON, definition hashes and hashed arguments. It also writes the
+statements of usage rules and checks generated text, as the core does.
 
 The Go tests in test/conformance check the same vectors with cedar-go, the
 manifest vectors with yaml.v3, canonical JSON with the kit's own reader and
@@ -218,21 +219,33 @@ class Engine:
         self.bundle_version = bundle_version
         self.validator = validator
         self.owner_of: list[str] = []
+        # The ID of the usage rule that each statement's @rule annotation reads as, or None.
+        self.rule_of: list[str | None] = []
         texts = []
         for p in policies:
-            count = len(cedarpy.PolicySet.from_str(p["text"]))  # raises if it does not parse
-            self.owner_of += [p["id"]] * count
+            statements = parsed_statements(p["text"])  # raises if it does not parse
+            self.owner_of += [p["id"]] * len(statements)
+            self.rule_of += [statement_rule(s) for s in statements]
             texts.append(p["text"])
         self.policies = cedarpy.PolicySet.from_str("\n".join(texts))
 
     def owners(self, policy_ids) -> list[str]:
         return sorted({self.owner_of[int(pid.removeprefix("policy"))] for pid in policy_ids})
 
+    def named_rules(self, policy_ids) -> list[dict]:
+        """The usage rules that a policy.forbid decision names: each distinct pair of policy ID and rule ID among the
+        forbidding statements whose annotation reads as a rule, sorted by code point, policy ID first (section 6.11, the
+        review of 2026-11-16)."""
+        indexes = [int(pid.removeprefix("policy")) for pid in policy_ids]
+        pairs_named = sorted({(self.owner_of[i], self.rule_of[i]) for i in indexes if self.rule_of[i] is not None})
+        return [{"policy_id": policy_id, "rule_id": rule_id} for policy_id, rule_id in pairs_named]
+
     def evaluate(self, req) -> dict:
         """Decides a request after the gate, with the reasons of section 6.6 in their order: error.unknown_agent for a
         request whose subject is not the bundle's agent, read before the profile is checked; error.invalid_request for
         a request outside the profile, which does not match the schema or breaks a rule it does not state; then the
-        policies, whose decisions carry the bundle's version."""
+        policies, whose decisions carry the bundle's version. A policy.forbid decision also gives the usage rules that
+        it names, in rules."""
         subject = req.get("subject") if type(req) is dict else None
         if type(subject) is not dict or subject.get("type") != "agent" or subject.get("id") != self.agent_id:
             return deny("error.unknown_agent")
@@ -255,7 +268,7 @@ class Engine:
         if result.decision == cedarpy.Decision.Allow:
             return self.decided(True, "policy.permit", self.owners(reasons))
         if reasons:
-            return self.decided(False, "policy.forbid", self.owners(reasons))
+            return {**self.decided(False, "policy.forbid", self.owners(reasons)), "rules": self.named_rules(reasons)}
         return self.decided(False, "policy.no_permit", [])
 
     def decided(self, decision: bool, reason: str, policies: list[str]) -> dict:
@@ -270,7 +283,7 @@ class Engine:
         the results; for a tool call, EP-19's record of its arguments (error.invalid_request); then evaluate, on the
         request whose resource is the catalog's entry (section 6.3). The decision also gives what its event names: the
         resource's ID, the SHA-256 of the reference of tooling that the catalog does not list, every block that covers
-        the call (EP-16), and the request evaluated."""
+        the call (EP-16), the usage rules that a policy.forbid decision names, and the request evaluated."""
         subject = call["subject"]
         if subject.get("type") != "agent" or subject.get("id") != self.agent_id:
             return deny("error.unknown_agent")
@@ -1498,6 +1511,231 @@ def fit_long(value) -> int:
     return value
 
 
+class RuleRefused(Exception):
+    """A usage rule that the generator refuses, or a policy whose @rule statements are not exactly what the generator
+    writes from their annotations (section 6.11)."""
+
+
+# The operators that each argument type takes, since Cedar cannot test each element of a set against a pattern or a
+# bound, and those that take exactly one value.
+RULE_OPERATORS = {
+    "String": ("equals", "not_equals", "in", "not_in", "matches", "not_matches"),
+    "Long": ("equals", "not_equals", "in", "not_in", "less_than", "greater_than"),
+    "Bool": ("equals", "not_equals"),
+    "Set<String>": ("in", "not_in"),
+    "Set<Long>": ("in", "not_in"),
+}
+SINGLE_VALUE = ("equals", "not_equals", "less_than", "greater_than")
+RULE_OPERATOR_NAMES = RULE_OPERATORS["String"] + ("less_than", "greater_than")
+
+
+def check_rule_strings(value) -> None:
+    """Refuses a string of a rule, at any depth, member names included, that holds a control character or a
+    noncharacter. Members is a list, so it is tested first."""
+    strings = [value] if isinstance(value, str) else []
+    if isinstance(value, (dict, Members)):
+        for name, item in pairs(value):
+            strings.append(name)
+            check_rule_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            check_rule_strings(item)
+    for text in strings:
+        if any(c < " " or c == "\x7f" for c in text):
+            raise RuleRefused("a control character")
+        try:
+            ijson_string(text)
+        except ManifestRefused as e:
+            raise RuleRefused(str(e)) from None
+
+
+def read_rule(value, from_annotation: bool) -> dict:
+    """A usage rule read as the generator reads it without the catalog: an object with the members that section 6.11
+    names, id, description, tools and when, or, for a rule read from an annotation, tool in place of tools. Its JSON is
+    I-JSON apart from the size of its integers, so that the rule has one text: no member name repeats, and no string
+    holds a lone surrogate, a noncharacter or a control character (the review of 2026-11-16). A condition has arg, op
+    and values, an optional transform and an optional if_absent; a value is a string, a boolean or a signed 64-bit
+    integer written without a fraction or an exponent, which json.loads reads as an int, and patterns are strings. It
+    returns the rule with tools, and conditions with if_absent only when it is no_match, or raises RuleRefused."""
+    try:
+        canonical_json(value)
+    except NoCanonicalJSON as e:
+        raise RuleRefused(str(e)) from None
+    check_rule_strings(value)
+    tools_member = "tool" if from_annotation else "tools"
+    if not isinstance(value, (dict, Members)) or set(dict(pairs(value))) - {"id", "description", tools_member, "when"}:
+        raise RuleRefused("a rule that is not an object, or with a member that section 6.11 does not name")
+    members = dict(pairs(value))
+    rule = {k: members.get(k) for k in ("id", "description")}
+    rule["tools"] = [members.get("tool")] if from_annotation else members.get("tools")
+    if not (type(rule["id"]) is str and 1 <= len(rule["id"]) <= 128 and type(rule["description"]) is str
+            and rule["description"] and type(rule["tools"]) is list and rule["tools"]
+            and all(type(t) is str for t in rule["tools"]) and len(set(rule["tools"])) == len(rule["tools"])):
+        raise RuleRefused("an id outside 1 to 128 characters, no description, or tools empty or named twice")
+    when = members.get("when")
+    if type(when) is not list or not when:
+        raise RuleRefused("no conditions")
+    rule["when"] = [read_condition(c) for c in when]
+    return rule
+
+
+def read_condition(value) -> dict:
+    """A condition of a usage rule, as read_rule reads it, or RuleRefused."""
+    if not isinstance(value, (dict, Members)):
+        raise RuleRefused("no conditions, or a condition that is not an object")
+    c = dict(pairs(value))
+    values = c.get("values")
+    if not ({"arg", "op", "values"} <= set(c) <= {"arg", "op", "values", "transform", "if_absent"}
+            and type(c["arg"]) is str and c["op"] in RULE_OPERATOR_NAMES
+            and c.get("transform", "path") in tuple(TRANSFORMS) and c.get("if_absent", "match") in ("match", "no_match")
+            and type(values) is list and values and (c["op"] not in SINGLE_VALUE or len(values) == 1)):
+        raise RuleRefused("a condition with a member that section 6.11 does not name, missing, or of another value")
+    for v in values:
+        if type(v) is not str and (c["op"] in ("matches", "not_matches")
+                                   or type(v) is not bool and (type(v) is not int or v not in INT64)):
+            raise RuleRefused(f"the value {v!r}, which no argument type takes")
+    condition = {k: c[k] for k in ("arg", "op", "values", "transform") if k in c}
+    if c.get("if_absent") == "no_match":
+        condition["if_absent"] = "no_match"
+    return condition
+
+
+def cedar_string(text: str) -> str:
+    """A string as a Cedar string: its backslashes and quotes escaped by a backslash, every other character as itself.
+    In a pattern, * is then the wildcard and a backslash matches itself."""
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def cedar_literal(value, declared_type: str) -> str:
+    """A value of the type given as a Cedar literal, or RuleRefused."""
+    if declared_type == "String" and type(value) is str:
+        return cedar_string(value)
+    if declared_type == "Long" and type(value) is int:
+        return str(value)
+    if declared_type == "Bool" and type(value) is bool:
+        return "true" if value else "false"
+    raise RuleRefused(f"the value {value!r} is not a {declared_type}")
+
+
+def compile_condition(condition: dict, v: str, declared_type: str) -> str:
+    """A condition's test of V, the argument's value, for its type: C in the table of section 6.11."""
+    op = condition["op"]
+    if op not in RULE_OPERATORS[declared_type]:
+        raise RuleRefused(f"an argument of type {declared_type} with the operator {op}")
+    is_set = declared_type.startswith("Set<")
+    literals = [cedar_literal(x, declared_type[4:-1] if is_set else declared_type) for x in condition["values"]]
+    listed = "[" + ", ".join(literals) + "]"
+    likes = " || ".join(f"{v} like {p}" for p in literals)
+    return {
+        "equals": f"{v} == {literals[0]}", "not_equals": f"{v} != {literals[0]}",
+        "less_than": f"{v} < {literals[0]}", "greater_than": f"{v} > {literals[0]}",
+        "in": f"{v}.containsAny({listed})" if is_set else f"{listed}.contains({v})",
+        "not_in": f"!{listed}.containsAll({v})" if is_set else f"!{listed}.contains({v})",
+        "matches": likes, "not_matches": f"!({likes})",
+    }[op]
+
+
+def rule_annotation(rule: dict, tool: str) -> str:
+    """A statement's @rule annotation, before it is written as a Cedar string: the canonical JSON of the rule's
+    description and id, the statement's tool and the rule's conditions."""
+    return canonical_json({"description": rule["description"], "id": rule["id"], "tool": tool, "when": rule["when"]})
+
+
+def rule_statements(rule: dict, tool: str, catalog: dict, scope: str) -> tuple[str, str]:
+    """A rule's two statements for one of its tools, its tool.invoke statement then its tool.expose statement, each
+    condition compiled for the type that the catalog declares for the tool's argument, or RuleRefused."""
+    entry = next((t for t in catalog["tools"] if t["key"] == tool), None)
+    if entry is None:
+        raise RuleRefused(f"the tool {tool!r}, which the catalog does not list")
+    if scope != "agent" and tool.startswith("agent/"):
+        raise RuleRefused(f"the agent's own tool {tool!r} in a global policy")
+    conditions = []
+    for c in rule["when"]:
+        arg = next((a for a in entry.get("args", []) if a["path"] == c["arg"].split(".")
+                    and a.get("transform") == c.get("transform")), None)
+        if arg is None:
+            raise RuleRefused(f"the argument {c['arg']!r}, with its transform, which the catalog does not declare")
+        v = f"context.args[{cedar_string(tool)}][{cedar_string(arg['name'])}]"
+        text = (f"if context has args && context.args has {cedar_string(tool)} && context.args[{cedar_string(tool)}] "
+                f"has {cedar_string(arg['name'])}\n  then {compile_condition(c, v, arg['type'])}\n  else "
+                + ("false" if c.get("if_absent") == "no_match" else "true"))
+        # Cedar reads if a then b else c && d as if a then b else (c && d).
+        conditions.append(f"({text})" if len(rule["when"]) > 1 else text)
+    def head(action: str) -> str:
+        return (f"@rule({cedar_string(rule_annotation(rule, tool))})\nforbid (\n  principal,\n"
+                f"  action == WhiteTower::Action::\"{action}\",\n  resource == WhiteTower::Tool::{cedar_string(tool)}\n) ")
+    return (head("tool.invoke") + "when {\n  " + " &&\n  ".join(conditions) + "\n};",
+            head("tool.expose") + "unless {\n  context.calls_decided\n};")
+
+
+def generate_rules(rules, catalog: dict, scope: str) -> str:
+    """The Cedar statements of a policy's usage rules, for a policy of the scope given, global or agent, with the
+    arguments that the catalog declares (section 6.11): for each rule, and for each of its tools in their order, its
+    tool.invoke statement, then its tool.expose statement, separated by an empty line; or RuleRefused."""
+    if type(rules) is not list:
+        raise RuleRefused("not an array of rules")
+    statements, ids = [], set()
+    for item in rules:
+        rule = read_rule(item, False)
+        if rule["id"] in ids:
+            raise RuleRefused(f"the id {rule['id']!r} of another rule of the policy")
+        ids.add(rule["id"])
+        for tool in rule["tools"]:
+            statements += rule_statements(rule, tool, catalog, scope)
+    return "\n\n".join(statements)
+
+
+def parsed_statements(text: str) -> list[dict]:
+    """The statements of a policy's text in Cedar's JSON form, as cedarpy writes them, in their order."""
+    policies = json.loads(cedarpy.policies_to_json_str(text))["staticPolicies"]
+    return [policies[f"policy{i}"] for i in range(len(policies))]
+
+
+def annotated_rule(statement: dict) -> dict | None:
+    """The rule of a statement's @rule annotation, read as read_rule reads it, None without one, or RuleRefused.
+    cedarpy gives an annotation without a value as None."""
+    if "rule" not in statement.get("annotations", {}):
+        return None
+    try:
+        return read_rule(read_json(statement["annotations"]["rule"] or ""), True)
+    except ValueError:
+        raise RuleRefused("an annotation that is not JSON") from None
+
+
+def check_rules(text: str, catalog: dict, scope: str) -> None:
+    """The check of a policy's text when a version is submitted (section 6.11): each statement that carries @rule,
+    regenerated from its annotation, equals once parsed what the generator writes, compared as canonical JSON, so that
+    true and 1 differ; and every rule is whole: the statements whose annotations carry one ID have the same description
+    and conditions, and each of their tools has exactly its two statements, none missing and none repeated (the review
+    of 2026-11-16). It raises RuleRefused otherwise."""
+    rules = {}
+    for statement in parsed_statements(text):
+        rule = annotated_rule(statement)
+        if rule is None:
+            continue
+        tool = rule["tools"][0]
+        generated = [canonical_json(parsed_statements(s)[0]) for s in rule_statements(rule, tool, catalog, scope)]
+        if canonical_json(statement) not in generated:
+            raise RuleRefused("a statement that is not what the generator writes from its annotation")
+        content, count = rules.setdefault(rule["id"], (rule_annotation(rule, ""), {}))
+        if content != rule_annotation(rule, ""):
+            raise RuleRefused(f"statements of the rule {rule['id']!r} with another description or other conditions")
+        count.setdefault(tool, [0, 0])[generated.index(canonical_json(statement))] += 1
+    if any(n != [1, 1] for _, count in rules.values() for n in count.values()):
+        raise RuleRefused("a rule that is not whole")
+
+
+def statement_rule(statement: dict) -> str | None:
+    """The ID of the rule that a statement's annotation reads as, or None: the JSON of an object with exactly
+    description, id, tool and when, each read as the generator reads it, without the catalog or the policy's scope
+    (the review of 2026-11-16)."""
+    try:
+        rule = annotated_rule(statement)
+    except RuleRefused:
+        return None
+    return None if rule is None else rule["id"]
+
+
 def main() -> int:
     failures = 0
     # Python converts integers of at most 4300 digits by default. Section 4.10 writes them exactly, whatever their size.
@@ -1652,11 +1890,32 @@ def main() -> int:
         want = None if case["record"] is None else canonical_json(case["record"])
         check(f"record {case['id']}", {"record": got}, {"record": want})
 
-    # The catalog check and exposure (sections 6.9 and 6.10): each case decided once the gate is open, on its own
-    # catalog file when it gives one, with what its decision names, every block that covers the call compared as a set,
-    # and, on an exposure that policies decided, calls_decided and the resource's origin property.
+    # Usage rules (section 6.11): the statements that the generator writes, compared as text, which the check of
+    # generated text accepts; and the check, on policies whose @rule statements are or are not what it writes. Rules
+    # given as text are read with read_json, which keeps what canonical JSON cannot write.
+    usage = json.loads((VECTORS / "usage-rules.json").read_text(encoding="utf-8"))
+    for case in usage["generator"]:
+        rules = read_json(case["rules_text"]) if "rules_text" in case else case["rules"]
+        try:
+            got = generate_rules(rules, usage["catalog"], case["scope"])
+            check_rules(got, usage["catalog"], case["scope"])
+        except RuleRefused:
+            got = None
+        check(f"generator {case['id']}", {"statements": got}, {"statements": case["statements"]})
+    for case in usage["checks"]:
+        try:
+            check_rules(case["text"], usage["catalog"], case["scope"])
+            got = True
+        except RuleRefused:
+            got = False
+        check(f"check {case['id']}", {"accepted": got}, {"accepted": case["accepted"]})
+
+    # The catalog check, exposure and the decisions of usage rules (sections 6.9 to 6.11): each case decided once the
+    # gate is open, on its own catalog file when it gives one, with what its decision names, every block that covers
+    # the call compared as a set, on an exposure that policies decided, calls_decided and the resource's origin
+    # property, and the usage rules that a policy.forbid decision names.
     calls_cases = 0
-    for name in ("catalog-check.json", "exposure.json"):
+    for name in ("catalog-check.json", "exposure.json", "usage-rules.json"):
         calls = json.loads((VECTORS / name).read_text(encoding="utf-8"))
         for case in calls["cases"]:
             catalog = case.get("catalog", calls["catalog"])
@@ -1700,17 +1959,32 @@ def main() -> int:
                 "resource_id": got.get("resource_id"), "reference_sha256": got.get("reference_sha256"),
                 "block_ids": sorted(got.get("block_ids", [])),
                 "calls_decided": exposure["context"].get("calls_decided"),
-                "origin": exposure["resource"]["properties"].get("origin"),
+                "origin": exposure["resource"]["properties"].get("origin"), "rules": got.get("rules", []),
             }, {
                 "resource_id": want.get("resource_id"), "reference_sha256": want.get("reference_sha256"),
                 "block_ids": sorted(want.get("block_ids", [])), "calls_decided": want.get("calls_decided"),
-                "origin": want.get("origin"),
+                "origin": want.get("origin"), "rules": want.get("rules", []),
             })
         calls_cases += len(calls["cases"])
 
+    # The generator writes, from its annotation, exactly the tool.expose statement of section 6.11's example that the
+    # cases of exposure.json hold, X-16 to X-23 and X-25 to X-27.
+    exposure_file = json.loads((VECTORS / "exposure.json").read_text(encoding="utf-8"))
+    expose_statements = 0
+    for case in exposure_file["cases"]:
+        for p in case.get("policies", []):
+            # The rule that annotated_rule reads has tools, as the generator takes it.
+            rule = annotated_rule(parsed_statements(p["text"])[0])
+            if rule is not None:
+                got = generate_rules([rule], exposure_file["catalog"], p["scope"]).split("\n\n")[1]
+                check(f"expose statement {case['id']}", {"text": got}, {"text": p["text"]})
+                expose_statements += 1
+    check("expose statements", {"count": expose_statements}, {"count": 11})
+
     total = (len(combination["cases"]) + len(fail_closed["cases"]) + len(bundle_cases) + len(manifest_cases)
              + len(documents) + len(hashed["cases"]) + len(tooling["definitions"]) + len(tooling["urls"])
-             + len(tooling["references"]) + len(arguments["transforms"]) + len(arguments["records"]) + calls_cases)
+             + len(tooling["references"]) + len(arguments["transforms"]) + len(arguments["records"]) + calls_cases
+             + len(usage["generator"]) + len(usage["checks"]))
     print(f"{total} vectors, {failures} failures (cedarpy, cryptography, PyYAML, jsonschema, idna)")
     return 1 if failures else 0
 

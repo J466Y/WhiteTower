@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/` are done, and its review is closed (2026-11-05); so are step 12's protobuf and its schemas of events, manifests and decision responses (pull request 2). Step 12's other schemas and its vectors (pull request 3), and the tag, remain (see [progress notes](#progress-notes)) |
+| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/` are done, and its review is closed (2026-11-05); so are step 12's protobuf and its schemas of events, manifests and decision responses (pull request 2), and its other schemas and its vectors on both stacks (pull request 3, 2026-11-17). Section 9.1's counts and appendix A, which the reviewer updates, and the tag remain (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
@@ -240,7 +240,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | --- | --- | --- |
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
-| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In seven parts, 3a-1, 3a-2, 3b, 3c, 3d-1, 3d-2 and 3d-3, which the notes of 2026-11-05 (the review of pull request 2), 2026-11-06 and 2026-11-12 list | In progress (6 of 7 parts: 3a-1 to 3d-2) |
+| 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In seven parts, 3a-1, 3a-2, 3b, 3c, 3d-1, 3d-2 and 3d-3, which the notes of 2026-11-05 (the review of pull request 2), 2026-11-06 and 2026-11-12 list | Done (7 of 7 parts) |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -1429,3 +1429,67 @@ Details the lists do not name:
 A follow-up for P1-16: a remote MCP server has one reference whether the agent or its model provider calls it (section 4.10), so the catalog has one entry for each of its tools, with one `origin`, while who runs the tool can differ from one agent to another. P1-16 decides how the entry's `origin` is set. Policies on whether a tool's calls are decided read `calls_decided`, never `origin`.
 
 For the specification, which is the reviewer's: section 9.1 counts 69 vectors in `catalog-check.json` and 27 in `exposure.json`.
+
+### 2026-11-17: step 12, part 3d-3: usage rules
+
+Part 3d-3 brings the usage rules of section 6.11 to both stacks: the generator, the check of generated text, and the rules that a decision names. They come in a new vector file, with the review's answers of 2026-11-16, which the specification now states (#138). No generated vector changes. With this part, step 12's three pull requests are done: `task verify:gen` passes, and both stacks pass every vector.
+
+| What | Change |
+| --- | --- |
+| `test/conformance/profile` | `GenerateRules` writes the statements of a policy's usage rules for the policy's scope, with the argument types that the catalog declares. It takes the rules as the JSON text of an array. `CheckRules` checks a policy's text as the core does when a version is submitted. Both refuse with `ErrUsageRule`. `NewEngine` reads each statement's `@rule` annotation once per bundle, and a `Decision` names, in `Rules`, the usage rules of a `policy.forbid` decision (`NamedRule`) |
+| `usage-rules.json` | New, with 193 cases: 110 cases of the generator, G-01 to G-110; 28 cases of the check, W-01 to W-28; and 55 decisions, R-01 to R-55, in the form of `catalog-check.json`. Its catalog declares an argument of each type, each transform, a nested path, and names with a quote, a backslash or a control character |
+| `exposure.json` | X-16, X-22 and X-25, whose usage rule forbids, name the rule `no-push-to-main` of its policy, and the file's description says so |
+| `vectors_test.go` | `TestUsageRuleVectors` compares the generator's statements as text, and checks that the check accepts them; it then runs the checks and the decisions. `TestTheGeneratorWritesTheExposeStatementOfExposure` generates each rule of `exposure.json` from its annotation, and compares the `tool.expose` statement with the case's text. `testCalls` also compares the rules that a decision names. It now takes a file that the caller has read, so that `usage-rules.json` can extend its type |
+| `profile/rules_test.go` | `FuzzGenerateRules`: the generator either refuses a policy's rules with `ErrUsageRule`, or writes statements that the check accepts |
+| The Python checker | The same generator, check and reading of annotations, and the rules that each decision names. It counts 927 vectors |
+
+| Cases | What they check |
+| --- | --- |
+| G-01 to G-18 | Each operator that each type takes, with the text of section 6.11's table |
+| G-19 to G-40 | Each operator that each type does not take |
+| G-41 to G-50 | <ul><li>Each transform.</li><li>`if_absent`, given and left out.</li><li>Several conditions, in parentheses.</li><li>Several tools, each condition compiled for the type that its tool declares.</li><li>Several rules, in their order.</li></ul> |
+| G-51 to G-55 | <ul><li>Escapes in values, patterns, argument names and tool keys.</li><li>Characters beyond ASCII, and a C1 control character.</li><li>The annotation as canonical JSON whatever the rule's form, repeated values kept.</li></ul> |
+| G-56 to G-60 | int64's minimum and maximum as values and as bounds, and integers beyond them |
+| G-61 to G-79 | <ul><li>The id at 128 characters and beyond, empty and repeated.</li><li>The description, tools and conditions.</li><li>A tool that the catalog does not list, one of the agent's own tools in a global policy, and a discovered tool, which the catalog declares.</li><li>Arguments that the catalog does not declare with their transform.</li></ul> |
+| G-80 to G-97 | `if_absent`, operators, transforms and values that section 6.11 refuses, among them numbers written with a fraction or an exponent, or beyond a double |
+| G-98 to G-110 | Unknown members, repeated member names, a lone surrogate, noncharacters, and control characters in the id, the description, a value, a pattern, a tool key and an argument name |
+| W-01 to W-06, W-23, W-27 | <ul><li>Generated statements, accepted, written with other spacing, CRLF line endings, a comment and another escape.</li><li>The same in another order, beside an ordinary statement.</li><li>Several rules.</li><li>One of the agent's own tools, accepted in an agent-specific policy and refused in a global one.</li></ul> |
+| W-07 to W-10 | Rules that are not whole: one statement alone, `exposure.json`'s statement among them, a statement repeated, and a tool's statement missing |
+| W-11 to W-22, W-24 to W-26, W-28 | Statements that are not what the generator writes: <ul><li>another condition;</li><li>an annotation that is not canonical, that is not JSON, or that has no value;</li><li>two descriptions under one ID;</li><li>a rule that the generator refuses;</li><li>another annotation, `permit`, a narrowed principal or another resource;</li><li>`else true` with `no_match`;</li><li>a missing pair of parentheses;</li><li>`1` where the annotation says `true`.</li></ul> |
+| R-01 to R-40 | The decisions that generated statements give: <ul><li>each operator, type and transform;</li><li>`if_absent`, several conditions and several tools;</li><li>escapes, and int64's bounds;</li><li>an exposure, with its calls decided and not;</li><li>a result, which no rule forbids.</li></ul> |
+| R-41 to R-55 | The rules that a decision names: <ul><li>several in one policy, and in several policies;</li><li>one ID in two policies;</li><li>a statement without `@rule`;</li><li>annotations that do not read as a rule, though their `id` is valid;</li><li>annotations that read as one, though their statement does not match or their argument is not declared;</li><li>the catalog check and EP-19, which come before the policies.</li></ul> |
+
+Details the lists do not name:
+
+- **The review's answers of 2026-11-16:**
+  - An annotation reads as a rule by its shape alone: the JSON of an object with exactly `description`, `id`, `tool` and `when`, each read as the generator reads it, without the catalog or the policy's scope. An enforcement point then needs no generator, and R-52 and R-53 pin that reading.
+  - A rule is whole when its statements are exactly those the generator writes: none missing, none added and none repeated.
+  - The rule's JSON is I-JSON apart from the size of its integers, so that a rule has one text. A repeated member name, a lone surrogate, a noncharacter, and an integer written with a fraction or an exponent are refused. Integers up to int64 are written exactly, in the annotation and in Cedar.
+  - A tool key or an argument name with a control character is refused, as a value is.
+  - A tool that the catalog does not declare is one that the catalog file does not list, whatever its status.
+  - The pairs of policy ID and rule ID sort by code point, policy ID first.
+- **The generator's text.** Both stacks write the layout of section 6.11's example, with an empty line between statements, and the vectors compare that text exactly, so that the vector file holds what the reference generator writes. The check compares statements once parsed, as section 6.11 says: cedar-go's JSON form, and cedarpy's `policies_to_json_str`. The checker compares the latter as canonical JSON, since Python reads `1` and `true` as equal (W-28).
+- **int64's minimum.** cedar-go 1.8.0 and cedarpy 4.12.1 both parse `-9223372036854775808` as a literal, compare with it and evaluate it, so no workaround was needed.
+- **Control characters in Cedar strings.** cedar-go 1.8.0 cannot parse a line feed or a NUL written as itself in a string literal, while cedarpy can. Since the review's answer refuses control characters in tool keys and argument names, the generator never writes one.
+- **Size.** About 1,140 changed lines without vector data, and about 80 of documentation: more than the 800 of a part. Both stacks need the whole generator, check and reading of annotations, and the Python checker is about half of it. The coordinator kept it as one pull request, as part 3a-2 was.
+- **The fuzz test** ran about 1.5 million inputs. On this machine the fuzzing engine stops making progress after a while, as it does for `FuzzRecord`, so later runs added little.
+- **What no test observes:**
+  - a policy's rules that are not an array;
+  - a scope other than `agent`, which reads as global;
+  - the check's error for a text that does not parse, which the core refuses anyway.
+
+For the specification, which is the reviewer's: section 9.1 gains `usage-rules.json` with 193 cases. After this part, the vector files hold 927 cases in all:
+
+| Vectors | Cases |
+| --- | --- |
+| Combination | 59 |
+| Fail-closed | 18 |
+| Hashed arguments | 12 |
+| Bundles | 98 |
+| Manifests | 8 |
+| Manifest documents | 67 |
+| `tooling.json` | 98 |
+| `arguments.json` | 278 |
+| `catalog-check.json` | 69 |
+| `exposure.json` | 27 |
+| `usage-rules.json` | 193 |
