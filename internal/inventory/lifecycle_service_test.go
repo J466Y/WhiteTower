@@ -89,9 +89,10 @@ func (f *fixture) setStatus(t *testing.T, p auth.Principal, status string) {
 	f.set(t, `UPDATE whitetower.principals SET status = $2 WHERE id = $1`, uuid.MustParse(p.ID), status)
 }
 
-// inState brings an agent of Olivia's, with a harness and an active agent
-// policy, to the state given: validated, ready, active, or suspended from one
-// of those. White Tower moves it to ready (T7).
+// inState brings an agent of Olivia's, with a harness, to the state given:
+// validated, ready, active, or suspended from one of those. Beyond validated,
+// it has an active agent policy, and White Tower moves it to ready (T7); a
+// validated agent has none, or it would be ready.
 func (f *fixture) inState(t *testing.T, slug, state string) *inventory.Agent {
 	t.Helper()
 	ctx := context.Background()
@@ -100,10 +101,12 @@ func (f *fixture) inState(t *testing.T, slug, state string) *inventory.Agent {
 		t.Fatal(err)
 	}
 	f.set(t, `UPDATE whitetower.agents SET harness = '{"description": "A container."}' WHERE id = $1`, a.ID)
-	f.policies.set(a.ID, true)
 	from, suspended := strings.CutPrefix(state, "suspended from ")
-	if from != "validated" && !f.system(t, a.ID, inventory.Cause{Action: "mark_ready"}) {
-		t.Fatal("White Tower did not make the agent ready")
+	if from != "validated" {
+		f.policies.set(a.ID, true)
+		if !f.system(t, a.ID, inventory.Cause{Action: "mark_ready"}) {
+			t.Fatal("White Tower did not make the agent ready")
+		}
 	}
 	if from == "active" {
 		if _, err := f.inv.Transition(ctx, f.olivia, a.ID, f.get(t, a.ID).Version, "activate", ""); err != nil {

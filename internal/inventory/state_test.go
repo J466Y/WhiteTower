@@ -43,6 +43,7 @@ func TestEveryWriteOfTheStateAddsTheSelectorHaltsTheAgentMatches(t *testing.T) {
 	}
 
 	later := f.halts.issue("team=finance")
+	f.policies.set(a.ID, true)
 	if !f.system(t, a.ID, inventory.Cause{Action: "mark_ready"}) {
 		t.Fatal("the agent did not become ready")
 	}

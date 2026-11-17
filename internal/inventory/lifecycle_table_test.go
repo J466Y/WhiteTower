@@ -176,6 +176,11 @@ func TestRandomSequencesKeepTheLifecyclesRules(t *testing.T) {
 			}
 			a, b.Version = b, b.Version+1
 			taken[tr.id]++
+			// An agent that T6 or T13 leaves validated becomes ready at once
+			// when T7's guards hold.
+			if a.LifecycleState == "validated" && w.policyActive && w.harnessDeclared {
+				a.LifecycleState, a.Version = "ready", a.Version+1
+			}
 			// The use case follows the decisions on the proposal while none
 			// has made it final.
 			switch {

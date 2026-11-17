@@ -107,6 +107,53 @@ func TestAnEditThatDeclaresAHarnessMakesAValidatedAgentReady(t *testing.T) {
 	}
 }
 
+// An agent that T6 validates, or that T13 reinstates to validated, with an
+// active agent-specific policy and a declared harness becomes ready in the
+// same transaction: T7 by White Tower follows the person's transition, at
+// its governance state version. Without a policy, the agent stays validated.
+func TestAnAgentValidatedWithAPolicyAndAHarnessBecomesReady(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	for _, policy := range []bool{false, true} {
+		want := map[bool]string{false: "validated", true: "ready"}[policy]
+		proposed := f.submitted(t, fmt.Sprintf("validated-%v", policy))
+		f.set(t, `UPDATE whitetower.agents SET harness = '{"description": "A container."}' WHERE id = $1`, proposed.ID)
+		f.policies.set(proposed.ID, policy)
+		suspended := f.inState(t, fmt.Sprintf("reinstated-%v", policy), "suspended from validated")
+		f.policies.set(suspended.ID, policy)
+		for _, c := range []struct {
+			before             *inventory.Agent
+			action, transition string
+		}{
+			{proposed, "validate", "T6"},
+			{suspended, "reinstate", "T13"},
+		} {
+			a, err := f.act(f.alex, c.before, c.action, "Fine.")
+			if err != nil {
+				t.Fatal(err)
+			}
+			moved := map[bool]int64{true: 1}[policy]
+			if a.LifecycleState != want || a.Version != c.before.Version+1+moved || f.lifecycleState(t, a.ID) != want {
+				t.Errorf("%s with a policy %v: state %s at version %d, governance state %s", c.transition, policy, a.LifecycleState, a.Version, f.lifecycleState(t, a.ID))
+			}
+			history, _, err := f.inv.Transitions(ctx, f.alex, a.ID, nil, 2)
+			if err != nil {
+				t.Fatal(err)
+			}
+			person := history[0]
+			if policy {
+				ready := history[0]
+				if person = history[1]; ready.Transition != "T7" || ready.Actor.Type != "system" || ready.StateVersion != person.StateVersion {
+					t.Errorf("%s: T7 %+v after %+v", c.transition, ready, person)
+				}
+			}
+			if person.Transition != c.transition || person.Actor.ID.String() != f.alex.ID || person.StateVersion != f.stateVersion(t, a.ID) {
+				t.Errorf("%s with a policy %v: history %+v", c.transition, policy, history)
+			}
+		}
+	}
+}
+
 // White Tower takes a transition only from a state that it starts from, and
 // only while its guards hold. Otherwise the agent stays as it is, and its
 // caller's transaction goes on: nothing fails.
@@ -116,41 +163,42 @@ func TestWhiteTowerTakesATransitionOnlyWhileItsGuardsHold(t *testing.T) {
 	for i, c := range []struct {
 		name, state string
 		cause       inventory.Cause
-		spoil       func(a *inventory.Agent)
+		spoil       func(t *testing.T, a *inventory.Agent)
 		want        string // the state it leaves the agent in, and the reason of a suspension
 	}{
+		{"T7 without a policy", "validated", inventory.Cause{Action: "mark_ready"}, nil, "validated"},
 		{
-			"T7 without a policy", "validated",
+			"T7 with a policy and a harness", "validated",
 			inventory.Cause{Action: "mark_ready"},
-			func(a *inventory.Agent) { f.policies.set(a.ID, false) }, "validated",
+			func(_ *testing.T, a *inventory.Agent) { f.policies.set(a.ID, true) }, "ready",
 		},
 		{"T7 of a suspended agent", "suspended from validated", inventory.Cause{Action: "mark_ready"}, nil, "suspended manual"},
 		{"T8 with a policy and a harness", "ready", inventory.Cause{Action: "unmark_ready"}, nil, "ready"},
 		{
 			"T8 without a policy", "ready",
 			inventory.Cause{Action: "unmark_ready"},
-			func(a *inventory.Agent) { f.policies.set(a.ID, false) }, "validated",
+			func(_ *testing.T, a *inventory.Agent) { f.policies.set(a.ID, false) }, "validated",
 		},
 		{"T11 for an owner who is active", "active", inventory.Cause{Action: "auto_suspend", Reason: "owner_inactive"}, nil, "active"},
 		{
 			"T11 for an owner who left", "active",
 			inventory.Cause{Action: "auto_suspend", Reason: "owner_inactive"},
-			func(*inventory.Agent) { f.setStatus(t, f.olivia, "inactive") }, "suspended owner_inactive",
+			func(t *testing.T, _ *inventory.Agent) { f.setStatus(t, f.olivia, "inactive") }, "suspended owner_inactive",
 		},
 		{
 			"T11 for an overdue review, which is not", "ready",
 			inventory.Cause{Action: "auto_suspend", Reason: "review_overdue"},
-			func(*inventory.Agent) { f.setStatus(t, f.olivia, "inactive") }, "ready",
+			func(t *testing.T, _ *inventory.Agent) { f.setStatus(t, f.olivia, "inactive") }, "ready",
 		},
 		{
 			"T11 for an overdue review", "ready",
 			inventory.Cause{Action: "auto_suspend", Reason: "review_overdue"},
-			func(a *inventory.Agent) { f.review(t, a.ID, &past) }, "suspended review_overdue",
+			func(t *testing.T, a *inventory.Agent) { f.review(t, a.ID, &past) }, "suspended review_overdue",
 		},
 		{
 			"T11 of a suspended agent", "suspended from active",
 			inventory.Cause{Action: "auto_suspend", Reason: "owner_inactive"},
-			func(*inventory.Agent) { f.setStatus(t, f.olivia, "inactive") }, "suspended manual",
+			func(t *testing.T, _ *inventory.Agent) { f.setStatus(t, f.olivia, "inactive") }, "suspended manual",
 		},
 		{"T12 for a halt of another agent", "active", inventory.Cause{Action: "halt_suspend", Halt: uuid.Must(uuid.NewV7())}, nil, "active"},
 	} {
@@ -158,7 +206,7 @@ func TestWhiteTowerTakesATransitionOnlyWhileItsGuardsHold(t *testing.T) {
 			f.setStatus(t, f.olivia, "active")
 			a := f.inState(t, fmt.Sprintf("agent-%d", i), c.state)
 			if c.spoil != nil {
-				c.spoil(a)
+				c.spoil(t, a)
 			}
 			history := scalar[int](t, f, `SELECT count(*) FROM whitetower.lifecycle_transitions WHERE agent_id = $1`, a.ID)
 			moved := f.system(t, a.ID, c.cause)

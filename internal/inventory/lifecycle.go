@@ -232,6 +232,8 @@ func requested(action string) (transition, error) {
 // separation of duties must allow it, and every guard of its transition must
 // hold. The agent's use case follows the decisions on its proposal while no
 // decision has made it final. The agent takes a new governance state version.
+// An agent that T6 or T13 leaves validated becomes ready in the same
+// transaction when T7's guards hold.
 func (inv *Inventory) Transition(ctx context.Context, caller auth.Principal, agentID uuid.UUID, version int64, action, comment string) (*Agent, error) {
 	t, err := requested(action)
 	if err != nil {
@@ -555,7 +557,18 @@ func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principa
 	if err != nil {
 		return err
 	}
-	return inv.record(ctx, tx, t, from, a, Actor{Type: actorType(caller), ID: &actor}, comment, version, now)
+	if err := inv.record(ctx, tx, t, from, a, Actor{Type: actorType(caller), ID: &actor}, comment, version, now); err != nil {
+		return err
+	}
+	// An agent that becomes validated may already have an active
+	// agent-specific policy and a declared harness: White Tower then makes
+	// it ready at once (T7), as it does whenever T7's guards hold.
+	if a.LifecycleState == "validated" {
+		if _, err := inv.SystemTransition(ctx, tx, a.ID, Cause{Action: "mark_ready"}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // lifecycleParams are what moving an agent writes on its row, at the

@@ -107,6 +107,11 @@ func (m *model) apply(action, to string) {
 	case action == "reject" || action == "validate":
 		m.useCase = to
 	}
+	// An agent that becomes validated with an active agent policy and a
+	// harness becomes ready at once: White Tower takes T7.
+	if m.state == "validated" && m.policy && m.harness {
+		m.state, m.history = "ready", m.history+1
+	}
 }
 
 // agrees fails the test unless the database holds what the model says of the
