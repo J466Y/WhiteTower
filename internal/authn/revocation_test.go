@@ -248,7 +248,7 @@ func TestNoTokenCarriesTheEmergencyRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"identity.me.read", "identity.tokens.manage", "inventory.view", "settings.manage"}; !slices.Equal(exchanged.Scopes, want) {
+	if want := []string{"catalog.view", "identity.me.read", "identity.tokens.manage", "inventory.view", "settings.manage"}; !slices.Equal(exchanged.Scopes, want) {
 		t.Errorf("an administrator's token of the exchange: scopes %v, want %v", exchanged.Scopes, want)
 	}
 	ada := auth.Principal{ID: exchanged.PrincipalID.String(), Kind: auth.Human, Roles: []string{"admin"}}

@@ -946,6 +946,701 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/catalog/servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List MCP servers
+         * @description Lists the MCP servers of the catalog that match every filter given,
+         *     ordered by key, one page at a time (CAT-02). Their references,
+         *     announced names, versions and display forms were reported by agents:
+         *     they are untrusted text, shown as plain text, and only to the callers
+         *     who may view the catalog (`catalog.view`).
+         */
+        get: operations["listCatalogServers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/servers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an MCP server
+         * @description Returns an MCP server of the catalog, with the ETag that its approval or decline must send back.
+         */
+        get: operations["getCatalogServer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/servers/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an MCP server
+         * @description Approves a discovered MCP server for the whole organization
+         *     (`catalog.entry.approve`, the advisory committee). Its key never
+         *     changes afterwards. The request can approve some of the server's
+         *     tools at once: each names the definition hash the reviewer saw in
+         *     full, its classification and the arguments policies may see, as
+         *     approveCatalogTool does, and the whole request is refused if one of
+         *     them is. Approving never enables anything for an agent (CAT-03). It
+         *     needs If-Match with the server's ETag.
+         */
+        post: operations["approveCatalogServer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/servers/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline an MCP server
+         * @description Declines a discovered MCP server, with a reason
+         *     (`catalog.entry.approve`). It leaves the queue of what waits for
+         *     review and stays discovered, so its tools stay denied; it can still
+         *     be approved later. An approved server cannot be declined
+         *     (`conflict`): a block or disables restrict it at once. It needs
+         *     If-Match with the server's ETag.
+         */
+        post: operations["declineCatalogServer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List tools
+         * @description Lists the tools of the catalog that match every filter given, ordered
+         *     by key, one page at a time (CAT-02). The agent's own tools
+         *     (`agent/<name>`) are entries of their agent, so two of them can share
+         *     a key: filter them by agent. Names were reported by agents, and are
+         *     untrusted text.
+         */
+        get: operations["listCatalogTools"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/tools/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a tool
+         * @description Returns a tool of the catalog: its pinned definition hash, the
+         *     definitions that wait for review, its classification and the
+         *     arguments policies may see, with the ETag that its approval or
+         *     decline must send back. getToolDefinition returns each definition in
+         *     full.
+         */
+        get: operations["getCatalogTool"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/tools/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a tool or a new definition
+         * @description Approves a discovered tool, or one of the definitions of an approved
+         *     tool that wait for review, for the whole organization
+         *     (`catalog.entry.approve`, the advisory committee). It pins the
+         *     definition hash the request names, which must be one of the tool's
+         *     reported definitions that the core stores; a built-in tool has none,
+         *     and a tool of any other kind without a definition hash is never
+         *     approved (`conflict`, contracts section 7.7). A tool of an MCP server
+         *     is approved only once its server is (`conflict`). The reviewer
+         *     classifies the tool, starting from its MCP annotations or, without
+         *     them, from the protocol's conservative defaults (not read-only,
+         *     destructive, open world), and declares the arguments policies may
+         *     see, with their types from the tool's input schema (RFC-0002, section
+         *     7.5). For an approved tool, a request that names its pinned
+         *     definition changes only its classification and declared arguments;
+         *     a declaration that an active policy version reads cannot be
+         *     withdrawn, and a declared argument's type cannot change while an
+         *     active usage rule uses it (`conflict`). Approving never
+         *     enables anything for an agent (CAT-03). It needs If-Match with the
+         *     tool's ETag.
+         */
+        post: operations["approveCatalogTool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/tools/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline a tool or a new definition
+         * @description Declines, with a reason (`catalog.entry.approve`), the definition
+         *     that the request names, which waits for review, or, without one, a
+         *     discovered tool and every definition of it that waits. What is
+         *     declined leaves the queue of what waits for review and stays not
+         *     approved, so it stays denied; it can still be approved later. A
+         *     declined definition reported again does not return to the queue. An
+         *     approved tool keeps its pinned definition. It needs If-Match with the
+         *     tool's ETag.
+         */
+        post: operations["declineCatalogTool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/definitions/{sha256}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a tool definition
+         * @description Returns a tool definition that the core stores, for review and diffs:
+         *     the members that its hash covers (contracts, section 4.10), as the
+         *     bytes of their canonical JSON, exactly as stored, so that the
+         *     SHA-256 of the body is the hash in the path. The definition was
+         *     reported by an agent: it is untrusted text, which the console shows
+         *     as plain text. It is served only as `application/json`, with
+         *     `X-Content-Type-Options: nosniff` and the API's
+         *     `Content-Security-Policy: default-src 'none'`, never as HTML. The
+         *     core stores no member over the limits of a report (a name and a
+         *     title of 256 bytes, a description of 16 KiB, each schema of 64 KiB,
+         *     annotations of 4 KiB), so a body is never larger than 1 MiB, JSON
+         *     escapes included.
+         */
+        get: operations["getToolDefinition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List models
+         * @description Lists the models of the catalog that match every filter given,
+         *     ordered by key, one page at a time (CAT-02). Their endpoints and
+         *     names were reported by agents, and are untrusted text.
+         */
+        get: operations["listCatalogModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/models/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a model
+         * @description Returns a model of the catalog, with the ETag that its approval or decline must send back.
+         */
+        get: operations["getCatalogModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/models/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a model or a new digest
+         * @description Approves a discovered model, or one of the digests of an approved
+         *     model that wait for review, for the whole organization
+         *     (`catalog.entry.approve`, the advisory committee). It pins the
+         *     digest of the weights that the request names, which must be one that
+         *     the model's runtime reported; a model whose runtime reports no digest
+         *     is approved without one. Approving never enables anything for an
+         *     agent (CAT-03). It needs If-Match with the model's ETag.
+         */
+        post: operations["approveCatalogModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/models/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline a model or a new digest
+         * @description Declines, with a reason (`catalog.entry.approve`), the digest that
+         *     the request names, which waits for review, or, without one, a
+         *     discovered model and every digest of it that waits. What is declined
+         *     leaves the queue of what waits for review and stays denied; it can
+         *     still be approved later. An approved model keeps its pinned digest.
+         *     It needs If-Match with the model's ETag.
+         */
+        post: operations["declineCatalogModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/declines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline everything an agent brought that waits for review
+         * @description Declines at once, with a reason, every entry, definition and digest
+         *     that the agent's reports brought and that still waits for review
+         *     (`catalog.entry.approve`): the answer to an agent that floods the
+         *     queue (threat model, T-74). What is declined stays denied, and frees
+         *     the agent's room for what waits for review (CORE-13). Approved
+         *     entries keep what they pinned.
+         */
+        post: operations["declinePendingFromAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List blocks
+         * @description Lists organization-wide blocks, the latest issued first, with their
+         *     spread to enforcement points (CAT-04): the active ones by default.
+         *     What a block covers is shown in clear only here, to the callers who
+         *     may view the catalog. The design of blocks is reserved for the halt
+         *     path's review (plan P1-16, step 7), which may change this operation.
+         */
+        get: operations["listCatalogBlocks"];
+        put?: never;
+        /**
+         * Block a server, a tool or models
+         * @description Blocks, for the whole organization and at once, with a reason, an MCP
+         *     server and its tools, a tool, a model, every model of a provider or
+         *     every model of an endpoint (CAT-04; `catalog.block.issue`). The block
+         *     names what it covers by reference, so it also covers what the
+         *     catalog has not seen yet; enforcement points receive the SHA-256 of
+         *     the reference in the watch stream, without a new bundle. It takes a
+         *     governance state version. At most 500 blocks are active, and one
+         *     more is refused (`conflict`), as is a second active block of the same
+         *     kind and reference. A block never changes an entry's status. The
+         *     design of blocks is reserved for the halt path's review (plan P1-16,
+         *     step 7), which may change this operation.
+         */
+        post: operations["issueCatalogBlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/blocks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a block
+         * @description Returns a block, with its spread to enforcement points and its
+         *     pending unblock request. The design of blocks is reserved for the
+         *     halt path's review (plan P1-16, step 7), which may change this
+         *     operation.
+         */
+        get: operations["getCatalogBlock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/blocks/{id}/unblock-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request that a block be lifted
+         * @description Asks, with a reason, that an active block be lifted
+         *     (`catalog.unblock.request`). Someone else on the steering or the
+         *     advisory committee approves it (HUM-04). A block has one pending
+         *     request at most (`conflict`). The design of blocks is reserved for
+         *     the halt path's review (plan P1-16, step 7), which may change this
+         *     operation.
+         */
+        post: operations["requestCatalogUnblock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/blocks/{id}/unblock-requests/{requestId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve lifting a block
+         * @description Approves a pending unblock request, and lifts the block in a
+         *     governance state version of its own (`catalog.unblock.approve`).
+         *     Nobody approves their own request (`forbidden`, HUM-04, ST-81), and
+         *     the database refuses it too. Lifting a block leaves every entry as it
+         *     was. The design of blocks is reserved for the halt path's review
+         *     (plan P1-16, step 7), which may change this operation.
+         */
+        post: operations["approveCatalogUnblock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/blocks/{id}/unblock-requests/{requestId}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline lifting a block
+         * @description Declines a pending unblock request, with a reason
+         *     (`catalog.unblock.approve`): the block stays active, and can take
+         *     another request. A decline only denies, so the requester may decline
+         *     their own request. The design of blocks is reserved for the halt
+         *     path's review (plan P1-16, step 7), which may change this operation.
+         */
+        post: operations["declineCatalogUnblock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/usage-rules/compile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compile usage rules into Cedar
+         * @description Writes the Cedar statements of a policy's usage rules, as the core's
+         *     check at submission regenerates them, for the console's forms and for
+         *     policy-as-code repositories (RFC-0002, section 8; contracts, section
+         *     6.11). It writes exactly what the reference generator of the
+         *     conformance kit writes (`test/conformance/profile`, `GenerateRules`),
+         *     and refuses what it refuses (`bad_request`, with the reason): for
+         *     each rule, and for each of its tools in their order, its
+         *     `tool.invoke` statement, then its `tool.expose` statement. A global
+         *     policy's rules take the arguments that the catalog declares, and
+         *     cannot name an agent's own tool (`agent/<name>`); an agent-specific
+         *     policy's take those of the agent's catalog. The rules are given as
+         *     JSON text, as their annotations carry them, so that the generator
+         *     reads exactly what a policy would hold: a repeated member name, a
+         *     lone surrogate or an integer beyond 64 bits is refused rather than
+         *     read another way. The text is at most 256 KiB, and statements that
+         *     would exceed 2 MiB, the limit of a whole bundle (contracts, step V1),
+         *     are refused before they are written. Compiling changes nothing.
+         */
+        post: operations["compileUsageRules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/tooling": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an agent's tooling
+         * @description Lists the MCP servers, tools and models observed, enabled or declared
+         *     for the agent, ordered by kind and key, one page at a time (UI-10):
+         *     for each, whether it is enabled and declared, and each observation,
+         *     with its source, its origin and when it was first and last seen. An
+         *     entry that the agent no longer has stays listed while it is enabled.
+         *     Observations were reported by the agent's enforcement points, and are
+         *     untrusted.
+         */
+        get: operations["listAgentTooling"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/tooling/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable an agent's tooling
+         * @description Disables, at once and with a reason, tools and models enabled for the
+         *     agent; naming an MCP server disables its tools (CAT-03). The agent's
+         *     owners disable it, and the advisory committee and operators disable
+         *     any agent's (`tooling.disable`). It takes no If-Match: a disable only
+         *     restricts, and never waits on a version. An entry that is not
+         *     enabled is left out of the answer. Enabling again needs a new
+         *     request. The agent's next bundle no longer lists the entry as
+         *     enabled.
+         */
+        post: operations["disableAgentTooling"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/tooling-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an agent's requests to enable tooling
+         * @description Lists the agent's requests to enable tools and models, newest first, with their decisions.
+         */
+        get: operations["listAgentToolingRequests"];
+        put?: never;
+        /**
+         * Request enabling tooling for an agent
+         * @description Asks, with a reason, that an approved tool or model be enabled for
+         *     the agent; naming an approved MCP server asks for its approved tools
+         *     at once (CAT-03). The agent's owners ask for their agents, and the
+         *     advisory committee for any (`tooling.enable.request`). Someone else
+         *     on the advisory committee approves it (HUM-04). An entry that is not
+         *     approved, an agent that is retired or rejected, and a second pending
+         *     request for the same entry are refused (`conflict`). The request
+         *     waits in the advisory committee's inbox.
+         */
+        post: operations["requestAgentTooling"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/tooling-requests/{requestId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a request to enable tooling
+         * @description Approves a pending request, and enables what it names for the agent
+         *     (`tooling.enable.approve`, the advisory committee). Nobody approves
+         *     their own request (`forbidden`, HUM-04, ST-81), and the database
+         *     refuses it too. An entry that is no longer approved, or an agent that
+         *     was retired or rejected since, is refused (`conflict`). A request is
+         *     decided once, and never changes afterwards.
+         */
+        post: operations["approveAgentToolingRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/tooling-requests/{requestId}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline a request to enable tooling
+         * @description Declines a pending request, with a reason
+         *     (`tooling.enable.approve`): nothing is enabled. A decline only
+         *     denies, so the requester may decline their own request. A request is
+         *     decided once, and never changes afterwards.
+         */
+        post: operations["declineAgentToolingRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{id}/declared-tooling": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an agent's declared tooling
+         * @description Returns the tooling that people declared for the agent, with the ETag
+         *     that a new declaration must send back. An agent without a
+         *     declaration has an empty one.
+         */
+        get: operations["getAgentDeclaredTooling"];
+        /**
+         * Declare an agent's tooling
+         * @description Replaces the tooling declared for an agent without an enforcement
+         *     point, so that the inventory is complete (CAT-08): the agent's owners
+         *     declare it, and operators declare any agent's (`tooling.declare`).
+         *     Nothing enforces it, and a declaration never approves, enables or
+         *     unblocks anything (CORE-10): what the catalog lacks becomes a
+         *     discovered entry. It takes the shape and the limits of a tooling
+         *     report (contracts, section 4.10), and is accepted only for an agent
+         *     below coverage C2 (`conflict`). It needs If-Match with the ETag of
+         *     getAgentDeclaredTooling.
+         */
+        put: operations["declareAgentTooling"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1672,8 +2367,12 @@ export interface components {
             /**
              * @description What waits: `use_case_validation`, `policy_approval`,
              *     `review_due`, `review_signoff`, `halt_release`,
-             *     `ownership_transfer` or `module_approval`. Later plans add kinds,
-             *     and a client shows a kind it does not know generically.
+             *     `ownership_transfer`, `module_approval`, `catalog_review` (an
+             *     entry, a definition or a digest of the catalog that waits for
+             *     review), `tooling_request` (a request to enable tooling for an
+             *     agent) or `unblock_request` (a request to lift a block). Later
+             *     plans add kinds, and a client shows a kind it does not know
+             *     generically.
              */
             kind: string;
             /** @description The kind of resource the item is about, such as `agent`, `review` or `ownership_transfer`. */
@@ -1699,6 +2398,566 @@ export interface components {
         InboxItemList: {
             items: components["schemas"]["InboxItem"][];
             nextCursor?: string | null;
+        };
+        /**
+         * @description An entry is discovered until the advisory committee approves it
+         *     (CAT-02). A declined entry stays discovered, so it stays denied.
+         * @enum {string}
+         */
+        CatalogStatus: "discovered" | "approved";
+        /**
+         * @description What the core flags for reviewers: `unpinned_package`, a local server
+         *     launched through `npx`, `uvx`, `pipx run` or `bunx` without an exact
+         *     version (threat model, T-77); `secret_in_path`, a reference whose URL
+         *     path has a segment that looks like a secret, for which the
+         *     administrator may add a redaction rule (CAT-10, T-76). Later plans
+         *     may add flags: a client shows a flag it does not know as it is, and a
+         *     filter on a flag the server does not know is refused
+         *     (`bad_request`).
+         */
+        CatalogFlag: string;
+        /** @enum {string} */
+        CatalogEntryType: "server" | "tool" | "model";
+        /**
+         * @description `function` is the agent's own code, `mcp` a tool of an MCP server,
+         *     `builtin` a tool that the model provider defines and runs, and
+         *     `http` and `other` the agent's own tools of those kinds (contracts,
+         *     section 4.10).
+         * @enum {string}
+         */
+        ToolKind: "function" | "mcp" | "builtin" | "http" | "other";
+        /**
+         * @description Who runs the tool, as a source reported it: `agent` (the agent's
+         *     process, or an MCP server the agent connects to) or `provider` (the
+         *     model provider, during a model call). One remote MCP server can be
+         *     run by one agent and by another agent's provider, so the origin is
+         *     an observation's, never the catalog entry's.
+         * @enum {string}
+         */
+        ToolOrigin: "agent" | "provider";
+        /** @enum {string} */
+        CatalogRequestStatus: "pending" | "approved" | "declined";
+        /**
+         * @description An argument's type, as Cedar names it (contracts, section 7.7).
+         * @enum {string}
+         */
+        ArgumentType: "String" | "Long" | "Bool" | "Set<String>" | "Set<Long>";
+        /**
+         * @description The transform that applies to a string, or to each string of a set, before policies see it (contracts, section 6.11).
+         * @enum {string}
+         */
+        ArgumentTransform: "lowercase" | "path" | "url_host" | "email_domain";
+        /**
+         * @description A reviewer's decline of an entry, or of one of its definitions or
+         *     digests, which then no longer waits for review.
+         */
+        CatalogDecline: {
+            reason: string;
+            declinedBy: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            declinedAt: string;
+            /** @description The declined definition, when a definition was declined rather than the tool. */
+            definitionSha256?: string;
+            /** @description The declined digest, when a digest was declined rather than the model. */
+            digest?: string;
+        };
+        /**
+         * @description An MCP server of the catalog (RFC-0002, section 3). Its reference,
+         *     announced name and version and display form were reported, redacted
+         *     by the enforcement point and again by the core (CAT-10): untrusted
+         *     text, shown as plain text.
+         */
+        CatalogServer: {
+            /** Format: uuid */
+            id: string;
+            /** @description The key that the core assigned, which never changes once the server is approved. */
+            key: string;
+            /** @description The server's reference, a normalized URL, a `connector:` name or a `stdio:` command line (contracts, section 4.10). */
+            reference: string;
+            /** @enum {string} */
+            transport: "stdio" | "http";
+            /** @description The name the server announces. */
+            announcedName?: string;
+            /** @description The version the server announces. */
+            announcedVersion?: string;
+            /** @description The server's URL or command line, redacted. */
+            displayForm?: string;
+            status: components["schemas"]["CatalogStatus"];
+            /** @description Whether an active block covers the server; a block never changes its status. */
+            blocked: boolean;
+            /** @description Whether the server waits for review. */
+            pendingReview: boolean;
+            flags: components["schemas"]["CatalogFlag"][];
+            /**
+             * Format: uuid
+             * @description The agent whose report or declaration first brought the server.
+             */
+            firstAgentId: string;
+            /** Format: date-time */
+            firstSeenAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            approvedBy?: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            approvedAt?: string;
+            lastDecline?: components["schemas"]["CatalogDecline"];
+        };
+        CatalogServerList: {
+            servers: components["schemas"]["CatalogServer"][];
+            nextCursor?: string | null;
+        };
+        /**
+         * @description The reviewer's classification of a tool, which policies read
+         *     (`read_only`, `destructive` and `open_world`). The MCP annotations
+         *     are hints from the server; these values have been reviewed.
+         */
+        ToolClassification: {
+            readOnly: boolean;
+            destructive: boolean;
+            openWorld: boolean;
+        };
+        /**
+         * @description An argument that policies may see (RFC-0002, section 7.5): its path
+         *     in the call's arguments, through objects only, its transform and its
+         *     type. A property whose name holds `.` or `:` cannot be declared, and
+         *     a transform applies to `String` and `Set<String>` only. The
+         *     argument's name is its path joined with `.`, followed by `:` and the
+         *     transform when it has one, and a tool declares each name once.
+         */
+        ToolArgumentDeclaration: {
+            path: string[];
+            transform?: components["schemas"]["ArgumentTransform"];
+            type: components["schemas"]["ArgumentType"];
+        };
+        /** @description A declared argument, under the name that is its key in the tool's record of `context.args`. */
+        ToolArgument: {
+            name: string;
+            path: string[];
+            transform?: components["schemas"]["ArgumentTransform"];
+            type: components["schemas"]["ArgumentType"];
+        };
+        /**
+         * @description A tool of the catalog (RFC-0002, section 3). An MCP tool names its
+         *     server, an agent's own tool its agent, and a built-in tool its
+         *     provider and type. Its name was reported: untrusted text. The tool
+         *     has no origin: each observation has its own (listAgentTooling).
+         */
+        CatalogTool: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description The key that the core assigned: `<server key>/<name>`,
+             *     `agent/<name>` for an agent's own tool, unique within its agent,
+             *     or `provider.<provider>/<type>` for a built-in tool. It never
+             *     changes once the tool is approved.
+             */
+            key: string;
+            kind: components["schemas"]["ToolKind"];
+            name: string;
+            /**
+             * Format: uuid
+             * @description An MCP tool's server.
+             */
+            serverId?: string;
+            /**
+             * Format: uuid
+             * @description The agent whose own tool this is.
+             */
+            agentId?: string;
+            /** @description A built-in tool's provider. */
+            provider?: string;
+            /** @description A built-in tool's type, as its provider names it. */
+            type?: string;
+            status: components["schemas"]["CatalogStatus"];
+            /** @description Whether an active block covers the tool or its server. */
+            blocked: boolean;
+            /** @description Whether the tool, or one of its definitions, waits for review. */
+            pendingReview: boolean;
+            /** @description The pinned definition hash, once approved; a built-in tool has none. */
+            definitionSha256?: string;
+            /**
+             * @description The reported definitions that differ from the pinned one and wait
+             *     for review, by hash. Enforcement points deny and hide the tool
+             *     for an agent whose definition differs from the pinned one
+             *     (RFC-0002, section 7.1).
+             */
+            pendingDefinitions: string[];
+            classification?: components["schemas"]["ToolClassification"];
+            /** @description The arguments policies may see, empty until a reviewer declares them. */
+            arguments: components["schemas"]["ToolArgument"][];
+            /**
+             * Format: uuid
+             * @description The agent whose report or declaration first brought the tool.
+             */
+            firstAgentId: string;
+            /** Format: date-time */
+            firstSeenAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            approvedBy?: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            approvedAt?: string;
+            lastDecline?: components["schemas"]["CatalogDecline"];
+        };
+        CatalogToolList: {
+            tools: components["schemas"]["CatalogTool"][];
+            nextCursor?: string | null;
+        };
+        /**
+         * @description A tool definition, the members that its hash covers, as reported
+         *     (contracts, section 4.10): an MCP tool's `name`, `title`,
+         *     `description`, `inputSchema`, `outputSchema` and `annotations`, and
+         *     another tool's `name` and `inputSchema`. Integers keep their exact
+         *     value, whatever their size.
+         */
+        ToolDefinition: {
+            name: string;
+            title?: string;
+            description?: string;
+            /** @description The tool's input schema, as reported. */
+            inputSchema?: unknown;
+            /** @description The tool's output schema, as reported. */
+            outputSchema?: unknown;
+            /** @description The tool's MCP annotations, as reported. */
+            annotations?: unknown;
+        };
+        /**
+         * @description A model of the catalog (RFC-0002, section 3). Its endpoint and name
+         *     were reported: untrusted text.
+         */
+        CatalogModel: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description The key that the core assigned, a slug of the provider or the
+             *     endpoint, a slash and a slug of the name. It never changes once
+             *     the model is approved.
+             */
+            key: string;
+            /** @description The provider, from the contracts' table of model providers (section 6.3) or a lowercase name of its own. */
+            provider: string;
+            /** @description The normalized base URL of the endpoint the agent calls. */
+            endpoint: string;
+            /** @description The model's name, as requested. */
+            name: string;
+            status: components["schemas"]["CatalogStatus"];
+            /** @description Whether an active block covers the model, its provider or its endpoint. */
+            blocked: boolean;
+            /** @description Whether the model, or one of its digests, waits for review. */
+            pendingReview: boolean;
+            flags: components["schemas"]["CatalogFlag"][];
+            /** @description The pinned digest of the model's weights, when its runtime reported one at approval. */
+            digest?: string;
+            /**
+             * @description The reported digests that differ from the pinned one and wait for
+             *     review. Enforcement points deny the model for a runtime whose
+             *     digest differs from the pinned one (RFC-0002, section 7.1).
+             */
+            pendingDigests: string[];
+            /**
+             * Format: uuid
+             * @description The agent whose report or declaration first brought the model.
+             */
+            firstAgentId: string;
+            /** Format: date-time */
+            firstSeenAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            approvedBy?: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            approvedAt?: string;
+            lastDecline?: components["schemas"]["CatalogDecline"];
+        };
+        CatalogModelList: {
+            models: components["schemas"]["CatalogModel"][];
+            nextCursor?: string | null;
+        };
+        CatalogToolApproval: {
+            /** @description The definition the reviewer saw in full, which approval pins. Required for every tool but a built-in one, which must not have it. */
+            definitionSha256?: string;
+            classification: components["schemas"]["ToolClassification"];
+            /** @description The arguments policies may see; none when absent. */
+            arguments?: components["schemas"]["ToolArgumentDeclaration"][];
+        };
+        ServerToolApproval: {
+            /**
+             * Format: uuid
+             * @description A tool of the server being approved.
+             */
+            toolId: string;
+            approval: components["schemas"]["CatalogToolApproval"];
+        };
+        ApproveCatalogServerRequest: {
+            /** @description The server's tools to approve with it, each once; none when absent. */
+            tools?: components["schemas"]["ServerToolApproval"][];
+        };
+        ApproveCatalogModelRequest: {
+            /** @description The digest of the weights the reviewer approves, which approval pins. Required when the model's runtime reported one. */
+            digest?: string;
+        };
+        ReasonRequest: {
+            reason: string;
+        };
+        ApprovalRequest: {
+            comment?: string;
+        };
+        DeclineCatalogToolRequest: {
+            reason: string;
+            /** @description A definition that waits for review, to decline it rather than the tool. */
+            definitionSha256?: string;
+        };
+        DeclineCatalogModelRequest: {
+            reason: string;
+            /** @description A digest that waits for review, to decline it rather than the model. */
+            digest?: string;
+        };
+        DeclinePendingFromAgentRequest: {
+            /** Format: uuid */
+            agentId: string;
+            reason: string;
+        };
+        /** @description How many entries, definitions and digests were declined. */
+        CatalogDeclineSummary: {
+            servers: number;
+            tools: number;
+            models: number;
+            definitions: number;
+            digests: number;
+        };
+        /**
+         * @description What a block covers, which its target names (RFC-0002, section 6).
+         * @enum {string}
+         */
+        CatalogBlockKind: "server" | "tool" | "model" | "provider" | "endpoint";
+        IssueCatalogBlockRequest: {
+            kind: components["schemas"]["CatalogBlockKind"];
+            /**
+             * @description What the block covers: the string form of the reference of a
+             *     server, a tool or a model (contracts, section 4.10), a provider,
+             *     or the normalized base URL of an endpoint.
+             */
+            target: string;
+            reason: string;
+        };
+        /** @description How many connected enforcement points acknowledged a state version that carries the block (EP-15). */
+        CatalogBlockSpread: {
+            enforcementPoints: number;
+            acknowledged: number;
+        };
+        /** @description A request to lift a block, which someone else on the steering or the advisory committee decides (HUM-04). */
+        CatalogUnblockRequest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            blockId: string;
+            reason: string;
+            requestedBy: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            requestedAt: string;
+            status: components["schemas"]["CatalogRequestStatus"];
+            decidedBy?: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            decidedAt?: string;
+            /** @description The approver's comment, or the reason of a decline. */
+            comment?: string;
+        };
+        /**
+         * @description An organization-wide block (CAT-04). Enforcement points receive its
+         *     ID, kind and the SHA-256 of its target; the target in clear and the
+         *     reason stay in the core.
+         */
+        CatalogBlock: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["CatalogBlockKind"];
+            target: string;
+            /** @description The SHA-256 of the target's UTF-8 bytes. */
+            targetSha256: string;
+            /** @description The key of the catalog entry the block covers, when the catalog has one. */
+            entryKey?: string;
+            reason: string;
+            issuedBy: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            issuedAt: string;
+            /**
+             * Format: int64
+             * @description The governance state version that carries the block.
+             */
+            issuedStateVersion: number;
+            /** @enum {string} */
+            status: "active" | "lifted";
+            /** Format: date-time */
+            liftedAt?: string;
+            /**
+             * Format: int64
+             * @description The governance state version that lifted the block.
+             */
+            liftedStateVersion?: number;
+            spread?: components["schemas"]["CatalogBlockSpread"];
+            unblockRequest?: components["schemas"]["CatalogUnblockRequest"];
+        };
+        CatalogBlockList: {
+            blocks: components["schemas"]["CatalogBlock"][];
+            nextCursor?: string | null;
+        };
+        CompileUsageRulesRequest: {
+            /**
+             * Format: uuid
+             * @description The agent of an agent-specific policy; absent for a global policy.
+             */
+            agentId?: string;
+            /**
+             * @description The JSON text of the policy's usage rules, an array of objects
+             *     with `id`, `description`, `tools` and `when`, whose conditions
+             *     have `arg`, `op`, `values` and optionally `transform` and
+             *     `if_absent` (contracts, section 6.11): at most 256 KiB of UTF-8.
+             */
+            rules: string;
+        };
+        CompiledUsageRules: {
+            /** @description The Cedar statements, separated by an empty line. */
+            statements: string;
+        };
+        /**
+         * @description What one source holds of an entry for the agent: an instance's
+         *     reports, or a person's declaration. A report's tool has the origin
+         *     and the definition hash it reported, and a report's model the digest.
+         */
+        ToolingObservation: {
+            /** @enum {string} */
+            source: "report" | "declaration";
+            /**
+             * Format: uuid
+             * @description The reporting instance.
+             */
+            instanceId?: string;
+            declaredBy?: components["schemas"]["PrincipalRef"];
+            origin?: components["schemas"]["ToolOrigin"];
+            definitionSha256?: string;
+            digest?: string;
+            /** Format: date-time */
+            firstSeenAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            /** @description Whether the source's latest report or declaration still holds the entry. */
+            current: boolean;
+        };
+        /**
+         * @description An entry of the catalog as it stands for the agent. A server is
+         *     enabled when one of its tools is, since an agent is enabled to use
+         *     tools and models.
+         */
+        AgentToolingEntry: {
+            entryType: components["schemas"]["CatalogEntryType"];
+            /** Format: uuid */
+            entryId: string;
+            key: string;
+            status: components["schemas"]["CatalogStatus"];
+            blocked: boolean;
+            enabled: boolean;
+            /** Format: date-time */
+            enabledAt?: string;
+            /**
+             * Format: uuid
+             * @description The approved request that enabled the entry.
+             */
+            requestId?: string;
+            /**
+             * Format: date-time
+             * @description When the agent last used the enabled entry, as allowed decisions record it (CAT-09).
+             */
+            lastUsedAt?: string;
+            declared: boolean;
+            observations: components["schemas"]["ToolingObservation"][];
+        };
+        AgentToolingList: {
+            entries: components["schemas"]["AgentToolingEntry"][];
+            nextCursor?: string | null;
+        };
+        ToolingEntrySelector: {
+            entryType: components["schemas"]["CatalogEntryType"];
+            /** Format: uuid */
+            entryId: string;
+        };
+        ToolingEntryRef: {
+            entryType: components["schemas"]["CatalogEntryType"];
+            /** Format: uuid */
+            entryId: string;
+            key: string;
+        };
+        ToolingEntryRefList: {
+            entries: components["schemas"]["ToolingEntryRef"][];
+        };
+        DisableAgentToolingRequest: {
+            entries: components["schemas"]["ToolingEntrySelector"][];
+            reason: string;
+        };
+        RequestAgentToolingRequest: {
+            entry: components["schemas"]["ToolingEntrySelector"];
+            reason: string;
+        };
+        /** @description A request to enable a tool, a model or an MCP server's approved tools for an agent, decided once. */
+        ToolingRequest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            agentId: string;
+            entry: components["schemas"]["ToolingEntryRef"];
+            reason: string;
+            requestedBy: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            requestedAt: string;
+            status: components["schemas"]["CatalogRequestStatus"];
+            decidedBy?: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            decidedAt?: string;
+            /** @description The approver's comment, or the reason of a decline. */
+            comment?: string;
+            /** @description What the approval enabled, an MCP server's approved tools for a request that names a server. */
+            enabled?: components["schemas"]["ToolingEntryRef"][];
+        };
+        ToolingRequestList: {
+            requests: components["schemas"]["ToolingRequest"][];
+            nextCursor?: string | null;
+        };
+        /** @description A declared MCP server, as a report carries one; the server checks the limits in UTF-8 bytes. */
+        DeclaredServer: {
+            reference: string;
+            /** @enum {string} */
+            transport: "stdio" | "http";
+            name?: string;
+            version?: string;
+            displayForm?: string;
+        };
+        /**
+         * @description A declared tool, as a report carries one: an MCP tool names its
+         *     server by its position in `servers`, and a built-in tool its provider
+         *     and type.
+         */
+        DeclaredTool: {
+            kind: components["schemas"]["ToolKind"];
+            name: string;
+            server?: number;
+            provider?: string;
+            type?: string;
+        };
+        DeclaredModel: {
+            provider: string;
+            endpoint: string;
+            name: string;
+        };
+        DeclareToolingRequest: {
+            servers: components["schemas"]["DeclaredServer"][];
+            tools: components["schemas"]["DeclaredTool"][];
+            models: components["schemas"]["DeclaredModel"][];
+        };
+        DeclaredTooling: {
+            servers: components["schemas"]["DeclaredServer"][];
+            tools: components["schemas"]["DeclaredTool"][];
+            models: components["schemas"]["DeclaredModel"][];
+            declaredBy?: components["schemas"]["PrincipalRef"];
+            /** Format: date-time */
+            declaredAt?: string;
         };
     };
     responses: {
@@ -1750,6 +3009,28 @@ export interface components {
         AgentUseCaseFilter: string;
         /** @description Text to look for in the slug, the name and the description. */
         AgentSearch: string;
+        /** @description The MCP server's ID. */
+        CatalogServerId: string;
+        /** @description The tool's ID. */
+        CatalogToolId: string;
+        /** @description The model's ID. */
+        CatalogModelId: string;
+        /** @description The block's ID. */
+        CatalogBlockId: string;
+        /** @description The unblock request's ID. */
+        UnblockRequestId: string;
+        /** @description The request's ID. */
+        ToolingRequestId: string;
+        /** @description The definition hash, the lowercase hexadecimal SHA-256 of the definition's canonical JSON (contracts, section 4.10). */
+        DefinitionSha256: string;
+        /** @description Entries in any of these statuses. */
+        CatalogStatusFilter: components["schemas"]["CatalogStatus"][];
+        /** @description Only the entries that wait for review, themselves or by a new definition or digest, or only the others. */
+        CatalogPendingReviewFilter: boolean;
+        /** @description Entries that carry every one of these flags. */
+        CatalogFlagFilter: components["schemas"]["CatalogFlag"][];
+        /** @description The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths. */
+        CatalogKeyFilter: string;
     };
     requestBodies: never;
     headers: {
@@ -2954,6 +4235,893 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxItemList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCatalogServers: {
+        parameters: {
+            query?: {
+                /** @description Entries in any of these statuses. */
+                status?: components["parameters"]["CatalogStatusFilter"];
+                /** @description Only the entries that wait for review, themselves or by a new definition or digest, or only the others. */
+                pendingReview?: components["parameters"]["CatalogPendingReviewFilter"];
+                /** @description Entries that carry every one of these flags. */
+                flag?: components["parameters"]["CatalogFlagFilter"];
+                /** @description The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths. */
+                key?: components["parameters"]["CatalogKeyFilter"];
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of MCP servers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogServerList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCatalogServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The MCP server's ID. */
+                id: components["parameters"]["CatalogServerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The MCP server. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogServer"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    approveCatalogServer: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The MCP server's ID. */
+                id: components["parameters"]["CatalogServerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveCatalogServerRequest"];
+            };
+        };
+        responses: {
+            /** @description The approved MCP server. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogServer"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    declineCatalogServer: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The MCP server's ID. */
+                id: components["parameters"]["CatalogServerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The declined MCP server. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogServer"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCatalogTools: {
+        parameters: {
+            query?: {
+                /** @description Entries in any of these statuses. */
+                status?: components["parameters"]["CatalogStatusFilter"];
+                /** @description Only the entries that wait for review, themselves or by a new definition or digest, or only the others. */
+                pendingReview?: components["parameters"]["CatalogPendingReviewFilter"];
+                /** @description The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths. */
+                key?: components["parameters"]["CatalogKeyFilter"];
+                /** @description The tools of this MCP server. */
+                serverId?: string;
+                /** @description The own tools of this agent. */
+                agentId?: string;
+                /** @description Tools of any of these kinds. */
+                kind?: components["schemas"]["ToolKind"][];
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of tools. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogToolList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCatalogTool: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The tool's ID. */
+                id: components["parameters"]["CatalogToolId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tool. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogTool"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    approveCatalogTool: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The tool's ID. */
+                id: components["parameters"]["CatalogToolId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogToolApproval"];
+            };
+        };
+        responses: {
+            /** @description The approved tool. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogTool"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    declineCatalogTool: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The tool's ID. */
+                id: components["parameters"]["CatalogToolId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclineCatalogToolRequest"];
+            };
+        };
+        responses: {
+            /** @description The tool, with what was declined. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogTool"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getToolDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The definition hash, the lowercase hexadecimal SHA-256 of the definition's canonical JSON (contracts, section 4.10). */
+                sha256: components["parameters"]["DefinitionSha256"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The definition, as stored. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolDefinition"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCatalogModels: {
+        parameters: {
+            query?: {
+                /** @description Entries in any of these statuses. */
+                status?: components["parameters"]["CatalogStatusFilter"];
+                /** @description Only the entries that wait for review, themselves or by a new definition or digest, or only the others. */
+                pendingReview?: components["parameters"]["CatalogPendingReviewFilter"];
+                /** @description Entries that carry every one of these flags. */
+                flag?: components["parameters"]["CatalogFlagFilter"];
+                /** @description The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths. */
+                key?: components["parameters"]["CatalogKeyFilter"];
+                /** @description The models of this provider (contracts, section 6.3). */
+                provider?: string;
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of models. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogModelList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCatalogModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The model's ID. */
+                id: components["parameters"]["CatalogModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The model. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogModel"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    approveCatalogModel: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The model's ID. */
+                id: components["parameters"]["CatalogModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveCatalogModelRequest"];
+            };
+        };
+        responses: {
+            /** @description The approved model. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogModel"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    declineCatalogModel: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The model's ID. */
+                id: components["parameters"]["CatalogModelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclineCatalogModelRequest"];
+            };
+        };
+        responses: {
+            /** @description The model, with what was declined. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogModel"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    declinePendingFromAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclinePendingFromAgentRequest"];
+            };
+        };
+        responses: {
+            /** @description How much was declined. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogDeclineSummary"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCatalogBlocks: {
+        parameters: {
+            query?: {
+                /** @description The blocks in this status. */
+                status?: "active" | "lifted";
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of blocks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogBlockList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    issueCatalogBlock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueCatalogBlockRequest"];
+            };
+        };
+        responses: {
+            /** @description The block. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogBlock"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCatalogBlock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The block's ID. */
+                id: components["parameters"]["CatalogBlockId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The block. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogBlock"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    requestCatalogUnblock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The block's ID. */
+                id: components["parameters"]["CatalogBlockId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The pending request. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogUnblockRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    approveCatalogUnblock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The block's ID. */
+                id: components["parameters"]["CatalogBlockId"];
+                /** @description The unblock request's ID. */
+                requestId: components["parameters"]["UnblockRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description The lifted block. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogBlock"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    declineCatalogUnblock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The block's ID. */
+                id: components["parameters"]["CatalogBlockId"];
+                /** @description The unblock request's ID. */
+                requestId: components["parameters"]["UnblockRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The declined request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogUnblockRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    compileUsageRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompileUsageRulesRequest"];
+            };
+        };
+        responses: {
+            /** @description The Cedar statements. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompiledUsageRules"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgentTooling: {
+        parameters: {
+            query?: {
+                /** @description Entries of this kind. */
+                entryType?: components["schemas"]["CatalogEntryType"];
+                /** @description Only the enabled entries, or only the others. */
+                enabled?: boolean;
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the agent's tooling. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentToolingList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    disableAgentTooling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisableAgentToolingRequest"];
+            };
+        };
+        responses: {
+            /** @description The entries disabled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolingEntryRefList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgentToolingRequests: {
+        parameters: {
+            query?: {
+                /** @description Requests in any of these statuses. */
+                status?: components["schemas"]["CatalogRequestStatus"][];
+                /** @description Where the page starts, as the previous page returned it in `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description The page size. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolingRequestList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    requestAgentTooling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestAgentToolingRequest"];
+            };
+        };
+        responses: {
+            /** @description The pending request. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolingRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    approveAgentToolingRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+                /** @description The request's ID. */
+                requestId: components["parameters"]["ToolingRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description The approved request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolingRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    declineAgentToolingRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+                /** @description The request's ID. */
+                requestId: components["parameters"]["ToolingRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The declined request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolingRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAgentDeclaredTooling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The declared tooling. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeclaredTooling"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    declareAgentTooling: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The ETag of the version the change applies to (API-03). A change
+                 *     without it is refused with `precondition_required`, and one with an
+                 *     ETag that is no longer current with `precondition_failed` (threat
+                 *     model, T-08).
+                 */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The agent's ID. */
+                id: components["parameters"]["AgentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclareToolingRequest"];
+            };
+        };
+        responses: {
+            /** @description The declared tooling. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeclaredTooling"];
                 };
             };
             default: components["responses"]["Problem"];

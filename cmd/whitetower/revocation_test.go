@@ -119,7 +119,7 @@ func TestAnEmergencyRevocationEndsEverySessionAndTokenOnEveryReplica(t *testing.
 		t.Errorf("a token with the emergency revocation's permission: %s", refused)
 	}
 	_, created = call(t, http.StatusCreated, http.MethodPost, withOIDC.console+"/api/v1/tokens",
-		`{"name":"everything","scopes":["identity.me.read","identity.tokens.manage","inventory.view","settings.manage"]}`, admin.change)
+		`{"name":"everything","scopes":["catalog.view","identity.me.read","identity.tokens.manage","inventory.view","settings.manage"]}`, admin.change)
 	adminsToken := bearer(created)
 	running, other := custodian(withoutOIDC), custodian(withOIDC)
 

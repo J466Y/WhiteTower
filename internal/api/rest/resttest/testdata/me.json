@@ -11,11 +11,15 @@
     "agent.review",
     "agent.suspend",
     "audit.events.read",
+    "catalog.view",
     "halt.agent.issue",
     "halt.release.request",
     "identity.me.read",
     "inventory.view",
-    "policy.agent.author"
+    "policy.agent.author",
+    "tooling.declare",
+    "tooling.disable",
+    "tooling.enable.request"
   ],
   "roles": [
     "owner"

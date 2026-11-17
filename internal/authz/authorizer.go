@@ -102,6 +102,42 @@ func (az *Authorizer) registerDefaults() {
 	az.operations["completeReview"] = PermissionAgentReview
 	az.operations["signOffReview"] = PermissionAgentReview
 	az.operations["listInboxItems"] = PermissionIdentityMeRead
+
+	// The catalog of MCP servers, tools and models, and agents' tooling (plan
+	// P1-16). The handlers of the agents' tooling check the scope of each
+	// grant against the agent, as the inventory's do: an owner requests,
+	// disables and declares only for the agents they own.
+	az.operations["listCatalogServers"] = PermissionCatalogView
+	az.operations["getCatalogServer"] = PermissionCatalogView
+	az.operations["approveCatalogServer"] = PermissionCatalogEntryApprove
+	az.operations["declineCatalogServer"] = PermissionCatalogEntryApprove
+	az.operations["listCatalogTools"] = PermissionCatalogView
+	az.operations["getCatalogTool"] = PermissionCatalogView
+	az.operations["approveCatalogTool"] = PermissionCatalogEntryApprove
+	az.operations["declineCatalogTool"] = PermissionCatalogEntryApprove
+	az.operations["getToolDefinition"] = PermissionCatalogView
+	az.operations["listCatalogModels"] = PermissionCatalogView
+	az.operations["getCatalogModel"] = PermissionCatalogView
+	az.operations["approveCatalogModel"] = PermissionCatalogEntryApprove
+	az.operations["declineCatalogModel"] = PermissionCatalogEntryApprove
+	az.operations["declinePendingFromAgent"] = PermissionCatalogEntryApprove
+	az.operations["listCatalogBlocks"] = PermissionCatalogView
+	az.operations["issueCatalogBlock"] = PermissionCatalogBlockIssue
+	az.operations["getCatalogBlock"] = PermissionCatalogView
+	az.operations["requestCatalogUnblock"] = PermissionCatalogUnblockRequest
+	az.operations["approveCatalogUnblock"] = PermissionCatalogUnblockApprove
+	// A decline only denies, so whoever may approve may decline any
+	// request, their own included.
+	az.operations["declineCatalogUnblock"] = PermissionCatalogUnblockApprove
+	az.operations["compileUsageRules"] = PermissionCatalogView
+	az.operations["listAgentTooling"] = PermissionCatalogView
+	az.operations["listAgentToolingRequests"] = PermissionCatalogView
+	az.operations["requestAgentTooling"] = PermissionToolingEnableRequest
+	az.operations["approveAgentToolingRequest"] = PermissionToolingEnableApprove
+	az.operations["declineAgentToolingRequest"] = PermissionToolingEnableApprove
+	az.operations["disableAgentTooling"] = PermissionToolingDisable
+	az.operations["getAgentDeclaredTooling"] = PermissionCatalogView
+	az.operations["declareAgentTooling"] = PermissionToolingDeclare
 }
 
 // RegisterOperation maps an OpenAPI operation ID to a Permission.

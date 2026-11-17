@@ -96,11 +96,19 @@ func sender(h http.Handler) func(method, path, as, body string, header http.Head
 
 func ifMatch(etag string) http.Header { return http.Header{"If-Match": []string{etag}} }
 
-// unbuilt lists the operations of plan P1-04 whose server side is not built
-// yet. The pull request that builds one removes it from here.
+// unbuilt lists the operations of plans P1-04 and P1-16 whose server side is
+// not built yet. The pull request that builds one removes it from here.
 var unbuilt = []string{
 	"exportAgents", "listAgentInstances",
 	"listAgentReviews", "listReviews", "getReview", "completeReview", "signOffReview", "listInboxItems",
+	// P1-16: the catalog, its blocks and usage rules, and agents' tooling.
+	"listCatalogServers", "getCatalogServer", "approveCatalogServer", "declineCatalogServer",
+	"listCatalogTools", "getCatalogTool", "approveCatalogTool", "declineCatalogTool", "getToolDefinition",
+	"listCatalogModels", "getCatalogModel", "approveCatalogModel", "declineCatalogModel", "declinePendingFromAgent",
+	"listCatalogBlocks", "issueCatalogBlock", "getCatalogBlock",
+	"requestCatalogUnblock", "approveCatalogUnblock", "declineCatalogUnblock", "compileUsageRules",
+	"listAgentTooling", "disableAgentTooling", "listAgentToolingRequests", "requestAgentTooling",
+	"approveAgentToolingRequest", "declineAgentToolingRequest", "getAgentDeclaredTooling", "declareAgentTooling",
 }
 
 // An operation that is agreed but not built answers not_implemented to a
