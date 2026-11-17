@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 0 Foundations |
-| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/` are done, and its review is closed (2026-11-05); so are step 12's protobuf and its schemas of events, manifests and decision responses (pull request 2), and its other schemas and its vectors on both stacks (pull request 3, 2026-11-17). Section 9.1's counts and appendix A, which the reviewer updates, and the tag remain (see [progress notes](#progress-notes)) |
+| **Status** | In progress: RFC-0001 and RFC-0002 are accepted provisionally (2026-10-23 and 2026-10-26), and RFC-0002 is in the specification. RFC-0001's changes to `api/` are done, and its review is closed (2026-11-05); so are step 12's protobuf and its schemas of events, manifests and decision responses (pull request 2), and its other schemas and its vectors on both stacks (pull request 3), and the reviewer's update of section 9.1's counts and appendix A (pull request 4): step 12 is done (2026-11-17). Only the tag `contracts/v0.1.0` remains, which is the maintainer's (see [progress notes](#progress-notes)) |
 | **Size** | L |
 | **Depends on** | P0-02 (entities, governance state record), P0-05 spike S1 (AGT facts); RFC-0002 accepted, for step 12 |
 | **Unblocks** | P0-04, P1-07, P1-09, P1-15, and the Phase 0 gate; through step 12, the parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 |
@@ -241,6 +241,7 @@ The maintainer brought the MCP servers, tools and models of agents into the MVP 
 | 1. Specification text | RFC-0002 in the specification (reserved for the reviewer) | Done |
 | 2. Protobuf, schemas and examples | `api/proto`, the kit's fake core, `api/events`, `api/manifest`, and the reasons of the decision response (the note of step 12's pull request 2, of 2026-11-05, says why the rest of `api/policy` moved to pull request 3) | Done |
 | 3. Vectors on both stacks | The decision request's schema, the Cedar schema, the bundle manifest's `catalog` and the catalog file's schema; the new vectors, the rewritten combination vectors, the Go profile, the Python checker and the reference bundle verifier. In seven parts, 3a-1, 3a-2, 3b, 3c, 3d-1, 3d-2 and 3d-3, which the notes of 2026-11-05 (the review of pull request 2), 2026-11-06 and 2026-11-12 list | Done (7 of 7 parts) |
+| 4. The counts and appendix A | Section 9.1's counts of vectors, and the valid bundle's reference in appendix A (reserved for the reviewer) | Done |
 
 ### 2026-10-20: changes from the halt-path design
 
@@ -1493,3 +1494,9 @@ For the specification, which is the reviewer's: section 9.1 gains `usage-rules.j
 | `catalog-check.json` | 69 |
 | `exposure.json` | 27 |
 | `usage-rules.json` | 193 |
+
+### 2026-11-17: the end of step 12
+
+Part 3d-3 is merged (#139), and so is the reviewer's pull request after it (#140): section 9.1 counts every vector file, 927 cases in all, and names the Python stack's `idna`; appendix A's watch examples take the valid bundle, `8afe1113…`, of 8802 bytes. Step 12 is done: `task verify:gen` passes, both stacks pass every vector, and the specification, `api/` and the vectors agree with RFC-0002 as accepted.
+
+The tag `contracts/v0.1.0` is the maintainer's, and closes the plan. The parts of P1-06, P1-07, P1-09 and P1-16 that build on RFC-0002 no longer wait for step 12; `test/conformance/profile` holds the reference code that the core's catalog check and usage rules match, and [P1-16's progress notes](../phase-1/P1-16-mcp-servers-tools-and-models.md#progress-notes) of 2026-11-16 list what the reviews of step 12 left to it.

@@ -5,4 +5,4 @@ An RFC proposes a change to the module contracts (`api/proto`, `api/events`, `ap
 | RFC | Title | Status |
 | --- | --- | --- |
 | [0001](0001-module-contracts-v0.1.md) | Module contracts v0.1 | Accepted provisionally on 2026-10-23, after the maintainer's review; its changes to `api/` follow before the tag (plan [P0-03](../plans/phase-0/P0-03-module-contracts.md)) |
-| [0002](0002-mcp-servers-tools-and-models.md) | MCP servers, tools and models | Accepted provisionally on 2026-10-26, after the maintainer's review; its contract changes follow before the tag (plans [P0-03](../plans/phase-0/P0-03-module-contracts.md), step 12, and [P1-16](../plans/phase-1/P1-16-mcp-servers-tools-and-models.md)) |
+| [0002](0002-mcp-servers-tools-and-models.md) | MCP servers, tools and models | Accepted provisionally on 2026-10-26, after the maintainer's review; its contract changes followed in plan [P0-03](../plans/phase-0/P0-03-module-contracts.md), step 12, done on 2026-11-17, before the tag, and [P1-16](../plans/phase-1/P1-16-mcp-servers-tools-and-models.md) builds on them |
