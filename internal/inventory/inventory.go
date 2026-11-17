@@ -38,6 +38,9 @@ type Options struct {
 	// Policies tells whether an agent has an active agent-specific policy,
 	// which activation needs.
 	Policies AgentPolicies
+	// SelectorHalts gives the active selector halts that an agent matches,
+	// which every write of its governance state adds.
+	SelectorHalts SelectorHalts
 	// RoleMapping maps IdP groups to roles, as the authentication does: it
 	// tells who holds the owner role, which owning an agent needs.
 	RoleMapping map[string]string
@@ -51,6 +54,7 @@ type Inventory struct {
 	authorizer  auth.Authorizer
 	versions    StateVersions
 	policies    AgentPolicies
+	halts       SelectorHalts
 	roleMapping map[string]string
 }
 
@@ -63,6 +67,7 @@ func New(opts Options) *Inventory {
 		authorizer:  opts.Authorizer,
 		versions:    opts.Versions,
 		policies:    opts.Policies,
+		halts:       opts.SelectorHalts,
 		roleMapping: opts.RoleMapping,
 	}
 }

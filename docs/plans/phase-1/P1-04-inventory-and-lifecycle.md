@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (5 of 10 pull requests) |
+| **Status** | In progress (6 of 10 pull requests) |
 | **Size** | L |
 | **Depends on** | P1-03 (and the P1-02 writer); the first pull request of P1-07.1 for pull requests 4 to 8 |
 | **Unblocks** | P1-05, P1-06, P1-08, P1-10.2, P1-16 (steps 1 to 4) |
@@ -167,7 +167,7 @@ The plan lands in ten pull requests, the fourth in three parts (the maintainer's
 | 3. Ownership | 3; the inbox items of transfers | Done |
 | 4a. Lifecycle engine: the proposal phase | 5 for T2 to T6, with `transitionAgent` and `listAgentTransitions`; the check of the engine's table against `agent-lifecycle.yaml`; ST-23 for their guards; a token without the action's scope is refused (ST-19); separation of duties over past assignments; `service_account` in `lifecycle_transitions.actor_type`; the advisory committee's inbox item of a submitted proposal; a rejection cancels the pending ownership transfer | Done |
 | 4b. Lifecycle engine: into and out of service | 5 for T9, T10, T13 and T14, through P1-06's interface, stubbed: no agent policy is active; `getAgentActions`; the property tests, 10,000 sequences on the decision core and about 200 on PostgreSQL; ST-23 for activation without the invariant; service accounts take only T10, which the lifecycle says beside "People decide on proposals"; T14 cancels the pending ownership transfer and takes the proposal out of the advisory committee's inbox | Done |
-| 4c. Lifecycle engine: the transitions White Tower makes | 5 for T7, T8, T11 and T12: the entry point for the transitions White Tower makes, where T12 skips drills, and T7 when an edit declares a harness; the active selector halts in every write of the state record, through P1-08's interface, stubbed; the shared form of the selector halts' advisory lock, with the key of `internal/govstate`, taken first in T1 and `editAgent`; `state_version` in `whitetower.agent.updated.v1` when a change concerns what enforcement points see ([design note](P1-08-kill-switch.md#progress-notes), sections 8, 13 and 14) | Not started |
+| 4c. Lifecycle engine: the transitions White Tower makes | 5 for T7, T8, T11 and T12: the entry point for the transitions White Tower makes, where T12 skips drills, and T7 when an edit declares a harness; the active selector halts in every write of the state record, through P1-08's interface, stubbed; the shared form of the selector halts' advisory lock, with the key of `internal/govstate`, taken first in T1 and `editAgent`; `state_version` in `whitetower.agent.updated.v1` when a change concerns what enforcement points see ([design note](P1-08-kill-switch.md#progress-notes), sections 8, 13 and 14) | Done |
 | 5. Reviews and the lifecycle guard job | 6, 7, through P1-16's interface, stubbed; the guard job suspends one agent per transaction | Not started |
 | 6. Coverage, instances, search and export | 8, 9; ST-24, with cells that start after a `;` or with a tab or a carriage return; C3 through P1-08's interface, stubbed | Not started |
 | 7. Inbox and notifications | 10; the dismissal of items that ask for no action, each member their own copy (P1-17 step 4, DC-4) | Not started |
@@ -405,3 +405,42 @@ A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-0
 - T13 gains the guard `not_owner_or_creator`, as T4 to T6 have it. An operator or an advisory member who is or ever was the agent's primary owner or one of its delegates, or who created the agent or its use case, is refused reinstatement with `forbidden`; another operator or advisory member reinstates it. Putting an agent back into service is the decision of someone independent.
 - `agent-lifecycle.yaml`, the lifecycle's T13 row and the description of `transitionAgent` say so.
 - Tests: an operator who is a delegate, an advisory member who was once the primary owner and the creator of the agent's use case are refused, `getAgentActions` names the guard for each of them, and another operator reinstates the agent (ST-18). Both property tests have callers whom separation of duties refuses, and the decision core's fails unless some sequence asks one of them to reinstate the agent.
+
+### 2026-11-17: lifecycle engine, the transitions White Tower makes (PR 4c)
+
+**What part 4c builds:**
+
+- **The entry point for the transitions White Tower makes,** `Inventory.SystemTransition(ctx, tx, agentID, cause)`, for T7, T8, T11 and T12. Its callers are an edit that declares a harness (T7), the guard job of pull request 5 (T11), P1-06's activation and retirement of agent-specific policies (T7 and T8) and P1-08's agent halt (T12). It follows the reading of the [design note](P1-08-kill-switch.md#progress-notes), section 8, accepted on 2026-11-12:
+  - it runs in its caller's transaction and at its version, through `StateVersions.Next`, and checks no permission and no If-Match;
+  - it locks the agent's row, then its governance state, both `FOR NO KEY UPDATE`, before it calls `Next`. A caller that has already called `Next`, as a halt does, holds both already, and locking them again waits for nothing;
+  - it reports whether the agent moved, and never fails its caller's transaction because a guard does not hold or the agent is in a state that the transition does not start from: the agent then stays as it is. A cause that names no such transition, or no reason of T11, is a fault of its caller, which fails;
+  - it gives the agent's row a new version, so an edit whose If-Match was read before it fails with `precondition_failed`;
+  - it changes only the lifecycle state of the governance state (`SetStateLifecycle`), keeping the lease, the halt mode, the attributes and the halts, skips the selector halts' fold, and reads no setting;
+  - it writes the `lifecycle_transitions` row and `whitetower.agent.lifecycle_changed.v1` with the system as actor. `apply` and the entry point share the code that writes them (`record`).
+- **The guards of these transitions** are in the engine's table with the others, and the entry point reads only what its transition's guards need, so that a halt reads no policy, no owner and no review:
+
+  | Transition | Guard | How the entry point reads it |
+  | --- | --- | --- |
+  | T7 | `agent_policy_active`, `harness_declared` | P1-06's `AgentPolicies`, asked under the agent's row lock, and the agent's harness |
+  | T8 | `agent_policy_or_harness_missing` | The same, negated |
+  | T11 | `owner_inactive_or_review_overdue` | The reason that its caller asserts must hold: `owner_inactive` while the primary owner is inactive, `review_overdue` while an open review's grace period has ended before the application's clock. The suspension records that reason, never one that does not hold |
+  | T12 | `agent_halt_issued` | The halt that its caller names is an agent halt of this agent, other than a drill, at the transaction's version: a drill suspends nothing (section 13, decision 1). The caller holds the version already, so `Next` returns it without moving the head |
+
+- **T7 when an edit declares a harness.** An edit that declares or replaces the harness of a validated agent asks for T7, in its transaction, after its own change and its event. With P1-06's stub, T7 never fires. A harness can be replaced but not removed (pull request 1), so no edit takes T8: only P1-06's retirement of a policy does.
+- **The selector halts' fold.** Every write of the state record, in `putState`, adds after its version the active selector halts that the agent matches, through `inventory.SelectorHalts`, which P1-08 implements; `cmd/whitetower/main.go` wires `inventory.NoSelectorHalts`, which answers that none is active. The halts a state carries stay: only a release removes one (section 8). T1 now folds too, in place of the mark that pull request 2 left.
+- **The shared form of the selector halts' advisory lock,** with the key `govstate.SelectorHaltsLock`, is the first statement of T1 (`Propose`) and of an edit whose request names the labels or the risk tier, so that a writer never waits for it while it holds a row.
+- **`state_version` in `whitetower.agent.updated.v1`.** The four members that enforcement points see through an edit are `risk_tier`, which also sets the lease, `data_categories`, `labels` and `halt_mode`; the slug and the kind never change, and the owner changes in `agent.ownership_changed`. The schema requires `state_version` when `changed` holds one of them, and forbids it otherwise (the review's decision of 2026-11-17): an event that carries a version then states that the edit changed what enforcement points see at that version, and the audit writer refuses one that would point at a version that no change of the edit holds. The design note asked for "required"; the review added "and only then". The inventory already wrote it exactly then, and the example stays valid. When an edit's harness makes the agent ready, T7's own event carries the version, and the edit's does not.
+
+**Tests:** an edit that declares a harness, without and with an active agent policy, its version, history and events; each transition White Tower takes, moving the agent or leaving it as it is: T7 without a policy and of a suspended agent, T8 with and without a policy, T11 for each reason, when it holds and when it does not, and of a suspended agent, and T12 for a halt of another agent; causes that are not one; a halt that suspends a validated, ready and active agent at its own version, keeping the lease, the attributes and the halt, and refuses an edit read before it; a drill and a halt of a draft, which suspend nothing; a halt that holds the head and waits for nothing, while another session holds the selector halts' lock, the fleet's row, the owner's row and the tables of settings, reviews, use cases and owners, and a writer waits for the agent's row; the entry point locking the agent's state before the head; reinstatement after T11; the fold at T1, its absence at T7, and halts that stay after the labels change; a proposal and the edits of the labels and of the risk tier waiting for a selector halt under way while they hold no lock of the agent, and an edit of the name that does not wait; and three cases of `whitetower.agent.updated.v1`. Both property tests now take T7 and T8 through the entry point: the PostgreSQL one checks after each step that the entry point moved the agent exactly when the model expects, and counts its rows and events. The tests that brought agents to `ready` with SQL use it too, and `TestEveryGuardOfABuiltTransitionIsChecked` covers every transition but T1.
+
+**Differences from the plan:**
+
+- The row says "T7 when an edit declares a harness"; an edit that replaces one asks for T7 as well, since the guard decides and the call costs only the agent's state lock.
+- T11 records only the reason that its caller asserts, and only while it holds, rather than the guard's "owner inactive or review overdue" on its own, so that the history never names a reason that did not hold.
+
+**Follow-ups:**
+
+- Pull request 5: the guard job calls `SystemTransition` with `auto_suspend` and the reason it found, one agent per transaction; the notifications of T7, T8 and T11 wait for pull request 7, with the inbox.
+- P1-06 implements `AgentPolicies` and calls `SystemTransition` with `mark_ready` when an agent-specific policy becomes active, and `unmark_ready` when one is retired, in that transaction. It should also consider T6 and T13: an agent validated, or reinstated to `validated`, that already has an active policy and a harness stays validated until something asks for T7. Under the stub no agent has one, so nothing is lost before P1-06.
+- P1-08 implements `SelectorHalts` and wires it in place of `NoSelectorHalts`. Its agent halt locks the agent's row and its state, takes its version, inserts the halt, adds it to the state, gives the agent's row a new version, and then calls `SystemTransition` with `halt_suspend` and the halt's ID. Its selector halts take `govstate.SelectorHaltsLock` exclusively, first.
+- The bulk import (pull request 8) takes the shared lock first in each of its transactions, as row 8 says.

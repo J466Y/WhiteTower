@@ -44,21 +44,19 @@ func (f *fixture) serviceAccount(t *testing.T, role string) auth.Principal {
 	return auth.Principal{ID: id.String(), Kind: auth.ServiceAccount, Name: "Deploy bot", Roles: []string{role}}
 }
 
-// moveAsSystem moves the agent to the state given, as the transitions that
-// White Tower makes itself will (part 4c): its row at a new version, and its
-// governance state at the transaction's.
-func (f *fixture) moveAsSystem(t *testing.T, id uuid.UUID, state string) {
+// system takes a transition as White Tower, in a transaction of its own, and
+// reports whether the agent moved.
+func (f *fixture) system(t *testing.T, id uuid.UUID, c inventory.Cause) bool {
 	t.Helper()
+	var moved bool
 	if err := f.pool.InTx(context.Background(), func(ctx context.Context, tx *db.Tx) error {
-		if _, err := tx.Exec(ctx, `UPDATE whitetower.agents SET lifecycle_state = $2, version = version + 1 WHERE id = $1`, id, state); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, `UPDATE whitetower.governance_state SET lifecycle_state = $2,
-			state_version = whitetower.next_governance_version() WHERE agent_id = $1`, id, state)
+		var err error
+		moved, err = f.inv.SystemTransition(ctx, tx, id, c)
 		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
+	return moved
 }
 
 // halt halts the agent, or releases it, as an agent halt of plan P1-08 does
@@ -93,7 +91,7 @@ func (f *fixture) setStatus(t *testing.T, p auth.Principal, status string) {
 
 // inState brings an agent of Olivia's, with a harness and an active agent
 // policy, to the state given: validated, ready, active, or suspended from one
-// of those. White Tower moves it to ready, as T7 will.
+// of those. White Tower moves it to ready (T7).
 func (f *fixture) inState(t *testing.T, slug, state string) *inventory.Agent {
 	t.Helper()
 	ctx := context.Background()
@@ -104,8 +102,8 @@ func (f *fixture) inState(t *testing.T, slug, state string) *inventory.Agent {
 	f.set(t, `UPDATE whitetower.agents SET harness = '{"description": "A container."}' WHERE id = $1`, a.ID)
 	f.policies.set(a.ID, true)
 	from, suspended := strings.CutPrefix(state, "suspended from ")
-	if from != "validated" {
-		f.moveAsSystem(t, a.ID, "ready")
+	if from != "validated" && !f.system(t, a.ID, inventory.Cause{Action: "mark_ready"}) {
+		t.Fatal("White Tower did not make the agent ready")
 	}
 	if from == "active" {
 		if _, err := f.inv.Transition(ctx, f.olivia, a.ID, f.get(t, a.ID).Version, "activate", ""); err != nil {

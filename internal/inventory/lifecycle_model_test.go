@@ -206,14 +206,22 @@ func TestTheDatabaseFollowsAModelOfTheLifecycle(t *testing.T) {
 					f.review(t, a.ID, nil)
 				}
 			}
-			// T7 and T8, which White Tower takes itself (part 4c).
-			switch {
-			case m.state == "validated" && m.policy && m.harness:
-				m.state, version = "ready", version+1
-				f.moveAsSystem(t, a.ID, m.state)
-			case m.state == "ready" && !m.policy:
-				m.state, version = "validated", version+1
-				f.moveAsSystem(t, a.ID, m.state)
+			// T7 and T8, which White Tower takes itself whenever it is asked,
+			// and which move the agent only while their guards hold.
+			for _, s := range []struct {
+				action, from, to string
+				holds            bool
+			}{
+				{"mark_ready", "validated", "ready", m.policy && m.harness},
+				{"unmark_ready", "ready", "validated", !m.policy || !m.harness},
+			} {
+				want := m.state == s.from && s.holds
+				if moved := f.system(t, a.ID, inventory.Cause{Action: s.action}); moved != want {
+					t.Fatalf("%s at step %d: %s with %+v: moved %v", a.Slug, step, s.action, m, moved)
+				}
+				if want {
+					m.state, m.history, version = s.to, m.history+1, version+1
+				}
 			}
 			reached[m.state]++
 

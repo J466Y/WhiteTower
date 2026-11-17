@@ -48,13 +48,10 @@ func TestTheEngineFollowsTheLifecycleTable(t *testing.T) {
 	}
 }
 
-// Every guard of a transition that people can ask for is checked.
+// Every guard of a transition after the creation, whether people or White
+// Tower take it, is checked.
 func TestEveryGuardOfABuiltTransitionIsChecked(t *testing.T) {
-	for action := range permissions {
-		tr, err := requested(action)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, tr := range lifecycle[1:] {
 		for _, g := range tr.guards {
 			if guards[g] == nil {
 				t.Errorf("%s: nothing checks the guard %s", tr.id, g)
@@ -124,7 +121,7 @@ func TestRandomSequencesKeepTheLifecyclesRules(t *testing.T) {
 					w.useCaseStatus = []string{"validated", "rejected"}[r.IntN(2)]
 				}
 			}
-			// T7 and T8, which White Tower takes itself (part 4c).
+			// T7 and T8, which White Tower takes itself.
 			switch {
 			case a.LifecycleState == "validated" && w.policyActive && w.harnessDeclared && r.IntN(2) == 0:
 				a.LifecycleState = "ready"
@@ -173,7 +170,7 @@ func TestRandomSequencesKeepTheLifecyclesRules(t *testing.T) {
 				}
 				continue
 			}
-			b := tr.move(a, epoch)
+			b := tr.move(a, "manual", epoch)
 			if rule := broken(tr, a, b, f); rule != "" {
 				t.Fatalf("%s %s %s with %+v", tr.id, rule, a.LifecycleState, f)
 			}

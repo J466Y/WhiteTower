@@ -70,6 +70,30 @@ func (q *Queries) AddOwner(ctx context.Context, arg AddOwnerParams) error {
 	return err
 }
 
+const agentHaltIssued = `-- name: AgentHaltIssued :one
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.halts
+  WHERE id = $1 AND agent_id = $2::uuid AND scope = 'agent' AND NOT drill
+    AND state_version = $3
+)
+`
+
+type AgentHaltIssuedParams struct {
+	HaltID       uuid.UUID
+	AgentID      uuid.UUID
+	StateVersion int64
+}
+
+// Whether the halt is an agent halt of the agent, other than a drill, issued
+// at the state version given: the transaction's, so that T12 applies only the
+// halt issued in its own transaction.
+func (q *Queries) AgentHaltIssued(ctx context.Context, arg AgentHaltIssuedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, agentHaltIssued, arg.HaltID, arg.AgentID, arg.StateVersion)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const cancelPendingTransfers = `-- name: CancelPendingTransfers :many
 UPDATE whitetower.ownership_transfers SET status = 'cancelled', decided_at = $1
 WHERE agent_id = $2 AND status = 'pending'
@@ -993,13 +1017,20 @@ func (q *Queries) PrincipalRefs(ctx context.Context, ids []uuid.UUID) ([]Princip
 
 const putGovernanceState = `-- name: PutGovernanceState :exec
 INSERT INTO whitetower.governance_state (
-  agent_id, lifecycle_state, lease_ttl_seconds, halt_mode, attributes, state_version, updated_at
+  agent_id, lifecycle_state, run_state, agent_halt_ids, lease_ttl_seconds, halt_mode, attributes,
+  state_version, updated_at
 ) VALUES (
-  $1, $2, $3, $4,
-  $5, $6, $7
+  $1, $2,
+  CASE WHEN cardinality($3::uuid[]) > 0 THEN 'halted' ELSE 'running' END,
+  $3::uuid[], $4, $5,
+  $6, $7, $8
 )
 ON CONFLICT (agent_id) DO UPDATE SET
   lifecycle_state = EXCLUDED.lifecycle_state,
+  run_state = CASE WHEN governance_state.run_state = 'halted' OR EXCLUDED.run_state = 'halted'
+    THEN 'halted' ELSE 'running' END,
+  agent_halt_ids = governance_state.agent_halt_ids || ARRAY(
+    SELECT h FROM unnest(EXCLUDED.agent_halt_ids) AS h WHERE h <> ALL (governance_state.agent_halt_ids)),
   lease_ttl_seconds = EXCLUDED.lease_ttl_seconds,
   halt_mode = EXCLUDED.halt_mode,
   attributes = EXCLUDED.attributes,
@@ -1010,6 +1041,7 @@ ON CONFLICT (agent_id) DO UPDATE SET
 type PutGovernanceStateParams struct {
 	AgentID         uuid.UUID
 	LifecycleState  string
+	SelectorHaltIds []uuid.UUID
 	LeaseTtlSeconds int32
 	HaltMode        string
 	Attributes      []byte
@@ -1017,11 +1049,14 @@ type PutGovernanceStateParams struct {
 	UpdatedAt       time.Time
 }
 
-// Writes what enforcement points know of the agent, at a new state version.
+// Writes what enforcement points know of the agent, at a new state version,
+// with the active selector halts that the agent matches. The halts that its
+// state already carries stay: only a release removes a halt.
 func (q *Queries) PutGovernanceState(ctx context.Context, arg PutGovernanceStateParams) error {
 	_, err := q.db.Exec(ctx, putGovernanceState,
 		arg.AgentID,
 		arg.LifecycleState,
+		arg.SelectorHaltIds,
 		arg.LeaseTtlSeconds,
 		arg.HaltMode,
 		arg.Attributes,
@@ -1195,6 +1230,32 @@ func (q *Queries) SetLifecycleState(ctx context.Context, arg SetLifecycleStatePa
 	return result.RowsAffected(), nil
 }
 
+const setStateLifecycle = `-- name: SetStateLifecycle :exec
+UPDATE whitetower.governance_state
+SET lifecycle_state = $1, state_version = $2, updated_at = $3
+WHERE agent_id = $4
+`
+
+type SetStateLifecycleParams struct {
+	LifecycleState string
+	StateVersion   int64
+	UpdatedAt      time.Time
+	AgentID        uuid.UUID
+}
+
+// Changes only the lifecycle state of the agent's governance state, at a new
+// state version: a transition that White Tower makes itself keeps the lease,
+// the halt mode, the attributes and the halts that the state holds.
+func (q *Queries) SetStateLifecycle(ctx context.Context, arg SetStateLifecycleParams) error {
+	_, err := q.db.Exec(ctx, setStateLifecycle,
+		arg.LifecycleState,
+		arg.StateVersion,
+		arg.UpdatedAt,
+		arg.AgentID,
+	)
+	return err
+}
+
 const setUseCaseStatus = `-- name: SetUseCaseStatus :exec
 UPDATE whitetower.use_cases
 SET status = $1, updated_at = $2, version = version + 1
@@ -1211,6 +1272,17 @@ type SetUseCaseStatusParams struct {
 // validated or rejected use case never changes.
 func (q *Queries) SetUseCaseStatus(ctx context.Context, arg SetUseCaseStatusParams) error {
 	_, err := q.db.Exec(ctx, setUseCaseStatus, arg.Status, arg.UpdatedAt, arg.ID)
+	return err
+}
+
+const shareSelectorHaltsLock = `-- name: ShareSelectorHaltsLock :exec
+SELECT pg_advisory_xact_lock_shared($1::bigint)
+`
+
+// Takes the selector halts' advisory lock in its shared form until the
+// transaction ends: every selector halt takes it exclusively.
+func (q *Queries) ShareSelectorHaltsLock(ctx context.Context, lockKey int64) error {
+	_, err := q.db.Exec(ctx, shareSelectorHaltsLock, lockKey)
 	return err
 }
 

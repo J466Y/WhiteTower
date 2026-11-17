@@ -1,13 +1,46 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Agent updated",
-  "description": "An agent's metadata changed (INV-01; plan P1-04, step 2). The description and the harness are free text that people write: they are named as changed, never copied. A change that enforcement points see carries its governance state version.",
+  "description": "An agent's metadata changed (INV-01; plan P1-04, step 2). The description and the harness are free text that people write: they are named as changed, never copied. Enforcement points see four of the members: the risk tier, which also sets the lease, the data categories, the labels and the halt mode. The event carries its governance state version when it changed one of them, and only then.",
   "type": "object",
   "required": [
     "changed",
     "actor"
   ],
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "changed"
+        ],
+        "properties": {
+          "changed": {
+            "contains": {
+              "enum": [
+                "risk_tier",
+                "data_categories",
+                "labels",
+                "halt_mode"
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "state_version"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "state_version"
+          ]
+        }
+      }
+    }
+  ],
   "properties": {
     "changed": {
       "type": "array",

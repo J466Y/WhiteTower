@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -32,6 +34,7 @@ type fixture struct {
 	inv      *inventory.Inventory
 	clk      *clocktest.Fake
 	policies *policies
+	halts    *selectorHalts
 	// olivia and otto are owners, alex is on the advisory committee, omar is
 	// an operator and uma a user.
 	olivia, otto, alex, omar, uma auth.Principal
@@ -46,17 +49,20 @@ func setup(t *testing.T) *fixture {
 	}
 	clk := clocktest.New(epoch)
 	active := &policies{active: map[uuid.UUID]bool{}}
+	halts := &selectorHalts{labels: map[string]uuid.UUID{}}
 	f := &fixture{
 		pool:     pool,
 		clk:      clk,
 		policies: active,
+		halts:    halts,
 		inv: inventory.New(inventory.Options{
-			DB:         pool,
-			Clock:      clk,
-			Writer:     audit.NewWriter(catalog, clk),
-			Authorizer: authz.NewAuthorizer(),
-			Versions:   govstate.NewVersions(notify.NewMemory(), slog.New(slog.DiscardHandler)),
-			Policies:   active,
+			DB:            pool,
+			Clock:         clk,
+			Writer:        audit.NewWriter(catalog, clk),
+			Authorizer:    authz.NewAuthorizer(),
+			Versions:      govstate.NewVersions(notify.NewMemory(), slog.New(slog.DiscardHandler)),
+			Policies:      active,
+			SelectorHalts: halts,
 			RoleMapping: map[string]string{
 				"wt-owner": "owner", "wt-advisory": "advisory", "wt-operator": "operator", "wt-user": "user",
 			},
@@ -88,6 +94,35 @@ func (p *policies) set(agentID uuid.UUID, active bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.active[agentID] = active
+}
+
+// selectorHalts stands for plan P1-08: each of its active halts covers the
+// agents that carry one label.
+type selectorHalts struct {
+	mu     sync.Mutex
+	labels map[string]uuid.UUID // "key=value" to the halt that covers it
+}
+
+func (s *selectorHalts) Matching(_ context.Context, _ *db.Tx, attrs govstate.Attributes) ([]uuid.UUID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var ids []uuid.UUID
+	for _, k := range slices.Sorted(maps.Keys(attrs.Labels)) {
+		if id, ok := s.labels[k+"="+attrs.Labels[k]]; ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+// issue starts a halt of the agents that carry the label, in place of the
+// one that covered them, and returns its ID.
+func (s *selectorHalts) issue(label string) uuid.UUID {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id := uuid.Must(uuid.NewV7())
+	s.labels[label] = id
+	return id
 }
 
 // person stores a human principal in the IdP group of the role given, and

@@ -186,6 +186,37 @@ func TestCheckRefusesInvalidEvents(t *testing.T) {
 			}
 		})
 	}
+	// An edit carries its governance state version when it changed what
+	// enforcement points see, and only then (the review's decision of
+	// 2026-11-17, plan P1-04).
+	for _, tt := range []struct {
+		name    string
+		changed []any
+		version bool
+		want    string // empty for an event the check accepts
+	}{
+		{"labels without a state version", []any{"labels"}, false, "invalid data"},
+		{"a name without a state version", []any{"name"}, false, ""},
+		{"a name with a state version", []any{"name"}, true, "invalid data"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			e := example("whitetower.agent.updated.v1")
+			data := e["data"].(map[string]any)
+			data["changed"] = tt.changed
+			delete(data, "before")
+			delete(data, "after")
+			if !tt.version {
+				delete(data, "state_version")
+			}
+			_, err := c.check(e)
+			switch {
+			case tt.want == "" && err != nil:
+				t.Fatalf("refused: %v", err)
+			case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+				t.Fatalf("got %v, want %q", err, tt.want)
+			}
+		})
+	}
 }
 
 func TestEmitterAndAction(t *testing.T) {
