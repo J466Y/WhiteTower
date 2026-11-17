@@ -102,6 +102,9 @@ type Decision struct {
 	// Request is the request that Evaluate decided, nil when the decision
 	// came before it.
 	Request *Request
+	// Rules are the usage rules that a policy.forbid decision names (section
+	// 6.11).
+	Rules []NamedRule
 }
 
 // Decide decides a tool or model action once the gate is open, in the order
@@ -199,7 +202,7 @@ func (e *Engine) Decide(catalog *tooling.Catalog, blocks []Block, call Call) Dec
 		d.Response = Deny(ReasonInvalidRequest)
 		return d
 	}
-	d.Response = e.Evaluate(data)
+	d.Response, d.Rules = e.evaluate(data)
 	return d
 }
 

@@ -1,5 +1,5 @@
 {
-  "description": "Exposure in the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6.10): tool.expose decisions alone, the offer of a tool to a model, which what an enforcement point does with a denied tool (EP-17) leaves to scenario S-22. The cases have the form of catalog-check.json, whose description says how each is decided: the catalog check, rows 1 to 5, on the case's catalog file when it gives one, otherwise the file's, then the policies, those of the case when it gives them, otherwise the file's, wt-catalog. calls_decided, which the request's context carries, follows from who runs the tool when it is offered, the case's origin, and from approval: it is true for a tool that the agent runs, and for a provider-run tool only while the provider submits each of its calls to the agent for approval (EP-18). It never follows from the origin that the catalog records, which stays the resource's origin property (section 6.3, the review of 2026-11-16). Once policies decided, the expected decision gives calls_decided, and origin, the resource's origin property in the request that they decided. A case with a usage rule takes its tool.expose statement as section 6.11's example writes it, for github/push_files, which forbids exposing the tool while its calls are not decided.",
+  "description": "Exposure in the decision profile v1alpha1 (docs/contracts/module-contract-v0.1.md, section 6.10): tool.expose decisions alone, the offer of a tool to a model, which what an enforcement point does with a denied tool (EP-17) leaves to scenario S-22. The cases have the form of catalog-check.json, whose description says how each is decided: the catalog check, rows 1 to 5, on the case's catalog file when it gives one, otherwise the file's, then the policies, those of the case when it gives them, otherwise the file's, wt-catalog. calls_decided, which the request's context carries, follows from who runs the tool when it is offered, the case's origin, and from approval: it is true for a tool that the agent runs, and for a provider-run tool only while the provider submits each of its calls to the agent for approval (EP-18). It never follows from the origin that the catalog records, which stays the resource's origin property (section 6.3, the review of 2026-11-16). Once policies decided, the expected decision gives calls_decided, and origin, the resource's origin property in the request that they decided. A policy.forbid decision also gives rules, the usage rules that it names, as usage-rules.json describes them. A case with a usage rule takes its tool.expose statement as section 6.11's example writes it, for github/push_files, which forbids exposing the tool while its calls are not decided.",
   "profile": "v1alpha1",
   "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
   "subject": {
@@ -599,7 +599,13 @@
         ],
         "resource_id": "github/push_files",
         "calls_decided": false,
-        "origin": "provider"
+        "origin": "provider",
+        "rules": [
+          {
+            "policy_id": "0192f1c2-7a3b-7c4d-8e5f-000000000903",
+            "rule_id": "no-push-to-main"
+          }
+        ]
       }
     },
     {
@@ -846,7 +852,13 @@
         ],
         "resource_id": "github/push_files",
         "calls_decided": false,
-        "origin": "provider"
+        "origin": "provider",
+        "rules": [
+          {
+            "policy_id": "0192f1c2-7a3b-7c4d-8e5f-000000000903",
+            "rule_id": "no-push-to-main"
+          }
+        ]
       }
     },
     {
@@ -981,7 +993,13 @@
         ],
         "resource_id": "github/push_files",
         "calls_decided": false,
-        "origin": "agent"
+        "origin": "agent",
+        "rules": [
+          {
+            "policy_id": "0192f1c2-7a3b-7c4d-8e5f-000000000903",
+            "rule_id": "no-push-to-main"
+          }
+        ]
       }
     },
     {
