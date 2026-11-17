@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Accepted provisionally on 2026-10-23 ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)): the specification at commit `a284a2d`, after the maintainer's review (see [Review record](#review-record)). Its changes to `api/`, the vectors and the conformance kit followed in eight parts, the last merged on 2026-11-05; the tag `contracts/v0.1.0` waits for RFC-0002's changes to `api/` (P0-03 step 12) |
+| **Status** | Accepted provisionally on 2026-10-23 ([GOVERNANCE.md](../../GOVERNANCE.md#rfc-process)): the specification at commit `a284a2d`, after the maintainer's review (see [Review record](#review-record)). Its changes to `api/`, the vectors and the conformance kit followed in eight parts, the last merged on 2026-11-05; RFC-0002's changes to `api/` followed in P0-03 step 12, done on 2026-11-17, and the tag `contracts/v0.1.0` is the maintainer's |
 | **Authors** | @J466Y |
 | **Review period** | 2026-10-21 to 2026-10-22: the maintainer's provisional review, with no external reviewer. A review of at least two weeks, with an external reviewer, follows before the contracts leave alpha (`v1beta1`) |
 | **Related** | Plan [P0-03](../plans/phase-0/P0-03-module-contracts.md); MOD-01 to MOD-05, MOD-08, POL-03, POL-05, POL-06, KIL-01 to KIL-04, KIL-07, KIL-10, AUD-02, NFR-20; [ADR-0004](../adr/0004-api-and-contract-formats.md), [ADR-0005](../adr/0005-edge-enforcement-with-leases.md), [ADR-0006](../adr/0006-tamper-evident-audit-log.md), [ADR-0010](../adr/0010-built-in-agent-token-issuer.md), [ADR-0011](../adr/0011-own-python-enforcement-point.md) |
