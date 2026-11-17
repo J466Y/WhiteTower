@@ -202,20 +202,52 @@ WHERE agent_id = ANY(sqlc.arg(agent_ids)::uuid[]) AND run_state = 'halted';
 SELECT agent_id FROM whitetower.governance_state WHERE agent_id = $1 FOR NO KEY UPDATE;
 
 -- name: PutGovernanceState :exec
--- Writes what enforcement points know of the agent, at a new state version.
+-- Writes what enforcement points know of the agent, at a new state version,
+-- with the active selector halts that the agent matches. The halts that its
+-- state already carries stay: only a release removes a halt.
 INSERT INTO whitetower.governance_state (
-  agent_id, lifecycle_state, lease_ttl_seconds, halt_mode, attributes, state_version, updated_at
+  agent_id, lifecycle_state, run_state, agent_halt_ids, lease_ttl_seconds, halt_mode, attributes,
+  state_version, updated_at
 ) VALUES (
-  sqlc.arg(agent_id), sqlc.arg(lifecycle_state), sqlc.arg(lease_ttl_seconds), sqlc.arg(halt_mode),
+  sqlc.arg(agent_id), sqlc.arg(lifecycle_state),
+  CASE WHEN cardinality(sqlc.arg(selector_halt_ids)::uuid[]) > 0 THEN 'halted' ELSE 'running' END,
+  sqlc.arg(selector_halt_ids)::uuid[], sqlc.arg(lease_ttl_seconds), sqlc.arg(halt_mode),
   sqlc.arg(attributes), sqlc.arg(state_version), sqlc.arg(updated_at)
 )
 ON CONFLICT (agent_id) DO UPDATE SET
   lifecycle_state = EXCLUDED.lifecycle_state,
+  run_state = CASE WHEN governance_state.run_state = 'halted' OR EXCLUDED.run_state = 'halted'
+    THEN 'halted' ELSE 'running' END,
+  agent_halt_ids = governance_state.agent_halt_ids || ARRAY(
+    SELECT h FROM unnest(EXCLUDED.agent_halt_ids) AS h WHERE h <> ALL (governance_state.agent_halt_ids)),
   lease_ttl_seconds = EXCLUDED.lease_ttl_seconds,
   halt_mode = EXCLUDED.halt_mode,
   attributes = EXCLUDED.attributes,
   state_version = EXCLUDED.state_version,
   updated_at = EXCLUDED.updated_at;
+
+-- name: SetStateLifecycle :exec
+-- Changes only the lifecycle state of the agent's governance state, at a new
+-- state version: a transition that White Tower makes itself keeps the lease,
+-- the halt mode, the attributes and the halts that the state holds.
+UPDATE whitetower.governance_state
+SET lifecycle_state = sqlc.arg(lifecycle_state), state_version = sqlc.arg(state_version), updated_at = sqlc.arg(updated_at)
+WHERE agent_id = sqlc.arg(agent_id);
+
+-- name: ShareSelectorHaltsLock :exec
+-- Takes the selector halts' advisory lock in its shared form until the
+-- transaction ends: every selector halt takes it exclusively.
+SELECT pg_advisory_xact_lock_shared(sqlc.arg(lock_key)::bigint);
+
+-- name: AgentHaltIssued :one
+-- Whether the halt is an agent halt of the agent, other than a drill, issued
+-- at the state version given: the transaction's, so that T12 applies only the
+-- halt issued in its own transaction.
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.halts
+  WHERE id = sqlc.arg(halt_id) AND agent_id = sqlc.arg(agent_id)::uuid AND scope = 'agent' AND NOT drill
+    AND state_version = sqlc.arg(state_version)
+);
 
 -- name: RecordTransition :exec
 INSERT INTO whitetower.lifecycle_transitions (

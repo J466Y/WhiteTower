@@ -75,9 +75,10 @@ func inventoryStore(t *testing.T, people map[string]string) (Options, *db.DB) {
 	opts.Authorizer = authz.NewAuthorizer()
 	opts.Inventory = inventory.New(inventory.Options{
 		DB: pool, Clock: clk, Writer: audit.NewWriter(catalog, clk), Authorizer: opts.Authorizer,
-		Versions:    govstate.NewVersions(notify.NewMemory(), opts.Logger),
-		Policies:    inventory.NoAgentPolicies{},
-		RoleMapping: map[string]string{"wt-owner": "owner"},
+		Versions:      govstate.NewVersions(notify.NewMemory(), opts.Logger),
+		Policies:      inventory.NoAgentPolicies{},
+		SelectorHalts: inventory.NoSelectorHalts{},
+		RoleMapping:   map[string]string{"wt-owner": "owner"},
 	})
 	return opts, pool
 }

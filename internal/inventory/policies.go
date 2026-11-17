@@ -15,7 +15,10 @@ import (
 type AgentPolicies interface {
 	// Active reports whether the agent has an active agent-specific policy,
 	// as tx sees it. A transition asks it under the agent's row lock, and
-	// the list of the actions open to a caller without a lock.
+	// the list of the actions open to a caller without a lock. T7 and T8
+	// may ask it once tx holds the version counter, after an edit or after
+	// T6 or T13, so it is a plain read that waits for no lock (the design of
+	// the halt path, section 2).
 	Active(ctx context.Context, tx *db.Tx, agentID uuid.UUID) (bool, error)
 }
 

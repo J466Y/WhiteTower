@@ -331,6 +331,9 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			// Until plan P1-06 brings policies, no agent has an active
 			// agent-specific policy, so none becomes active (POL-04).
 			Policies: inventory.NoAgentPolicies{},
+			// Until plan P1-08 brings selector halts, none is active for a
+			// write of an agent's governance state to add.
+			SelectorHalts: inventory.NoSelectorHalts{},
 		}),
 	})
 	drain := server.NewDrain()

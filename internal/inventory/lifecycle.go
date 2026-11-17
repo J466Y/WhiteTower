@@ -133,11 +133,22 @@ type facts struct {
 	// their token's scopes; own is true for the agent's primary owner and
 	// its delegates.
 	person, permitted, own bool
+	// reason is why White Tower suspends the agent by itself (T11), as the
+	// caller found it; haltIssued is true when the caller issued an agent
+	// halt of the agent, other than a drill, in its transaction (T12).
+	reason     string
+	haltIssued bool
 }
 
-// guards tells whether each guard that the transitions people take read
-// holds (docs/architecture/lifecycle.md, section 4).
+// guards tells whether each guard of the lifecycle holds
+// (docs/architecture/lifecycle.md, section 4). An automatic suspension holds
+// only for the reason that it records.
 var guards = map[string]func(facts) bool{
+	"agent_policy_or_harness_missing": func(f facts) bool { return !f.policyActive || !f.harnessDeclared },
+	"owner_inactive_or_review_overdue": func(f facts) bool {
+		return (f.reason == "owner_inactive" && !f.ownerActive) || (f.reason == "review_overdue" && f.reviewOverdue)
+	},
+	"agent_halt_issued":              func(f facts) bool { return f.haltIssued },
 	"metadata_complete":              func(f facts) bool { return f.metadataComplete },
 	"owner_active":                   func(f facts) bool { return f.ownerActive },
 	"use_case_not_rejected":          func(f facts) bool { return f.useCaseStatus != "rejected" },
@@ -221,6 +232,8 @@ func requested(action string) (transition, error) {
 // separation of duties must allow it, and every guard of its transition must
 // hold. The agent's use case follows the decisions on its proposal while no
 // decision has made it final. The agent takes a new governance state version.
+// An agent that T6 or T13 leaves validated becomes ready in the same
+// transaction when T7's guards hold.
 func (inv *Inventory) Transition(ctx context.Context, caller auth.Principal, agentID uuid.UUID, version int64, action, comment string) (*Agent, error) {
 	t, err := requested(action)
 	if err != nil {
@@ -481,17 +494,17 @@ func (t transition) refusals(f facts) []string {
 }
 
 // move returns the agent as t leaves it at the time given: in its new state,
-// suspended with the state it came from, back in that state once reinstated,
-// and with the times of its activation and of its retirement. People suspend
-// an agent only by hand (T10).
-func (t transition) move(a Agent, now time.Time) Agent {
+// suspended with the state it came from and the reason given, back in that
+// state once reinstated, and with the times of its activation and of its
+// retirement. People suspend an agent only by hand (T10).
+func (t transition) move(a Agent, reason string, now time.Time) Agent {
 	b := a
 	b.LifecycleState, b.Suspension = t.to, nil
 	switch t.to {
 	case previousState:
 		b.LifecycleState = a.Suspension.From
 	case "suspended":
-		b.Suspension = &Suspension{From: a.LifecycleState, Reason: "manual", At: now}
+		b.Suspension = &Suspension{From: a.LifecycleState, Reason: reason, At: now}
 	case "active":
 		b.ActivatedAt = &now
 	case "retired":
@@ -507,15 +520,8 @@ func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principa
 	q := inventorydb.New(tx)
 	now := inv.clk.Now().UTC()
 	from := a.LifecycleState
-	moved := t.move(*a, now)
-	set := inventorydb.SetLifecycleStateParams{
-		LifecycleState: moved.LifecycleState, ActivatedAt: moved.ActivatedAt, RetiredAt: moved.RetiredAt,
-		UpdatedAt: now, ID: a.ID, Version: a.Version,
-	}
-	if s := moved.Suspension; s != nil {
-		set.SuspendedFrom, set.SuspensionReason, set.SuspendedAt = &s.From, &s.Reason, &s.At
-	}
-	n, err := q.SetLifecycleState(ctx, set)
+	moved := t.move(*a, "manual", now)
+	n, err := q.SetLifecycleState(ctx, lifecycleParams(moved, now))
 	if err != nil {
 		return fmt.Errorf("moving the agent: %w", err)
 	}
@@ -551,15 +557,45 @@ func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principa
 	if err != nil {
 		return err
 	}
+	if err := inv.record(ctx, tx, t, from, a, Actor{Type: actorType(caller), ID: &actor}, comment, version, now); err != nil {
+		return err
+	}
+	// An agent that becomes validated may already have an active
+	// agent-specific policy and a declared harness: White Tower then makes
+	// it ready at once (T7), as it does whenever T7's guards hold.
+	if a.LifecycleState == "validated" {
+		if _, err := inv.SystemTransition(ctx, tx, a.ID, Cause{Action: "mark_ready"}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// lifecycleParams are what moving an agent writes on its row, at the
+// version that it was read at.
+func lifecycleParams(moved Agent, now time.Time) inventorydb.SetLifecycleStateParams {
+	set := inventorydb.SetLifecycleStateParams{
+		LifecycleState: moved.LifecycleState, ActivatedAt: moved.ActivatedAt, RetiredAt: moved.RetiredAt,
+		UpdatedAt: now, ID: moved.ID, Version: moved.Version,
+	}
+	if s := moved.Suspension; s != nil {
+		set.SuspendedFrom, set.SuspensionReason, set.SuspendedAt = &s.From, &s.Reason, &s.At
+	}
+	return set
+}
+
+// record writes the transition t of the agent, which it moved from the state
+// given, in its history and in the audit log, at the governance state
+// version given.
+func (inv *Inventory) record(ctx context.Context, tx *db.Tx, t transition, from string, a *Agent, by Actor, comment string, version int64, now time.Time) error {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return fmt.Errorf("generating the transition's ID: %w", err)
 	}
-	if err := q.RecordTransition(ctx, inventorydb.RecordTransitionParams{
-		ID: id, AgentID: a.ID, Action: t.action, FromState: &from, ToState: a.LifecycleState, ActorType: actorType(caller),
-		ActorID: &actor, Reason: set.SuspensionReason, Comment: nonEmpty(comment), StateVersion: version, OccurredAt: now,
-	}); err != nil {
-		return fmt.Errorf("recording the transition: %w", err)
+	var reason *string
+	actor := map[string]any{"type": by.Type}
+	if by.ID != nil {
+		actor["id"] = by.ID.String()
 	}
 	data := map[string]any{
 		"transition":    t.id,
@@ -567,16 +603,143 @@ func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principa
 		"from":          from,
 		"to":            a.LifecycleState,
 		"comment_given": comment != "",
-		"actor":         actorOf(caller),
+		"actor":         actor,
 		"state_version": version,
 	}
 	if a.Suspension != nil {
-		data["suspension_reason"] = a.Suspension.Reason
+		reason, data["suspension_reason"] = &a.Suspension.Reason, a.Suspension.Reason
+	}
+	if err := inventorydb.New(tx).RecordTransition(ctx, inventorydb.RecordTransitionParams{
+		ID: id, AgentID: a.ID, Action: t.action, FromState: &from, ToState: a.LifecycleState, ActorType: by.Type,
+		ActorID: by.ID, Reason: reason, Comment: nonEmpty(comment), StateVersion: version, OccurredAt: now,
+	}); err != nil {
+		return fmt.Errorf("recording the transition: %w", err)
 	}
 	if err := inv.writer.Record(ctx, tx, audit.Event{Type: "whitetower.agent.lifecycle_changed.v1", Subject: a.ID.String(), Data: data}); err != nil {
 		return fmt.Errorf("recording the agent's transition: %w", err)
 	}
 	return nil
+}
+
+// Cause is why White Tower takes a transition of an agent's lifecycle itself
+// (T7, T8, T11 and T12; docs/architecture/lifecycle.md, section 3).
+type Cause struct {
+	// Action is the transition's: mark_ready (T7), unmark_ready (T8),
+	// auto_suspend (T11) or halt_suspend (T12).
+	Action string
+	// Reason is why auto_suspend suspends the agent, as its caller found it:
+	// owner_inactive or review_overdue.
+	Reason string
+	// Halt is the agent halt that halt_suspend applies, which the caller
+	// issued in its transaction.
+	Halt uuid.UUID
+}
+
+// SystemTransition takes the transition of the cause given, as White Tower,
+// in the caller's transaction and at its governance state version, and
+// reports whether the agent moved. It checks no permission and no version:
+// it locks the agent's row, then its governance state, and gives the row a
+// new version, so that a change read before it fails as stale and an edit
+// never writes active over the suspension of a halt. It never fails tx for a
+// guard that does not hold, nor for an agent in a state that the transition
+// does not start from: the agent then stays as it is. T12 suspends for no
+// drill, which only closes the gate (the design of the halt path, section 8
+// and section 13, decision 1).
+//
+// It changes only the lifecycle state of the agent's governance state, and
+// skips the selector halts, which only a change of the agent's attributes
+// makes it match. It reads no setting, so that a halt, which calls it once it
+// holds the version counter, waits for nothing: such a caller holds the
+// agent's row and its governance state already, as every writer locks them
+// before it takes its version (section 2).
+func (inv *Inventory) SystemTransition(ctx context.Context, tx *db.Tx, agentID uuid.UUID, c Cause) (bool, error) {
+	t, reason, err := caused(c)
+	if err != nil {
+		return false, err
+	}
+	q := inventorydb.New(tx)
+	if _, err := q.LockAgent(ctx, agentID); err != nil {
+		return false, fmt.Errorf("locking agent %s: %w", agentID, err)
+	}
+	if err := lockState(ctx, q, agentID); err != nil {
+		return false, err
+	}
+	row, err := q.GetAgent(ctx, agentID)
+	if err != nil {
+		return false, fmt.Errorf("reading agent %s: %w", agentID, err)
+	}
+	if !slices.Contains(t.from, row.LifecycleState) {
+		return false, nil
+	}
+	f, err := inv.systemFacts(ctx, tx, t, c, row)
+	if err != nil || len(t.unmet(f)) > 0 {
+		return false, err
+	}
+	version, err := inv.versions.Next(ctx, tx)
+	if err != nil {
+		return false, err
+	}
+	now := inv.clk.Now().UTC()
+	a := Agent{ID: row.ID, LifecycleState: row.LifecycleState, ActivatedAt: row.ActivatedAt, RetiredAt: row.RetiredAt, Version: row.Version}
+	moved := t.move(a, reason, now)
+	n, err := q.SetLifecycleState(ctx, lifecycleParams(moved, now))
+	if err != nil {
+		return false, fmt.Errorf("moving agent %s: %w", agentID, err)
+	}
+	if n == 0 {
+		return false, fmt.Errorf("agent %s changed although it is locked", agentID)
+	}
+	if err := q.SetStateLifecycle(ctx, inventorydb.SetStateLifecycleParams{
+		LifecycleState: moved.LifecycleState, StateVersion: version, UpdatedAt: now, AgentID: agentID,
+	}); err != nil {
+		return false, fmt.Errorf("writing the lifecycle state of agent %s's governance state: %w", agentID, err)
+	}
+	return true, inv.record(ctx, tx, t, row.LifecycleState, &moved, Actor{Type: "system"}, "", version, now)
+}
+
+// caused returns the transition that White Tower takes for the cause, and the
+// reason that a suspension records. A cause that is not one is a fault of
+// its caller.
+func caused(c Cause) (transition, string, error) {
+	i := slices.IndexFunc(lifecycle, func(t transition) bool { return t.action == c.Action && slices.Contains(t.actors, "system") })
+	switch {
+	case i < 0:
+		return transition{}, "", fmt.Errorf("%q is not a transition that White Tower takes itself", c.Action)
+	case c.Action == "halt_suspend":
+		return lifecycle[i], "halt", nil
+	case c.Action == "auto_suspend" && c.Reason != "owner_inactive" && c.Reason != "review_overdue":
+		return transition{}, "", fmt.Errorf("an automatic suspension for the reason %q: want owner_inactive or review_overdue", c.Reason)
+	}
+	return lifecycle[i], c.Reason, nil
+}
+
+// systemFacts reads what the guards of a transition that White Tower takes
+// read, and nothing else: a halt reads no policy, no owner and no review.
+func (inv *Inventory) systemFacts(ctx context.Context, tx *db.Tx, t transition, c Cause, row inventorydb.WhitetowerAgent) (facts, error) {
+	q := inventorydb.New(tx)
+	f := facts{reason: c.Reason, harnessDeclared: row.Harness != nil}
+	var err error
+	switch t.action {
+	case "mark_ready", "unmark_ready":
+		f.policyActive, err = inv.policies.Active(ctx, tx, row.ID)
+	case "auto_suspend":
+		var owners []inventorydb.CurrentOwnersRow
+		if owners, err = q.CurrentOwners(ctx, []uuid.UUID{row.ID}); err == nil {
+			f.ownerActive = slices.ContainsFunc(owners, func(o inventorydb.CurrentOwnersRow) bool { return o.Role == "primary" && o.Status == "active" })
+			f.reviewOverdue, err = q.ReviewOverdue(ctx, inventorydb.ReviewOverdueParams{AgentID: row.ID, Now: inv.clk.Now().UTC()})
+		}
+	case "halt_suspend":
+		// The halt was issued at the version that its caller holds, which
+		// Next returns again.
+		var version int64
+		if version, err = inv.versions.Next(ctx, tx); err == nil {
+			f.haltIssued, err = q.AgentHaltIssued(ctx, inventorydb.AgentHaltIssuedParams{HaltID: c.Halt, AgentID: row.ID, StateVersion: version})
+		}
+	}
+	if err != nil {
+		return facts{}, fmt.Errorf("reading what the guards of %s check: %w", t.id, err)
+	}
+	return f, nil
 }
 
 // affectUseCase applies the effect of a decision on a proposal to its use

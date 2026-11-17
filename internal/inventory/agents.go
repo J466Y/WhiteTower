@@ -161,6 +161,9 @@ func (inv *Inventory) Propose(ctx context.Context, caller auth.Principal, in New
 	var id uuid.UUID
 	err = inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := inventorydb.New(tx)
+		if err := shareSelectorHaltsLock(ctx, q); err != nil {
+			return err
+		}
 		if err := checkCategories(ctx, q, draft.DataCategories); err != nil {
 			return err
 		}
@@ -214,9 +217,8 @@ func (inv *Inventory) Propose(ctx context.Context, caller auth.Principal, in New
 		if err != nil {
 			return err
 		}
-		// T1 creates the agent's governance state, which every later change
-		// writes again. P1-08 folds the active selector halts into it here,
-		// once selector halts exist.
+		// T1 creates the agent's governance state, with the active selector
+		// halts that it matches, and every later change writes it again.
 		version, err := inv.putState(ctx, tx, created, now)
 		if err != nil {
 			return err
@@ -297,7 +299,8 @@ func (inv *Inventory) List(ctx context.Context, caller auth.Principal, after str
 // Edit changes an agent's metadata (INV-01), if it is still at the version
 // the caller read (API-03). The agent's owners edit it, and operators any
 // agent. A change to what policies see of the agent, or to its halt mode,
-// takes a new governance state version.
+// takes a new governance state version. A harness declared on a validated
+// agent makes it ready when it has an active agent-specific policy (T7).
 func (inv *Inventory) Edit(ctx context.Context, caller auth.Principal, id uuid.UUID, version int64, ch AgentChanges) (*Agent, error) {
 	callerID, err := uuid.Parse(caller.ID)
 	if err != nil {
@@ -305,6 +308,11 @@ func (inv *Inventory) Edit(ctx context.Context, caller auth.Principal, id uuid.U
 	}
 	err = inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := inventorydb.New(tx)
+		if ch.Labels != nil || ch.RiskTier != nil {
+			if err := shareSelectorHaltsLock(ctx, q); err != nil {
+				return err
+			}
+		}
 		before, err := inv.load(ctx, q, id)
 		if err != nil {
 			return err
@@ -386,6 +394,13 @@ func (inv *Inventory) Edit(ctx context.Context, caller auth.Principal, id uuid.U
 		}
 		if err := inv.writer.Record(ctx, tx, audit.Event{Type: "whitetower.agent.updated.v1", Subject: id.String(), Data: data}); err != nil {
 			return fmt.Errorf("recording the agent's change: %w", err)
+		}
+		// A harness can be replaced but never removed, so no edit takes an
+		// agent back from ready (T8): only a policy that P1-06 retires does.
+		if slices.Contains(cs.names, "harness") && after.LifecycleState == "validated" {
+			if _, err := inv.SystemTransition(ctx, tx, id, Cause{Action: "mark_ready"}); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
