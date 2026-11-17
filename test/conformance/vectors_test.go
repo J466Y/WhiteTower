@@ -504,6 +504,8 @@ type callsFile struct {
 			// property, in the request that policies decided.
 			CallsDecided *bool  `json:"calls_decided"`
 			Origin       string `json:"origin"`
+			// The usage rules that a policy.forbid decision names.
+			Rules []profile.NamedRule `json:"rules"`
 		} `json:"expected"`
 	} `json:"cases"`
 }
@@ -534,14 +536,13 @@ func resolve(t *testing.T, e referenceEntry, rules tooling.Rules) profile.Toolin
 	return got
 }
 
-// testCalls decides the cases of catalog-check.json or exposure.json with the
-// reference implementation, and checks what each decision names: the
-// resource, the reference of tooling that the catalog does not list, every
-// block that covers the call, and, on an exposure that policies decided,
-// calls_decided and the resource's origin property.
-func testCalls(t *testing.T, path string) {
-	var file callsFile
-	loadJSON(t, path, &file)
+// testCalls decides the cases of catalog-check.json, exposure.json or
+// usage-rules.json with the reference implementation, and checks what each
+// decision names: the resource, the reference of tooling that the catalog
+// does not list, every block that covers the call, on an exposure that
+// policies decided, calls_decided and the resource's origin property, and the
+// usage rules that a policy.forbid decision names.
+func testCalls(t *testing.T, file callsFile) {
 	if len(file.Cases) == 0 {
 		t.Fatal("no cases")
 	}
@@ -615,10 +616,10 @@ func testCalls(t *testing.T, path string) {
 			}
 			if got.ResourceID != want.ResourceID || got.ReferenceSHA256 != want.ReferenceSHA256 ||
 				!slices.Equal(set(got.BlockIDs), set(want.BlockIDs)) || show(decided) != show(want.CallsDecided) ||
-				origin != want.Origin {
-				t.Errorf("got resource %q, reference_sha256 %q, blocks %v, calls_decided %s, origin %q; want %q, %q, %v, %s, %q",
-					got.ResourceID, got.ReferenceSHA256, got.BlockIDs, show(decided), origin,
-					want.ResourceID, want.ReferenceSHA256, want.BlockIDs, show(want.CallsDecided), want.Origin)
+				origin != want.Origin || !slices.Equal(got.Rules, want.Rules) {
+				t.Errorf("got resource %q, reference_sha256 %q, blocks %v, calls_decided %s, origin %q, rules %v; want %q, %q, %v, %s, %q, %v",
+					got.ResourceID, got.ReferenceSHA256, got.BlockIDs, show(decided), origin, got.Rules,
+					want.ResourceID, want.ReferenceSHA256, want.BlockIDs, show(want.CallsDecided), want.Origin, want.Rules)
 			}
 		})
 	}
@@ -628,7 +629,9 @@ func testCalls(t *testing.T, path string) {
 // 6.9): blocks of each kind, tooling that the catalog does not list, rows 3
 // to 6, results, and the check's place among the reasons.
 func TestCatalogCheckVectors(t *testing.T) {
-	testCalls(t, "vectors/catalog-check.json")
+	var file callsFile
+	loadJSON(t, "vectors/catalog-check.json", &file)
+	testCalls(t, file)
 }
 
 // TestExposureVectors runs the exposure vectors (section 6.10): tool.expose
@@ -636,7 +639,130 @@ func TestCatalogCheckVectors(t *testing.T) {
 // from who runs the tool when it is offered and from approval (EP-18), never
 // from the origin that the catalog records.
 func TestExposureVectors(t *testing.T) {
-	testCalls(t, "vectors/exposure.json")
+	var file callsFile
+	loadJSON(t, "vectors/exposure.json", &file)
+	testCalls(t, file)
+}
+
+// usageRulesFile is usage-rules.json: the generator's statements, the check
+// of generated text, and calls decided as those of catalog-check.json are,
+// with the usage rules that each policy.forbid decision names.
+type usageRulesFile struct {
+	callsFile
+	Generator []struct {
+		ID          string `json:"id"`
+		Description string `json:"description"`
+		Scope       string `json:"scope"`
+		// The policy's rules as a JSON value or, where a parsed value
+		// cannot hold them, as their text.
+		Rules     json.RawMessage `json:"rules"`
+		RulesText *string         `json:"rules_text"`
+		// nil when the generator refuses a rule.
+		Statements *string `json:"statements"`
+	} `json:"generator"`
+	Checks []struct {
+		ID          string `json:"id"`
+		Description string `json:"description"`
+		Scope       string `json:"scope"`
+		Text        string `json:"text"`
+		Accepted    bool   `json:"accepted"`
+	} `json:"checks"`
+}
+
+// TestUsageRuleVectors runs the vectors of usage rules (section 6.11): the
+// statements that the generator writes from a policy's rules, compared as
+// text, which the check of generated text accepts; the check, on policies
+// whose @rule statements are or are not what the generator writes; and the
+// decisions of generated and hand-written statements, with the rules that
+// each names.
+func TestUsageRuleVectors(t *testing.T) {
+	var file usageRulesFile
+	loadJSON(t, "vectors/usage-rules.json", &file)
+	if len(file.Generator) == 0 || len(file.Checks) == 0 {
+		t.Fatal("no cases")
+	}
+	catalog := readCatalog(t, file.Catalog)
+	for _, c := range file.Generator {
+		t.Run(c.ID, func(t *testing.T) {
+			rules := []byte(c.Rules)
+			switch {
+			case (c.Rules == nil) == (c.RulesText == nil):
+				t.Fatal("the case gives its rules both as a value and as text, or neither way")
+			case c.RulesText != nil:
+				rules = []byte(*c.RulesText)
+			}
+			var got *string
+			statements, err := profile.GenerateRules(rules, &catalog, c.Scope)
+			switch {
+			case errors.Is(err, profile.ErrUsageRule):
+			case err != nil:
+				t.Fatal(err)
+			default:
+				got = &statements
+				if err := profile.CheckRules(statements, &catalog, c.Scope); err != nil {
+					t.Errorf("the check refuses the generator's statements: %v", err)
+				}
+			}
+			if !reflect.DeepEqual(got, c.Statements) {
+				t.Errorf("got %s (%v), want %s", show(got), err, show(c.Statements))
+			}
+		})
+	}
+	for _, c := range file.Checks {
+		t.Run(c.ID, func(t *testing.T) {
+			err := profile.CheckRules(c.Text, &catalog, c.Scope)
+			if err != nil && !errors.Is(err, profile.ErrUsageRule) {
+				t.Fatal(err)
+			}
+			if (err == nil) != c.Accepted {
+				t.Errorf("the check says %v, the vector says accepted=%v", err, c.Accepted)
+			}
+		})
+	}
+	testCalls(t, file.callsFile)
+}
+
+// TestTheGeneratorWritesTheExposeStatementOfExposure checks that the
+// generator writes, from its annotation, exactly the tool.expose statement of
+// section 6.11's example that the cases of exposure.json hold.
+func TestTheGeneratorWritesTheExposeStatementOfExposure(t *testing.T) {
+	var file callsFile
+	loadJSON(t, "vectors/exposure.json", &file)
+	catalog := readCatalog(t, file.Catalog)
+	checked := 0
+	for _, c := range file.Cases {
+		for _, p := range c.Policies {
+			list, err := cedar.NewPolicyListFromBytes(p.ID, []byte(p.Text))
+			if err != nil {
+				t.Fatal(err)
+			}
+			annotation, ok := list[0].Annotations()["rule"]
+			if !ok {
+				continue
+			}
+			var rule map[string]any
+			if err := json.Unmarshal([]byte(annotation), &rule); err != nil {
+				t.Fatalf("%s: %v", c.ID, err)
+			}
+			rule["tools"] = []any{rule["tool"]}
+			delete(rule, "tool")
+			rules, err := json.Marshal([]any{rule})
+			if err != nil {
+				t.Fatal(err)
+			}
+			statements, err := profile.GenerateRules(rules, &catalog, p.Scope)
+			if err != nil {
+				t.Fatalf("%s: %v", c.ID, err)
+			}
+			if expose := strings.Split(statements, "\n\n")[1]; expose != p.Text {
+				t.Errorf("%s: the generator writes\n%s\nwhere the vector holds\n%s", c.ID, expose, p.Text)
+			}
+			checked++
+		}
+	}
+	if checked != 11 {
+		t.Errorf("%d policies with a usage rule, want 11: X-16 to X-23 and X-25 to X-27", checked)
+	}
 }
 
 // hashedArguments is what a decision event records of a call's arguments in
