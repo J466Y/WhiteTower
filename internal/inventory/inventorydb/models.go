@@ -64,6 +64,23 @@ type WhitetowerOwnershipTransfer struct {
 	DecidedAt       *time.Time
 }
 
+type WhitetowerReview struct {
+	ID              uuid.UUID
+	AgentID         uuid.UUID
+	DueAt           time.Time
+	GraceEndsAt     time.Time
+	Status          string
+	Attestation     []byte
+	CompletedBy     *uuid.UUID
+	CompletedAt     *time.Time
+	SignoffRequired bool
+	SignedOffBy     *uuid.UUID
+	SignedOffAt     *time.Time
+	LastReminderAt  *time.Time
+	CreatedAt       time.Time
+	Version         int64
+}
+
 type WhitetowerUseCase struct {
 	ID                    uuid.UUID
 	Title                 string

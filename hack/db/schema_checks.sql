@@ -121,6 +121,20 @@ SELECT pg_temp.must_fail('a released halt is reopened',
   $$UPDATE whitetower.halts SET status = 'propagating', released_at = NULL
     WHERE id = '00000000-0000-7000-8000-000000000040'$$, '23000');
 
+-- A periodic review is signed off by someone independent of its agent
+-- (plan P1-04, pull request 5a).
+INSERT INTO whitetower.reviews (id, agent_id, due_at, grace_ends_at, status, completed_by, completed_at, signoff_required)
+  VALUES ('00000000-0000-7000-8000-000000000060', '00000000-0000-7000-8000-000000000020', now(), now(), 'awaiting_signoff',
+          '00000000-0000-7000-8000-000000000001', now(), true);
+SELECT pg_temp.must_fail('the agent''s owner signs off its review',
+  $$UPDATE whitetower.reviews SET status = 'completed', signed_off_by = '00000000-0000-7000-8000-000000000001',
+    signed_off_at = now() WHERE id = '00000000-0000-7000-8000-000000000060'$$, '42501');
+SELECT pg_temp.must_fail('a review signed off before anyone completed it',
+  $$UPDATE whitetower.reviews SET completed_by = NULL, signed_off_by = '00000000-0000-7000-8000-000000000002',
+    signed_off_at = now() WHERE id = '00000000-0000-7000-8000-000000000060'$$, '42501');
+UPDATE whitetower.reviews SET status = 'completed', signed_off_by = '00000000-0000-7000-8000-000000000002', signed_off_at = now()
+  WHERE id = '00000000-0000-7000-8000-000000000060';
+
 -- 4. Structural invariants.
 SELECT pg_temp.must_fail('a second primary owner',
   $$INSERT INTO whitetower.agent_owners (id, agent_id, principal_id, role, assigned_by)

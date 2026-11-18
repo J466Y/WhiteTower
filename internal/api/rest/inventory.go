@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -33,6 +34,10 @@ type (
 	assignmentPosition struct {
 		After uuid.UUID `json:"after"`
 		Ended bool      `json:"ended"`
+	}
+	reviewPosition struct {
+		DueAt time.Time `json:"dueAt"`
+		ID    uuid.UUID `json:"id"`
 	}
 )
 
@@ -611,32 +616,124 @@ func (s Server) ListDataCategories(ctx context.Context, _ gen.ListDataCategories
 	return gen.ListDataCategories200JSONResponse{DataCategories: categories}, nil
 }
 
-// ListAgentReviews lists an agent's periodic reviews (P1-04, step 6).
-func (Server) ListAgentReviews(context.Context, gen.ListAgentReviewsRequestObject) (gen.ListAgentReviewsResponseObject, error) {
-	return nil, notBuilt()
+// ListAgentReviews lists an agent's periodic reviews, the latest due first
+// (P1-04, step 6).
+func (s Server) ListAgentReviews(ctx context.Context, request gen.ListAgentReviewsRequestObject) (gen.ListAgentReviewsResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	size, err := PageSize(request.Params.Limit)
+	if err != nil {
+		return nil, err
+	}
+	before, err := reviewPositionOf(request.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	reviews, more, err := s.inventory.AgentReviews(ctx, *p, request.Id, before, size)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	list, err := reviewListOf(reviews, more)
+	if err != nil {
+		return nil, err
+	}
+	return gen.ListAgentReviews200JSONResponse(list), nil
 }
 
-// ListReviews lists the periodic reviews that match the filters (P1-04,
-// step 6).
-func (Server) ListReviews(context.Context, gen.ListReviewsRequestObject) (gen.ListReviewsResponseObject, error) {
-	return nil, notBuilt()
+// ListReviews lists the periodic reviews that match the filters, the
+// earliest due first (P1-04, step 6).
+func (s Server) ListReviews(ctx context.Context, request gen.ListReviewsRequestObject) (gen.ListReviewsResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	size, err := PageSize(request.Params.Limit)
+	if err != nil {
+		return nil, err
+	}
+	after, err := reviewPositionOf(request.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	filter := inventory.ReviewFilter{Overdue: request.Params.Overdue}
+	if request.Params.Status != nil {
+		for _, st := range *request.Params.Status {
+			filter.Statuses = append(filter.Statuses, string(st))
+		}
+	}
+	reviews, more, err := s.inventory.ListReviews(ctx, *p, filter, after, size)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	list, err := reviewListOf(reviews, more)
+	if err != nil {
+		return nil, err
+	}
+	return gen.ListReviews200JSONResponse(list), nil
 }
 
-// GetReview returns a periodic review, with its candidates to disable (P1-04,
-// step 6).
-func (Server) GetReview(context.Context, gen.GetReviewRequestObject) (gen.GetReviewResponseObject, error) {
-	return nil, notBuilt()
+// GetReview returns a periodic review, with its ETag and, while it is open,
+// its candidates to disable (P1-04, step 6).
+func (s Server) GetReview(ctx context.Context, request gen.GetReviewRequestObject) (gen.GetReviewResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	r, err := s.inventory.GetReview(ctx, *p, request.Id)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.GetReview200JSONResponse{Body: reviewOf(r), Headers: gen.GetReview200ResponseHeaders{ETag: ETag(r.Version)}}, nil
 }
 
-// CompleteReview records the owner's attestation of a review (P1-04, step 6).
-func (Server) CompleteReview(context.Context, gen.CompleteReviewRequestObject) (gen.CompleteReviewResponseObject, error) {
-	return nil, notBuilt()
+// CompleteReview records the owner's attestation of a review, at the version
+// that If-Match names (P1-04, step 6).
+func (s Server) CompleteReview(ctx context.Context, request gen.CompleteReviewRequestObject) (gen.CompleteReviewResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	version, err := IfMatch(value(request.Params.IfMatch))
+	if err != nil {
+		return nil, err
+	}
+	b := request.Body
+	att := inventory.Attestation{
+		StillNeeded:           b.StillNeeded,
+		OwnerStillRight:       b.OwnerStillRight,
+		DataCategoriesCurrent: b.DataCategoriesCurrent,
+		PolicyAdequate:        b.PolicyAdequate,
+		ToolingStillNeeded:    b.ToolingStillNeeded,
+		Comment:               value(b.Comment),
+	}
+	if b.KeptTooling != nil {
+		att.KeptTooling = *b.KeptTooling
+	}
+	r, err := s.inventory.CompleteReview(ctx, *p, request.Id, version, att)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.CompleteReview200JSONResponse{Body: reviewOf(r), Headers: gen.CompleteReview200ResponseHeaders{ETag: ETag(r.Version)}}, nil
 }
 
-// SignOffReview records the advisory committee's sign-off of a review (P1-04,
-// step 6).
-func (Server) SignOffReview(context.Context, gen.SignOffReviewRequestObject) (gen.SignOffReviewResponseObject, error) {
-	return nil, notBuilt()
+// SignOffReview records the advisory committee's sign-off of a review, at the
+// version that If-Match names (P1-04, step 6).
+func (s Server) SignOffReview(ctx context.Context, request gen.SignOffReviewRequestObject) (gen.SignOffReviewResponseObject, error) {
+	p, err := s.inventoryCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	version, err := IfMatch(value(request.Params.IfMatch))
+	if err != nil {
+		return nil, err
+	}
+	r, err := s.inventory.SignOffReview(ctx, *p, request.Id, version)
+	if err != nil {
+		return nil, inventoryError(err)
+	}
+	return gen.SignOffReview200JSONResponse{Body: reviewOf(r), Headers: gen.SignOffReview200ResponseHeaders{ETag: ETag(r.Version)}}, nil
 }
 
 // ListInboxItems lists the work that waits for the caller (P1-04, step 10).
@@ -654,6 +751,82 @@ func beforeOf(cursor *gen.Cursor) (*uuid.UUID, error) {
 		return nil, err
 	}
 	return &pos.Before, nil
+}
+
+// reviewPositionOf reads the position of a cursor of a list of reviews.
+func reviewPositionOf(cursor *gen.Cursor) (*inventory.ReviewPosition, error) {
+	if cursor == nil {
+		return nil, nil
+	}
+	var pos reviewPosition
+	if err := DecodeCursor(*cursor, &pos); err != nil {
+		return nil, err
+	}
+	return &inventory.ReviewPosition{DueAt: pos.DueAt, ID: pos.ID}, nil
+}
+
+// reviewListOf is how the API shows a page of reviews: without the
+// candidates to disable, which only a review read on its own shows.
+func reviewListOf(reviews []inventory.Review, more bool) (gen.ReviewList, error) {
+	list := gen.ReviewList{Reviews: make([]gen.Review, len(reviews))}
+	for i := range reviews {
+		list.Reviews[i] = reviewOf(&reviews[i])
+	}
+	if more {
+		last := reviews[len(reviews)-1]
+		next, err := EncodeCursor(reviewPosition{DueAt: last.DueAt, ID: last.ID})
+		if err != nil {
+			return list, err
+		}
+		list.NextCursor = &next
+	}
+	return list, nil
+}
+
+// reviewOf is how the API shows a review.
+func reviewOf(r *inventory.Review) gen.Review {
+	out := gen.Review{
+		Id:              r.ID,
+		AgentId:         r.AgentID,
+		Status:          gen.ReviewStatus(r.Status),
+		DueAt:           r.DueAt,
+		GraceEndsAt:     r.GraceEndsAt,
+		Overdue:         r.Overdue,
+		SignoffRequired: r.SignoffRequired,
+		CompletedAt:     r.CompletedAt,
+		SignedOffAt:     r.SignedOffAt,
+		CreatedAt:       r.CreatedAt,
+	}
+	if r.CompletedBy != nil {
+		p := personOf(*r.CompletedBy)
+		out.CompletedBy = &p
+	}
+	if r.SignedOffBy != nil {
+		p := personOf(*r.SignedOffBy)
+		out.SignedOffBy = &p
+	}
+	if a := r.Attestation; a != nil {
+		out.Attestation = &gen.ReviewAttestation{
+			StillNeeded:           a.StillNeeded,
+			OwnerStillRight:       a.OwnerStillRight,
+			DataCategoriesCurrent: a.DataCategoriesCurrent,
+			PolicyAdequate:        a.PolicyAdequate,
+			ToolingStillNeeded:    a.ToolingStillNeeded,
+			Comment:               optionalText(a.Comment),
+		}
+		if a.KeptTooling != nil {
+			kept := a.KeptTooling
+			out.Attestation.KeptTooling = &kept
+		}
+	}
+	if r.UnusedTooling != nil {
+		unused := make([]gen.UnusedTooling, len(r.UnusedTooling))
+		for i, u := range r.UnusedTooling {
+			unused[i] = gen.UnusedTooling{Key: u.Key, Kind: gen.UnusedToolingKind(u.Kind), LastUsedAt: u.LastUsedAt}
+		}
+		out.UnusedTooling = &unused
+	}
+	return out
 }
 
 // agentOf is how the API shows an agent.

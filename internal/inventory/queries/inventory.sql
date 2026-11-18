@@ -174,6 +174,81 @@ SELECT EXISTS (
     AND grace_ends_at < sqlc.arg(now)
 );
 
+-- name: HasOpenReview :one
+-- Whether the agent has a review that is scheduled or waits for a sign-off.
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.reviews WHERE agent_id = $1 AND status IN ('scheduled', 'awaiting_signoff')
+);
+
+-- name: ScheduleReview :exec
+-- Schedules a review, with the terms that the settings gave when it was
+-- scheduled: its due date, the end of its grace period and whether it needs a
+-- sign-off.
+INSERT INTO whitetower.reviews (id, agent_id, due_at, grace_ends_at, signoff_required, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(agent_id), sqlc.arg(due_at), sqlc.arg(grace_ends_at), sqlc.arg(signoff_required),
+  sqlc.arg(created_at));
+
+-- name: GetReview :one
+SELECT * FROM whitetower.reviews WHERE id = $1;
+
+-- name: LockReview :one
+-- Locks a review until the transaction ends, then reads it. The caller has
+-- locked the review's agent before.
+SELECT * FROM whitetower.reviews WHERE id = $1 FOR NO KEY UPDATE;
+
+-- name: CompleteReview :execrows
+-- Records the owner's attestation of a scheduled review, if it is still at
+-- the version the caller read: the review is then completed, or waits for a
+-- sign-off.
+UPDATE whitetower.reviews SET
+  status = sqlc.arg(status),
+  attestation = sqlc.arg(attestation),
+  completed_by = sqlc.arg(completed_by),
+  completed_at = sqlc.arg(completed_at),
+  version = version + 1
+WHERE id = sqlc.arg(id) AND version = sqlc.arg(version) AND status = 'scheduled';
+
+-- name: SignOffReview :execrows
+-- Completes a review that waits for a sign-off, if it is still at the version
+-- the caller read.
+UPDATE whitetower.reviews SET
+  status = 'completed',
+  signed_off_by = sqlc.arg(signed_off_by),
+  signed_off_at = sqlc.arg(signed_off_at),
+  version = version + 1
+WHERE id = sqlc.arg(id) AND version = sqlc.arg(version) AND status = 'awaiting_signoff';
+
+-- name: CancelOpenReviews :many
+-- Cancels the agent's open review, if it has one, and returns its ID.
+UPDATE whitetower.reviews SET status = 'cancelled', version = version + 1
+WHERE agent_id = $1 AND status IN ('scheduled', 'awaiting_signoff')
+RETURNING id;
+
+-- name: ListAgentReviews :many
+-- A page of the agent's reviews, the latest due first.
+SELECT * FROM whitetower.reviews
+WHERE agent_id = sqlc.arg(agent_id)
+  AND (sqlc.narg(before_due)::timestamptz IS NULL
+       OR (due_at, id) < (sqlc.narg(before_due)::timestamptz, sqlc.narg(before_id)::uuid))
+ORDER BY due_at DESC, id DESC
+LIMIT sqlc.arg(page_limit);
+
+-- name: ListReviews :many
+-- A page of the reviews in any of the statuses given (all with none), the
+-- earliest due first. With active_only, only those of active agents. With
+-- overdue, only the open reviews past their due date at the time given, or
+-- only the others.
+SELECT r.* FROM whitetower.reviews r
+JOIN whitetower.agents a ON a.id = r.agent_id
+WHERE (NOT sqlc.arg(active_only)::boolean OR a.lifecycle_state = 'active')
+  AND (cardinality(sqlc.arg(statuses)::text[]) = 0 OR r.status = ANY(sqlc.arg(statuses)::text[]))
+  AND (sqlc.narg(overdue)::boolean IS NULL
+       OR (r.status IN ('scheduled', 'awaiting_signoff') AND r.due_at < sqlc.arg(now)) = sqlc.narg(overdue)::boolean)
+  AND (sqlc.narg(after_due)::timestamptz IS NULL
+       OR (r.due_at, r.id) > (sqlc.narg(after_due)::timestamptz, sqlc.narg(after_id)::uuid))
+ORDER BY r.due_at, r.id
+LIMIT sqlc.arg(page_limit);
+
 -- name: ListTransitions :many
 -- A page of the agent's lifecycle transitions, newest first, with the display
 -- name of whoever took each one; the system has none.

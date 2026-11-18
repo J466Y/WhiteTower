@@ -19,11 +19,12 @@ import (
 // model is what the lifecycle says of an agent with a use case of its own,
 // written apart from the engine: its state, the state a suspension
 // remembers, its use case's status, the facts that the rest of White Tower
-// changes, and how many transitions its history holds.
+// changes, whether it has an open review, and how many transitions its
+// history holds.
 type model struct {
-	state, previous, useCase                                 string
-	ownerActive, policy, harness, halted, overdue, activated bool
-	history                                                  int
+	state, previous, useCase                                         string
+	ownerActive, policy, harness, halted, overdue, activated, review bool
+	history                                                          int
 }
 
 // caller is a principal, with the actions that their kind, roles and
@@ -107,6 +108,13 @@ func (m *model) apply(action, to string) {
 	case action == "reject" || action == "validate":
 		m.useCase = to
 	}
+	// T9 schedules a review unless one is open, and T14 cancels it.
+	switch action {
+	case "activate":
+		m.review = true
+	case "retire":
+		m.review, m.overdue = false, false
+	}
 	// An agent that becomes validated with an active agent policy and a
 	// harness becomes ready at once: White Tower takes T7.
 	if m.state == "validated" && m.policy && m.harness {
@@ -116,12 +124,13 @@ func (m *model) apply(action, to string) {
 
 // agrees fails the test unless the database holds what the model says of the
 // agent: its row, its use case, its governance state, its history, its audit
-// events and the advisory committee's inbox. It returns the agent's version.
+// events, the advisory committee's inbox and its open review. It returns the
+// agent's version.
 func (f *fixture) agrees(t *testing.T, id uuid.UUID, m model, step string) int64 {
 	t.Helper()
 	var state, previous, reason, useCase, published string
 	var activated, retired bool
-	var history, events, inbox int
+	var history, events, inbox, reviews int
 	var version int64
 	if err := f.pool.QueryRow(context.Background(), `
 		SELECT a.version, a.lifecycle_state, coalesce(a.suspended_from, ''), coalesce(a.suspension_reason, ''), u.status,
@@ -130,11 +139,13 @@ func (f *fixture) agrees(t *testing.T, id uuid.UUID, m model, step string) int64
 		  (SELECT count(*) FROM whitetower.audit_events e WHERE e.subject_agent_id = a.id
 		     AND e.type IN ('whitetower.agent.created.v1', 'whitetower.agent.lifecycle_changed.v1')),
 		  (SELECT count(*) FROM whitetower.inbox_items i WHERE i.kind = 'use_case_validation' AND i.subject_id = a.id
-		     AND i.resolved_at IS NULL)
+		     AND i.resolved_at IS NULL),
+		  (SELECT count(*) FROM whitetower.reviews r WHERE r.agent_id = a.id AND r.status IN ('scheduled', 'awaiting_signoff'))
 		FROM whitetower.agents a
 		JOIN whitetower.use_cases u ON u.id = a.use_case_id
 		JOIN whitetower.governance_state g ON g.agent_id = a.id
-		WHERE a.id = $1`, id).Scan(&version, &state, &previous, &reason, &useCase, &activated, &retired, &published, &history, &events, &inbox); err != nil {
+		WHERE a.id = $1`, id).Scan(&version, &state, &previous, &reason, &useCase, &activated, &retired, &published, &history, &events, &inbox,
+		&reviews); err != nil {
 		t.Fatal(err)
 	}
 	wantReason, wantInbox := "", 0
@@ -144,8 +155,11 @@ func (f *fixture) agrees(t *testing.T, id uuid.UUID, m model, step string) int64
 	if m.state == "proposed" {
 		wantInbox = 1
 	}
-	got := fmt.Sprint([]any{state, previous, reason, useCase, activated, retired, published, history, events, inbox})
-	want := fmt.Sprint([]any{m.state, m.previous, wantReason, m.useCase, m.activated, m.state == "retired", m.state, m.history, m.history, wantInbox})
+	got := fmt.Sprint([]any{state, previous, reason, useCase, activated, retired, published, history, events, inbox, reviews})
+	want := fmt.Sprint([]any{
+		m.state, m.previous, wantReason, m.useCase, m.activated, m.state == "retired", m.state, m.history, m.history, wantInbox,
+		map[bool]int{true: 1}[m.review],
+	})
 	if got != want {
 		t.Fatalf("after %s, the database holds %s, the model %s", step, got, want)
 	}
@@ -205,6 +219,7 @@ func TestTheDatabaseFollowsAModelOfTheLifecycle(t *testing.T) {
 				f.halt(t, a.ID, m.halted)
 			case 8:
 				m.overdue = !m.overdue
+				m.review = m.overdue
 				if m.overdue {
 					f.review(t, a.ID, &past)
 				} else {

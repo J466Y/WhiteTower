@@ -41,6 +41,8 @@ type Options struct {
 	// SelectorHalts gives the active selector halts that an agent matches,
 	// which every write of its governance state adds.
 	SelectorHalts SelectorHalts
+	// Tooling lists the candidates to disable that an agent's review shows.
+	Tooling Tooling
 	// RoleMapping maps IdP groups to roles, as the authentication does: it
 	// tells who holds the owner role, which owning an agent needs.
 	RoleMapping map[string]string
@@ -55,6 +57,7 @@ type Inventory struct {
 	versions    StateVersions
 	policies    AgentPolicies
 	halts       SelectorHalts
+	tooling     Tooling
 	roleMapping map[string]string
 }
 
@@ -68,6 +71,7 @@ func New(opts Options) *Inventory {
 		versions:    opts.Versions,
 		policies:    opts.Policies,
 		halts:       opts.SelectorHalts,
+		tooling:     opts.Tooling,
 		roleMapping: opts.RoleMapping,
 	}
 }
