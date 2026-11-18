@@ -646,7 +646,8 @@ func TestRetirementCancelsTheOpenReview(t *testing.T) {
 }
 
 // Whoever sees an agent sees its reviews; only a caller who may view agents'
-// tooling sees the candidates to disable and the tooling kept, and lists
+// tooling (catalog.view, within a token's scopes, and never in a break-glass
+// session) sees the candidates to disable and the tooling kept, and lists
 // leave the candidates out. Lists go a page at a time, by due date, and
 // filter on status and on whether a review is overdue.
 func TestReviewsAreReadAsTheCallerMaySeeThem(t *testing.T) {
@@ -659,12 +660,17 @@ func TestReviewsAreReadAsTheCallerMaySeeThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	breakglass := auth.Principal{ID: f.omar.ID, Kind: auth.Human, Roles: []string{"operator"}, IsBreakglass: true}
+	token := func(scopes ...string) auth.Principal {
+		return auth.Principal{ID: f.alex.ID, Kind: auth.Human, Roles: []string{"advisory"}, Scopes: scopes}
+	}
 	for _, c := range []struct {
 		name    string
 		caller  auth.Principal
 		tooling bool
 	}{
 		{"the advisory committee", f.alex, true},
+		{"a token with catalog.view", token("inventory.view", "catalog.view"), true},
+		{"a token without catalog.view", token("inventory.view"), false},
 		{"a user", f.uma, false},
 		{"a break-glass session", breakglass, false},
 	} {
@@ -674,6 +680,10 @@ func TestReviewsAreReadAsTheCallerMaySeeThem(t *testing.T) {
 		}
 		if (got.UnusedTooling != nil) != c.tooling || (got.Attestation.KeptTooling != nil) != c.tooling || !got.Attestation.StillNeeded {
 			t.Errorf("%s reads %+v, attestation %+v", c.name, got, got.Attestation)
+		}
+		listed, _, err := f.inv.AgentReviews(ctx, c.caller, a.ID, nil, 10)
+		if err != nil || len(listed) != 1 || (listed[0].Attestation.KeptTooling != nil) != c.tooling || listed[0].UnusedTooling != nil {
+			t.Errorf("%s lists %+v, %v", c.name, listed, err)
 		}
 	}
 	suspended := f.inState(t, "suspended-agent", "suspended from active")

@@ -109,10 +109,14 @@ var reviewItems = []string{"review_due", "review_signoff"}
 
 func isOpen(status string) bool { return status == "scheduled" || status == "awaiting_signoff" }
 
-// seesTooling reports whether the caller may view agents' tooling: every
-// role but the user role, and never a break-glass session (the permission
-// matrix, "View the catalog and agents' tooling").
-func seesTooling(caller auth.Principal) bool { return !caller.IsBreakglass && seesAll(caller) }
+// seesTooling reports whether the caller may view agents' tooling
+// (catalog.view; the permission matrix, "View the catalog and agents'
+// tooling"). The Authorizer applies a token's scopes and refuses it to a
+// break-glass session. It decides only whether a review shows tooling, and
+// never refuses the review.
+func (inv *Inventory) seesTooling(ctx context.Context, caller auth.Principal) bool {
+	return inv.authorize(ctx, caller, authz.PermissionCatalogView, authz.Relationship{}) == nil
+}
 
 // GetReview returns a review of an agent that the caller may see, with its
 // candidates to disable while it is open, to a caller who may view them.
@@ -136,7 +140,7 @@ func (inv *Inventory) GetReview(ctx context.Context, caller auth.Principal, id u
 			return err
 		}
 		review = &reviews[0]
-		if isOpen(r.Status) && seesTooling(caller) {
+		if isOpen(r.Status) && inv.seesTooling(ctx, caller) {
 			if review.UnusedTooling, err = inv.tooling.Unused(ctx, tx, r.AgentID); err != nil {
 				return fmt.Errorf("reading the agent's unused tooling: %w", err)
 			}
@@ -689,6 +693,7 @@ func (inv *Inventory) reviewsOf(ctx context.Context, q *inventorydb.Queries, cal
 		p := who[*id]
 		return &p
 	}
+	tooling := inv.seesTooling(ctx, caller)
 	now := inv.clk.Now().UTC()
 	reviews := make([]Review, len(rows))
 	for i, r := range rows {
@@ -705,7 +710,7 @@ func (inv *Inventory) reviewsOf(ctx context.Context, q *inventorydb.Queries, cal
 				return nil, fmt.Errorf("decoding the attestation of review %s: %w", r.ID, err)
 			}
 			switch {
-			case !seesTooling(caller):
+			case !tooling:
 				att.KeptTooling = nil
 			case att.KeptTooling == nil:
 				att.KeptTooling = []string{}
