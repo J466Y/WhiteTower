@@ -375,7 +375,7 @@ func (r *recording) toolEntry(t ReportedTool, reported []ReportedServer, servers
 		parts = map[string]string{"name": t.Name}
 	}
 	var err error
-	e.reference, err = stringForm(parts)
+	e.reference, err = canonicalJSON(parts)
 	return e, err
 }
 
@@ -566,7 +566,7 @@ func (r *recording) models(ctx context.Context, reported []ReportedModel) error 
 
 // reference returns the string form of a model's reference.
 func (e *modelEntry) reference() (string, error) {
-	return stringForm(map[string]string{"endpoint": e.identity.endpoint, "name": e.identity.name, "provider": e.identity.provider})
+	return canonicalJSON(map[string]string{"endpoint": e.identity.endpoint, "name": e.identity.name, "provider": e.identity.provider})
 }
 
 // findModels fills in the catalog's models among those given.
@@ -766,13 +766,23 @@ func (s *ReportedServer) validate(at string) error {
 	); err != nil {
 		return err
 	}
-	_, local := stdioCommand(s.Reference)
+	command, local := stdioCommand(s.Reference)
 	remote := strings.HasPrefix(s.Reference, "connector:")
 	if _, ok := urlHost(s.Reference); ok {
 		remote = true
 	}
 	if s.Transport == "stdio" && !local || s.Transport == "http" && !remote {
 		return refuse(Invalid, "%s.reference: not a reference of a server of its transport", at)
+	}
+	// A conforming enforcement point writes a local server's command line as
+	// its canonical JSON (contracts, section 4.10), so any other text, such
+	// as one with spaces, other escapes or the escape of a lone surrogate,
+	// which decoding replaces, would be an entry that none ever reports.
+	if local {
+		canonical, err := canonicalJSON(command)
+		if err != nil || "stdio:"+canonical != s.Reference {
+			return refuse(Invalid, "%s.reference: a command line that is not its canonical JSON", at)
+		}
 	}
 	return nil
 }
@@ -902,11 +912,12 @@ func serverFlags(reference string) []string {
 	return f
 }
 
-// stringForm returns the string form of a reference with several parts: the
-// canonical JSON (RFC 8785) of an object of those parts (contracts, section
-// 4.10).
-func stringForm(parts map[string]string) (string, error) {
-	raw, err := json.Marshal(parts)
+// canonicalJSON returns the canonical JSON (RFC 8785) of strings, in an
+// array or an object: a local server's command line, after stdio:, and the
+// string form of a reference with several parts, an object of those parts
+// (contracts, section 4.10).
+func canonicalJSON(v any) (string, error) {
+	raw, err := json.Marshal(v)
 	if err != nil {
 		return "", fmt.Errorf("encoding a reference: %w", err)
 	}

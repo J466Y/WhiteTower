@@ -58,7 +58,7 @@ func TestStringFormsAreThoseOfTheConformanceVectors(t *testing.T) {
 		default:
 			continue
 		}
-		got, err := stringForm(parts)
+		got, err := canonicalJSON(parts)
 		if err != nil {
 			t.Fatalf("%s: %v", v.ID, err)
 		}

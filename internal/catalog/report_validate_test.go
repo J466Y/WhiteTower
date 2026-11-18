@@ -33,6 +33,12 @@ func TestAReportWithinItsLimitsIsValid(t *testing.T) {
 	if err := r.validate(); err != nil {
 		t.Fatal(err)
 	}
+	// A command line in its canonical JSON, with the escapes that RFC 8785
+	// writes and a character it writes as itself.
+	r.Servers[1].Reference = `stdio:["a\"b","c\\d","\n","\u001f","é<>"]`
+	if err := r.validate(); err != nil {
+		t.Fatalf("a canonical command line: %v", err)
+	}
 	r.Servers = make([]ReportedServer, MaxReportServers)
 	for i := range r.Servers {
 		r.Servers[i] = ReportedServer{Reference: "https://s.example.com/" + strings.Repeat("a", maxReference-23), Transport: "http", Origin: "agent"}
@@ -72,6 +78,11 @@ func TestAMalformedReportIsRefusedAsAWholeBeforeAnythingIsRead(t *testing.T) {
 		{"a command line over http", func(r *Report) { r.Servers[1].Transport = "http" }, "servers[1].reference: not a reference"},
 		{"a command line that is not JSON", func(r *Report) { r.Servers[1].Reference = "stdio:npx server-fs" }, "servers[1].reference"},
 		{"an empty command line", func(r *Report) { r.Servers[1].Reference = "stdio:[]" }, "servers[1].reference"},
+		{"a command line with spaces", func(r *Report) { r.Servers[1].Reference = `stdio:["npx", "-y", "server-fs"]` }, "servers[1].reference: a command line that is not its canonical JSON"},
+		{"a command line with another escape", func(r *Report) { r.Servers[1].Reference = `stdio:["\u006epx","-y","server-fs"]` }, "servers[1].reference: a command line that is not its canonical JSON"},
+		{"a command line with an escaped <", func(r *Report) { r.Servers[1].Reference = `stdio:["a\u003cb"]` }, "servers[1].reference: a command line that is not its canonical JSON"},
+		{"a command line with a lone surrogate's escape", func(r *Report) { r.Servers[1].Reference = `stdio:["npx","\ud800"]` }, "servers[1].reference: a command line that is not its canonical JSON"},
+		{"a command line with a trailing newline", func(r *Report) { r.Servers[1].Reference = "stdio:[\"npx\"]\n" }, "servers[1].reference: a command line that is not its canonical JSON"},
 		{"a NUL in a display form", func(r *Report) { r.Servers[1].Display = "npx\x00" }, "servers[1].display: holds a NUL"},
 		{"a noncharacter in a name", func(r *Report) { r.Servers[0].Name = "Git￾Hub" }, "servers[0].name: holds a noncharacter"},
 		{"a noncharacter of another plane", func(r *Report) { r.Servers[0].Version = "\U0010FFFF" }, "servers[0].version: holds a noncharacter"},
