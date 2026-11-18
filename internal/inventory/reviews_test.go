@@ -507,6 +507,11 @@ func TestTheDatabaseRefusesASignOffByAParty(t *testing.T) {
 		spoil func(t *testing.T, a *inventory.Agent, r *inventory.Review)
 	}{
 		{"the primary owner, who completed it", f.olivia.ID, nil},
+		{"a delegate", adam.ID, func(t *testing.T, a *inventory.Agent, _ *inventory.Review) {
+			if _, err := f.inv.AddDelegate(ctx, f.olivia, a.ID, uuid.MustParse(adam.ID)); err != nil {
+				t.Fatal(err)
+			}
+		}},
 		{"a former delegate", adam.ID, func(t *testing.T, a *inventory.Agent, _ *inventory.Review) {
 			if _, err := f.inv.AddDelegate(ctx, f.olivia, a.ID, uuid.MustParse(adam.ID)); err != nil {
 				t.Fatal(err)

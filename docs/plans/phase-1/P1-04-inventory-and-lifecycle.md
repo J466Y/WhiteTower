@@ -448,7 +448,7 @@ A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-0
 - P1-08 implements `SelectorHalts` and wires it in place of `NoSelectorHalts`. Its agent halt locks the agent's row and its state, takes its version, inserts the halt, adds it to the state, gives the agent's row a new version, and then calls `SystemTransition` with `halt_suspend` and the halt's ID. Its selector halts take `govstate.SelectorHaltsLock` exclusively, first.
 - The bulk import (pull request 8) takes the shared lock first in each of its transactions, as row 8 says.
 
-### 2026-11-17: reviews (PR 5a)
+### 2026-11-18: reviews (PR 5a)
 
 **Pull request 5 in two parts** (the maintainer's decision of 2026-11-17). Before writing code, the agent of pull request 5 put the whole of it at about 2,200 changed lines without generated code. Part 5a builds the reviews (step 6). Part 5b builds the lifecycle guard job (step 7), from `main` once 5a is merged. Rows 5a and 5b of the table above replace row 5.
 
