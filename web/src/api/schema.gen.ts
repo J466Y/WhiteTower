@@ -2522,7 +2522,11 @@ export interface components {
          *     type. A property whose name holds `.` or `:` cannot be declared, and
          *     a transform applies to `String` and `Set<String>` only. The
          *     argument's name is its path joined with `.`, followed by `:` and the
-         *     transform when it has one, and a tool declares each name once.
+         *     transform when it has one, and a tool declares each name once. A
+         *     property name is never empty and holds no control character (U+0000
+         *     to U+001F, U+007F), since the generator of usage rules refuses one in
+         *     an argument's name (contracts, section 6.11); the server also refuses
+         *     a lone surrogate or a noncharacter, as it does in a report.
          */
         ToolArgumentDeclaration: {
             path: string[];
@@ -2946,6 +2950,15 @@ export interface components {
             endpoint: string;
             name: string;
         };
+        /**
+         * @description The complete tooling declared for an agent, in the shape and within
+         *     the limits of a tooling report (contracts, section 4.10). A tool's
+         *     name, provider and type and a model's provider and name, which become
+         *     keys, hold no control character (U+0000 to U+001F, U+007F), since the
+         *     generator of usage rules refuses one in a tool's key (contracts,
+         *     section 6.11); the server also refuses a lone surrogate or a
+         *     noncharacter in any string, as it does in a report.
+         */
         DeclareToolingRequest: {
             servers: components["schemas"]["DeclaredServer"][];
             tools: components["schemas"]["DeclaredTool"][];

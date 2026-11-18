@@ -3,6 +3,7 @@ package authz
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
@@ -26,6 +27,9 @@ func RelationshipFromContext(ctx context.Context) (Relationship, bool) {
 type Authorizer struct {
 	mu         sync.RWMutex
 	operations map[string]Permission
+	// viewsCatalog holds the operations that also need PermissionCatalogView,
+	// whose answers carry references and reported text.
+	viewsCatalog map[string]bool
 }
 
 var _ auth.Authorizer = (*Authorizer)(nil)
@@ -33,7 +37,8 @@ var _ auth.Authorizer = (*Authorizer)(nil)
 // NewAuthorizer returns an initialized Authorizer with standard operation mappings.
 func NewAuthorizer() *Authorizer {
 	az := &Authorizer{
-		operations: make(map[string]Permission),
+		operations:   make(map[string]Permission),
+		viewsCatalog: make(map[string]bool),
 	}
 	az.registerDefaults()
 	return az
@@ -106,38 +111,48 @@ func (az *Authorizer) registerDefaults() {
 	// The catalog of MCP servers, tools and models, and agents' tooling (plan
 	// P1-16). The handlers of the agents' tooling check the scope of each
 	// grant against the agent, as the inventory's do: an owner requests,
-	// disables and declares only for the agents they own.
-	az.operations["listCatalogServers"] = PermissionCatalogView
-	az.operations["getCatalogServer"] = PermissionCatalogView
-	az.operations["approveCatalogServer"] = PermissionCatalogEntryApprove
-	az.operations["declineCatalogServer"] = PermissionCatalogEntryApprove
-	az.operations["listCatalogTools"] = PermissionCatalogView
-	az.operations["getCatalogTool"] = PermissionCatalogView
-	az.operations["approveCatalogTool"] = PermissionCatalogEntryApprove
-	az.operations["declineCatalogTool"] = PermissionCatalogEntryApprove
-	az.operations["getToolDefinition"] = PermissionCatalogView
-	az.operations["listCatalogModels"] = PermissionCatalogView
-	az.operations["getCatalogModel"] = PermissionCatalogView
-	az.operations["approveCatalogModel"] = PermissionCatalogEntryApprove
-	az.operations["declineCatalogModel"] = PermissionCatalogEntryApprove
-	az.operations["declinePendingFromAgent"] = PermissionCatalogEntryApprove
-	az.operations["listCatalogBlocks"] = PermissionCatalogView
-	az.operations["issueCatalogBlock"] = PermissionCatalogBlockIssue
-	az.operations["getCatalogBlock"] = PermissionCatalogView
-	az.operations["requestCatalogUnblock"] = PermissionCatalogUnblockRequest
-	az.operations["approveCatalogUnblock"] = PermissionCatalogUnblockApprove
+	// disables and declares only for the agents they own. Their answers
+	// carry references and reported text, so each also needs
+	// PermissionCatalogView, which Authorize checks here rather than in each
+	// handler.
+	az.catalogOperation("listCatalogServers", PermissionCatalogView)
+	az.catalogOperation("getCatalogServer", PermissionCatalogView)
+	az.catalogOperation("approveCatalogServer", PermissionCatalogEntryApprove)
+	az.catalogOperation("declineCatalogServer", PermissionCatalogEntryApprove)
+	az.catalogOperation("listCatalogTools", PermissionCatalogView)
+	az.catalogOperation("getCatalogTool", PermissionCatalogView)
+	az.catalogOperation("approveCatalogTool", PermissionCatalogEntryApprove)
+	az.catalogOperation("declineCatalogTool", PermissionCatalogEntryApprove)
+	az.catalogOperation("getToolDefinition", PermissionCatalogView)
+	az.catalogOperation("listCatalogModels", PermissionCatalogView)
+	az.catalogOperation("getCatalogModel", PermissionCatalogView)
+	az.catalogOperation("approveCatalogModel", PermissionCatalogEntryApprove)
+	az.catalogOperation("declineCatalogModel", PermissionCatalogEntryApprove)
+	az.catalogOperation("declinePendingFromAgent", PermissionCatalogEntryApprove)
+	az.catalogOperation("listCatalogBlocks", PermissionCatalogView)
+	az.catalogOperation("issueCatalogBlock", PermissionCatalogBlockIssue)
+	az.catalogOperation("getCatalogBlock", PermissionCatalogView)
+	az.catalogOperation("requestCatalogUnblock", PermissionCatalogUnblockRequest)
+	az.catalogOperation("approveCatalogUnblock", PermissionCatalogUnblockApprove)
 	// A decline only denies, so whoever may approve may decline any
 	// request, their own included.
-	az.operations["declineCatalogUnblock"] = PermissionCatalogUnblockApprove
-	az.operations["compileUsageRules"] = PermissionCatalogView
-	az.operations["listAgentTooling"] = PermissionCatalogView
-	az.operations["listAgentToolingRequests"] = PermissionCatalogView
-	az.operations["requestAgentTooling"] = PermissionToolingEnableRequest
-	az.operations["approveAgentToolingRequest"] = PermissionToolingEnableApprove
-	az.operations["declineAgentToolingRequest"] = PermissionToolingEnableApprove
-	az.operations["disableAgentTooling"] = PermissionToolingDisable
-	az.operations["getAgentDeclaredTooling"] = PermissionCatalogView
-	az.operations["declareAgentTooling"] = PermissionToolingDeclare
+	az.catalogOperation("declineCatalogUnblock", PermissionCatalogUnblockApprove)
+	az.catalogOperation("compileUsageRules", PermissionCatalogView)
+	az.catalogOperation("listAgentTooling", PermissionCatalogView)
+	az.catalogOperation("listAgentToolingRequests", PermissionCatalogView)
+	az.catalogOperation("requestAgentTooling", PermissionToolingEnableRequest)
+	az.catalogOperation("approveAgentToolingRequest", PermissionToolingEnableApprove)
+	az.catalogOperation("declineAgentToolingRequest", PermissionToolingEnableApprove)
+	az.catalogOperation("disableAgentTooling", PermissionToolingDisable)
+	az.catalogOperation("getAgentDeclaredTooling", PermissionCatalogView)
+	az.catalogOperation("declareAgentTooling", PermissionToolingDeclare)
+}
+
+// catalogOperation maps an operation of the catalog to its permission, and
+// marks it as one that also needs PermissionCatalogView.
+func (az *Authorizer) catalogOperation(operationID string, perm Permission) {
+	az.operations[operationID] = perm
+	az.viewsCatalog[operationID] = true
 }
 
 // RegisterOperation maps an OpenAPI operation ID to a Permission.
@@ -204,15 +219,15 @@ func (az *Authorizer) Authorize(ctx context.Context, p *auth.Principal, operatio
 	}
 
 	// Enforce API token scopes: a scoped token can do only what its scopes allow (ST-19).
-	if p.Scopes != nil {
-		hasScope := false
-		for _, s := range p.Scopes {
-			if s == string(perm) || s == "*" {
-				hasScope = true
-				break
-			}
-		}
-		if !hasScope {
+	if p.Scopes != nil && !hasScope(p.Scopes, perm) {
+		return auth.ErrDenied
+	}
+
+	// An operation of the catalog answers with references and reported text,
+	// which only PermissionCatalogView shows (RFC-0002, Privacy): it needs
+	// that permission too, from a role and, for a token, in its scopes.
+	if az.needsCatalogView(operation) {
+		if _, ok := EffectiveGrant(p.Roles, PermissionCatalogView); !ok || (p.Scopes != nil && !hasScope(p.Scopes, PermissionCatalogView)) {
 			return auth.ErrDenied
 		}
 	}
@@ -231,6 +246,19 @@ func (az *Authorizer) Authorize(ctx context.Context, p *auth.Principal, operatio
 		return auth.ErrDenied
 	}
 	return nil
+}
+
+// needsCatalogView reports whether operation is one of the catalog, which
+// also needs PermissionCatalogView.
+func (az *Authorizer) needsCatalogView(operation string) bool {
+	az.mu.RLock()
+	defer az.mu.RUnlock()
+	return az.viewsCatalog[operation]
+}
+
+// hasScope reports whether a token's scopes hold perm, or every permission.
+func hasScope(scopes []string, perm Permission) bool {
+	return slices.Contains(scopes, string(perm)) || slices.Contains(scopes, "*")
 }
 
 // AuthorizeResource checks if the principal is authorized for permission under

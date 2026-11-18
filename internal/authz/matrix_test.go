@@ -433,6 +433,34 @@ func TestCatalogOperationsFollowTheMatrix(t *testing.T) {
 	}
 }
 
+// Every operation of the catalog also needs catalog.view, since its answer
+// carries references and reported text: a token that holds the operation's
+// own scope but not catalog.view is refused, and passes once it holds both.
+func TestEveryCatalogOperationAlsoNeedsCatalogView(t *testing.T) {
+	az := NewAuthorizer()
+	owned := ContextWithRelationship(context.Background(), Relationship{IsOwner: true})
+	roles := []string{string(RoleSteering), string(RoleAdvisory), string(RoleOwner), string(RoleOperator)}
+	for op := range catalogOperations() {
+		perm, ok := az.ResolveOperation(op)
+		if !ok {
+			t.Errorf("%s maps to no permission", op)
+			continue
+		}
+		own := perm
+		if perm == PermissionCatalogView {
+			own = PermissionInventoryView
+		}
+		token := &auth.Principal{ID: "p1", Roles: roles, Scopes: []string{string(own)}}
+		if err := az.Authorize(owned, token, op); !errors.Is(err, auth.ErrDenied) {
+			t.Errorf("%s with the scope %s alone: got %v, want refused", op, own, err)
+		}
+		token.Scopes = append(token.Scopes, string(PermissionCatalogView))
+		if err := az.Authorize(owned, token, op); err != nil {
+			t.Errorf("%s with the scopes %v: got %v, want allowed", op, token.Scopes, err)
+		}
+	}
+}
+
 // An owner requests, disables and declares tooling only for the agents they
 // own: each grant of these is `own`, and the authorizer refuses it on an
 // agent the owner does not own, while the advisory committee and operators
