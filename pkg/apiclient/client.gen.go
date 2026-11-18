@@ -44,19 +44,19 @@ func (e ActorType) Valid() bool {
 
 // Defines values for AgentSource.
 const (
-	Discovered AgentSource = "discovered"
-	Imported   AgentSource = "imported"
-	Registered AgentSource = "registered"
+	AgentSourceDiscovered AgentSource = "discovered"
+	AgentSourceImported   AgentSource = "imported"
+	AgentSourceRegistered AgentSource = "registered"
 )
 
 // Valid indicates whether the value is a known member of the AgentSource enum.
 func (e AgentSource) Valid() bool {
 	switch e {
-	case Discovered:
+	case AgentSourceDiscovered:
 		return true
-	case Imported:
+	case AgentSourceImported:
 		return true
-	case Registered:
+	case AgentSourceRegistered:
 		return true
 	default:
 		return false
@@ -108,6 +108,180 @@ func (e AiActClassification) Valid() bool {
 	}
 }
 
+// Defines values for ArgumentTransform.
+const (
+	EmailDomain ArgumentTransform = "email_domain"
+	Lowercase   ArgumentTransform = "lowercase"
+	Path        ArgumentTransform = "path"
+	UrlHost     ArgumentTransform = "url_host"
+)
+
+// Valid indicates whether the value is a known member of the ArgumentTransform enum.
+func (e ArgumentTransform) Valid() bool {
+	switch e {
+	case EmailDomain:
+		return true
+	case Lowercase:
+		return true
+	case Path:
+		return true
+	case UrlHost:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArgumentType.
+const (
+	Bool      ArgumentType = "Bool"
+	Long      ArgumentType = "Long"
+	SetLong   ArgumentType = "Set<Long>"
+	SetString ArgumentType = "Set<String>"
+	String    ArgumentType = "String"
+)
+
+// Valid indicates whether the value is a known member of the ArgumentType enum.
+func (e ArgumentType) Valid() bool {
+	switch e {
+	case Bool:
+		return true
+	case Long:
+		return true
+	case SetLong:
+		return true
+	case SetString:
+		return true
+	case String:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogBlockStatus.
+const (
+	CatalogBlockStatusActive CatalogBlockStatus = "active"
+	CatalogBlockStatusLifted CatalogBlockStatus = "lifted"
+)
+
+// Valid indicates whether the value is a known member of the CatalogBlockStatus enum.
+func (e CatalogBlockStatus) Valid() bool {
+	switch e {
+	case CatalogBlockStatusActive:
+		return true
+	case CatalogBlockStatusLifted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogBlockKind.
+const (
+	CatalogBlockKindEndpoint CatalogBlockKind = "endpoint"
+	CatalogBlockKindModel    CatalogBlockKind = "model"
+	CatalogBlockKindProvider CatalogBlockKind = "provider"
+	CatalogBlockKindServer   CatalogBlockKind = "server"
+	CatalogBlockKindTool     CatalogBlockKind = "tool"
+)
+
+// Valid indicates whether the value is a known member of the CatalogBlockKind enum.
+func (e CatalogBlockKind) Valid() bool {
+	switch e {
+	case CatalogBlockKindEndpoint:
+		return true
+	case CatalogBlockKindModel:
+		return true
+	case CatalogBlockKindProvider:
+		return true
+	case CatalogBlockKindServer:
+		return true
+	case CatalogBlockKindTool:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogEntryType.
+const (
+	CatalogEntryTypeModel  CatalogEntryType = "model"
+	CatalogEntryTypeServer CatalogEntryType = "server"
+	CatalogEntryTypeTool   CatalogEntryType = "tool"
+)
+
+// Valid indicates whether the value is a known member of the CatalogEntryType enum.
+func (e CatalogEntryType) Valid() bool {
+	switch e {
+	case CatalogEntryTypeModel:
+		return true
+	case CatalogEntryTypeServer:
+		return true
+	case CatalogEntryTypeTool:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogRequestStatus.
+const (
+	CatalogRequestStatusApproved CatalogRequestStatus = "approved"
+	CatalogRequestStatusDeclined CatalogRequestStatus = "declined"
+	CatalogRequestStatusPending  CatalogRequestStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the CatalogRequestStatus enum.
+func (e CatalogRequestStatus) Valid() bool {
+	switch e {
+	case CatalogRequestStatusApproved:
+		return true
+	case CatalogRequestStatusDeclined:
+		return true
+	case CatalogRequestStatusPending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogServerTransport.
+const (
+	CatalogServerTransportHttp  CatalogServerTransport = "http"
+	CatalogServerTransportStdio CatalogServerTransport = "stdio"
+)
+
+// Valid indicates whether the value is a known member of the CatalogServerTransport enum.
+func (e CatalogServerTransport) Valid() bool {
+	switch e {
+	case CatalogServerTransportHttp:
+		return true
+	case CatalogServerTransportStdio:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogStatus.
+const (
+	CatalogStatusApproved   CatalogStatus = "approved"
+	CatalogStatusDiscovered CatalogStatus = "discovered"
+)
+
+// Valid indicates whether the value is a known member of the CatalogStatus enum.
+func (e CatalogStatus) Valid() bool {
+	switch e {
+	case CatalogStatusApproved:
+		return true
+	case CatalogStatusDiscovered:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CoverageLevel.
 const (
 	C0 CoverageLevel = "C0"
@@ -126,6 +300,24 @@ func (e CoverageLevel) Valid() bool {
 	case C2:
 		return true
 	case C3:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeclaredServerTransport.
+const (
+	DeclaredServerTransportHttp  DeclaredServerTransport = "http"
+	DeclaredServerTransportStdio DeclaredServerTransport = "stdio"
+)
+
+// Valid indicates whether the value is a known member of the DeclaredServerTransport enum.
+func (e DeclaredServerTransport) Valid() bool {
+	switch e {
+	case DeclaredServerTransportHttp:
+		return true
+	case DeclaredServerTransportStdio:
 		return true
 	default:
 		return false
@@ -546,18 +738,81 @@ func (e SuspensionReason) Valid() bool {
 	}
 }
 
+// Defines values for ToolKind.
+const (
+	ToolKindBuiltin  ToolKind = "builtin"
+	ToolKindFunction ToolKind = "function"
+	ToolKindHttp     ToolKind = "http"
+	ToolKindMcp      ToolKind = "mcp"
+	ToolKindOther    ToolKind = "other"
+)
+
+// Valid indicates whether the value is a known member of the ToolKind enum.
+func (e ToolKind) Valid() bool {
+	switch e {
+	case ToolKindBuiltin:
+		return true
+	case ToolKindFunction:
+		return true
+	case ToolKindHttp:
+		return true
+	case ToolKindMcp:
+		return true
+	case ToolKindOther:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ToolOrigin.
+const (
+	ToolOriginAgent    ToolOrigin = "agent"
+	ToolOriginProvider ToolOrigin = "provider"
+)
+
+// Valid indicates whether the value is a known member of the ToolOrigin enum.
+func (e ToolOrigin) Valid() bool {
+	switch e {
+	case ToolOriginAgent:
+		return true
+	case ToolOriginProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ToolingObservationSource.
+const (
+	Declaration ToolingObservationSource = "declaration"
+	Report      ToolingObservationSource = "report"
+)
+
+// Valid indicates whether the value is a known member of the ToolingObservationSource enum.
+func (e ToolingObservationSource) Valid() bool {
+	switch e {
+	case Declaration:
+		return true
+	case Report:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UnusedToolingKind.
 const (
-	Model UnusedToolingKind = "model"
-	Tool  UnusedToolingKind = "tool"
+	UnusedToolingKindModel UnusedToolingKind = "model"
+	UnusedToolingKindTool  UnusedToolingKind = "tool"
 )
 
 // Valid indicates whether the value is a known member of the UnusedToolingKind enum.
 func (e UnusedToolingKind) Valid() bool {
 	switch e {
-	case Model:
+	case UnusedToolingKindModel:
 		return true
-	case Tool:
+	case UnusedToolingKindTool:
 		return true
 	default:
 		return false
@@ -639,6 +894,24 @@ func (e ExportAgentsParamsFormat) Valid() bool {
 	case Csv:
 		return true
 	case Json:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListCatalogBlocksParamsStatus.
+const (
+	ListCatalogBlocksParamsStatusActive ListCatalogBlocksParamsStatus = "active"
+	ListCatalogBlocksParamsStatusLifted ListCatalogBlocksParamsStatus = "lifted"
+)
+
+// Valid indicates whether the value is a known member of the ListCatalogBlocksParamsStatus enum.
+func (e ListCatalogBlocksParamsStatus) Valid() bool {
+	switch e {
+	case ListCatalogBlocksParamsStatusActive:
+		return true
+	case ListCatalogBlocksParamsStatusLifted:
 		return true
 	default:
 		return false
@@ -799,6 +1072,36 @@ type AgentList struct {
 	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
+// AgentToolingEntry An entry of the catalog as it stands for the agent. A server is
+// enabled when one of its tools is, since an agent is enabled to use
+// tools and models.
+type AgentToolingEntry struct {
+	Blocked   bool               `json:"blocked"`
+	Declared  bool               `json:"declared"`
+	Enabled   bool               `json:"enabled"`
+	EnabledAt *time.Time         `json:"enabledAt,omitempty"`
+	EntryId   openapi_types.UUID `json:"entryId"`
+	EntryType CatalogEntryType   `json:"entryType"`
+	Key       string             `json:"key"`
+
+	// LastUsedAt When the agent last used the enabled entry, as allowed decisions record it (CAT-09).
+	LastUsedAt   *time.Time           `json:"lastUsedAt,omitempty"`
+	Observations []ToolingObservation `json:"observations"`
+
+	// RequestId The approved request that enabled the entry.
+	RequestId *openapi_types.UUID `json:"requestId,omitempty"`
+
+	// Status An entry is discovered until the advisory committee approves it
+	// (CAT-02). A declined entry stays discovered, so it stays denied.
+	Status CatalogStatus `json:"status"`
+}
+
+// AgentToolingList defines model for AgentToolingList.
+type AgentToolingList struct {
+	Entries    []AgentToolingEntry `json:"entries"`
+	NextCursor *string             `json:"nextCursor,omitempty"`
+}
+
 // AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
 type AiActClassification string
 
@@ -814,6 +1117,29 @@ type ApiTokenMetadata struct {
 	Scopes      []string           `json:"scopes"`
 	TokenPrefix string             `json:"tokenPrefix"`
 }
+
+// ApprovalRequest defines model for ApprovalRequest.
+type ApprovalRequest struct {
+	Comment *string `json:"comment,omitempty"`
+}
+
+// ApproveCatalogModelRequest defines model for ApproveCatalogModelRequest.
+type ApproveCatalogModelRequest struct {
+	// Digest The digest of the weights the reviewer approves, which approval pins. Required when the model's runtime reported one.
+	Digest *string `json:"digest,omitempty"`
+}
+
+// ApproveCatalogServerRequest defines model for ApproveCatalogServerRequest.
+type ApproveCatalogServerRequest struct {
+	// Tools The server's tools to approve with it, each once; none when absent.
+	Tools *[]ServerToolApproval `json:"tools,omitempty"`
+}
+
+// ArgumentTransform The transform that applies to a string, or to each string of a set, before policies see it (contracts, section 6.11).
+type ArgumentTransform string
+
+// ArgumentType An argument's type, as Cedar names it (contracts, section 7.7).
+type ArgumentType string
 
 // AuditCheckpoint defines model for AuditCheckpoint.
 type AuditCheckpoint struct {
@@ -873,6 +1199,361 @@ type AuditInclusionProof struct {
 	// RootHash Base64-encoded 32-byte Merkle root hash.
 	RootHash string `json:"rootHash"`
 	TreeSize int64  `json:"treeSize"`
+}
+
+// CatalogBlock An organization-wide block (CAT-04). Enforcement points receive its
+// ID, kind and the SHA-256 of its target; the target in clear and the
+// reason stay in the core.
+type CatalogBlock struct {
+	// EntryKey The key of the catalog entry the block covers, when the catalog has one.
+	EntryKey *string            `json:"entryKey,omitempty"`
+	Id       openapi_types.UUID `json:"id"`
+	IssuedAt time.Time          `json:"issuedAt"`
+
+	// IssuedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	IssuedBy PrincipalRef `json:"issuedBy"`
+
+	// IssuedStateVersion The governance state version that carries the block.
+	IssuedStateVersion int64 `json:"issuedStateVersion"`
+
+	// Kind What a block covers, which its target names (RFC-0002, section 6).
+	Kind     CatalogBlockKind `json:"kind"`
+	LiftedAt *time.Time       `json:"liftedAt,omitempty"`
+
+	// LiftedStateVersion The governance state version that lifted the block.
+	LiftedStateVersion *int64 `json:"liftedStateVersion,omitempty"`
+	Reason             string `json:"reason"`
+
+	// Spread How many connected enforcement points acknowledged a state version that carries the block (EP-15).
+	Spread *CatalogBlockSpread `json:"spread,omitempty"`
+	Status CatalogBlockStatus  `json:"status"`
+	Target string              `json:"target"`
+
+	// TargetSha256 The SHA-256 of the target's UTF-8 bytes.
+	TargetSha256 string `json:"targetSha256"`
+
+	// UnblockRequest A request to lift a block, which someone else on the steering or the advisory committee decides (HUM-04).
+	UnblockRequest *CatalogUnblockRequest `json:"unblockRequest,omitempty"`
+}
+
+// CatalogBlockStatus defines model for CatalogBlock.Status.
+type CatalogBlockStatus string
+
+// CatalogBlockKind What a block covers, which its target names (RFC-0002, section 6).
+type CatalogBlockKind string
+
+// CatalogBlockList defines model for CatalogBlockList.
+type CatalogBlockList struct {
+	Blocks     []CatalogBlock `json:"blocks"`
+	NextCursor *string        `json:"nextCursor,omitempty"`
+}
+
+// CatalogBlockSpread How many connected enforcement points acknowledged a state version that carries the block (EP-15).
+type CatalogBlockSpread struct {
+	Acknowledged      int `json:"acknowledged"`
+	EnforcementPoints int `json:"enforcementPoints"`
+}
+
+// CatalogDecline A reviewer's decline of an entry, or of one of its definitions or
+// digests, which then no longer waits for review.
+type CatalogDecline struct {
+	DeclinedAt time.Time `json:"declinedAt"`
+
+	// DeclinedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DeclinedBy PrincipalRef `json:"declinedBy"`
+
+	// DefinitionSha256 The declined definition, when a definition was declined rather than the tool.
+	DefinitionSha256 *string `json:"definitionSha256,omitempty"`
+
+	// Digest The declined digest, when a digest was declined rather than the model.
+	Digest *string `json:"digest,omitempty"`
+	Reason string  `json:"reason"`
+}
+
+// CatalogDeclineSummary How many entries, definitions and digests were declined.
+type CatalogDeclineSummary struct {
+	Definitions int `json:"definitions"`
+	Digests     int `json:"digests"`
+	Models      int `json:"models"`
+	Servers     int `json:"servers"`
+	Tools       int `json:"tools"`
+}
+
+// CatalogEntryType defines model for CatalogEntryType.
+type CatalogEntryType string
+
+// CatalogFlag What the core flags for reviewers: `unpinned_package`, a local server
+// launched through `npx`, `uvx`, `pipx run` or `bunx` without an exact
+// version (threat model, T-77); `secret_in_path`, a reference whose URL
+// path has a segment that looks like a secret, for which the
+// administrator may add a redaction rule (CAT-10, T-76). Later plans
+// may add flags: a client shows a flag it does not know as it is, and a
+// filter on a flag the server does not know is refused
+// (`bad_request`).
+type CatalogFlag = string
+
+// CatalogModel A model of the catalog (RFC-0002, section 3). Its endpoint and name
+// were reported: untrusted text.
+type CatalogModel struct {
+	ApprovedAt *time.Time `json:"approvedAt,omitempty"`
+
+	// ApprovedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	ApprovedBy *PrincipalRef `json:"approvedBy,omitempty"`
+
+	// Blocked Whether an active block covers the model, its provider or its endpoint.
+	Blocked bool `json:"blocked"`
+
+	// Digest The pinned digest of the model's weights, when its runtime reported one at approval.
+	Digest *string `json:"digest,omitempty"`
+
+	// Endpoint The normalized base URL of the endpoint the agent calls.
+	Endpoint string `json:"endpoint"`
+
+	// FirstAgentId The agent whose report or declaration first brought the model.
+	FirstAgentId openapi_types.UUID `json:"firstAgentId"`
+	FirstSeenAt  time.Time          `json:"firstSeenAt"`
+	Flags        []CatalogFlag      `json:"flags"`
+	Id           openapi_types.UUID `json:"id"`
+
+	// Key The key that the core assigned, a slug of the provider or the
+	// endpoint, a slash and a slug of the name. It never changes once
+	// the model is approved.
+	Key string `json:"key"`
+
+	// LastDecline A reviewer's decline of an entry, or of one of its definitions or
+	// digests, which then no longer waits for review.
+	LastDecline *CatalogDecline `json:"lastDecline,omitempty"`
+	LastSeenAt  time.Time       `json:"lastSeenAt"`
+
+	// Name The model's name, as requested.
+	Name string `json:"name"`
+
+	// PendingDigests The reported digests that differ from the pinned one and wait for
+	// review. Enforcement points deny the model for a runtime whose
+	// digest differs from the pinned one (RFC-0002, section 7.1).
+	PendingDigests []string `json:"pendingDigests"`
+
+	// PendingReview Whether the model, or one of its digests, waits for review.
+	PendingReview bool `json:"pendingReview"`
+
+	// Provider The provider, from the contracts' table of model providers (section 6.3) or a lowercase name of its own.
+	Provider string `json:"provider"`
+
+	// Status An entry is discovered until the advisory committee approves it
+	// (CAT-02). A declined entry stays discovered, so it stays denied.
+	Status CatalogStatus `json:"status"`
+}
+
+// CatalogModelList defines model for CatalogModelList.
+type CatalogModelList struct {
+	Models     []CatalogModel `json:"models"`
+	NextCursor *string        `json:"nextCursor,omitempty"`
+}
+
+// CatalogRequestStatus defines model for CatalogRequestStatus.
+type CatalogRequestStatus string
+
+// CatalogServer An MCP server of the catalog (RFC-0002, section 3). Its reference,
+// announced name and version and display form were reported, redacted
+// by the enforcement point and again by the core (CAT-10): untrusted
+// text, shown as plain text.
+type CatalogServer struct {
+	// AnnouncedName The name the server announces.
+	AnnouncedName *string `json:"announcedName,omitempty"`
+
+	// AnnouncedVersion The version the server announces.
+	AnnouncedVersion *string    `json:"announcedVersion,omitempty"`
+	ApprovedAt       *time.Time `json:"approvedAt,omitempty"`
+
+	// ApprovedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	ApprovedBy *PrincipalRef `json:"approvedBy,omitempty"`
+
+	// Blocked Whether an active block covers the server; a block never changes its status.
+	Blocked bool `json:"blocked"`
+
+	// DisplayForm The server's URL or command line, redacted.
+	DisplayForm *string `json:"displayForm,omitempty"`
+
+	// FirstAgentId The agent whose report or declaration first brought the server.
+	FirstAgentId openapi_types.UUID `json:"firstAgentId"`
+	FirstSeenAt  time.Time          `json:"firstSeenAt"`
+	Flags        []CatalogFlag      `json:"flags"`
+	Id           openapi_types.UUID `json:"id"`
+
+	// Key The key that the core assigned, which never changes once the server is approved.
+	Key string `json:"key"`
+
+	// LastDecline A reviewer's decline of an entry, or of one of its definitions or
+	// digests, which then no longer waits for review.
+	LastDecline *CatalogDecline `json:"lastDecline,omitempty"`
+	LastSeenAt  time.Time       `json:"lastSeenAt"`
+
+	// PendingReview Whether the server waits for review.
+	PendingReview bool `json:"pendingReview"`
+
+	// Reference The server's reference, a normalized URL, a `connector:` name or a `stdio:` command line (contracts, section 4.10).
+	Reference string `json:"reference"`
+
+	// Status An entry is discovered until the advisory committee approves it
+	// (CAT-02). A declined entry stays discovered, so it stays denied.
+	Status    CatalogStatus          `json:"status"`
+	Transport CatalogServerTransport `json:"transport"`
+}
+
+// CatalogServerTransport defines model for CatalogServer.Transport.
+type CatalogServerTransport string
+
+// CatalogServerList defines model for CatalogServerList.
+type CatalogServerList struct {
+	NextCursor *string         `json:"nextCursor,omitempty"`
+	Servers    []CatalogServer `json:"servers"`
+}
+
+// CatalogStatus An entry is discovered until the advisory committee approves it
+// (CAT-02). A declined entry stays discovered, so it stays denied.
+type CatalogStatus string
+
+// CatalogTool A tool of the catalog (RFC-0002, section 3). An MCP tool names its
+// server, an agent's own tool its agent, and a built-in tool its
+// provider and type. Its name was reported: untrusted text. The tool
+// has no origin: each observation has its own (listAgentTooling).
+type CatalogTool struct {
+	// AgentId The agent whose own tool this is.
+	AgentId    *openapi_types.UUID `json:"agentId,omitempty"`
+	ApprovedAt *time.Time          `json:"approvedAt,omitempty"`
+
+	// ApprovedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	ApprovedBy *PrincipalRef `json:"approvedBy,omitempty"`
+
+	// Arguments The arguments policies may see, empty until a reviewer declares them.
+	Arguments []ToolArgument `json:"arguments"`
+
+	// Blocked Whether an active block covers the tool or its server.
+	Blocked bool `json:"blocked"`
+
+	// Classification The reviewer's classification of a tool, which policies read
+	// (`read_only`, `destructive` and `open_world`). The MCP annotations
+	// are hints from the server; these values have been reviewed.
+	Classification *ToolClassification `json:"classification,omitempty"`
+
+	// DefinitionSha256 The pinned definition hash, once approved; a built-in tool has none.
+	DefinitionSha256 *string `json:"definitionSha256,omitempty"`
+
+	// FirstAgentId The agent whose report or declaration first brought the tool.
+	FirstAgentId openapi_types.UUID `json:"firstAgentId"`
+	FirstSeenAt  time.Time          `json:"firstSeenAt"`
+	Id           openapi_types.UUID `json:"id"`
+
+	// Key The key that the core assigned: `<server key>/<name>`,
+	// `agent/<name>` for an agent's own tool, unique within its agent,
+	// or `provider.<provider>/<type>` for a built-in tool. It never
+	// changes once the tool is approved.
+	Key string `json:"key"`
+
+	// Kind `function` is the agent's own code, `mcp` a tool of an MCP server,
+	// `builtin` a tool that the model provider defines and runs, and
+	// `http` and `other` the agent's own tools of those kinds (contracts,
+	// section 4.10).
+	Kind ToolKind `json:"kind"`
+
+	// LastDecline A reviewer's decline of an entry, or of one of its definitions or
+	// digests, which then no longer waits for review.
+	LastDecline *CatalogDecline `json:"lastDecline,omitempty"`
+	LastSeenAt  time.Time       `json:"lastSeenAt"`
+	Name        string          `json:"name"`
+
+	// PendingDefinitions The reported definitions that differ from the pinned one and wait
+	// for review, by hash. Enforcement points deny and hide the tool
+	// for an agent whose definition differs from the pinned one
+	// (RFC-0002, section 7.1).
+	PendingDefinitions []string `json:"pendingDefinitions"`
+
+	// PendingReview Whether the tool, or one of its definitions, waits for review.
+	PendingReview bool `json:"pendingReview"`
+
+	// Provider A built-in tool's provider.
+	Provider *string `json:"provider,omitempty"`
+
+	// ServerId An MCP tool's server.
+	ServerId *openapi_types.UUID `json:"serverId,omitempty"`
+
+	// Status An entry is discovered until the advisory committee approves it
+	// (CAT-02). A declined entry stays discovered, so it stays denied.
+	Status CatalogStatus `json:"status"`
+
+	// Type A built-in tool's type, as its provider names it.
+	Type *string `json:"type,omitempty"`
+}
+
+// CatalogToolApproval defines model for CatalogToolApproval.
+type CatalogToolApproval struct {
+	// Arguments The arguments policies may see; none when absent.
+	Arguments *[]ToolArgumentDeclaration `json:"arguments,omitempty"`
+
+	// Classification The reviewer's classification of a tool, which policies read
+	// (`read_only`, `destructive` and `open_world`). The MCP annotations
+	// are hints from the server; these values have been reviewed.
+	Classification ToolClassification `json:"classification"`
+
+	// DefinitionSha256 The definition the reviewer saw in full, which approval pins. Required for every tool but a built-in one, which must not have it.
+	DefinitionSha256 *string `json:"definitionSha256,omitempty"`
+}
+
+// CatalogToolList defines model for CatalogToolList.
+type CatalogToolList struct {
+	NextCursor *string       `json:"nextCursor,omitempty"`
+	Tools      []CatalogTool `json:"tools"`
+}
+
+// CatalogUnblockRequest A request to lift a block, which someone else on the steering or the advisory committee decides (HUM-04).
+type CatalogUnblockRequest struct {
+	BlockId openapi_types.UUID `json:"blockId"`
+
+	// Comment The approver's comment, or the reason of a decline.
+	Comment   *string    `json:"comment,omitempty"`
+	DecidedAt *time.Time `json:"decidedAt,omitempty"`
+
+	// DecidedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DecidedBy   *PrincipalRef      `json:"decidedBy,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	Reason      string             `json:"reason"`
+	RequestedAt time.Time          `json:"requestedAt"`
+
+	// RequestedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	RequestedBy PrincipalRef         `json:"requestedBy"`
+	Status      CatalogRequestStatus `json:"status"`
+}
+
+// CompileUsageRulesRequest defines model for CompileUsageRulesRequest.
+type CompileUsageRulesRequest struct {
+	// AgentId The agent of an agent-specific policy; absent for a global policy.
+	AgentId *openapi_types.UUID `json:"agentId,omitempty"`
+
+	// Rules The JSON text of the policy's usage rules, an array of objects
+	// with `id`, `description`, `tools` and `when`, whose conditions
+	// have `arg`, `op`, `values` and optionally `transform` and
+	// `if_absent` (contracts, section 6.11): at most 256 KiB of UTF-8.
+	Rules string `json:"rules"`
+}
+
+// CompiledUsageRules defines model for CompiledUsageRules.
+type CompiledUsageRules struct {
+	// Statements The Cedar statements, separated by an empty line.
+	Statements string `json:"statements"`
 }
 
 // CoverageLevel How deeply White Tower governs the agent (INV-08): C0, declared in the
@@ -937,6 +1618,92 @@ type CreatedToken struct {
 // DataCategoryList defines model for DataCategoryList.
 type DataCategoryList struct {
 	DataCategories []string `json:"dataCategories"`
+}
+
+// DeclareToolingRequest The complete tooling declared for an agent, in the shape and within
+// the limits of a tooling report (contracts, section 4.10). A tool's
+// name, provider and type and a model's provider and name, which become
+// keys, hold no control character (U+0000 to U+001F, U+007F), since the
+// generator of usage rules refuses one in a tool's key (contracts,
+// section 6.11); the server also refuses a lone surrogate or a
+// noncharacter in any string, as it does in a report.
+type DeclareToolingRequest struct {
+	Models  []DeclaredModel  `json:"models"`
+	Servers []DeclaredServer `json:"servers"`
+	Tools   []DeclaredTool   `json:"tools"`
+}
+
+// DeclaredModel defines model for DeclaredModel.
+type DeclaredModel struct {
+	Endpoint string `json:"endpoint"`
+	Name     string `json:"name"`
+	Provider string `json:"provider"`
+}
+
+// DeclaredServer A declared MCP server, as a report carries one; the server checks the limits in UTF-8 bytes.
+type DeclaredServer struct {
+	DisplayForm *string                 `json:"displayForm,omitempty"`
+	Name        *string                 `json:"name,omitempty"`
+	Reference   string                  `json:"reference"`
+	Transport   DeclaredServerTransport `json:"transport"`
+	Version     *string                 `json:"version,omitempty"`
+}
+
+// DeclaredServerTransport defines model for DeclaredServer.Transport.
+type DeclaredServerTransport string
+
+// DeclaredTool A declared tool, as a report carries one: an MCP tool names its
+// server by its position in `servers`, and a built-in tool its provider
+// and type.
+type DeclaredTool struct {
+	// Kind `function` is the agent's own code, `mcp` a tool of an MCP server,
+	// `builtin` a tool that the model provider defines and runs, and
+	// `http` and `other` the agent's own tools of those kinds (contracts,
+	// section 4.10).
+	Kind     ToolKind `json:"kind"`
+	Name     string   `json:"name"`
+	Provider *string  `json:"provider,omitempty"`
+	Server   *int     `json:"server,omitempty"`
+	Type     *string  `json:"type,omitempty"`
+}
+
+// DeclaredTooling defines model for DeclaredTooling.
+type DeclaredTooling struct {
+	DeclaredAt *time.Time `json:"declaredAt,omitempty"`
+
+	// DeclaredBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DeclaredBy *PrincipalRef    `json:"declaredBy,omitempty"`
+	Models     []DeclaredModel  `json:"models"`
+	Servers    []DeclaredServer `json:"servers"`
+	Tools      []DeclaredTool   `json:"tools"`
+}
+
+// DeclineCatalogModelRequest defines model for DeclineCatalogModelRequest.
+type DeclineCatalogModelRequest struct {
+	// Digest A digest that waits for review, to decline it rather than the model.
+	Digest *string `json:"digest,omitempty"`
+	Reason string  `json:"reason"`
+}
+
+// DeclineCatalogToolRequest defines model for DeclineCatalogToolRequest.
+type DeclineCatalogToolRequest struct {
+	// DefinitionSha256 A definition that waits for review, to decline it rather than the tool.
+	DefinitionSha256 *string `json:"definitionSha256,omitempty"`
+	Reason           string  `json:"reason"`
+}
+
+// DeclinePendingFromAgentRequest defines model for DeclinePendingFromAgentRequest.
+type DeclinePendingFromAgentRequest struct {
+	AgentId openapi_types.UUID `json:"agentId"`
+	Reason  string             `json:"reason"`
+}
+
+// DisableAgentToolingRequest defines model for DisableAgentToolingRequest.
+type DisableAgentToolingRequest struct {
+	Entries []ToolingEntrySelector `json:"entries"`
+	Reason  string                 `json:"reason"`
 }
 
 // EditAgentRequest The members to change; the others keep their values (editAgent).
@@ -1031,8 +1798,12 @@ type InboxItem struct {
 
 	// Kind What waits: `use_case_validation`, `policy_approval`,
 	// `review_due`, `review_signoff`, `halt_release`,
-	// `ownership_transfer` or `module_approval`. Later plans add kinds,
-	// and a client shows a kind it does not know generically.
+	// `ownership_transfer`, `module_approval`, `catalog_review` (an
+	// entry, a definition or a digest of the catalog that waits for
+	// review), `tooling_request` (a request to enable tooling for an
+	// agent) or `unblock_request` (a request to lift a block). Later
+	// plans add kinds, and a client shows a kind it does not know
+	// generically.
 	Kind string `json:"kind"`
 
 	// Role The caller's role that the item is addressed to; absent when it is addressed to the caller.
@@ -1083,6 +1854,18 @@ type InstanceStatus string
 type InstanceList struct {
 	Instances  []Instance `json:"instances"`
 	NextCursor *string    `json:"nextCursor,omitempty"`
+}
+
+// IssueCatalogBlockRequest defines model for IssueCatalogBlockRequest.
+type IssueCatalogBlockRequest struct {
+	// Kind What a block covers, which its target names (RFC-0002, section 6).
+	Kind   CatalogBlockKind `json:"kind"`
+	Reason string           `json:"reason"`
+
+	// Target What the block covers: the string form of the reference of a
+	// server, a tool or a model (contracts, section 4.10), a provider,
+	// or the normalized base URL of an endpoint.
+	Target string `json:"target"`
 }
 
 // Labels Labels, which filters, selector halts and policies use; policies see
@@ -1269,11 +2052,22 @@ type ProposeAgentRequest struct {
 	Vendor    *string            `json:"vendor,omitempty"`
 }
 
+// ReasonRequest defines model for ReasonRequest.
+type ReasonRequest struct {
+	Reason string `json:"reason"`
+}
+
 // ReassignOwnerRequest defines model for ReassignOwnerRequest.
 type ReassignOwnerRequest struct {
 	// PrincipalId The new primary owner.
 	PrincipalId openapi_types.UUID `json:"principalId"`
 	Reason      string             `json:"reason"`
+}
+
+// RequestAgentToolingRequest defines model for RequestAgentToolingRequest.
+type RequestAgentToolingRequest struct {
+	Entry  ToolingEntrySelector `json:"entry"`
+	Reason string               `json:"reason"`
 }
 
 // RequestOwnershipTransferRequest defines model for RequestOwnershipTransferRequest.
@@ -1365,6 +2159,14 @@ type RiskTier string
 // stops it, whatever its lifecycle state (lifecycle, section 2).
 type RunState string
 
+// ServerToolApproval defines model for ServerToolApproval.
+type ServerToolApproval struct {
+	Approval CatalogToolApproval `json:"approval"`
+
+	// ToolId A tool of the server being approved.
+	ToolId openapi_types.UUID `json:"toolId"`
+}
+
 // ServiceAccount defines model for ServiceAccount.
 type ServiceAccount struct {
 	CreatedAt              time.Time            `json:"createdAt"`
@@ -1393,6 +2195,161 @@ type SuspensionFrom string
 
 // SuspensionReason Why the agent was suspended (lifecycle, transitions T10 to T12).
 type SuspensionReason string
+
+// ToolArgument A declared argument, under the name that is its key in the tool's record of `context.args`.
+type ToolArgument struct {
+	Name string   `json:"name"`
+	Path []string `json:"path"`
+
+	// Transform The transform that applies to a string, or to each string of a set, before policies see it (contracts, section 6.11).
+	Transform *ArgumentTransform `json:"transform,omitempty"`
+
+	// Type An argument's type, as Cedar names it (contracts, section 7.7).
+	Type ArgumentType `json:"type"`
+}
+
+// ToolArgumentDeclaration An argument that policies may see (RFC-0002, section 7.5): its path
+// in the call's arguments, through objects only, its transform and its
+// type. A property whose name holds `.` or `:` cannot be declared, and
+// a transform applies to `String` and `Set<String>` only. The
+// argument's name is its path joined with `.`, followed by `:` and the
+// transform when it has one, and a tool declares each name once. A
+// property name is never empty and holds no control character (U+0000
+// to U+001F, U+007F), since the generator of usage rules refuses one in
+// an argument's name (contracts, section 6.11); the server also refuses
+// a lone surrogate or a noncharacter, as it does in a report.
+type ToolArgumentDeclaration struct {
+	Path []string `json:"path"`
+
+	// Transform The transform that applies to a string, or to each string of a set, before policies see it (contracts, section 6.11).
+	Transform *ArgumentTransform `json:"transform,omitempty"`
+
+	// Type An argument's type, as Cedar names it (contracts, section 7.7).
+	Type ArgumentType `json:"type"`
+}
+
+// ToolClassification The reviewer's classification of a tool, which policies read
+// (`read_only`, `destructive` and `open_world`). The MCP annotations
+// are hints from the server; these values have been reviewed.
+type ToolClassification struct {
+	Destructive bool `json:"destructive"`
+	OpenWorld   bool `json:"openWorld"`
+	ReadOnly    bool `json:"readOnly"`
+}
+
+// ToolDefinition A tool definition, the members that its hash covers, as reported
+// (contracts, section 4.10): an MCP tool's `name`, `title`,
+// `description`, `inputSchema`, `outputSchema` and `annotations`, and
+// another tool's `name` and `inputSchema`. Integers keep their exact
+// value, whatever their size.
+type ToolDefinition struct {
+	// Annotations The tool's MCP annotations, as reported.
+	Annotations interface{} `json:"annotations,omitempty"`
+	Description *string     `json:"description,omitempty"`
+
+	// InputSchema The tool's input schema, as reported.
+	InputSchema interface{} `json:"inputSchema,omitempty"`
+	Name        string      `json:"name"`
+
+	// OutputSchema The tool's output schema, as reported.
+	OutputSchema interface{} `json:"outputSchema,omitempty"`
+	Title        *string     `json:"title,omitempty"`
+}
+
+// ToolKind `function` is the agent's own code, `mcp` a tool of an MCP server,
+// `builtin` a tool that the model provider defines and runs, and
+// `http` and `other` the agent's own tools of those kinds (contracts,
+// section 4.10).
+type ToolKind string
+
+// ToolOrigin Who runs the tool, as a source reported it: `agent` (the agent's
+// process, or an MCP server the agent connects to) or `provider` (the
+// model provider, during a model call). One remote MCP server can be
+// run by one agent and by another agent's provider, so the origin is
+// an observation's, never the catalog entry's.
+type ToolOrigin string
+
+// ToolingEntryRef defines model for ToolingEntryRef.
+type ToolingEntryRef struct {
+	EntryId   openapi_types.UUID `json:"entryId"`
+	EntryType CatalogEntryType   `json:"entryType"`
+	Key       string             `json:"key"`
+}
+
+// ToolingEntryRefList defines model for ToolingEntryRefList.
+type ToolingEntryRefList struct {
+	Entries []ToolingEntryRef `json:"entries"`
+}
+
+// ToolingEntrySelector defines model for ToolingEntrySelector.
+type ToolingEntrySelector struct {
+	EntryId   openapi_types.UUID `json:"entryId"`
+	EntryType CatalogEntryType   `json:"entryType"`
+}
+
+// ToolingObservation What one source holds of an entry for the agent: an instance's
+// reports, or a person's declaration. A report's tool has the origin
+// and the definition hash it reported, and a report's model the digest.
+type ToolingObservation struct {
+	// Current Whether the source's latest report or declaration still holds the entry.
+	Current bool `json:"current"`
+
+	// DeclaredBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DeclaredBy       *PrincipalRef `json:"declaredBy,omitempty"`
+	DefinitionSha256 *string       `json:"definitionSha256,omitempty"`
+	Digest           *string       `json:"digest,omitempty"`
+	FirstSeenAt      time.Time     `json:"firstSeenAt"`
+
+	// InstanceId The reporting instance.
+	InstanceId *openapi_types.UUID `json:"instanceId,omitempty"`
+	LastSeenAt time.Time           `json:"lastSeenAt"`
+
+	// Origin Who runs the tool, as a source reported it: `agent` (the agent's
+	// process, or an MCP server the agent connects to) or `provider` (the
+	// model provider, during a model call). One remote MCP server can be
+	// run by one agent and by another agent's provider, so the origin is
+	// an observation's, never the catalog entry's.
+	Origin *ToolOrigin              `json:"origin,omitempty"`
+	Source ToolingObservationSource `json:"source"`
+}
+
+// ToolingObservationSource defines model for ToolingObservation.Source.
+type ToolingObservationSource string
+
+// ToolingRequest A request to enable a tool, a model or an MCP server's approved tools for an agent, decided once.
+type ToolingRequest struct {
+	AgentId openapi_types.UUID `json:"agentId"`
+
+	// Comment The approver's comment, or the reason of a decline.
+	Comment   *string    `json:"comment,omitempty"`
+	DecidedAt *time.Time `json:"decidedAt,omitempty"`
+
+	// DecidedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DecidedBy *PrincipalRef `json:"decidedBy,omitempty"`
+
+	// Enabled What the approval enabled, an MCP server's approved tools for a request that names a server.
+	Enabled     *[]ToolingEntryRef `json:"enabled,omitempty"`
+	Entry       ToolingEntryRef    `json:"entry"`
+	Id          openapi_types.UUID `json:"id"`
+	Reason      string             `json:"reason"`
+	RequestedAt time.Time          `json:"requestedAt"`
+
+	// RequestedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	RequestedBy PrincipalRef         `json:"requestedBy"`
+	Status      CatalogRequestStatus `json:"status"`
+}
+
+// ToolingRequestList defines model for ToolingRequestList.
+type ToolingRequestList struct {
+	NextCursor *string          `json:"nextCursor,omitempty"`
+	Requests   []ToolingRequest `json:"requests"`
+}
 
 // Transition One transition of an agent's lifecycle. `fromState` is absent for the
 // agent's creation, T1, and `reason` is present for a suspension.
@@ -1553,8 +2510,35 @@ type AgentStateFilter = []LifecycleState
 // AgentUseCaseFilter defines model for AgentUseCaseFilter.
 type AgentUseCaseFilter = openapi_types.UUID
 
+// CatalogBlockId defines model for CatalogBlockId.
+type CatalogBlockId = openapi_types.UUID
+
+// CatalogFlagFilter defines model for CatalogFlagFilter.
+type CatalogFlagFilter = []CatalogFlag
+
+// CatalogKeyFilter defines model for CatalogKeyFilter.
+type CatalogKeyFilter = string
+
+// CatalogModelId defines model for CatalogModelId.
+type CatalogModelId = openapi_types.UUID
+
+// CatalogPendingReviewFilter defines model for CatalogPendingReviewFilter.
+type CatalogPendingReviewFilter = bool
+
+// CatalogServerId defines model for CatalogServerId.
+type CatalogServerId = openapi_types.UUID
+
+// CatalogStatusFilter defines model for CatalogStatusFilter.
+type CatalogStatusFilter = []CatalogStatus
+
+// CatalogToolId defines model for CatalogToolId.
+type CatalogToolId = openapi_types.UUID
+
 // Cursor defines model for Cursor.
 type Cursor = string
+
+// DefinitionSha256 defines model for DefinitionSha256.
+type DefinitionSha256 = string
 
 // DelegateId defines model for DelegateId.
 type DelegateId = openapi_types.UUID
@@ -1568,8 +2552,14 @@ type Limit = int
 // ReviewId defines model for ReviewId.
 type ReviewId = openapi_types.UUID
 
+// ToolingRequestId defines model for ToolingRequestId.
+type ToolingRequestId = openapi_types.UUID
+
 // TransferId defines model for TransferId.
 type TransferId = openapi_types.UUID
+
+// UnblockRequestId defines model for UnblockRequestId.
+type UnblockRequestId = openapi_types.UUID
 
 // UseCaseId defines model for UseCaseId.
 type UseCaseId = openapi_types.UUID
@@ -1654,6 +2644,15 @@ type EditAgentParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// DeclareAgentToolingParams defines parameters for DeclareAgentTooling.
+type DeclareAgentToolingParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // RemoveAgentDelegateParams defines parameters for RemoveAgentDelegate.
 type RemoveAgentDelegateParams struct {
 	// Reason Why the assignment ends. A request without a reason is refused (`bad_request`).
@@ -1689,6 +2688,33 @@ type ReassignAgentOwnerParams struct {
 
 // ListAgentReviewsParams defines parameters for ListAgentReviews.
 type ListAgentReviewsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListAgentToolingParams defines parameters for ListAgentTooling.
+type ListAgentToolingParams struct {
+	// EntryType Entries of this kind.
+	EntryType *CatalogEntryType `form:"entryType,omitempty" json:"entryType,omitempty"`
+
+	// Enabled Only the enabled entries, or only the others.
+	Enabled *bool `form:"enabled,omitempty" json:"enabled,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListAgentToolingRequestsParams defines parameters for ListAgentToolingRequests.
+type ListAgentToolingRequestsParams struct {
+	// Status Requests in any of these statuses.
+	Status *[]CatalogRequestStatus `form:"status,omitempty" json:"status,omitempty"`
+
 	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
@@ -1748,6 +2774,147 @@ type GetAuditEventsParams struct {
 
 	// Limit Maximum number of events to return.
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListCatalogBlocksParams defines parameters for ListCatalogBlocks.
+type ListCatalogBlocksParams struct {
+	// Status The blocks in this status.
+	Status *ListCatalogBlocksParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListCatalogBlocksParamsStatus defines parameters for ListCatalogBlocks.
+type ListCatalogBlocksParamsStatus string
+
+// ListCatalogModelsParams defines parameters for ListCatalogModels.
+type ListCatalogModelsParams struct {
+	// Status Entries in any of these statuses.
+	Status *CatalogStatusFilter `form:"status,omitempty" json:"status,omitempty"`
+
+	// PendingReview Only the entries that wait for review, themselves or by a new definition or digest, or only the others.
+	PendingReview *CatalogPendingReviewFilter `form:"pendingReview,omitempty" json:"pendingReview,omitempty"`
+
+	// Flag Entries that carry every one of these flags.
+	Flag *CatalogFlagFilter `form:"flag,omitempty" json:"flag,omitempty"`
+
+	// Key The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths.
+	Key *CatalogKeyFilter `form:"key,omitempty" json:"key,omitempty"`
+
+	// Provider The models of this provider (contracts, section 6.3).
+	Provider *string `form:"provider,omitempty" json:"provider,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ApproveCatalogModelParams defines parameters for ApproveCatalogModel.
+type ApproveCatalogModelParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// DeclineCatalogModelParams defines parameters for DeclineCatalogModel.
+type DeclineCatalogModelParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListCatalogServersParams defines parameters for ListCatalogServers.
+type ListCatalogServersParams struct {
+	// Status Entries in any of these statuses.
+	Status *CatalogStatusFilter `form:"status,omitempty" json:"status,omitempty"`
+
+	// PendingReview Only the entries that wait for review, themselves or by a new definition or digest, or only the others.
+	PendingReview *CatalogPendingReviewFilter `form:"pendingReview,omitempty" json:"pendingReview,omitempty"`
+
+	// Flag Entries that carry every one of these flags.
+	Flag *CatalogFlagFilter `form:"flag,omitempty" json:"flag,omitempty"`
+
+	// Key The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths.
+	Key *CatalogKeyFilter `form:"key,omitempty" json:"key,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ApproveCatalogServerParams defines parameters for ApproveCatalogServer.
+type ApproveCatalogServerParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// DeclineCatalogServerParams defines parameters for DeclineCatalogServer.
+type DeclineCatalogServerParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListCatalogToolsParams defines parameters for ListCatalogTools.
+type ListCatalogToolsParams struct {
+	// Status Entries in any of these statuses.
+	Status *CatalogStatusFilter `form:"status,omitempty" json:"status,omitempty"`
+
+	// PendingReview Only the entries that wait for review, themselves or by a new definition or digest, or only the others.
+	PendingReview *CatalogPendingReviewFilter `form:"pendingReview,omitempty" json:"pendingReview,omitempty"`
+
+	// Key The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths.
+	Key *CatalogKeyFilter `form:"key,omitempty" json:"key,omitempty"`
+
+	// ServerId The tools of this MCP server.
+	ServerId *openapi_types.UUID `form:"serverId,omitempty" json:"serverId,omitempty"`
+
+	// AgentId The own tools of this agent.
+	AgentId *openapi_types.UUID `form:"agentId,omitempty" json:"agentId,omitempty"`
+
+	// Kind Tools of any of these kinds.
+	Kind *[]ToolKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ApproveCatalogToolParams defines parameters for ApproveCatalogTool.
+type ApproveCatalogToolParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// DeclineCatalogToolParams defines parameters for DeclineCatalogTool.
+type DeclineCatalogToolParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // ListInboxItemsParams defines parameters for ListInboxItems.
@@ -1843,6 +3010,9 @@ type ProposeAgentJSONRequestBody = ProposeAgentRequest
 // EditAgentJSONRequestBody defines body for EditAgent for application/json ContentType.
 type EditAgentJSONRequestBody = EditAgentRequest
 
+// DeclareAgentToolingJSONRequestBody defines body for DeclareAgentTooling for application/json ContentType.
+type DeclareAgentToolingJSONRequestBody = DeclareToolingRequest
+
 // AddAgentDelegateJSONRequestBody defines body for AddAgentDelegate for application/json ContentType.
 type AddAgentDelegateJSONRequestBody = AddDelegateRequest
 
@@ -1852,8 +3022,56 @@ type RequestOwnershipTransferJSONRequestBody = RequestOwnershipTransferRequest
 // ReassignAgentOwnerJSONRequestBody defines body for ReassignAgentOwner for application/json ContentType.
 type ReassignAgentOwnerJSONRequestBody = ReassignOwnerRequest
 
+// RequestAgentToolingJSONRequestBody defines body for RequestAgentTooling for application/json ContentType.
+type RequestAgentToolingJSONRequestBody = RequestAgentToolingRequest
+
+// ApproveAgentToolingRequestJSONRequestBody defines body for ApproveAgentToolingRequest for application/json ContentType.
+type ApproveAgentToolingRequestJSONRequestBody = ApprovalRequest
+
+// DeclineAgentToolingRequestJSONRequestBody defines body for DeclineAgentToolingRequest for application/json ContentType.
+type DeclineAgentToolingRequestJSONRequestBody = ReasonRequest
+
+// DisableAgentToolingJSONRequestBody defines body for DisableAgentTooling for application/json ContentType.
+type DisableAgentToolingJSONRequestBody = DisableAgentToolingRequest
+
 // TransitionAgentJSONRequestBody defines body for TransitionAgent for application/json ContentType.
 type TransitionAgentJSONRequestBody = TransitionRequest
+
+// IssueCatalogBlockJSONRequestBody defines body for IssueCatalogBlock for application/json ContentType.
+type IssueCatalogBlockJSONRequestBody = IssueCatalogBlockRequest
+
+// RequestCatalogUnblockJSONRequestBody defines body for RequestCatalogUnblock for application/json ContentType.
+type RequestCatalogUnblockJSONRequestBody = ReasonRequest
+
+// ApproveCatalogUnblockJSONRequestBody defines body for ApproveCatalogUnblock for application/json ContentType.
+type ApproveCatalogUnblockJSONRequestBody = ApprovalRequest
+
+// DeclineCatalogUnblockJSONRequestBody defines body for DeclineCatalogUnblock for application/json ContentType.
+type DeclineCatalogUnblockJSONRequestBody = ReasonRequest
+
+// DeclinePendingFromAgentJSONRequestBody defines body for DeclinePendingFromAgent for application/json ContentType.
+type DeclinePendingFromAgentJSONRequestBody = DeclinePendingFromAgentRequest
+
+// ApproveCatalogModelJSONRequestBody defines body for ApproveCatalogModel for application/json ContentType.
+type ApproveCatalogModelJSONRequestBody = ApproveCatalogModelRequest
+
+// DeclineCatalogModelJSONRequestBody defines body for DeclineCatalogModel for application/json ContentType.
+type DeclineCatalogModelJSONRequestBody = DeclineCatalogModelRequest
+
+// ApproveCatalogServerJSONRequestBody defines body for ApproveCatalogServer for application/json ContentType.
+type ApproveCatalogServerJSONRequestBody = ApproveCatalogServerRequest
+
+// DeclineCatalogServerJSONRequestBody defines body for DeclineCatalogServer for application/json ContentType.
+type DeclineCatalogServerJSONRequestBody = ReasonRequest
+
+// ApproveCatalogToolJSONRequestBody defines body for ApproveCatalogTool for application/json ContentType.
+type ApproveCatalogToolJSONRequestBody = CatalogToolApproval
+
+// DeclineCatalogToolJSONRequestBody defines body for DeclineCatalogTool for application/json ContentType.
+type DeclineCatalogToolJSONRequestBody = DeclineCatalogToolRequest
+
+// CompileUsageRulesJSONRequestBody defines body for CompileUsageRules for application/json ContentType.
+type CompileUsageRulesJSONRequestBody = CompileUsageRulesRequest
 
 // RevokeAllSessionsAndTokensJSONRequestBody defines body for RevokeAllSessionsAndTokens for application/json ContentType.
 type RevokeAllSessionsAndTokensJSONRequestBody = EmergencyRevocationRequest
@@ -2069,6 +3287,49 @@ type ClientInterface interface {
 	// Corresponds with GET /agents/{id}/actions (the `GetAgentActions` operationId).
 	GetAgentActions(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAgentDeclaredTooling Get an agent's declared tooling
+	//
+	// Returns the tooling that people declared for the agent, with the ETag
+	// that a new declaration must send back. An agent without a
+	// declaration has an empty one.
+	//
+	// Corresponds with GET /agents/{id}/declared-tooling (the `GetAgentDeclaredTooling` operationId).
+	GetAgentDeclaredTooling(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclareAgentToolingWithBody Declare an agent's tooling
+	//
+	// Replaces the tooling declared for an agent without an enforcement
+	// point, so that the inventory is complete (CAT-08): the agent's owners
+	// declare it, and operators declare any agent's (`tooling.declare`).
+	// Nothing enforces it, and a declaration never approves, enables or
+	// unblocks anything (CORE-10): what the catalog lacks becomes a
+	// discovered entry. It takes the shape and the limits of a tooling
+	// report (contracts, section 4.10), and is accepted only for an agent
+	// below coverage C2 (`conflict`). It needs If-Match with the ETag of
+	// getAgentDeclaredTooling.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /agents/{id}/declared-tooling (the `DeclareAgentTooling` operationId).
+	DeclareAgentToolingWithBody(ctx context.Context, id AgentId, params *DeclareAgentToolingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclareAgentTooling Declare an agent's tooling
+	//
+	// Replaces the tooling declared for an agent without an enforcement
+	// point, so that the inventory is complete (CAT-08): the agent's owners
+	// declare it, and operators declare any agent's (`tooling.declare`).
+	// Nothing enforces it, and a declaration never approves, enables or
+	// unblocks anything (CORE-10): what the catalog lacks becomes a
+	// discovered entry. It takes the shape and the limits of a tooling
+	// report (contracts, section 4.10), and is accepted only for an agent
+	// below coverage C2 (`conflict`). It needs If-Match with the ETag of
+	// getAgentDeclaredTooling.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /agents/{id}/declared-tooling (the `DeclareAgentTooling` operationId).
+	DeclareAgentTooling(ctx context.Context, id AgentId, params *DeclareAgentToolingParams, body DeclareAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AddAgentDelegateWithBody Add a delegate
 	//
 	// Makes an active human with the owner role a delegate of the agent: the
@@ -2215,6 +3476,142 @@ type ClientInterface interface {
 	// Corresponds with GET /agents/{id}/reviews (the `ListAgentReviews` operationId).
 	ListAgentReviews(ctx context.Context, id AgentId, params *ListAgentReviewsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAgentTooling List an agent's tooling
+	//
+	// Lists the MCP servers, tools and models observed, enabled or declared
+	// for the agent, ordered by kind and key, one page at a time (UI-10):
+	// for each, whether it is enabled and declared, and each observation,
+	// with its source, its origin and when it was first and last seen. An
+	// entry that the agent no longer has stays listed while it is enabled.
+	// Observations were reported by the agent's enforcement points, and are
+	// untrusted.
+	//
+	// Corresponds with GET /agents/{id}/tooling (the `ListAgentTooling` operationId).
+	ListAgentTooling(ctx context.Context, id AgentId, params *ListAgentToolingParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgentToolingRequests List an agent's requests to enable tooling
+	//
+	// Lists the agent's requests to enable tools and models, newest first, with their decisions.
+	//
+	// Corresponds with GET /agents/{id}/tooling-requests (the `ListAgentToolingRequests` operationId).
+	ListAgentToolingRequests(ctx context.Context, id AgentId, params *ListAgentToolingRequestsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestAgentToolingWithBody Request enabling tooling for an agent
+	//
+	// Asks, with a reason, that an approved tool or model be enabled for
+	// the agent; naming an approved MCP server asks for its approved tools
+	// at once (CAT-03). The agent's owners ask for their agents, and the
+	// advisory committee for any (`tooling.enable.request`). Someone else
+	// on the advisory committee approves it (HUM-04). An entry that is not
+	// approved, an agent that is retired or rejected, and a second pending
+	// request for the same entry are refused (`conflict`). The request
+	// waits in the advisory committee's inbox.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests (the `RequestAgentTooling` operationId).
+	RequestAgentToolingWithBody(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestAgentTooling Request enabling tooling for an agent
+	//
+	// Asks, with a reason, that an approved tool or model be enabled for
+	// the agent; naming an approved MCP server asks for its approved tools
+	// at once (CAT-03). The agent's owners ask for their agents, and the
+	// advisory committee for any (`tooling.enable.request`). Someone else
+	// on the advisory committee approves it (HUM-04). An entry that is not
+	// approved, an agent that is retired or rejected, and a second pending
+	// request for the same entry are refused (`conflict`). The request
+	// waits in the advisory committee's inbox.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests (the `RequestAgentTooling` operationId).
+	RequestAgentTooling(ctx context.Context, id AgentId, body RequestAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveAgentToolingRequestWithBody Approve a request to enable tooling
+	//
+	// Approves a pending request, and enables what it names for the agent
+	// (`tooling.enable.approve`, the advisory committee). Nobody approves
+	// their own request (`forbidden`, HUM-04, ST-81), and the database
+	// refuses it too. An entry that is no longer approved, or an agent that
+	// was retired or rejected since, is refused (`conflict`). A request is
+	// decided once, and never changes afterwards.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/approve (the `ApproveAgentToolingRequest` operationId).
+	ApproveAgentToolingRequestWithBody(ctx context.Context, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveAgentToolingRequest Approve a request to enable tooling
+	//
+	// Approves a pending request, and enables what it names for the agent
+	// (`tooling.enable.approve`, the advisory committee). Nobody approves
+	// their own request (`forbidden`, HUM-04, ST-81), and the database
+	// refuses it too. An entry that is no longer approved, or an agent that
+	// was retired or rejected since, is refused (`conflict`). A request is
+	// decided once, and never changes afterwards.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/approve (the `ApproveAgentToolingRequest` operationId).
+	ApproveAgentToolingRequest(ctx context.Context, id AgentId, requestId ToolingRequestId, body ApproveAgentToolingRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineAgentToolingRequestWithBody Decline a request to enable tooling
+	//
+	// Declines a pending request, with a reason
+	// (`tooling.enable.approve`): nothing is enabled. A decline only
+	// denies, so the requester may decline their own request. A request is
+	// decided once, and never changes afterwards.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/decline (the `DeclineAgentToolingRequest` operationId).
+	DeclineAgentToolingRequestWithBody(ctx context.Context, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineAgentToolingRequest Decline a request to enable tooling
+	//
+	// Declines a pending request, with a reason
+	// (`tooling.enable.approve`): nothing is enabled. A decline only
+	// denies, so the requester may decline their own request. A request is
+	// decided once, and never changes afterwards.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/decline (the `DeclineAgentToolingRequest` operationId).
+	DeclineAgentToolingRequest(ctx context.Context, id AgentId, requestId ToolingRequestId, body DeclineAgentToolingRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableAgentToolingWithBody Disable an agent's tooling
+	//
+	// Disables, at once and with a reason, tools and models enabled for the
+	// agent; naming an MCP server disables its tools (CAT-03). The agent's
+	// owners disable it, and the advisory committee and operators disable
+	// any agent's (`tooling.disable`). It takes no If-Match: a disable only
+	// restricts, and never waits on a version. An entry that is not
+	// enabled is left out of the answer. Enabling again needs a new
+	// request. The agent's next bundle no longer lists the entry as
+	// enabled.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{id}/tooling/disable (the `DisableAgentTooling` operationId).
+	DisableAgentToolingWithBody(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableAgentTooling Disable an agent's tooling
+	//
+	// Disables, at once and with a reason, tools and models enabled for the
+	// agent; naming an MCP server disables its tools (CAT-03). The agent's
+	// owners disable it, and the advisory committee and operators disable
+	// any agent's (`tooling.disable`). It takes no If-Match: a disable only
+	// restricts, and never waits on a version. An entry that is not
+	// enabled is left out of the answer. Enabling again needs a new
+	// request. The agent's next bundle no longer lists the entry as
+	// enabled.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{id}/tooling/disable (the `DisableAgentTooling` operationId).
+	DisableAgentTooling(ctx context.Context, id AgentId, body DisableAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListAgentTransitions List an agent's lifecycle history
 	//
 	// Lists the agent's lifecycle transitions, newest first: who made each
@@ -2359,6 +3756,503 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /audit/keys (the `GetAuditKeys` operationId).
 	GetAuditKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListCatalogBlocks List blocks
+	//
+	// Lists organization-wide blocks, the latest issued first, with their
+	// spread to enforcement points (CAT-04): the active ones by default.
+	// What a block covers is shown in clear only here, to the callers who
+	// may view the catalog. The design of blocks is reserved for the halt
+	// path's review (plan P1-16, step 7), which may change this operation.
+	//
+	// Corresponds with GET /catalog/blocks (the `ListCatalogBlocks` operationId).
+	ListCatalogBlocks(ctx context.Context, params *ListCatalogBlocksParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// IssueCatalogBlockWithBody Block a server, a tool or models
+	//
+	// Blocks, for the whole organization and at once, with a reason, an MCP
+	// server and its tools, a tool, a model, every model of a provider or
+	// every model of an endpoint (CAT-04; `catalog.block.issue`). The block
+	// names what it covers by reference, so it also covers what the
+	// catalog has not seen yet; enforcement points receive the SHA-256 of
+	// the reference in the watch stream, without a new bundle. It takes a
+	// governance state version. At most 500 blocks are active, and one
+	// more is refused (`conflict`), as is a second active block of the same
+	// kind and reference. A block never changes an entry's status. The
+	// design of blocks is reserved for the halt path's review (plan P1-16,
+	// step 7), which may change this operation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/blocks (the `IssueCatalogBlock` operationId).
+	IssueCatalogBlockWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// IssueCatalogBlock Block a server, a tool or models
+	//
+	// Blocks, for the whole organization and at once, with a reason, an MCP
+	// server and its tools, a tool, a model, every model of a provider or
+	// every model of an endpoint (CAT-04; `catalog.block.issue`). The block
+	// names what it covers by reference, so it also covers what the
+	// catalog has not seen yet; enforcement points receive the SHA-256 of
+	// the reference in the watch stream, without a new bundle. It takes a
+	// governance state version. At most 500 blocks are active, and one
+	// more is refused (`conflict`), as is a second active block of the same
+	// kind and reference. A block never changes an entry's status. The
+	// design of blocks is reserved for the halt path's review (plan P1-16,
+	// step 7), which may change this operation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/blocks (the `IssueCatalogBlock` operationId).
+	IssueCatalogBlock(ctx context.Context, body IssueCatalogBlockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCatalogBlock Get a block
+	//
+	// Returns a block, with its spread to enforcement points and its
+	// pending unblock request. The design of blocks is reserved for the
+	// halt path's review (plan P1-16, step 7), which may change this
+	// operation.
+	//
+	// Corresponds with GET /catalog/blocks/{id} (the `GetCatalogBlock` operationId).
+	GetCatalogBlock(ctx context.Context, id CatalogBlockId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestCatalogUnblockWithBody Request that a block be lifted
+	//
+	// Asks, with a reason, that an active block be lifted
+	// (`catalog.unblock.request`). Someone else on the steering or the
+	// advisory committee approves it (HUM-04). A block has one pending
+	// request at most (`conflict`). The design of blocks is reserved for
+	// the halt path's review (plan P1-16, step 7), which may change this
+	// operation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests (the `RequestCatalogUnblock` operationId).
+	RequestCatalogUnblockWithBody(ctx context.Context, id CatalogBlockId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestCatalogUnblock Request that a block be lifted
+	//
+	// Asks, with a reason, that an active block be lifted
+	// (`catalog.unblock.request`). Someone else on the steering or the
+	// advisory committee approves it (HUM-04). A block has one pending
+	// request at most (`conflict`). The design of blocks is reserved for
+	// the halt path's review (plan P1-16, step 7), which may change this
+	// operation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests (the `RequestCatalogUnblock` operationId).
+	RequestCatalogUnblock(ctx context.Context, id CatalogBlockId, body RequestCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveCatalogUnblockWithBody Approve lifting a block
+	//
+	// Approves a pending unblock request, and lifts the block in a
+	// governance state version of its own (`catalog.unblock.approve`).
+	// Nobody approves their own request (`forbidden`, HUM-04, ST-81), and
+	// the database refuses it too. Lifting a block leaves every entry as it
+	// was. The design of blocks is reserved for the halt path's review
+	// (plan P1-16, step 7), which may change this operation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve (the `ApproveCatalogUnblock` operationId).
+	ApproveCatalogUnblockWithBody(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveCatalogUnblock Approve lifting a block
+	//
+	// Approves a pending unblock request, and lifts the block in a
+	// governance state version of its own (`catalog.unblock.approve`).
+	// Nobody approves their own request (`forbidden`, HUM-04, ST-81), and
+	// the database refuses it too. Lifting a block leaves every entry as it
+	// was. The design of blocks is reserved for the halt path's review
+	// (plan P1-16, step 7), which may change this operation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve (the `ApproveCatalogUnblock` operationId).
+	ApproveCatalogUnblock(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, body ApproveCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineCatalogUnblockWithBody Decline lifting a block
+	//
+	// Declines a pending unblock request, with a reason
+	// (`catalog.unblock.approve`): the block stays active, and can take
+	// another request. A decline only denies, so the requester may decline
+	// their own request. The design of blocks is reserved for the halt
+	// path's review (plan P1-16, step 7), which may change this operation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline (the `DeclineCatalogUnblock` operationId).
+	DeclineCatalogUnblockWithBody(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineCatalogUnblock Decline lifting a block
+	//
+	// Declines a pending unblock request, with a reason
+	// (`catalog.unblock.approve`): the block stays active, and can take
+	// another request. A decline only denies, so the requester may decline
+	// their own request. The design of blocks is reserved for the halt
+	// path's review (plan P1-16, step 7), which may change this operation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline (the `DeclineCatalogUnblock` operationId).
+	DeclineCatalogUnblock(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, body DeclineCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclinePendingFromAgentWithBody Decline everything an agent brought that waits for review
+	//
+	// Declines at once, with a reason, every entry, definition and digest
+	// that the agent's reports brought and that still waits for review
+	// (`catalog.entry.approve`): the answer to an agent that floods the
+	// queue (threat model, T-74). What is declined stays denied, and frees
+	// the agent's room for what waits for review (CORE-13). Approved
+	// entries keep what they pinned.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/declines (the `DeclinePendingFromAgent` operationId).
+	DeclinePendingFromAgentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclinePendingFromAgent Decline everything an agent brought that waits for review
+	//
+	// Declines at once, with a reason, every entry, definition and digest
+	// that the agent's reports brought and that still waits for review
+	// (`catalog.entry.approve`): the answer to an agent that floods the
+	// queue (threat model, T-74). What is declined stays denied, and frees
+	// the agent's room for what waits for review (CORE-13). Approved
+	// entries keep what they pinned.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/declines (the `DeclinePendingFromAgent` operationId).
+	DeclinePendingFromAgent(ctx context.Context, body DeclinePendingFromAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetToolDefinition Get a tool definition
+	//
+	// Returns a tool definition that the core stores, for review and diffs:
+	// the members that its hash covers (contracts, section 4.10), as the
+	// bytes of their canonical JSON, exactly as stored, so that the
+	// SHA-256 of the body is the hash in the path. The definition was
+	// reported by an agent: it is untrusted text, which the console shows
+	// as plain text. It is served only as `application/json`, with
+	// `X-Content-Type-Options: nosniff` and the API's
+	// `Content-Security-Policy: default-src 'none'`, never as HTML. The
+	// core stores no member over the limits of a report (a name and a
+	// title of 256 bytes, a description of 16 KiB, each schema of 64 KiB,
+	// annotations of 4 KiB), so a body is never larger than 1 MiB, JSON
+	// escapes included.
+	//
+	// Corresponds with GET /catalog/definitions/{sha256} (the `GetToolDefinition` operationId).
+	GetToolDefinition(ctx context.Context, sha256 DefinitionSha256, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListCatalogModels List models
+	//
+	// Lists the models of the catalog that match every filter given,
+	// ordered by key, one page at a time (CAT-02). Their endpoints and
+	// names were reported by agents, and are untrusted text.
+	//
+	// Corresponds with GET /catalog/models (the `ListCatalogModels` operationId).
+	ListCatalogModels(ctx context.Context, params *ListCatalogModelsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCatalogModel Get a model
+	//
+	// Returns a model of the catalog, with the ETag that its approval or decline must send back.
+	//
+	// Corresponds with GET /catalog/models/{id} (the `GetCatalogModel` operationId).
+	GetCatalogModel(ctx context.Context, id CatalogModelId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveCatalogModelWithBody Approve a model or a new digest
+	//
+	// Approves a discovered model, or one of the digests of an approved
+	// model that wait for review, for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). It pins the
+	// digest of the weights that the request names, which must be one that
+	// the model's runtime reported; a model whose runtime reports no digest
+	// is approved without one. Approving never enables anything for an
+	// agent (CAT-03). It needs If-Match with the model's ETag.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/models/{id}/approve (the `ApproveCatalogModel` operationId).
+	ApproveCatalogModelWithBody(ctx context.Context, id CatalogModelId, params *ApproveCatalogModelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveCatalogModel Approve a model or a new digest
+	//
+	// Approves a discovered model, or one of the digests of an approved
+	// model that wait for review, for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). It pins the
+	// digest of the weights that the request names, which must be one that
+	// the model's runtime reported; a model whose runtime reports no digest
+	// is approved without one. Approving never enables anything for an
+	// agent (CAT-03). It needs If-Match with the model's ETag.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/models/{id}/approve (the `ApproveCatalogModel` operationId).
+	ApproveCatalogModel(ctx context.Context, id CatalogModelId, params *ApproveCatalogModelParams, body ApproveCatalogModelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineCatalogModelWithBody Decline a model or a new digest
+	//
+	// Declines, with a reason (`catalog.entry.approve`), the digest that
+	// the request names, which waits for review, or, without one, a
+	// discovered model and every digest of it that waits. What is declined
+	// leaves the queue of what waits for review and stays denied; it can
+	// still be approved later. An approved model keeps its pinned digest.
+	// It needs If-Match with the model's ETag.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/models/{id}/decline (the `DeclineCatalogModel` operationId).
+	DeclineCatalogModelWithBody(ctx context.Context, id CatalogModelId, params *DeclineCatalogModelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineCatalogModel Decline a model or a new digest
+	//
+	// Declines, with a reason (`catalog.entry.approve`), the digest that
+	// the request names, which waits for review, or, without one, a
+	// discovered model and every digest of it that waits. What is declined
+	// leaves the queue of what waits for review and stays denied; it can
+	// still be approved later. An approved model keeps its pinned digest.
+	// It needs If-Match with the model's ETag.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/models/{id}/decline (the `DeclineCatalogModel` operationId).
+	DeclineCatalogModel(ctx context.Context, id CatalogModelId, params *DeclineCatalogModelParams, body DeclineCatalogModelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListCatalogServers List MCP servers
+	//
+	// Lists the MCP servers of the catalog that match every filter given,
+	// ordered by key, one page at a time (CAT-02). Their references,
+	// announced names, versions and display forms were reported by agents:
+	// they are untrusted text, shown as plain text, and only to the callers
+	// who may view the catalog (`catalog.view`).
+	//
+	// Corresponds with GET /catalog/servers (the `ListCatalogServers` operationId).
+	ListCatalogServers(ctx context.Context, params *ListCatalogServersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCatalogServer Get an MCP server
+	//
+	// Returns an MCP server of the catalog, with the ETag that its approval or decline must send back.
+	//
+	// Corresponds with GET /catalog/servers/{id} (the `GetCatalogServer` operationId).
+	GetCatalogServer(ctx context.Context, id CatalogServerId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveCatalogServerWithBody Approve an MCP server
+	//
+	// Approves a discovered MCP server for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). Its key never
+	// changes afterwards. The request can approve some of the server's
+	// tools at once: each names the definition hash the reviewer saw in
+	// full, its classification and the arguments policies may see, as
+	// approveCatalogTool does, and the whole request is refused if one of
+	// them is. Approving never enables anything for an agent (CAT-03). It
+	// needs If-Match with the server's ETag.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/servers/{id}/approve (the `ApproveCatalogServer` operationId).
+	ApproveCatalogServerWithBody(ctx context.Context, id CatalogServerId, params *ApproveCatalogServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveCatalogServer Approve an MCP server
+	//
+	// Approves a discovered MCP server for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). Its key never
+	// changes afterwards. The request can approve some of the server's
+	// tools at once: each names the definition hash the reviewer saw in
+	// full, its classification and the arguments policies may see, as
+	// approveCatalogTool does, and the whole request is refused if one of
+	// them is. Approving never enables anything for an agent (CAT-03). It
+	// needs If-Match with the server's ETag.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/servers/{id}/approve (the `ApproveCatalogServer` operationId).
+	ApproveCatalogServer(ctx context.Context, id CatalogServerId, params *ApproveCatalogServerParams, body ApproveCatalogServerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineCatalogServerWithBody Decline an MCP server
+	//
+	// Declines a discovered MCP server, with a reason
+	// (`catalog.entry.approve`). It leaves the queue of what waits for
+	// review and stays discovered, so its tools stay denied; it can still
+	// be approved later. An approved server cannot be declined
+	// (`conflict`): a block or disables restrict it at once. It needs
+	// If-Match with the server's ETag.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/servers/{id}/decline (the `DeclineCatalogServer` operationId).
+	DeclineCatalogServerWithBody(ctx context.Context, id CatalogServerId, params *DeclineCatalogServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineCatalogServer Decline an MCP server
+	//
+	// Declines a discovered MCP server, with a reason
+	// (`catalog.entry.approve`). It leaves the queue of what waits for
+	// review and stays discovered, so its tools stay denied; it can still
+	// be approved later. An approved server cannot be declined
+	// (`conflict`): a block or disables restrict it at once. It needs
+	// If-Match with the server's ETag.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/servers/{id}/decline (the `DeclineCatalogServer` operationId).
+	DeclineCatalogServer(ctx context.Context, id CatalogServerId, params *DeclineCatalogServerParams, body DeclineCatalogServerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListCatalogTools List tools
+	//
+	// Lists the tools of the catalog that match every filter given, ordered
+	// by key, one page at a time (CAT-02). The agent's own tools
+	// (`agent/<name>`) are entries of their agent, so two of them can share
+	// a key: filter them by agent. Names were reported by agents, and are
+	// untrusted text.
+	//
+	// Corresponds with GET /catalog/tools (the `ListCatalogTools` operationId).
+	ListCatalogTools(ctx context.Context, params *ListCatalogToolsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCatalogTool Get a tool
+	//
+	// Returns a tool of the catalog: its pinned definition hash, the
+	// definitions that wait for review, its classification and the
+	// arguments policies may see, with the ETag that its approval or
+	// decline must send back. getToolDefinition returns each definition in
+	// full.
+	//
+	// Corresponds with GET /catalog/tools/{id} (the `GetCatalogTool` operationId).
+	GetCatalogTool(ctx context.Context, id CatalogToolId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveCatalogToolWithBody Approve a tool or a new definition
+	//
+	// Approves a discovered tool, or one of the definitions of an approved
+	// tool that wait for review, for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). It pins the
+	// definition hash the request names, which must be one of the tool's
+	// reported definitions that the core stores; a built-in tool has none,
+	// and a tool of any other kind without a definition hash is never
+	// approved (`conflict`, contracts section 7.7). A tool of an MCP server
+	// is approved only once its server is (`conflict`). The reviewer
+	// classifies the tool, starting from its MCP annotations or, without
+	// them, from the protocol's conservative defaults (not read-only,
+	// destructive, open world), and declares the arguments policies may
+	// see, with their types from the tool's input schema (RFC-0002, section
+	// 7.5). For an approved tool, a request that names its pinned
+	// definition changes only its classification and declared arguments;
+	// a declaration that an active policy version reads cannot be
+	// withdrawn, and a declared argument's type cannot change while an
+	// active usage rule uses it (`conflict`). Approving never
+	// enables anything for an agent (CAT-03). It needs If-Match with the
+	// tool's ETag.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/tools/{id}/approve (the `ApproveCatalogTool` operationId).
+	ApproveCatalogToolWithBody(ctx context.Context, id CatalogToolId, params *ApproveCatalogToolParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveCatalogTool Approve a tool or a new definition
+	//
+	// Approves a discovered tool, or one of the definitions of an approved
+	// tool that wait for review, for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). It pins the
+	// definition hash the request names, which must be one of the tool's
+	// reported definitions that the core stores; a built-in tool has none,
+	// and a tool of any other kind without a definition hash is never
+	// approved (`conflict`, contracts section 7.7). A tool of an MCP server
+	// is approved only once its server is (`conflict`). The reviewer
+	// classifies the tool, starting from its MCP annotations or, without
+	// them, from the protocol's conservative defaults (not read-only,
+	// destructive, open world), and declares the arguments policies may
+	// see, with their types from the tool's input schema (RFC-0002, section
+	// 7.5). For an approved tool, a request that names its pinned
+	// definition changes only its classification and declared arguments;
+	// a declaration that an active policy version reads cannot be
+	// withdrawn, and a declared argument's type cannot change while an
+	// active usage rule uses it (`conflict`). Approving never
+	// enables anything for an agent (CAT-03). It needs If-Match with the
+	// tool's ETag.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/tools/{id}/approve (the `ApproveCatalogTool` operationId).
+	ApproveCatalogTool(ctx context.Context, id CatalogToolId, params *ApproveCatalogToolParams, body ApproveCatalogToolJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineCatalogToolWithBody Decline a tool or a new definition
+	//
+	// Declines, with a reason (`catalog.entry.approve`), the definition
+	// that the request names, which waits for review, or, without one, a
+	// discovered tool and every definition of it that waits. What is
+	// declined leaves the queue of what waits for review and stays not
+	// approved, so it stays denied; it can still be approved later. A
+	// declined definition reported again does not return to the queue. An
+	// approved tool keeps its pinned definition. It needs If-Match with the
+	// tool's ETag.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/tools/{id}/decline (the `DeclineCatalogTool` operationId).
+	DeclineCatalogToolWithBody(ctx context.Context, id CatalogToolId, params *DeclineCatalogToolParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclineCatalogTool Decline a tool or a new definition
+	//
+	// Declines, with a reason (`catalog.entry.approve`), the definition
+	// that the request names, which waits for review, or, without one, a
+	// discovered tool and every definition of it that waits. What is
+	// declined leaves the queue of what waits for review and stays not
+	// approved, so it stays denied; it can still be approved later. A
+	// declined definition reported again does not return to the queue. An
+	// approved tool keeps its pinned definition. It needs If-Match with the
+	// tool's ETag.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/tools/{id}/decline (the `DeclineCatalogTool` operationId).
+	DeclineCatalogTool(ctx context.Context, id CatalogToolId, params *DeclineCatalogToolParams, body DeclineCatalogToolJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompileUsageRulesWithBody Compile usage rules into Cedar
+	//
+	// Writes the Cedar statements of a policy's usage rules, as the core's
+	// check at submission regenerates them, for the console's forms and for
+	// policy-as-code repositories (RFC-0002, section 8; contracts, section
+	// 6.11). It writes exactly what the reference generator of the
+	// conformance kit writes (`test/conformance/profile`, `GenerateRules`),
+	// and refuses what it refuses (`bad_request`, with the reason): for
+	// each rule, and for each of its tools in their order, its
+	// `tool.invoke` statement, then its `tool.expose` statement. A global
+	// policy's rules take the arguments that the catalog declares, and
+	// cannot name an agent's own tool (`agent/<name>`); an agent-specific
+	// policy's take those of the agent's catalog. The rules are given as
+	// JSON text, as their annotations carry them, so that the generator
+	// reads exactly what a policy would hold: a repeated member name, a
+	// lone surrogate or an integer beyond 64 bits is refused rather than
+	// read another way. The text is at most 256 KiB, and statements that
+	// would exceed 2 MiB, the limit of a whole bundle (contracts, step V1),
+	// are refused before they are written. Compiling changes nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /catalog/usage-rules/compile (the `CompileUsageRules` operationId).
+	CompileUsageRulesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompileUsageRules Compile usage rules into Cedar
+	//
+	// Writes the Cedar statements of a policy's usage rules, as the core's
+	// check at submission regenerates them, for the console's forms and for
+	// policy-as-code repositories (RFC-0002, section 8; contracts, section
+	// 6.11). It writes exactly what the reference generator of the
+	// conformance kit writes (`test/conformance/profile`, `GenerateRules`),
+	// and refuses what it refuses (`bad_request`, with the reason): for
+	// each rule, and for each of its tools in their order, its
+	// `tool.invoke` statement, then its `tool.expose` statement. A global
+	// policy's rules take the arguments that the catalog declares, and
+	// cannot name an agent's own tool (`agent/<name>`); an agent-specific
+	// policy's take those of the agent's catalog. The rules are given as
+	// JSON text, as their annotations carry them, so that the generator
+	// reads exactly what a policy would hold: a repeated member name, a
+	// lone surrogate or an integer beyond 64 bits is refused rather than
+	// read another way. The text is at most 256 KiB, and statements that
+	// would exceed 2 MiB, the limit of a whole bundle (contracts, step V1),
+	// are refused before they are written. Compiling changes nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /catalog/usage-rules/compile (the `CompileUsageRules` operationId).
+	CompileUsageRules(ctx context.Context, body CompileUsageRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListDataCategories List the data categories
 	//
@@ -2935,6 +4829,79 @@ func (c *Client) GetAgentActions(ctx context.Context, id AgentId, reqEditors ...
 	return c.Client.Do(req)
 }
 
+// GetAgentDeclaredTooling Get an agent's declared tooling
+//
+// Returns the tooling that people declared for the agent, with the ETag
+// that a new declaration must send back. An agent without a
+// declaration has an empty one.
+//
+// Corresponds with GET /agents/{id}/declared-tooling (the `GetAgentDeclaredTooling` operationId).
+func (c *Client) GetAgentDeclaredTooling(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentDeclaredToolingRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclareAgentToolingWithBody Declare an agent's tooling
+//
+// Replaces the tooling declared for an agent without an enforcement
+// point, so that the inventory is complete (CAT-08): the agent's owners
+// declare it, and operators declare any agent's (`tooling.declare`).
+// Nothing enforces it, and a declaration never approves, enables or
+// unblocks anything (CORE-10): what the catalog lacks becomes a
+// discovered entry. It takes the shape and the limits of a tooling
+// report (contracts, section 4.10), and is accepted only for an agent
+// below coverage C2 (`conflict`). It needs If-Match with the ETag of
+// getAgentDeclaredTooling.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /agents/{id}/declared-tooling (the `DeclareAgentTooling` operationId).
+func (c *Client) DeclareAgentToolingWithBody(ctx context.Context, id AgentId, params *DeclareAgentToolingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclareAgentToolingRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclareAgentTooling Declare an agent's tooling
+//
+// Replaces the tooling declared for an agent without an enforcement
+// point, so that the inventory is complete (CAT-08): the agent's owners
+// declare it, and operators declare any agent's (`tooling.declare`).
+// Nothing enforces it, and a declaration never approves, enables or
+// unblocks anything (CORE-10): what the catalog lacks becomes a
+// discovered entry. It takes the shape and the limits of a tooling
+// report (contracts, section 4.10), and is accepted only for an agent
+// below coverage C2 (`conflict`). It needs If-Match with the ETag of
+// getAgentDeclaredTooling.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /agents/{id}/declared-tooling (the `DeclareAgentTooling` operationId).
+func (c *Client) DeclareAgentTooling(ctx context.Context, id AgentId, params *DeclareAgentToolingParams, body DeclareAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclareAgentToolingRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // AddAgentDelegateWithBody Add a delegate
 //
 // Makes an active human with the owner role a delegate of the agent: the
@@ -3211,6 +5178,242 @@ func (c *Client) ListAgentReviews(ctx context.Context, id AgentId, params *ListA
 	return c.Client.Do(req)
 }
 
+// ListAgentTooling List an agent's tooling
+//
+// Lists the MCP servers, tools and models observed, enabled or declared
+// for the agent, ordered by kind and key, one page at a time (UI-10):
+// for each, whether it is enabled and declared, and each observation,
+// with its source, its origin and when it was first and last seen. An
+// entry that the agent no longer has stays listed while it is enabled.
+// Observations were reported by the agent's enforcement points, and are
+// untrusted.
+//
+// Corresponds with GET /agents/{id}/tooling (the `ListAgentTooling` operationId).
+func (c *Client) ListAgentTooling(ctx context.Context, id AgentId, params *ListAgentToolingParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentToolingRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentToolingRequests List an agent's requests to enable tooling
+//
+// Lists the agent's requests to enable tools and models, newest first, with their decisions.
+//
+// Corresponds with GET /agents/{id}/tooling-requests (the `ListAgentToolingRequests` operationId).
+func (c *Client) ListAgentToolingRequests(ctx context.Context, id AgentId, params *ListAgentToolingRequestsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentToolingRequestsRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestAgentToolingWithBody Request enabling tooling for an agent
+//
+// Asks, with a reason, that an approved tool or model be enabled for
+// the agent; naming an approved MCP server asks for its approved tools
+// at once (CAT-03). The agent's owners ask for their agents, and the
+// advisory committee for any (`tooling.enable.request`). Someone else
+// on the advisory committee approves it (HUM-04). An entry that is not
+// approved, an agent that is retired or rejected, and a second pending
+// request for the same entry are refused (`conflict`). The request
+// waits in the advisory committee's inbox.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{id}/tooling-requests (the `RequestAgentTooling` operationId).
+func (c *Client) RequestAgentToolingWithBody(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestAgentToolingRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestAgentTooling Request enabling tooling for an agent
+//
+// Asks, with a reason, that an approved tool or model be enabled for
+// the agent; naming an approved MCP server asks for its approved tools
+// at once (CAT-03). The agent's owners ask for their agents, and the
+// advisory committee for any (`tooling.enable.request`). Someone else
+// on the advisory committee approves it (HUM-04). An entry that is not
+// approved, an agent that is retired or rejected, and a second pending
+// request for the same entry are refused (`conflict`). The request
+// waits in the advisory committee's inbox.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{id}/tooling-requests (the `RequestAgentTooling` operationId).
+func (c *Client) RequestAgentTooling(ctx context.Context, id AgentId, body RequestAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestAgentToolingRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveAgentToolingRequestWithBody Approve a request to enable tooling
+//
+// Approves a pending request, and enables what it names for the agent
+// (`tooling.enable.approve`, the advisory committee). Nobody approves
+// their own request (`forbidden`, HUM-04, ST-81), and the database
+// refuses it too. An entry that is no longer approved, or an agent that
+// was retired or rejected since, is refused (`conflict`). A request is
+// decided once, and never changes afterwards.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/approve (the `ApproveAgentToolingRequest` operationId).
+func (c *Client) ApproveAgentToolingRequestWithBody(ctx context.Context, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveAgentToolingRequestRequestWithBody(c.Server, id, requestId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveAgentToolingRequest Approve a request to enable tooling
+//
+// Approves a pending request, and enables what it names for the agent
+// (`tooling.enable.approve`, the advisory committee). Nobody approves
+// their own request (`forbidden`, HUM-04, ST-81), and the database
+// refuses it too. An entry that is no longer approved, or an agent that
+// was retired or rejected since, is refused (`conflict`). A request is
+// decided once, and never changes afterwards.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/approve (the `ApproveAgentToolingRequest` operationId).
+func (c *Client) ApproveAgentToolingRequest(ctx context.Context, id AgentId, requestId ToolingRequestId, body ApproveAgentToolingRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveAgentToolingRequestRequest(c.Server, id, requestId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineAgentToolingRequestWithBody Decline a request to enable tooling
+//
+// Declines a pending request, with a reason
+// (`tooling.enable.approve`): nothing is enabled. A decline only
+// denies, so the requester may decline their own request. A request is
+// decided once, and never changes afterwards.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/decline (the `DeclineAgentToolingRequest` operationId).
+func (c *Client) DeclineAgentToolingRequestWithBody(ctx context.Context, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineAgentToolingRequestRequestWithBody(c.Server, id, requestId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineAgentToolingRequest Decline a request to enable tooling
+//
+// Declines a pending request, with a reason
+// (`tooling.enable.approve`): nothing is enabled. A decline only
+// denies, so the requester may decline their own request. A request is
+// decided once, and never changes afterwards.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/decline (the `DeclineAgentToolingRequest` operationId).
+func (c *Client) DeclineAgentToolingRequest(ctx context.Context, id AgentId, requestId ToolingRequestId, body DeclineAgentToolingRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineAgentToolingRequestRequest(c.Server, id, requestId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableAgentToolingWithBody Disable an agent's tooling
+//
+// Disables, at once and with a reason, tools and models enabled for the
+// agent; naming an MCP server disables its tools (CAT-03). The agent's
+// owners disable it, and the advisory committee and operators disable
+// any agent's (`tooling.disable`). It takes no If-Match: a disable only
+// restricts, and never waits on a version. An entry that is not
+// enabled is left out of the answer. Enabling again needs a new
+// request. The agent's next bundle no longer lists the entry as
+// enabled.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{id}/tooling/disable (the `DisableAgentTooling` operationId).
+func (c *Client) DisableAgentToolingWithBody(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableAgentToolingRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableAgentTooling Disable an agent's tooling
+//
+// Disables, at once and with a reason, tools and models enabled for the
+// agent; naming an MCP server disables its tools (CAT-03). The agent's
+// owners disable it, and the advisory committee and operators disable
+// any agent's (`tooling.disable`). It takes no If-Match: a disable only
+// restricts, and never waits on a version. An entry that is not
+// enabled is left out of the answer. Enabling again needs a new
+// request. The agent's next bundle no longer lists the entry as
+// enabled.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{id}/tooling/disable (the `DisableAgentTooling` operationId).
+func (c *Client) DisableAgentTooling(ctx context.Context, id AgentId, body DisableAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableAgentToolingRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListAgentTransitions List an agent's lifecycle history
 //
 // Lists the agent's lifecycle transitions, newest first: who made each
@@ -3416,6 +5619,833 @@ func (c *Client) GetAuditEvent(ctx context.Context, id openapi_types.UUID, reqEd
 // Corresponds with GET /audit/keys (the `GetAuditKeys` operationId).
 func (c *Client) GetAuditKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAuditKeysRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListCatalogBlocks List blocks
+//
+// Lists organization-wide blocks, the latest issued first, with their
+// spread to enforcement points (CAT-04): the active ones by default.
+// What a block covers is shown in clear only here, to the callers who
+// may view the catalog. The design of blocks is reserved for the halt
+// path's review (plan P1-16, step 7), which may change this operation.
+//
+// Corresponds with GET /catalog/blocks (the `ListCatalogBlocks` operationId).
+func (c *Client) ListCatalogBlocks(ctx context.Context, params *ListCatalogBlocksParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCatalogBlocksRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// IssueCatalogBlockWithBody Block a server, a tool or models
+//
+// Blocks, for the whole organization and at once, with a reason, an MCP
+// server and its tools, a tool, a model, every model of a provider or
+// every model of an endpoint (CAT-04; `catalog.block.issue`). The block
+// names what it covers by reference, so it also covers what the
+// catalog has not seen yet; enforcement points receive the SHA-256 of
+// the reference in the watch stream, without a new bundle. It takes a
+// governance state version. At most 500 blocks are active, and one
+// more is refused (`conflict`), as is a second active block of the same
+// kind and reference. A block never changes an entry's status. The
+// design of blocks is reserved for the halt path's review (plan P1-16,
+// step 7), which may change this operation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/blocks (the `IssueCatalogBlock` operationId).
+func (c *Client) IssueCatalogBlockWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewIssueCatalogBlockRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// IssueCatalogBlock Block a server, a tool or models
+//
+// Blocks, for the whole organization and at once, with a reason, an MCP
+// server and its tools, a tool, a model, every model of a provider or
+// every model of an endpoint (CAT-04; `catalog.block.issue`). The block
+// names what it covers by reference, so it also covers what the
+// catalog has not seen yet; enforcement points receive the SHA-256 of
+// the reference in the watch stream, without a new bundle. It takes a
+// governance state version. At most 500 blocks are active, and one
+// more is refused (`conflict`), as is a second active block of the same
+// kind and reference. A block never changes an entry's status. The
+// design of blocks is reserved for the halt path's review (plan P1-16,
+// step 7), which may change this operation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/blocks (the `IssueCatalogBlock` operationId).
+func (c *Client) IssueCatalogBlock(ctx context.Context, body IssueCatalogBlockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewIssueCatalogBlockRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetCatalogBlock Get a block
+//
+// Returns a block, with its spread to enforcement points and its
+// pending unblock request. The design of blocks is reserved for the
+// halt path's review (plan P1-16, step 7), which may change this
+// operation.
+//
+// Corresponds with GET /catalog/blocks/{id} (the `GetCatalogBlock` operationId).
+func (c *Client) GetCatalogBlock(ctx context.Context, id CatalogBlockId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCatalogBlockRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestCatalogUnblockWithBody Request that a block be lifted
+//
+// Asks, with a reason, that an active block be lifted
+// (`catalog.unblock.request`). Someone else on the steering or the
+// advisory committee approves it (HUM-04). A block has one pending
+// request at most (`conflict`). The design of blocks is reserved for
+// the halt path's review (plan P1-16, step 7), which may change this
+// operation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests (the `RequestCatalogUnblock` operationId).
+func (c *Client) RequestCatalogUnblockWithBody(ctx context.Context, id CatalogBlockId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestCatalogUnblockRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestCatalogUnblock Request that a block be lifted
+//
+// Asks, with a reason, that an active block be lifted
+// (`catalog.unblock.request`). Someone else on the steering or the
+// advisory committee approves it (HUM-04). A block has one pending
+// request at most (`conflict`). The design of blocks is reserved for
+// the halt path's review (plan P1-16, step 7), which may change this
+// operation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests (the `RequestCatalogUnblock` operationId).
+func (c *Client) RequestCatalogUnblock(ctx context.Context, id CatalogBlockId, body RequestCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestCatalogUnblockRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveCatalogUnblockWithBody Approve lifting a block
+//
+// Approves a pending unblock request, and lifts the block in a
+// governance state version of its own (`catalog.unblock.approve`).
+// Nobody approves their own request (`forbidden`, HUM-04, ST-81), and
+// the database refuses it too. Lifting a block leaves every entry as it
+// was. The design of blocks is reserved for the halt path's review
+// (plan P1-16, step 7), which may change this operation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve (the `ApproveCatalogUnblock` operationId).
+func (c *Client) ApproveCatalogUnblockWithBody(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveCatalogUnblockRequestWithBody(c.Server, id, requestId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveCatalogUnblock Approve lifting a block
+//
+// Approves a pending unblock request, and lifts the block in a
+// governance state version of its own (`catalog.unblock.approve`).
+// Nobody approves their own request (`forbidden`, HUM-04, ST-81), and
+// the database refuses it too. Lifting a block leaves every entry as it
+// was. The design of blocks is reserved for the halt path's review
+// (plan P1-16, step 7), which may change this operation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve (the `ApproveCatalogUnblock` operationId).
+func (c *Client) ApproveCatalogUnblock(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, body ApproveCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveCatalogUnblockRequest(c.Server, id, requestId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineCatalogUnblockWithBody Decline lifting a block
+//
+// Declines a pending unblock request, with a reason
+// (`catalog.unblock.approve`): the block stays active, and can take
+// another request. A decline only denies, so the requester may decline
+// their own request. The design of blocks is reserved for the halt
+// path's review (plan P1-16, step 7), which may change this operation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline (the `DeclineCatalogUnblock` operationId).
+func (c *Client) DeclineCatalogUnblockWithBody(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineCatalogUnblockRequestWithBody(c.Server, id, requestId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineCatalogUnblock Decline lifting a block
+//
+// Declines a pending unblock request, with a reason
+// (`catalog.unblock.approve`): the block stays active, and can take
+// another request. A decline only denies, so the requester may decline
+// their own request. The design of blocks is reserved for the halt
+// path's review (plan P1-16, step 7), which may change this operation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline (the `DeclineCatalogUnblock` operationId).
+func (c *Client) DeclineCatalogUnblock(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, body DeclineCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineCatalogUnblockRequest(c.Server, id, requestId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclinePendingFromAgentWithBody Decline everything an agent brought that waits for review
+//
+// Declines at once, with a reason, every entry, definition and digest
+// that the agent's reports brought and that still waits for review
+// (`catalog.entry.approve`): the answer to an agent that floods the
+// queue (threat model, T-74). What is declined stays denied, and frees
+// the agent's room for what waits for review (CORE-13). Approved
+// entries keep what they pinned.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/declines (the `DeclinePendingFromAgent` operationId).
+func (c *Client) DeclinePendingFromAgentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclinePendingFromAgentRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclinePendingFromAgent Decline everything an agent brought that waits for review
+//
+// Declines at once, with a reason, every entry, definition and digest
+// that the agent's reports brought and that still waits for review
+// (`catalog.entry.approve`): the answer to an agent that floods the
+// queue (threat model, T-74). What is declined stays denied, and frees
+// the agent's room for what waits for review (CORE-13). Approved
+// entries keep what they pinned.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/declines (the `DeclinePendingFromAgent` operationId).
+func (c *Client) DeclinePendingFromAgent(ctx context.Context, body DeclinePendingFromAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclinePendingFromAgentRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetToolDefinition Get a tool definition
+//
+// Returns a tool definition that the core stores, for review and diffs:
+// the members that its hash covers (contracts, section 4.10), as the
+// bytes of their canonical JSON, exactly as stored, so that the
+// SHA-256 of the body is the hash in the path. The definition was
+// reported by an agent: it is untrusted text, which the console shows
+// as plain text. It is served only as `application/json`, with
+// `X-Content-Type-Options: nosniff` and the API's
+// `Content-Security-Policy: default-src 'none'`, never as HTML. The
+// core stores no member over the limits of a report (a name and a
+// title of 256 bytes, a description of 16 KiB, each schema of 64 KiB,
+// annotations of 4 KiB), so a body is never larger than 1 MiB, JSON
+// escapes included.
+//
+// Corresponds with GET /catalog/definitions/{sha256} (the `GetToolDefinition` operationId).
+func (c *Client) GetToolDefinition(ctx context.Context, sha256 DefinitionSha256, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetToolDefinitionRequest(c.Server, sha256)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListCatalogModels List models
+//
+// Lists the models of the catalog that match every filter given,
+// ordered by key, one page at a time (CAT-02). Their endpoints and
+// names were reported by agents, and are untrusted text.
+//
+// Corresponds with GET /catalog/models (the `ListCatalogModels` operationId).
+func (c *Client) ListCatalogModels(ctx context.Context, params *ListCatalogModelsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCatalogModelsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetCatalogModel Get a model
+//
+// Returns a model of the catalog, with the ETag that its approval or decline must send back.
+//
+// Corresponds with GET /catalog/models/{id} (the `GetCatalogModel` operationId).
+func (c *Client) GetCatalogModel(ctx context.Context, id CatalogModelId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCatalogModelRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveCatalogModelWithBody Approve a model or a new digest
+//
+// Approves a discovered model, or one of the digests of an approved
+// model that wait for review, for the whole organization
+// (`catalog.entry.approve`, the advisory committee). It pins the
+// digest of the weights that the request names, which must be one that
+// the model's runtime reported; a model whose runtime reports no digest
+// is approved without one. Approving never enables anything for an
+// agent (CAT-03). It needs If-Match with the model's ETag.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/models/{id}/approve (the `ApproveCatalogModel` operationId).
+func (c *Client) ApproveCatalogModelWithBody(ctx context.Context, id CatalogModelId, params *ApproveCatalogModelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveCatalogModelRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveCatalogModel Approve a model or a new digest
+//
+// Approves a discovered model, or one of the digests of an approved
+// model that wait for review, for the whole organization
+// (`catalog.entry.approve`, the advisory committee). It pins the
+// digest of the weights that the request names, which must be one that
+// the model's runtime reported; a model whose runtime reports no digest
+// is approved without one. Approving never enables anything for an
+// agent (CAT-03). It needs If-Match with the model's ETag.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/models/{id}/approve (the `ApproveCatalogModel` operationId).
+func (c *Client) ApproveCatalogModel(ctx context.Context, id CatalogModelId, params *ApproveCatalogModelParams, body ApproveCatalogModelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveCatalogModelRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineCatalogModelWithBody Decline a model or a new digest
+//
+// Declines, with a reason (`catalog.entry.approve`), the digest that
+// the request names, which waits for review, or, without one, a
+// discovered model and every digest of it that waits. What is declined
+// leaves the queue of what waits for review and stays denied; it can
+// still be approved later. An approved model keeps its pinned digest.
+// It needs If-Match with the model's ETag.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/models/{id}/decline (the `DeclineCatalogModel` operationId).
+func (c *Client) DeclineCatalogModelWithBody(ctx context.Context, id CatalogModelId, params *DeclineCatalogModelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineCatalogModelRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineCatalogModel Decline a model or a new digest
+//
+// Declines, with a reason (`catalog.entry.approve`), the digest that
+// the request names, which waits for review, or, without one, a
+// discovered model and every digest of it that waits. What is declined
+// leaves the queue of what waits for review and stays denied; it can
+// still be approved later. An approved model keeps its pinned digest.
+// It needs If-Match with the model's ETag.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/models/{id}/decline (the `DeclineCatalogModel` operationId).
+func (c *Client) DeclineCatalogModel(ctx context.Context, id CatalogModelId, params *DeclineCatalogModelParams, body DeclineCatalogModelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineCatalogModelRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListCatalogServers List MCP servers
+//
+// Lists the MCP servers of the catalog that match every filter given,
+// ordered by key, one page at a time (CAT-02). Their references,
+// announced names, versions and display forms were reported by agents:
+// they are untrusted text, shown as plain text, and only to the callers
+// who may view the catalog (`catalog.view`).
+//
+// Corresponds with GET /catalog/servers (the `ListCatalogServers` operationId).
+func (c *Client) ListCatalogServers(ctx context.Context, params *ListCatalogServersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCatalogServersRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetCatalogServer Get an MCP server
+//
+// Returns an MCP server of the catalog, with the ETag that its approval or decline must send back.
+//
+// Corresponds with GET /catalog/servers/{id} (the `GetCatalogServer` operationId).
+func (c *Client) GetCatalogServer(ctx context.Context, id CatalogServerId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCatalogServerRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveCatalogServerWithBody Approve an MCP server
+//
+// Approves a discovered MCP server for the whole organization
+// (`catalog.entry.approve`, the advisory committee). Its key never
+// changes afterwards. The request can approve some of the server's
+// tools at once: each names the definition hash the reviewer saw in
+// full, its classification and the arguments policies may see, as
+// approveCatalogTool does, and the whole request is refused if one of
+// them is. Approving never enables anything for an agent (CAT-03). It
+// needs If-Match with the server's ETag.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/servers/{id}/approve (the `ApproveCatalogServer` operationId).
+func (c *Client) ApproveCatalogServerWithBody(ctx context.Context, id CatalogServerId, params *ApproveCatalogServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveCatalogServerRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveCatalogServer Approve an MCP server
+//
+// Approves a discovered MCP server for the whole organization
+// (`catalog.entry.approve`, the advisory committee). Its key never
+// changes afterwards. The request can approve some of the server's
+// tools at once: each names the definition hash the reviewer saw in
+// full, its classification and the arguments policies may see, as
+// approveCatalogTool does, and the whole request is refused if one of
+// them is. Approving never enables anything for an agent (CAT-03). It
+// needs If-Match with the server's ETag.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/servers/{id}/approve (the `ApproveCatalogServer` operationId).
+func (c *Client) ApproveCatalogServer(ctx context.Context, id CatalogServerId, params *ApproveCatalogServerParams, body ApproveCatalogServerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveCatalogServerRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineCatalogServerWithBody Decline an MCP server
+//
+// Declines a discovered MCP server, with a reason
+// (`catalog.entry.approve`). It leaves the queue of what waits for
+// review and stays discovered, so its tools stay denied; it can still
+// be approved later. An approved server cannot be declined
+// (`conflict`): a block or disables restrict it at once. It needs
+// If-Match with the server's ETag.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/servers/{id}/decline (the `DeclineCatalogServer` operationId).
+func (c *Client) DeclineCatalogServerWithBody(ctx context.Context, id CatalogServerId, params *DeclineCatalogServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineCatalogServerRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineCatalogServer Decline an MCP server
+//
+// Declines a discovered MCP server, with a reason
+// (`catalog.entry.approve`). It leaves the queue of what waits for
+// review and stays discovered, so its tools stay denied; it can still
+// be approved later. An approved server cannot be declined
+// (`conflict`): a block or disables restrict it at once. It needs
+// If-Match with the server's ETag.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/servers/{id}/decline (the `DeclineCatalogServer` operationId).
+func (c *Client) DeclineCatalogServer(ctx context.Context, id CatalogServerId, params *DeclineCatalogServerParams, body DeclineCatalogServerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineCatalogServerRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListCatalogTools List tools
+//
+// Lists the tools of the catalog that match every filter given, ordered
+// by key, one page at a time (CAT-02). The agent's own tools
+// (`agent/<name>`) are entries of their agent, so two of them can share
+// a key: filter them by agent. Names were reported by agents, and are
+// untrusted text.
+//
+// Corresponds with GET /catalog/tools (the `ListCatalogTools` operationId).
+func (c *Client) ListCatalogTools(ctx context.Context, params *ListCatalogToolsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCatalogToolsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetCatalogTool Get a tool
+//
+// Returns a tool of the catalog: its pinned definition hash, the
+// definitions that wait for review, its classification and the
+// arguments policies may see, with the ETag that its approval or
+// decline must send back. getToolDefinition returns each definition in
+// full.
+//
+// Corresponds with GET /catalog/tools/{id} (the `GetCatalogTool` operationId).
+func (c *Client) GetCatalogTool(ctx context.Context, id CatalogToolId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCatalogToolRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveCatalogToolWithBody Approve a tool or a new definition
+//
+// Approves a discovered tool, or one of the definitions of an approved
+// tool that wait for review, for the whole organization
+// (`catalog.entry.approve`, the advisory committee). It pins the
+// definition hash the request names, which must be one of the tool's
+// reported definitions that the core stores; a built-in tool has none,
+// and a tool of any other kind without a definition hash is never
+// approved (`conflict`, contracts section 7.7). A tool of an MCP server
+// is approved only once its server is (`conflict`). The reviewer
+// classifies the tool, starting from its MCP annotations or, without
+// them, from the protocol's conservative defaults (not read-only,
+// destructive, open world), and declares the arguments policies may
+// see, with their types from the tool's input schema (RFC-0002, section
+// 7.5). For an approved tool, a request that names its pinned
+// definition changes only its classification and declared arguments;
+// a declaration that an active policy version reads cannot be
+// withdrawn, and a declared argument's type cannot change while an
+// active usage rule uses it (`conflict`). Approving never
+// enables anything for an agent (CAT-03). It needs If-Match with the
+// tool's ETag.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/tools/{id}/approve (the `ApproveCatalogTool` operationId).
+func (c *Client) ApproveCatalogToolWithBody(ctx context.Context, id CatalogToolId, params *ApproveCatalogToolParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveCatalogToolRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveCatalogTool Approve a tool or a new definition
+//
+// Approves a discovered tool, or one of the definitions of an approved
+// tool that wait for review, for the whole organization
+// (`catalog.entry.approve`, the advisory committee). It pins the
+// definition hash the request names, which must be one of the tool's
+// reported definitions that the core stores; a built-in tool has none,
+// and a tool of any other kind without a definition hash is never
+// approved (`conflict`, contracts section 7.7). A tool of an MCP server
+// is approved only once its server is (`conflict`). The reviewer
+// classifies the tool, starting from its MCP annotations or, without
+// them, from the protocol's conservative defaults (not read-only,
+// destructive, open world), and declares the arguments policies may
+// see, with their types from the tool's input schema (RFC-0002, section
+// 7.5). For an approved tool, a request that names its pinned
+// definition changes only its classification and declared arguments;
+// a declaration that an active policy version reads cannot be
+// withdrawn, and a declared argument's type cannot change while an
+// active usage rule uses it (`conflict`). Approving never
+// enables anything for an agent (CAT-03). It needs If-Match with the
+// tool's ETag.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/tools/{id}/approve (the `ApproveCatalogTool` operationId).
+func (c *Client) ApproveCatalogTool(ctx context.Context, id CatalogToolId, params *ApproveCatalogToolParams, body ApproveCatalogToolJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveCatalogToolRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineCatalogToolWithBody Decline a tool or a new definition
+//
+// Declines, with a reason (`catalog.entry.approve`), the definition
+// that the request names, which waits for review, or, without one, a
+// discovered tool and every definition of it that waits. What is
+// declined leaves the queue of what waits for review and stays not
+// approved, so it stays denied; it can still be approved later. A
+// declined definition reported again does not return to the queue. An
+// approved tool keeps its pinned definition. It needs If-Match with the
+// tool's ETag.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/tools/{id}/decline (the `DeclineCatalogTool` operationId).
+func (c *Client) DeclineCatalogToolWithBody(ctx context.Context, id CatalogToolId, params *DeclineCatalogToolParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineCatalogToolRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclineCatalogTool Decline a tool or a new definition
+//
+// Declines, with a reason (`catalog.entry.approve`), the definition
+// that the request names, which waits for review, or, without one, a
+// discovered tool and every definition of it that waits. What is
+// declined leaves the queue of what waits for review and stays not
+// approved, so it stays denied; it can still be approved later. A
+// declined definition reported again does not return to the queue. An
+// approved tool keeps its pinned definition. It needs If-Match with the
+// tool's ETag.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/tools/{id}/decline (the `DeclineCatalogTool` operationId).
+func (c *Client) DeclineCatalogTool(ctx context.Context, id CatalogToolId, params *DeclineCatalogToolParams, body DeclineCatalogToolJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclineCatalogToolRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompileUsageRulesWithBody Compile usage rules into Cedar
+//
+// Writes the Cedar statements of a policy's usage rules, as the core's
+// check at submission regenerates them, for the console's forms and for
+// policy-as-code repositories (RFC-0002, section 8; contracts, section
+// 6.11). It writes exactly what the reference generator of the
+// conformance kit writes (`test/conformance/profile`, `GenerateRules`),
+// and refuses what it refuses (`bad_request`, with the reason): for
+// each rule, and for each of its tools in their order, its
+// `tool.invoke` statement, then its `tool.expose` statement. A global
+// policy's rules take the arguments that the catalog declares, and
+// cannot name an agent's own tool (`agent/<name>`); an agent-specific
+// policy's take those of the agent's catalog. The rules are given as
+// JSON text, as their annotations carry them, so that the generator
+// reads exactly what a policy would hold: a repeated member name, a
+// lone surrogate or an integer beyond 64 bits is refused rather than
+// read another way. The text is at most 256 KiB, and statements that
+// would exceed 2 MiB, the limit of a whole bundle (contracts, step V1),
+// are refused before they are written. Compiling changes nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /catalog/usage-rules/compile (the `CompileUsageRules` operationId).
+func (c *Client) CompileUsageRulesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompileUsageRulesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompileUsageRules Compile usage rules into Cedar
+//
+// Writes the Cedar statements of a policy's usage rules, as the core's
+// check at submission regenerates them, for the console's forms and for
+// policy-as-code repositories (RFC-0002, section 8; contracts, section
+// 6.11). It writes exactly what the reference generator of the
+// conformance kit writes (`test/conformance/profile`, `GenerateRules`),
+// and refuses what it refuses (`bad_request`, with the reason): for
+// each rule, and for each of its tools in their order, its
+// `tool.invoke` statement, then its `tool.expose` statement. A global
+// policy's rules take the arguments that the catalog declares, and
+// cannot name an agent's own tool (`agent/<name>`); an agent-specific
+// policy's take those of the agent's catalog. The rules are given as
+// JSON text, as their annotations carry them, so that the generator
+// reads exactly what a policy would hold: a repeated member name, a
+// lone surrogate or an integer beyond 64 bits is refused rather than
+// read another way. The text is at most 256 KiB, and statements that
+// would exceed 2 MiB, the limit of a whole bundle (contracts, step V1),
+// are refused before they are written. Compiling changes nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /catalog/usage-rules/compile (the `CompileUsageRules` operationId).
+func (c *Client) CompileUsageRules(ctx context.Context, body CompileUsageRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompileUsageRulesRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4565,6 +7595,102 @@ func NewGetAgentActionsRequest(server string, id AgentId) (*http.Request, error)
 	return req, nil
 }
 
+// NewGetAgentDeclaredToolingRequest constructs an http.Request for the GetAgentDeclaredTooling method
+func NewGetAgentDeclaredToolingRequest(server string, id AgentId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/declared-tooling", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeclareAgentToolingRequest calls the generic DeclareAgentTooling builder with application/json body
+func NewDeclareAgentToolingRequest(server string, id AgentId, params *DeclareAgentToolingParams, body DeclareAgentToolingJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeclareAgentToolingRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewDeclareAgentToolingRequestWithBody constructs an http.Request for the DeclareAgentTooling method, with any body, and a specified content type
+func NewDeclareAgentToolingRequestWithBody(server string, id AgentId, params *DeclareAgentToolingParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/declared-tooling", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewAddAgentDelegateRequest calls the generic AddAgentDelegate builder with application/json body
 func NewAddAgentDelegateRequest(server string, id AgentId, body AddAgentDelegateJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -5131,6 +8257,390 @@ func NewListAgentReviewsRequest(server string, id AgentId, params *ListAgentRevi
 	return req, nil
 }
 
+// NewListAgentToolingRequest constructs an http.Request for the ListAgentTooling method
+func NewListAgentToolingRequest(server string, id AgentId, params *ListAgentToolingParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/tooling", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.EntryType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "entryType", *params.EntryType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Enabled != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "enabled", *params.Enabled, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAgentToolingRequestsRequest constructs an http.Request for the ListAgentToolingRequests method
+func NewListAgentToolingRequestsRequest(server string, id AgentId, params *ListAgentToolingRequestsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/tooling-requests", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRequestAgentToolingRequest calls the generic RequestAgentTooling builder with application/json body
+func NewRequestAgentToolingRequest(server string, id AgentId, body RequestAgentToolingJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRequestAgentToolingRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewRequestAgentToolingRequestWithBody constructs an http.Request for the RequestAgentTooling method, with any body, and a specified content type
+func NewRequestAgentToolingRequestWithBody(server string, id AgentId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/tooling-requests", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewApproveAgentToolingRequestRequest calls the generic ApproveAgentToolingRequest builder with application/json body
+func NewApproveAgentToolingRequestRequest(server string, id AgentId, requestId ToolingRequestId, body ApproveAgentToolingRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveAgentToolingRequestRequestWithBody(server, id, requestId, "application/json", bodyReader)
+}
+
+// NewApproveAgentToolingRequestRequestWithBody constructs an http.Request for the ApproveAgentToolingRequest method, with any body, and a specified content type
+func NewApproveAgentToolingRequestRequestWithBody(server string, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "requestId", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/tooling-requests/%s/approve", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeclineAgentToolingRequestRequest calls the generic DeclineAgentToolingRequest builder with application/json body
+func NewDeclineAgentToolingRequestRequest(server string, id AgentId, requestId ToolingRequestId, body DeclineAgentToolingRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeclineAgentToolingRequestRequestWithBody(server, id, requestId, "application/json", bodyReader)
+}
+
+// NewDeclineAgentToolingRequestRequestWithBody constructs an http.Request for the DeclineAgentToolingRequest method, with any body, and a specified content type
+func NewDeclineAgentToolingRequestRequestWithBody(server string, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "requestId", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/tooling-requests/%s/decline", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDisableAgentToolingRequest calls the generic DisableAgentTooling builder with application/json body
+func NewDisableAgentToolingRequest(server string, id AgentId, body DisableAgentToolingJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDisableAgentToolingRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewDisableAgentToolingRequestWithBody constructs an http.Request for the DisableAgentTooling method, with any body, and a specified content type
+func NewDisableAgentToolingRequestWithBody(server string, id AgentId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/tooling/disable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListAgentTransitionsRequest constructs an http.Request for the ListAgentTransitions method
 func NewListAgentTransitionsRequest(server string, id AgentId, params *ListAgentTransitionsParams) (*http.Request, error) {
 	var err error
@@ -5524,6 +9034,1279 @@ func NewGetAuditKeysRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewListCatalogBlocksRequest constructs an http.Request for the ListCatalogBlocks method
+func NewListCatalogBlocksRequest(server string, params *ListCatalogBlocksParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/blocks")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewIssueCatalogBlockRequest calls the generic IssueCatalogBlock builder with application/json body
+func NewIssueCatalogBlockRequest(server string, body IssueCatalogBlockJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewIssueCatalogBlockRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewIssueCatalogBlockRequestWithBody constructs an http.Request for the IssueCatalogBlock method, with any body, and a specified content type
+func NewIssueCatalogBlockRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/blocks")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetCatalogBlockRequest constructs an http.Request for the GetCatalogBlock method
+func NewGetCatalogBlockRequest(server string, id CatalogBlockId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/blocks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRequestCatalogUnblockRequest calls the generic RequestCatalogUnblock builder with application/json body
+func NewRequestCatalogUnblockRequest(server string, id CatalogBlockId, body RequestCatalogUnblockJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRequestCatalogUnblockRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewRequestCatalogUnblockRequestWithBody constructs an http.Request for the RequestCatalogUnblock method, with any body, and a specified content type
+func NewRequestCatalogUnblockRequestWithBody(server string, id CatalogBlockId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/blocks/%s/unblock-requests", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewApproveCatalogUnblockRequest calls the generic ApproveCatalogUnblock builder with application/json body
+func NewApproveCatalogUnblockRequest(server string, id CatalogBlockId, requestId UnblockRequestId, body ApproveCatalogUnblockJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveCatalogUnblockRequestWithBody(server, id, requestId, "application/json", bodyReader)
+}
+
+// NewApproveCatalogUnblockRequestWithBody constructs an http.Request for the ApproveCatalogUnblock method, with any body, and a specified content type
+func NewApproveCatalogUnblockRequestWithBody(server string, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "requestId", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/blocks/%s/unblock-requests/%s/approve", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeclineCatalogUnblockRequest calls the generic DeclineCatalogUnblock builder with application/json body
+func NewDeclineCatalogUnblockRequest(server string, id CatalogBlockId, requestId UnblockRequestId, body DeclineCatalogUnblockJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeclineCatalogUnblockRequestWithBody(server, id, requestId, "application/json", bodyReader)
+}
+
+// NewDeclineCatalogUnblockRequestWithBody constructs an http.Request for the DeclineCatalogUnblock method, with any body, and a specified content type
+func NewDeclineCatalogUnblockRequestWithBody(server string, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "requestId", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/blocks/%s/unblock-requests/%s/decline", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeclinePendingFromAgentRequest calls the generic DeclinePendingFromAgent builder with application/json body
+func NewDeclinePendingFromAgentRequest(server string, body DeclinePendingFromAgentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeclinePendingFromAgentRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewDeclinePendingFromAgentRequestWithBody constructs an http.Request for the DeclinePendingFromAgent method, with any body, and a specified content type
+func NewDeclinePendingFromAgentRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/declines")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetToolDefinitionRequest constructs an http.Request for the GetToolDefinition method
+func NewGetToolDefinitionRequest(server string, sha256 DefinitionSha256) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sha256", sha256, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/definitions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListCatalogModelsRequest constructs an http.Request for the ListCatalogModels method
+func NewListCatalogModelsRequest(server string, params *ListCatalogModelsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/models")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PendingReview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "pendingReview", *params.PendingReview, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Flag != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "flag", *params.Flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Key != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "key", *params.Key, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Provider != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "provider", *params.Provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetCatalogModelRequest constructs an http.Request for the GetCatalogModel method
+func NewGetCatalogModelRequest(server string, id CatalogModelId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/models/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewApproveCatalogModelRequest calls the generic ApproveCatalogModel builder with application/json body
+func NewApproveCatalogModelRequest(server string, id CatalogModelId, params *ApproveCatalogModelParams, body ApproveCatalogModelJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveCatalogModelRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewApproveCatalogModelRequestWithBody constructs an http.Request for the ApproveCatalogModel method, with any body, and a specified content type
+func NewApproveCatalogModelRequestWithBody(server string, id CatalogModelId, params *ApproveCatalogModelParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/models/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDeclineCatalogModelRequest calls the generic DeclineCatalogModel builder with application/json body
+func NewDeclineCatalogModelRequest(server string, id CatalogModelId, params *DeclineCatalogModelParams, body DeclineCatalogModelJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeclineCatalogModelRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewDeclineCatalogModelRequestWithBody constructs an http.Request for the DeclineCatalogModel method, with any body, and a specified content type
+func NewDeclineCatalogModelRequestWithBody(server string, id CatalogModelId, params *DeclineCatalogModelParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/models/%s/decline", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListCatalogServersRequest constructs an http.Request for the ListCatalogServers method
+func NewListCatalogServersRequest(server string, params *ListCatalogServersParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/servers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PendingReview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "pendingReview", *params.PendingReview, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Flag != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "flag", *params.Flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Key != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "key", *params.Key, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetCatalogServerRequest constructs an http.Request for the GetCatalogServer method
+func NewGetCatalogServerRequest(server string, id CatalogServerId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/servers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewApproveCatalogServerRequest calls the generic ApproveCatalogServer builder with application/json body
+func NewApproveCatalogServerRequest(server string, id CatalogServerId, params *ApproveCatalogServerParams, body ApproveCatalogServerJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveCatalogServerRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewApproveCatalogServerRequestWithBody constructs an http.Request for the ApproveCatalogServer method, with any body, and a specified content type
+func NewApproveCatalogServerRequestWithBody(server string, id CatalogServerId, params *ApproveCatalogServerParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/servers/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDeclineCatalogServerRequest calls the generic DeclineCatalogServer builder with application/json body
+func NewDeclineCatalogServerRequest(server string, id CatalogServerId, params *DeclineCatalogServerParams, body DeclineCatalogServerJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeclineCatalogServerRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewDeclineCatalogServerRequestWithBody constructs an http.Request for the DeclineCatalogServer method, with any body, and a specified content type
+func NewDeclineCatalogServerRequestWithBody(server string, id CatalogServerId, params *DeclineCatalogServerParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/servers/%s/decline", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListCatalogToolsRequest constructs an http.Request for the ListCatalogTools method
+func NewListCatalogToolsRequest(server string, params *ListCatalogToolsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/tools")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PendingReview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "pendingReview", *params.PendingReview, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Key != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "key", *params.Key, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ServerId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "serverId", *params.ServerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AgentId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agentId", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kind", *params.Kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetCatalogToolRequest constructs an http.Request for the GetCatalogTool method
+func NewGetCatalogToolRequest(server string, id CatalogToolId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/tools/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewApproveCatalogToolRequest calls the generic ApproveCatalogTool builder with application/json body
+func NewApproveCatalogToolRequest(server string, id CatalogToolId, params *ApproveCatalogToolParams, body ApproveCatalogToolJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveCatalogToolRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewApproveCatalogToolRequestWithBody constructs an http.Request for the ApproveCatalogTool method, with any body, and a specified content type
+func NewApproveCatalogToolRequestWithBody(server string, id CatalogToolId, params *ApproveCatalogToolParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/tools/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDeclineCatalogToolRequest calls the generic DeclineCatalogTool builder with application/json body
+func NewDeclineCatalogToolRequest(server string, id CatalogToolId, params *DeclineCatalogToolParams, body DeclineCatalogToolJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeclineCatalogToolRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewDeclineCatalogToolRequestWithBody constructs an http.Request for the DeclineCatalogTool method, with any body, and a specified content type
+func NewDeclineCatalogToolRequestWithBody(server string, id CatalogToolId, params *DeclineCatalogToolParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/tools/%s/decline", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewCompileUsageRulesRequest calls the generic CompileUsageRules builder with application/json body
+func NewCompileUsageRulesRequest(server string, body CompileUsageRulesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCompileUsageRulesRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCompileUsageRulesRequestWithBody constructs an http.Request for the CompileUsageRules method, with any body, and a specified content type
+func NewCompileUsageRulesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/catalog/usage-rules/compile")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -6682,6 +11465,51 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /agents/{id}/actions (the `GetAgentActions` operationId).
 	GetAgentActionsWithResponse(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*GetAgentActionsResponse, error)
 
+	// GetAgentDeclaredToolingWithResponse Get an agent's declared tooling
+	//
+	// Returns the tooling that people declared for the agent, with the ETag
+	// that a new declaration must send back. An agent without a
+	// declaration has an empty one.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/{id}/declared-tooling (the `GetAgentDeclaredTooling` operationId).
+	GetAgentDeclaredToolingWithResponse(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*GetAgentDeclaredToolingResponse, error)
+
+	// DeclareAgentToolingWithBodyWithResponse Declare an agent's tooling
+	//
+	// Replaces the tooling declared for an agent without an enforcement
+	// point, so that the inventory is complete (CAT-08): the agent's owners
+	// declare it, and operators declare any agent's (`tooling.declare`).
+	// Nothing enforces it, and a declaration never approves, enables or
+	// unblocks anything (CORE-10): what the catalog lacks becomes a
+	// discovered entry. It takes the shape and the limits of a tooling
+	// report (contracts, section 4.10), and is accepted only for an agent
+	// below coverage C2 (`conflict`). It needs If-Match with the ETag of
+	// getAgentDeclaredTooling.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /agents/{id}/declared-tooling (the `DeclareAgentTooling` operationId).
+	DeclareAgentToolingWithBodyWithResponse(ctx context.Context, id AgentId, params *DeclareAgentToolingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclareAgentToolingResponse, error)
+
+	// DeclareAgentToolingWithResponse Declare an agent's tooling
+	//
+	// Replaces the tooling declared for an agent without an enforcement
+	// point, so that the inventory is complete (CAT-08): the agent's owners
+	// declare it, and operators declare any agent's (`tooling.declare`).
+	// Nothing enforces it, and a declaration never approves, enables or
+	// unblocks anything (CORE-10): what the catalog lacks becomes a
+	// discovered entry. It takes the shape and the limits of a tooling
+	// report (contracts, section 4.10), and is accepted only for an agent
+	// below coverage C2 (`conflict`). It needs If-Match with the ETag of
+	// getAgentDeclaredTooling.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /agents/{id}/declared-tooling (the `DeclareAgentTooling` operationId).
+	DeclareAgentToolingWithResponse(ctx context.Context, id AgentId, params *DeclareAgentToolingParams, body DeclareAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclareAgentToolingResponse, error)
+
 	// AddAgentDelegateWithBodyWithResponse Add a delegate
 	//
 	// Makes an active human with the owner role a delegate of the agent: the
@@ -6842,6 +11670,146 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /agents/{id}/reviews (the `ListAgentReviews` operationId).
 	ListAgentReviewsWithResponse(ctx context.Context, id AgentId, params *ListAgentReviewsParams, reqEditors ...RequestEditorFn) (*ListAgentReviewsResponse, error)
 
+	// ListAgentToolingWithResponse List an agent's tooling
+	//
+	// Lists the MCP servers, tools and models observed, enabled or declared
+	// for the agent, ordered by kind and key, one page at a time (UI-10):
+	// for each, whether it is enabled and declared, and each observation,
+	// with its source, its origin and when it was first and last seen. An
+	// entry that the agent no longer has stays listed while it is enabled.
+	// Observations were reported by the agent's enforcement points, and are
+	// untrusted.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/{id}/tooling (the `ListAgentTooling` operationId).
+	ListAgentToolingWithResponse(ctx context.Context, id AgentId, params *ListAgentToolingParams, reqEditors ...RequestEditorFn) (*ListAgentToolingResponse, error)
+
+	// ListAgentToolingRequestsWithResponse List an agent's requests to enable tooling
+	//
+	// Lists the agent's requests to enable tools and models, newest first, with their decisions.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/{id}/tooling-requests (the `ListAgentToolingRequests` operationId).
+	ListAgentToolingRequestsWithResponse(ctx context.Context, id AgentId, params *ListAgentToolingRequestsParams, reqEditors ...RequestEditorFn) (*ListAgentToolingRequestsResponse, error)
+
+	// RequestAgentToolingWithBodyWithResponse Request enabling tooling for an agent
+	//
+	// Asks, with a reason, that an approved tool or model be enabled for
+	// the agent; naming an approved MCP server asks for its approved tools
+	// at once (CAT-03). The agent's owners ask for their agents, and the
+	// advisory committee for any (`tooling.enable.request`). Someone else
+	// on the advisory committee approves it (HUM-04). An entry that is not
+	// approved, an agent that is retired or rejected, and a second pending
+	// request for the same entry are refused (`conflict`). The request
+	// waits in the advisory committee's inbox.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests (the `RequestAgentTooling` operationId).
+	RequestAgentToolingWithBodyWithResponse(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestAgentToolingResponse, error)
+
+	// RequestAgentToolingWithResponse Request enabling tooling for an agent
+	//
+	// Asks, with a reason, that an approved tool or model be enabled for
+	// the agent; naming an approved MCP server asks for its approved tools
+	// at once (CAT-03). The agent's owners ask for their agents, and the
+	// advisory committee for any (`tooling.enable.request`). Someone else
+	// on the advisory committee approves it (HUM-04). An entry that is not
+	// approved, an agent that is retired or rejected, and a second pending
+	// request for the same entry are refused (`conflict`). The request
+	// waits in the advisory committee's inbox.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests (the `RequestAgentTooling` operationId).
+	RequestAgentToolingWithResponse(ctx context.Context, id AgentId, body RequestAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestAgentToolingResponse, error)
+
+	// ApproveAgentToolingRequestWithBodyWithResponse Approve a request to enable tooling
+	//
+	// Approves a pending request, and enables what it names for the agent
+	// (`tooling.enable.approve`, the advisory committee). Nobody approves
+	// their own request (`forbidden`, HUM-04, ST-81), and the database
+	// refuses it too. An entry that is no longer approved, or an agent that
+	// was retired or rejected since, is refused (`conflict`). A request is
+	// decided once, and never changes afterwards.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/approve (the `ApproveAgentToolingRequest` operationId).
+	ApproveAgentToolingRequestWithBodyWithResponse(ctx context.Context, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveAgentToolingRequestResponse, error)
+
+	// ApproveAgentToolingRequestWithResponse Approve a request to enable tooling
+	//
+	// Approves a pending request, and enables what it names for the agent
+	// (`tooling.enable.approve`, the advisory committee). Nobody approves
+	// their own request (`forbidden`, HUM-04, ST-81), and the database
+	// refuses it too. An entry that is no longer approved, or an agent that
+	// was retired or rejected since, is refused (`conflict`). A request is
+	// decided once, and never changes afterwards.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/approve (the `ApproveAgentToolingRequest` operationId).
+	ApproveAgentToolingRequestWithResponse(ctx context.Context, id AgentId, requestId ToolingRequestId, body ApproveAgentToolingRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveAgentToolingRequestResponse, error)
+
+	// DeclineAgentToolingRequestWithBodyWithResponse Decline a request to enable tooling
+	//
+	// Declines a pending request, with a reason
+	// (`tooling.enable.approve`): nothing is enabled. A decline only
+	// denies, so the requester may decline their own request. A request is
+	// decided once, and never changes afterwards.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/decline (the `DeclineAgentToolingRequest` operationId).
+	DeclineAgentToolingRequestWithBodyWithResponse(ctx context.Context, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineAgentToolingRequestResponse, error)
+
+	// DeclineAgentToolingRequestWithResponse Decline a request to enable tooling
+	//
+	// Declines a pending request, with a reason
+	// (`tooling.enable.approve`): nothing is enabled. A decline only
+	// denies, so the requester may decline their own request. A request is
+	// decided once, and never changes afterwards.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/decline (the `DeclineAgentToolingRequest` operationId).
+	DeclineAgentToolingRequestWithResponse(ctx context.Context, id AgentId, requestId ToolingRequestId, body DeclineAgentToolingRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineAgentToolingRequestResponse, error)
+
+	// DisableAgentToolingWithBodyWithResponse Disable an agent's tooling
+	//
+	// Disables, at once and with a reason, tools and models enabled for the
+	// agent; naming an MCP server disables its tools (CAT-03). The agent's
+	// owners disable it, and the advisory committee and operators disable
+	// any agent's (`tooling.disable`). It takes no If-Match: a disable only
+	// restricts, and never waits on a version. An entry that is not
+	// enabled is left out of the answer. Enabling again needs a new
+	// request. The agent's next bundle no longer lists the entry as
+	// enabled.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/tooling/disable (the `DisableAgentTooling` operationId).
+	DisableAgentToolingWithBodyWithResponse(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DisableAgentToolingResponse, error)
+
+	// DisableAgentToolingWithResponse Disable an agent's tooling
+	//
+	// Disables, at once and with a reason, tools and models enabled for the
+	// agent; naming an MCP server disables its tools (CAT-03). The agent's
+	// owners disable it, and the advisory committee and operators disable
+	// any agent's (`tooling.disable`). It takes no If-Match: a disable only
+	// restricts, and never waits on a version. An entry that is not
+	// enabled is left out of the answer. Enabling again needs a new
+	// request. The agent's next bundle no longer lists the entry as
+	// enabled.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/{id}/tooling/disable (the `DisableAgentTooling` operationId).
+	DisableAgentToolingWithResponse(ctx context.Context, id AgentId, body DisableAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*DisableAgentToolingResponse, error)
+
 	// ListAgentTransitionsWithResponse List an agent's lifecycle history
 	//
 	// Lists the agent's lifecycle transitions, newest first: who made each
@@ -6996,6 +11964,521 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /audit/keys (the `GetAuditKeys` operationId).
 	GetAuditKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditKeysResponse, error)
+
+	// ListCatalogBlocksWithResponse List blocks
+	//
+	// Lists organization-wide blocks, the latest issued first, with their
+	// spread to enforcement points (CAT-04): the active ones by default.
+	// What a block covers is shown in clear only here, to the callers who
+	// may view the catalog. The design of blocks is reserved for the halt
+	// path's review (plan P1-16, step 7), which may change this operation.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /catalog/blocks (the `ListCatalogBlocks` operationId).
+	ListCatalogBlocksWithResponse(ctx context.Context, params *ListCatalogBlocksParams, reqEditors ...RequestEditorFn) (*ListCatalogBlocksResponse, error)
+
+	// IssueCatalogBlockWithBodyWithResponse Block a server, a tool or models
+	//
+	// Blocks, for the whole organization and at once, with a reason, an MCP
+	// server and its tools, a tool, a model, every model of a provider or
+	// every model of an endpoint (CAT-04; `catalog.block.issue`). The block
+	// names what it covers by reference, so it also covers what the
+	// catalog has not seen yet; enforcement points receive the SHA-256 of
+	// the reference in the watch stream, without a new bundle. It takes a
+	// governance state version. At most 500 blocks are active, and one
+	// more is refused (`conflict`), as is a second active block of the same
+	// kind and reference. A block never changes an entry's status. The
+	// design of blocks is reserved for the halt path's review (plan P1-16,
+	// step 7), which may change this operation.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/blocks (the `IssueCatalogBlock` operationId).
+	IssueCatalogBlockWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IssueCatalogBlockResponse, error)
+
+	// IssueCatalogBlockWithResponse Block a server, a tool or models
+	//
+	// Blocks, for the whole organization and at once, with a reason, an MCP
+	// server and its tools, a tool, a model, every model of a provider or
+	// every model of an endpoint (CAT-04; `catalog.block.issue`). The block
+	// names what it covers by reference, so it also covers what the
+	// catalog has not seen yet; enforcement points receive the SHA-256 of
+	// the reference in the watch stream, without a new bundle. It takes a
+	// governance state version. At most 500 blocks are active, and one
+	// more is refused (`conflict`), as is a second active block of the same
+	// kind and reference. A block never changes an entry's status. The
+	// design of blocks is reserved for the halt path's review (plan P1-16,
+	// step 7), which may change this operation.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/blocks (the `IssueCatalogBlock` operationId).
+	IssueCatalogBlockWithResponse(ctx context.Context, body IssueCatalogBlockJSONRequestBody, reqEditors ...RequestEditorFn) (*IssueCatalogBlockResponse, error)
+
+	// GetCatalogBlockWithResponse Get a block
+	//
+	// Returns a block, with its spread to enforcement points and its
+	// pending unblock request. The design of blocks is reserved for the
+	// halt path's review (plan P1-16, step 7), which may change this
+	// operation.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /catalog/blocks/{id} (the `GetCatalogBlock` operationId).
+	GetCatalogBlockWithResponse(ctx context.Context, id CatalogBlockId, reqEditors ...RequestEditorFn) (*GetCatalogBlockResponse, error)
+
+	// RequestCatalogUnblockWithBodyWithResponse Request that a block be lifted
+	//
+	// Asks, with a reason, that an active block be lifted
+	// (`catalog.unblock.request`). Someone else on the steering or the
+	// advisory committee approves it (HUM-04). A block has one pending
+	// request at most (`conflict`). The design of blocks is reserved for
+	// the halt path's review (plan P1-16, step 7), which may change this
+	// operation.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests (the `RequestCatalogUnblock` operationId).
+	RequestCatalogUnblockWithBodyWithResponse(ctx context.Context, id CatalogBlockId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestCatalogUnblockResponse, error)
+
+	// RequestCatalogUnblockWithResponse Request that a block be lifted
+	//
+	// Asks, with a reason, that an active block be lifted
+	// (`catalog.unblock.request`). Someone else on the steering or the
+	// advisory committee approves it (HUM-04). A block has one pending
+	// request at most (`conflict`). The design of blocks is reserved for
+	// the halt path's review (plan P1-16, step 7), which may change this
+	// operation.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests (the `RequestCatalogUnblock` operationId).
+	RequestCatalogUnblockWithResponse(ctx context.Context, id CatalogBlockId, body RequestCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestCatalogUnblockResponse, error)
+
+	// ApproveCatalogUnblockWithBodyWithResponse Approve lifting a block
+	//
+	// Approves a pending unblock request, and lifts the block in a
+	// governance state version of its own (`catalog.unblock.approve`).
+	// Nobody approves their own request (`forbidden`, HUM-04, ST-81), and
+	// the database refuses it too. Lifting a block leaves every entry as it
+	// was. The design of blocks is reserved for the halt path's review
+	// (plan P1-16, step 7), which may change this operation.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve (the `ApproveCatalogUnblock` operationId).
+	ApproveCatalogUnblockWithBodyWithResponse(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveCatalogUnblockResponse, error)
+
+	// ApproveCatalogUnblockWithResponse Approve lifting a block
+	//
+	// Approves a pending unblock request, and lifts the block in a
+	// governance state version of its own (`catalog.unblock.approve`).
+	// Nobody approves their own request (`forbidden`, HUM-04, ST-81), and
+	// the database refuses it too. Lifting a block leaves every entry as it
+	// was. The design of blocks is reserved for the halt path's review
+	// (plan P1-16, step 7), which may change this operation.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve (the `ApproveCatalogUnblock` operationId).
+	ApproveCatalogUnblockWithResponse(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, body ApproveCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveCatalogUnblockResponse, error)
+
+	// DeclineCatalogUnblockWithBodyWithResponse Decline lifting a block
+	//
+	// Declines a pending unblock request, with a reason
+	// (`catalog.unblock.approve`): the block stays active, and can take
+	// another request. A decline only denies, so the requester may decline
+	// their own request. The design of blocks is reserved for the halt
+	// path's review (plan P1-16, step 7), which may change this operation.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline (the `DeclineCatalogUnblock` operationId).
+	DeclineCatalogUnblockWithBodyWithResponse(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineCatalogUnblockResponse, error)
+
+	// DeclineCatalogUnblockWithResponse Decline lifting a block
+	//
+	// Declines a pending unblock request, with a reason
+	// (`catalog.unblock.approve`): the block stays active, and can take
+	// another request. A decline only denies, so the requester may decline
+	// their own request. The design of blocks is reserved for the halt
+	// path's review (plan P1-16, step 7), which may change this operation.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline (the `DeclineCatalogUnblock` operationId).
+	DeclineCatalogUnblockWithResponse(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, body DeclineCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineCatalogUnblockResponse, error)
+
+	// DeclinePendingFromAgentWithBodyWithResponse Decline everything an agent brought that waits for review
+	//
+	// Declines at once, with a reason, every entry, definition and digest
+	// that the agent's reports brought and that still waits for review
+	// (`catalog.entry.approve`): the answer to an agent that floods the
+	// queue (threat model, T-74). What is declined stays denied, and frees
+	// the agent's room for what waits for review (CORE-13). Approved
+	// entries keep what they pinned.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/declines (the `DeclinePendingFromAgent` operationId).
+	DeclinePendingFromAgentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclinePendingFromAgentResponse, error)
+
+	// DeclinePendingFromAgentWithResponse Decline everything an agent brought that waits for review
+	//
+	// Declines at once, with a reason, every entry, definition and digest
+	// that the agent's reports brought and that still waits for review
+	// (`catalog.entry.approve`): the answer to an agent that floods the
+	// queue (threat model, T-74). What is declined stays denied, and frees
+	// the agent's room for what waits for review (CORE-13). Approved
+	// entries keep what they pinned.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/declines (the `DeclinePendingFromAgent` operationId).
+	DeclinePendingFromAgentWithResponse(ctx context.Context, body DeclinePendingFromAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclinePendingFromAgentResponse, error)
+
+	// GetToolDefinitionWithResponse Get a tool definition
+	//
+	// Returns a tool definition that the core stores, for review and diffs:
+	// the members that its hash covers (contracts, section 4.10), as the
+	// bytes of their canonical JSON, exactly as stored, so that the
+	// SHA-256 of the body is the hash in the path. The definition was
+	// reported by an agent: it is untrusted text, which the console shows
+	// as plain text. It is served only as `application/json`, with
+	// `X-Content-Type-Options: nosniff` and the API's
+	// `Content-Security-Policy: default-src 'none'`, never as HTML. The
+	// core stores no member over the limits of a report (a name and a
+	// title of 256 bytes, a description of 16 KiB, each schema of 64 KiB,
+	// annotations of 4 KiB), so a body is never larger than 1 MiB, JSON
+	// escapes included.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /catalog/definitions/{sha256} (the `GetToolDefinition` operationId).
+	GetToolDefinitionWithResponse(ctx context.Context, sha256 DefinitionSha256, reqEditors ...RequestEditorFn) (*GetToolDefinitionResponse, error)
+
+	// ListCatalogModelsWithResponse List models
+	//
+	// Lists the models of the catalog that match every filter given,
+	// ordered by key, one page at a time (CAT-02). Their endpoints and
+	// names were reported by agents, and are untrusted text.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /catalog/models (the `ListCatalogModels` operationId).
+	ListCatalogModelsWithResponse(ctx context.Context, params *ListCatalogModelsParams, reqEditors ...RequestEditorFn) (*ListCatalogModelsResponse, error)
+
+	// GetCatalogModelWithResponse Get a model
+	//
+	// Returns a model of the catalog, with the ETag that its approval or decline must send back.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /catalog/models/{id} (the `GetCatalogModel` operationId).
+	GetCatalogModelWithResponse(ctx context.Context, id CatalogModelId, reqEditors ...RequestEditorFn) (*GetCatalogModelResponse, error)
+
+	// ApproveCatalogModelWithBodyWithResponse Approve a model or a new digest
+	//
+	// Approves a discovered model, or one of the digests of an approved
+	// model that wait for review, for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). It pins the
+	// digest of the weights that the request names, which must be one that
+	// the model's runtime reported; a model whose runtime reports no digest
+	// is approved without one. Approving never enables anything for an
+	// agent (CAT-03). It needs If-Match with the model's ETag.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/models/{id}/approve (the `ApproveCatalogModel` operationId).
+	ApproveCatalogModelWithBodyWithResponse(ctx context.Context, id CatalogModelId, params *ApproveCatalogModelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveCatalogModelResponse, error)
+
+	// ApproveCatalogModelWithResponse Approve a model or a new digest
+	//
+	// Approves a discovered model, or one of the digests of an approved
+	// model that wait for review, for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). It pins the
+	// digest of the weights that the request names, which must be one that
+	// the model's runtime reported; a model whose runtime reports no digest
+	// is approved without one. Approving never enables anything for an
+	// agent (CAT-03). It needs If-Match with the model's ETag.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/models/{id}/approve (the `ApproveCatalogModel` operationId).
+	ApproveCatalogModelWithResponse(ctx context.Context, id CatalogModelId, params *ApproveCatalogModelParams, body ApproveCatalogModelJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveCatalogModelResponse, error)
+
+	// DeclineCatalogModelWithBodyWithResponse Decline a model or a new digest
+	//
+	// Declines, with a reason (`catalog.entry.approve`), the digest that
+	// the request names, which waits for review, or, without one, a
+	// discovered model and every digest of it that waits. What is declined
+	// leaves the queue of what waits for review and stays denied; it can
+	// still be approved later. An approved model keeps its pinned digest.
+	// It needs If-Match with the model's ETag.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/models/{id}/decline (the `DeclineCatalogModel` operationId).
+	DeclineCatalogModelWithBodyWithResponse(ctx context.Context, id CatalogModelId, params *DeclineCatalogModelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineCatalogModelResponse, error)
+
+	// DeclineCatalogModelWithResponse Decline a model or a new digest
+	//
+	// Declines, with a reason (`catalog.entry.approve`), the digest that
+	// the request names, which waits for review, or, without one, a
+	// discovered model and every digest of it that waits. What is declined
+	// leaves the queue of what waits for review and stays denied; it can
+	// still be approved later. An approved model keeps its pinned digest.
+	// It needs If-Match with the model's ETag.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/models/{id}/decline (the `DeclineCatalogModel` operationId).
+	DeclineCatalogModelWithResponse(ctx context.Context, id CatalogModelId, params *DeclineCatalogModelParams, body DeclineCatalogModelJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineCatalogModelResponse, error)
+
+	// ListCatalogServersWithResponse List MCP servers
+	//
+	// Lists the MCP servers of the catalog that match every filter given,
+	// ordered by key, one page at a time (CAT-02). Their references,
+	// announced names, versions and display forms were reported by agents:
+	// they are untrusted text, shown as plain text, and only to the callers
+	// who may view the catalog (`catalog.view`).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /catalog/servers (the `ListCatalogServers` operationId).
+	ListCatalogServersWithResponse(ctx context.Context, params *ListCatalogServersParams, reqEditors ...RequestEditorFn) (*ListCatalogServersResponse, error)
+
+	// GetCatalogServerWithResponse Get an MCP server
+	//
+	// Returns an MCP server of the catalog, with the ETag that its approval or decline must send back.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /catalog/servers/{id} (the `GetCatalogServer` operationId).
+	GetCatalogServerWithResponse(ctx context.Context, id CatalogServerId, reqEditors ...RequestEditorFn) (*GetCatalogServerResponse, error)
+
+	// ApproveCatalogServerWithBodyWithResponse Approve an MCP server
+	//
+	// Approves a discovered MCP server for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). Its key never
+	// changes afterwards. The request can approve some of the server's
+	// tools at once: each names the definition hash the reviewer saw in
+	// full, its classification and the arguments policies may see, as
+	// approveCatalogTool does, and the whole request is refused if one of
+	// them is. Approving never enables anything for an agent (CAT-03). It
+	// needs If-Match with the server's ETag.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/servers/{id}/approve (the `ApproveCatalogServer` operationId).
+	ApproveCatalogServerWithBodyWithResponse(ctx context.Context, id CatalogServerId, params *ApproveCatalogServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveCatalogServerResponse, error)
+
+	// ApproveCatalogServerWithResponse Approve an MCP server
+	//
+	// Approves a discovered MCP server for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). Its key never
+	// changes afterwards. The request can approve some of the server's
+	// tools at once: each names the definition hash the reviewer saw in
+	// full, its classification and the arguments policies may see, as
+	// approveCatalogTool does, and the whole request is refused if one of
+	// them is. Approving never enables anything for an agent (CAT-03). It
+	// needs If-Match with the server's ETag.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/servers/{id}/approve (the `ApproveCatalogServer` operationId).
+	ApproveCatalogServerWithResponse(ctx context.Context, id CatalogServerId, params *ApproveCatalogServerParams, body ApproveCatalogServerJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveCatalogServerResponse, error)
+
+	// DeclineCatalogServerWithBodyWithResponse Decline an MCP server
+	//
+	// Declines a discovered MCP server, with a reason
+	// (`catalog.entry.approve`). It leaves the queue of what waits for
+	// review and stays discovered, so its tools stay denied; it can still
+	// be approved later. An approved server cannot be declined
+	// (`conflict`): a block or disables restrict it at once. It needs
+	// If-Match with the server's ETag.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/servers/{id}/decline (the `DeclineCatalogServer` operationId).
+	DeclineCatalogServerWithBodyWithResponse(ctx context.Context, id CatalogServerId, params *DeclineCatalogServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineCatalogServerResponse, error)
+
+	// DeclineCatalogServerWithResponse Decline an MCP server
+	//
+	// Declines a discovered MCP server, with a reason
+	// (`catalog.entry.approve`). It leaves the queue of what waits for
+	// review and stays discovered, so its tools stay denied; it can still
+	// be approved later. An approved server cannot be declined
+	// (`conflict`): a block or disables restrict it at once. It needs
+	// If-Match with the server's ETag.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/servers/{id}/decline (the `DeclineCatalogServer` operationId).
+	DeclineCatalogServerWithResponse(ctx context.Context, id CatalogServerId, params *DeclineCatalogServerParams, body DeclineCatalogServerJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineCatalogServerResponse, error)
+
+	// ListCatalogToolsWithResponse List tools
+	//
+	// Lists the tools of the catalog that match every filter given, ordered
+	// by key, one page at a time (CAT-02). The agent's own tools
+	// (`agent/<name>`) are entries of their agent, so two of them can share
+	// a key: filter them by agent. Names were reported by agents, and are
+	// untrusted text.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /catalog/tools (the `ListCatalogTools` operationId).
+	ListCatalogToolsWithResponse(ctx context.Context, params *ListCatalogToolsParams, reqEditors ...RequestEditorFn) (*ListCatalogToolsResponse, error)
+
+	// GetCatalogToolWithResponse Get a tool
+	//
+	// Returns a tool of the catalog: its pinned definition hash, the
+	// definitions that wait for review, its classification and the
+	// arguments policies may see, with the ETag that its approval or
+	// decline must send back. getToolDefinition returns each definition in
+	// full.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /catalog/tools/{id} (the `GetCatalogTool` operationId).
+	GetCatalogToolWithResponse(ctx context.Context, id CatalogToolId, reqEditors ...RequestEditorFn) (*GetCatalogToolResponse, error)
+
+	// ApproveCatalogToolWithBodyWithResponse Approve a tool or a new definition
+	//
+	// Approves a discovered tool, or one of the definitions of an approved
+	// tool that wait for review, for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). It pins the
+	// definition hash the request names, which must be one of the tool's
+	// reported definitions that the core stores; a built-in tool has none,
+	// and a tool of any other kind without a definition hash is never
+	// approved (`conflict`, contracts section 7.7). A tool of an MCP server
+	// is approved only once its server is (`conflict`). The reviewer
+	// classifies the tool, starting from its MCP annotations or, without
+	// them, from the protocol's conservative defaults (not read-only,
+	// destructive, open world), and declares the arguments policies may
+	// see, with their types from the tool's input schema (RFC-0002, section
+	// 7.5). For an approved tool, a request that names its pinned
+	// definition changes only its classification and declared arguments;
+	// a declaration that an active policy version reads cannot be
+	// withdrawn, and a declared argument's type cannot change while an
+	// active usage rule uses it (`conflict`). Approving never
+	// enables anything for an agent (CAT-03). It needs If-Match with the
+	// tool's ETag.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/tools/{id}/approve (the `ApproveCatalogTool` operationId).
+	ApproveCatalogToolWithBodyWithResponse(ctx context.Context, id CatalogToolId, params *ApproveCatalogToolParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveCatalogToolResponse, error)
+
+	// ApproveCatalogToolWithResponse Approve a tool or a new definition
+	//
+	// Approves a discovered tool, or one of the definitions of an approved
+	// tool that wait for review, for the whole organization
+	// (`catalog.entry.approve`, the advisory committee). It pins the
+	// definition hash the request names, which must be one of the tool's
+	// reported definitions that the core stores; a built-in tool has none,
+	// and a tool of any other kind without a definition hash is never
+	// approved (`conflict`, contracts section 7.7). A tool of an MCP server
+	// is approved only once its server is (`conflict`). The reviewer
+	// classifies the tool, starting from its MCP annotations or, without
+	// them, from the protocol's conservative defaults (not read-only,
+	// destructive, open world), and declares the arguments policies may
+	// see, with their types from the tool's input schema (RFC-0002, section
+	// 7.5). For an approved tool, a request that names its pinned
+	// definition changes only its classification and declared arguments;
+	// a declaration that an active policy version reads cannot be
+	// withdrawn, and a declared argument's type cannot change while an
+	// active usage rule uses it (`conflict`). Approving never
+	// enables anything for an agent (CAT-03). It needs If-Match with the
+	// tool's ETag.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/tools/{id}/approve (the `ApproveCatalogTool` operationId).
+	ApproveCatalogToolWithResponse(ctx context.Context, id CatalogToolId, params *ApproveCatalogToolParams, body ApproveCatalogToolJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveCatalogToolResponse, error)
+
+	// DeclineCatalogToolWithBodyWithResponse Decline a tool or a new definition
+	//
+	// Declines, with a reason (`catalog.entry.approve`), the definition
+	// that the request names, which waits for review, or, without one, a
+	// discovered tool and every definition of it that waits. What is
+	// declined leaves the queue of what waits for review and stays not
+	// approved, so it stays denied; it can still be approved later. A
+	// declined definition reported again does not return to the queue. An
+	// approved tool keeps its pinned definition. It needs If-Match with the
+	// tool's ETag.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/tools/{id}/decline (the `DeclineCatalogTool` operationId).
+	DeclineCatalogToolWithBodyWithResponse(ctx context.Context, id CatalogToolId, params *DeclineCatalogToolParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineCatalogToolResponse, error)
+
+	// DeclineCatalogToolWithResponse Decline a tool or a new definition
+	//
+	// Declines, with a reason (`catalog.entry.approve`), the definition
+	// that the request names, which waits for review, or, without one, a
+	// discovered tool and every definition of it that waits. What is
+	// declined leaves the queue of what waits for review and stays not
+	// approved, so it stays denied; it can still be approved later. A
+	// declined definition reported again does not return to the queue. An
+	// approved tool keeps its pinned definition. It needs If-Match with the
+	// tool's ETag.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/tools/{id}/decline (the `DeclineCatalogTool` operationId).
+	DeclineCatalogToolWithResponse(ctx context.Context, id CatalogToolId, params *DeclineCatalogToolParams, body DeclineCatalogToolJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineCatalogToolResponse, error)
+
+	// CompileUsageRulesWithBodyWithResponse Compile usage rules into Cedar
+	//
+	// Writes the Cedar statements of a policy's usage rules, as the core's
+	// check at submission regenerates them, for the console's forms and for
+	// policy-as-code repositories (RFC-0002, section 8; contracts, section
+	// 6.11). It writes exactly what the reference generator of the
+	// conformance kit writes (`test/conformance/profile`, `GenerateRules`),
+	// and refuses what it refuses (`bad_request`, with the reason): for
+	// each rule, and for each of its tools in their order, its
+	// `tool.invoke` statement, then its `tool.expose` statement. A global
+	// policy's rules take the arguments that the catalog declares, and
+	// cannot name an agent's own tool (`agent/<name>`); an agent-specific
+	// policy's take those of the agent's catalog. The rules are given as
+	// JSON text, as their annotations carry them, so that the generator
+	// reads exactly what a policy would hold: a repeated member name, a
+	// lone surrogate or an integer beyond 64 bits is refused rather than
+	// read another way. The text is at most 256 KiB, and statements that
+	// would exceed 2 MiB, the limit of a whole bundle (contracts, step V1),
+	// are refused before they are written. Compiling changes nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/usage-rules/compile (the `CompileUsageRules` operationId).
+	CompileUsageRulesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompileUsageRulesResponse, error)
+
+	// CompileUsageRulesWithResponse Compile usage rules into Cedar
+	//
+	// Writes the Cedar statements of a policy's usage rules, as the core's
+	// check at submission regenerates them, for the console's forms and for
+	// policy-as-code repositories (RFC-0002, section 8; contracts, section
+	// 6.11). It writes exactly what the reference generator of the
+	// conformance kit writes (`test/conformance/profile`, `GenerateRules`),
+	// and refuses what it refuses (`bad_request`, with the reason): for
+	// each rule, and for each of its tools in their order, its
+	// `tool.invoke` statement, then its `tool.expose` statement. A global
+	// policy's rules take the arguments that the catalog declares, and
+	// cannot name an agent's own tool (`agent/<name>`); an agent-specific
+	// policy's take those of the agent's catalog. The rules are given as
+	// JSON text, as their annotations carry them, so that the generator
+	// reads exactly what a policy would hold: a repeated member name, a
+	// lone surrogate or an integer beyond 64 bits is refused rather than
+	// read another way. The text is at most 256 KiB, and statements that
+	// would exceed 2 MiB, the limit of a whole bundle (contracts, step V1),
+	// are refused before they are written. Compiling changes nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /catalog/usage-rules/compile (the `CompileUsageRules` operationId).
+	CompileUsageRulesWithResponse(ctx context.Context, body CompileUsageRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*CompileUsageRulesResponse, error)
 
 	// ListDataCategoriesWithResponse List the data categories
 	//
@@ -7715,6 +13198,116 @@ func (r GetAgentActionsResponse) ContentType() string {
 	return ""
 }
 
+// GetAgentDeclaredToolingResponse200Headers the declared response headers of an HTTP 200 response for GetAgentDeclaredTooling
+type GetAgentDeclaredToolingResponse200Headers struct {
+	ETag string
+}
+
+type GetAgentDeclaredToolingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DeclaredTooling
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetAgentDeclaredToolingResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAgentDeclaredToolingResponse) GetJSON200() *DeclaredTooling {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetAgentDeclaredToolingResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAgentDeclaredToolingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgentDeclaredToolingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgentDeclaredToolingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAgentDeclaredToolingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeclareAgentToolingResponse200Headers the declared response headers of an HTTP 200 response for DeclareAgentTooling
+type DeclareAgentToolingResponse200Headers struct {
+	ETag string
+}
+
+type DeclareAgentToolingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DeclaredTooling
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DeclareAgentToolingResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeclareAgentToolingResponse) GetJSON200() *DeclaredTooling {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeclareAgentToolingResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeclareAgentToolingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeclareAgentToolingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeclareAgentToolingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeclareAgentToolingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type AddAgentDelegateResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -8188,6 +13781,294 @@ func (r ListAgentReviewsResponse) ContentType() string {
 	return ""
 }
 
+type ListAgentToolingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AgentToolingList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAgentToolingResponse) GetJSON200() *AgentToolingList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAgentToolingResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAgentToolingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAgentToolingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAgentToolingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAgentToolingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListAgentToolingRequestsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ToolingRequestList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAgentToolingRequestsResponse) GetJSON200() *ToolingRequestList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAgentToolingRequestsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAgentToolingRequestsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAgentToolingRequestsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAgentToolingRequestsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAgentToolingRequestsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RequestAgentToolingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ToolingRequest
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r RequestAgentToolingResponse) GetJSON201() *ToolingRequest {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RequestAgentToolingResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RequestAgentToolingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RequestAgentToolingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RequestAgentToolingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RequestAgentToolingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ApproveAgentToolingRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ToolingRequest
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveAgentToolingRequestResponse) GetJSON200() *ToolingRequest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveAgentToolingRequestResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveAgentToolingRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveAgentToolingRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveAgentToolingRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveAgentToolingRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeclineAgentToolingRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ToolingRequest
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeclineAgentToolingRequestResponse) GetJSON200() *ToolingRequest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeclineAgentToolingRequestResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeclineAgentToolingRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeclineAgentToolingRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeclineAgentToolingRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeclineAgentToolingRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DisableAgentToolingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ToolingEntryRefList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DisableAgentToolingResponse) GetJSON200() *ToolingEntryRefList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DisableAgentToolingResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DisableAgentToolingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DisableAgentToolingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DisableAgentToolingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DisableAgentToolingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListAgentTransitionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -8484,6 +14365,1084 @@ func (r GetAuditKeysResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetAuditKeysResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListCatalogBlocksResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogBlockList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListCatalogBlocksResponse) GetJSON200() *CatalogBlockList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListCatalogBlocksResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListCatalogBlocksResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCatalogBlocksResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCatalogBlocksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCatalogBlocksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type IssueCatalogBlockResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CatalogBlock
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r IssueCatalogBlockResponse) GetJSON201() *CatalogBlock {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r IssueCatalogBlockResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r IssueCatalogBlockResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r IssueCatalogBlockResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r IssueCatalogBlockResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r IssueCatalogBlockResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetCatalogBlockResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogBlock
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetCatalogBlockResponse) GetJSON200() *CatalogBlock {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetCatalogBlockResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetCatalogBlockResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCatalogBlockResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCatalogBlockResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetCatalogBlockResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RequestCatalogUnblockResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CatalogUnblockRequest
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r RequestCatalogUnblockResponse) GetJSON201() *CatalogUnblockRequest {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RequestCatalogUnblockResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RequestCatalogUnblockResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RequestCatalogUnblockResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RequestCatalogUnblockResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RequestCatalogUnblockResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ApproveCatalogUnblockResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogBlock
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveCatalogUnblockResponse) GetJSON200() *CatalogBlock {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveCatalogUnblockResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveCatalogUnblockResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveCatalogUnblockResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveCatalogUnblockResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveCatalogUnblockResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeclineCatalogUnblockResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogUnblockRequest
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeclineCatalogUnblockResponse) GetJSON200() *CatalogUnblockRequest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeclineCatalogUnblockResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeclineCatalogUnblockResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeclineCatalogUnblockResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeclineCatalogUnblockResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeclineCatalogUnblockResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeclinePendingFromAgentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogDeclineSummary
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeclinePendingFromAgentResponse) GetJSON200() *CatalogDeclineSummary {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeclinePendingFromAgentResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeclinePendingFromAgentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeclinePendingFromAgentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeclinePendingFromAgentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeclinePendingFromAgentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetToolDefinitionResponse200Headers the declared response headers of an HTTP 200 response for GetToolDefinition
+type GetToolDefinitionResponse200Headers struct {
+	ETag string
+}
+
+type GetToolDefinitionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ToolDefinition
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetToolDefinitionResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetToolDefinitionResponse) GetJSON200() *ToolDefinition {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetToolDefinitionResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetToolDefinitionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetToolDefinitionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetToolDefinitionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetToolDefinitionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListCatalogModelsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogModelList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListCatalogModelsResponse) GetJSON200() *CatalogModelList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListCatalogModelsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListCatalogModelsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCatalogModelsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCatalogModelsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCatalogModelsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetCatalogModelResponse200Headers the declared response headers of an HTTP 200 response for GetCatalogModel
+type GetCatalogModelResponse200Headers struct {
+	ETag string
+}
+
+type GetCatalogModelResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogModel
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetCatalogModelResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetCatalogModelResponse) GetJSON200() *CatalogModel {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetCatalogModelResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetCatalogModelResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCatalogModelResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCatalogModelResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetCatalogModelResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ApproveCatalogModelResponse200Headers the declared response headers of an HTTP 200 response for ApproveCatalogModel
+type ApproveCatalogModelResponse200Headers struct {
+	ETag string
+}
+
+type ApproveCatalogModelResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogModel
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ApproveCatalogModelResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveCatalogModelResponse) GetJSON200() *CatalogModel {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveCatalogModelResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveCatalogModelResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveCatalogModelResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveCatalogModelResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveCatalogModelResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeclineCatalogModelResponse200Headers the declared response headers of an HTTP 200 response for DeclineCatalogModel
+type DeclineCatalogModelResponse200Headers struct {
+	ETag string
+}
+
+type DeclineCatalogModelResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogModel
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DeclineCatalogModelResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeclineCatalogModelResponse) GetJSON200() *CatalogModel {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeclineCatalogModelResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeclineCatalogModelResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeclineCatalogModelResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeclineCatalogModelResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeclineCatalogModelResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListCatalogServersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogServerList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListCatalogServersResponse) GetJSON200() *CatalogServerList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListCatalogServersResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListCatalogServersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCatalogServersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCatalogServersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCatalogServersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetCatalogServerResponse200Headers the declared response headers of an HTTP 200 response for GetCatalogServer
+type GetCatalogServerResponse200Headers struct {
+	ETag string
+}
+
+type GetCatalogServerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogServer
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetCatalogServerResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetCatalogServerResponse) GetJSON200() *CatalogServer {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetCatalogServerResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetCatalogServerResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCatalogServerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCatalogServerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetCatalogServerResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ApproveCatalogServerResponse200Headers the declared response headers of an HTTP 200 response for ApproveCatalogServer
+type ApproveCatalogServerResponse200Headers struct {
+	ETag string
+}
+
+type ApproveCatalogServerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogServer
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ApproveCatalogServerResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveCatalogServerResponse) GetJSON200() *CatalogServer {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveCatalogServerResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveCatalogServerResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveCatalogServerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveCatalogServerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveCatalogServerResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeclineCatalogServerResponse200Headers the declared response headers of an HTTP 200 response for DeclineCatalogServer
+type DeclineCatalogServerResponse200Headers struct {
+	ETag string
+}
+
+type DeclineCatalogServerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogServer
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DeclineCatalogServerResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeclineCatalogServerResponse) GetJSON200() *CatalogServer {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeclineCatalogServerResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeclineCatalogServerResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeclineCatalogServerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeclineCatalogServerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeclineCatalogServerResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListCatalogToolsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogToolList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListCatalogToolsResponse) GetJSON200() *CatalogToolList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListCatalogToolsResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListCatalogToolsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCatalogToolsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCatalogToolsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCatalogToolsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetCatalogToolResponse200Headers the declared response headers of an HTTP 200 response for GetCatalogTool
+type GetCatalogToolResponse200Headers struct {
+	ETag string
+}
+
+type GetCatalogToolResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogTool
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetCatalogToolResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetCatalogToolResponse) GetJSON200() *CatalogTool {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetCatalogToolResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetCatalogToolResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCatalogToolResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCatalogToolResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetCatalogToolResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ApproveCatalogToolResponse200Headers the declared response headers of an HTTP 200 response for ApproveCatalogTool
+type ApproveCatalogToolResponse200Headers struct {
+	ETag string
+}
+
+type ApproveCatalogToolResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogTool
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ApproveCatalogToolResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveCatalogToolResponse) GetJSON200() *CatalogTool {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveCatalogToolResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveCatalogToolResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveCatalogToolResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveCatalogToolResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveCatalogToolResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeclineCatalogToolResponse200Headers the declared response headers of an HTTP 200 response for DeclineCatalogTool
+type DeclineCatalogToolResponse200Headers struct {
+	ETag string
+}
+
+type DeclineCatalogToolResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogTool
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DeclineCatalogToolResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeclineCatalogToolResponse) GetJSON200() *CatalogTool {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeclineCatalogToolResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeclineCatalogToolResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeclineCatalogToolResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeclineCatalogToolResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeclineCatalogToolResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CompileUsageRulesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CompiledUsageRules
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CompileUsageRulesResponse) GetJSON200() *CompiledUsageRules {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CompileUsageRulesResponse) GetApplicationproblemJSONDefault() *Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CompileUsageRulesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CompileUsageRulesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CompileUsageRulesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CompileUsageRulesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -9667,6 +16626,69 @@ func (c *ClientWithResponses) GetAgentActionsWithResponse(ctx context.Context, i
 	return ParseGetAgentActionsResponse(rsp)
 }
 
+// GetAgentDeclaredToolingWithResponse Get an agent's declared tooling
+//
+// Returns the tooling that people declared for the agent, with the ETag
+// that a new declaration must send back. An agent without a
+// declaration has an empty one.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{id}/declared-tooling (the `GetAgentDeclaredTooling` operationId).
+func (c *ClientWithResponses) GetAgentDeclaredToolingWithResponse(ctx context.Context, id AgentId, reqEditors ...RequestEditorFn) (*GetAgentDeclaredToolingResponse, error) {
+	rsp, err := c.GetAgentDeclaredTooling(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentDeclaredToolingResponse(rsp)
+}
+
+// DeclareAgentToolingWithBodyWithResponse Declare an agent's tooling
+//
+// Replaces the tooling declared for an agent without an enforcement
+// point, so that the inventory is complete (CAT-08): the agent's owners
+// declare it, and operators declare any agent's (`tooling.declare`).
+// Nothing enforces it, and a declaration never approves, enables or
+// unblocks anything (CORE-10): what the catalog lacks becomes a
+// discovered entry. It takes the shape and the limits of a tooling
+// report (contracts, section 4.10), and is accepted only for an agent
+// below coverage C2 (`conflict`). It needs If-Match with the ETag of
+// getAgentDeclaredTooling.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /agents/{id}/declared-tooling (the `DeclareAgentTooling` operationId).
+func (c *ClientWithResponses) DeclareAgentToolingWithBodyWithResponse(ctx context.Context, id AgentId, params *DeclareAgentToolingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclareAgentToolingResponse, error) {
+	rsp, err := c.DeclareAgentToolingWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclareAgentToolingResponse(rsp)
+}
+
+// DeclareAgentToolingWithResponse Declare an agent's tooling
+//
+// Replaces the tooling declared for an agent without an enforcement
+// point, so that the inventory is complete (CAT-08): the agent's owners
+// declare it, and operators declare any agent's (`tooling.declare`).
+// Nothing enforces it, and a declaration never approves, enables or
+// unblocks anything (CORE-10): what the catalog lacks becomes a
+// discovered entry. It takes the shape and the limits of a tooling
+// report (contracts, section 4.10), and is accepted only for an agent
+// below coverage C2 (`conflict`). It needs If-Match with the ETag of
+// getAgentDeclaredTooling.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /agents/{id}/declared-tooling (the `DeclareAgentTooling` operationId).
+func (c *ClientWithResponses) DeclareAgentToolingWithResponse(ctx context.Context, id AgentId, params *DeclareAgentToolingParams, body DeclareAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclareAgentToolingResponse, error) {
+	rsp, err := c.DeclareAgentTooling(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclareAgentToolingResponse(rsp)
+}
+
 // AddAgentDelegateWithBodyWithResponse Add a delegate
 //
 // Makes an active human with the owner role a delegate of the agent: the
@@ -9905,6 +16927,206 @@ func (c *ClientWithResponses) ListAgentReviewsWithResponse(ctx context.Context, 
 	return ParseListAgentReviewsResponse(rsp)
 }
 
+// ListAgentToolingWithResponse List an agent's tooling
+//
+// Lists the MCP servers, tools and models observed, enabled or declared
+// for the agent, ordered by kind and key, one page at a time (UI-10):
+// for each, whether it is enabled and declared, and each observation,
+// with its source, its origin and when it was first and last seen. An
+// entry that the agent no longer has stays listed while it is enabled.
+// Observations were reported by the agent's enforcement points, and are
+// untrusted.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{id}/tooling (the `ListAgentTooling` operationId).
+func (c *ClientWithResponses) ListAgentToolingWithResponse(ctx context.Context, id AgentId, params *ListAgentToolingParams, reqEditors ...RequestEditorFn) (*ListAgentToolingResponse, error) {
+	rsp, err := c.ListAgentTooling(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAgentToolingResponse(rsp)
+}
+
+// ListAgentToolingRequestsWithResponse List an agent's requests to enable tooling
+//
+// Lists the agent's requests to enable tools and models, newest first, with their decisions.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{id}/tooling-requests (the `ListAgentToolingRequests` operationId).
+func (c *ClientWithResponses) ListAgentToolingRequestsWithResponse(ctx context.Context, id AgentId, params *ListAgentToolingRequestsParams, reqEditors ...RequestEditorFn) (*ListAgentToolingRequestsResponse, error) {
+	rsp, err := c.ListAgentToolingRequests(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAgentToolingRequestsResponse(rsp)
+}
+
+// RequestAgentToolingWithBodyWithResponse Request enabling tooling for an agent
+//
+// Asks, with a reason, that an approved tool or model be enabled for
+// the agent; naming an approved MCP server asks for its approved tools
+// at once (CAT-03). The agent's owners ask for their agents, and the
+// advisory committee for any (`tooling.enable.request`). Someone else
+// on the advisory committee approves it (HUM-04). An entry that is not
+// approved, an agent that is retired or rejected, and a second pending
+// request for the same entry are refused (`conflict`). The request
+// waits in the advisory committee's inbox.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/tooling-requests (the `RequestAgentTooling` operationId).
+func (c *ClientWithResponses) RequestAgentToolingWithBodyWithResponse(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestAgentToolingResponse, error) {
+	rsp, err := c.RequestAgentToolingWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestAgentToolingResponse(rsp)
+}
+
+// RequestAgentToolingWithResponse Request enabling tooling for an agent
+//
+// Asks, with a reason, that an approved tool or model be enabled for
+// the agent; naming an approved MCP server asks for its approved tools
+// at once (CAT-03). The agent's owners ask for their agents, and the
+// advisory committee for any (`tooling.enable.request`). Someone else
+// on the advisory committee approves it (HUM-04). An entry that is not
+// approved, an agent that is retired or rejected, and a second pending
+// request for the same entry are refused (`conflict`). The request
+// waits in the advisory committee's inbox.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/tooling-requests (the `RequestAgentTooling` operationId).
+func (c *ClientWithResponses) RequestAgentToolingWithResponse(ctx context.Context, id AgentId, body RequestAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestAgentToolingResponse, error) {
+	rsp, err := c.RequestAgentTooling(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestAgentToolingResponse(rsp)
+}
+
+// ApproveAgentToolingRequestWithBodyWithResponse Approve a request to enable tooling
+//
+// Approves a pending request, and enables what it names for the agent
+// (`tooling.enable.approve`, the advisory committee). Nobody approves
+// their own request (`forbidden`, HUM-04, ST-81), and the database
+// refuses it too. An entry that is no longer approved, or an agent that
+// was retired or rejected since, is refused (`conflict`). A request is
+// decided once, and never changes afterwards.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/approve (the `ApproveAgentToolingRequest` operationId).
+func (c *ClientWithResponses) ApproveAgentToolingRequestWithBodyWithResponse(ctx context.Context, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveAgentToolingRequestResponse, error) {
+	rsp, err := c.ApproveAgentToolingRequestWithBody(ctx, id, requestId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveAgentToolingRequestResponse(rsp)
+}
+
+// ApproveAgentToolingRequestWithResponse Approve a request to enable tooling
+//
+// Approves a pending request, and enables what it names for the agent
+// (`tooling.enable.approve`, the advisory committee). Nobody approves
+// their own request (`forbidden`, HUM-04, ST-81), and the database
+// refuses it too. An entry that is no longer approved, or an agent that
+// was retired or rejected since, is refused (`conflict`). A request is
+// decided once, and never changes afterwards.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/approve (the `ApproveAgentToolingRequest` operationId).
+func (c *ClientWithResponses) ApproveAgentToolingRequestWithResponse(ctx context.Context, id AgentId, requestId ToolingRequestId, body ApproveAgentToolingRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveAgentToolingRequestResponse, error) {
+	rsp, err := c.ApproveAgentToolingRequest(ctx, id, requestId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveAgentToolingRequestResponse(rsp)
+}
+
+// DeclineAgentToolingRequestWithBodyWithResponse Decline a request to enable tooling
+//
+// Declines a pending request, with a reason
+// (`tooling.enable.approve`): nothing is enabled. A decline only
+// denies, so the requester may decline their own request. A request is
+// decided once, and never changes afterwards.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/decline (the `DeclineAgentToolingRequest` operationId).
+func (c *ClientWithResponses) DeclineAgentToolingRequestWithBodyWithResponse(ctx context.Context, id AgentId, requestId ToolingRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineAgentToolingRequestResponse, error) {
+	rsp, err := c.DeclineAgentToolingRequestWithBody(ctx, id, requestId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineAgentToolingRequestResponse(rsp)
+}
+
+// DeclineAgentToolingRequestWithResponse Decline a request to enable tooling
+//
+// Declines a pending request, with a reason
+// (`tooling.enable.approve`): nothing is enabled. A decline only
+// denies, so the requester may decline their own request. A request is
+// decided once, and never changes afterwards.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/tooling-requests/{requestId}/decline (the `DeclineAgentToolingRequest` operationId).
+func (c *ClientWithResponses) DeclineAgentToolingRequestWithResponse(ctx context.Context, id AgentId, requestId ToolingRequestId, body DeclineAgentToolingRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineAgentToolingRequestResponse, error) {
+	rsp, err := c.DeclineAgentToolingRequest(ctx, id, requestId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineAgentToolingRequestResponse(rsp)
+}
+
+// DisableAgentToolingWithBodyWithResponse Disable an agent's tooling
+//
+// Disables, at once and with a reason, tools and models enabled for the
+// agent; naming an MCP server disables its tools (CAT-03). The agent's
+// owners disable it, and the advisory committee and operators disable
+// any agent's (`tooling.disable`). It takes no If-Match: a disable only
+// restricts, and never waits on a version. An entry that is not
+// enabled is left out of the answer. Enabling again needs a new
+// request. The agent's next bundle no longer lists the entry as
+// enabled.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/tooling/disable (the `DisableAgentTooling` operationId).
+func (c *ClientWithResponses) DisableAgentToolingWithBodyWithResponse(ctx context.Context, id AgentId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DisableAgentToolingResponse, error) {
+	rsp, err := c.DisableAgentToolingWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDisableAgentToolingResponse(rsp)
+}
+
+// DisableAgentToolingWithResponse Disable an agent's tooling
+//
+// Disables, at once and with a reason, tools and models enabled for the
+// agent; naming an MCP server disables its tools (CAT-03). The agent's
+// owners disable it, and the advisory committee and operators disable
+// any agent's (`tooling.disable`). It takes no If-Match: a disable only
+// restricts, and never waits on a version. An entry that is not
+// enabled is left out of the answer. Enabling again needs a new
+// request. The agent's next bundle no longer lists the entry as
+// enabled.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/{id}/tooling/disable (the `DisableAgentTooling` operationId).
+func (c *ClientWithResponses) DisableAgentToolingWithResponse(ctx context.Context, id AgentId, body DisableAgentToolingJSONRequestBody, reqEditors ...RequestEditorFn) (*DisableAgentToolingResponse, error) {
+	rsp, err := c.DisableAgentTooling(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDisableAgentToolingResponse(rsp)
+}
+
 // ListAgentTransitionsWithResponse List an agent's lifecycle history
 //
 // Lists the agent's lifecycle transitions, newest first: who made each
@@ -10100,6 +17322,719 @@ func (c *ClientWithResponses) GetAuditKeysWithResponse(ctx context.Context, reqE
 		return nil, err
 	}
 	return ParseGetAuditKeysResponse(rsp)
+}
+
+// ListCatalogBlocksWithResponse List blocks
+//
+// Lists organization-wide blocks, the latest issued first, with their
+// spread to enforcement points (CAT-04): the active ones by default.
+// What a block covers is shown in clear only here, to the callers who
+// may view the catalog. The design of blocks is reserved for the halt
+// path's review (plan P1-16, step 7), which may change this operation.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /catalog/blocks (the `ListCatalogBlocks` operationId).
+func (c *ClientWithResponses) ListCatalogBlocksWithResponse(ctx context.Context, params *ListCatalogBlocksParams, reqEditors ...RequestEditorFn) (*ListCatalogBlocksResponse, error) {
+	rsp, err := c.ListCatalogBlocks(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCatalogBlocksResponse(rsp)
+}
+
+// IssueCatalogBlockWithBodyWithResponse Block a server, a tool or models
+//
+// Blocks, for the whole organization and at once, with a reason, an MCP
+// server and its tools, a tool, a model, every model of a provider or
+// every model of an endpoint (CAT-04; `catalog.block.issue`). The block
+// names what it covers by reference, so it also covers what the
+// catalog has not seen yet; enforcement points receive the SHA-256 of
+// the reference in the watch stream, without a new bundle. It takes a
+// governance state version. At most 500 blocks are active, and one
+// more is refused (`conflict`), as is a second active block of the same
+// kind and reference. A block never changes an entry's status. The
+// design of blocks is reserved for the halt path's review (plan P1-16,
+// step 7), which may change this operation.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/blocks (the `IssueCatalogBlock` operationId).
+func (c *ClientWithResponses) IssueCatalogBlockWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IssueCatalogBlockResponse, error) {
+	rsp, err := c.IssueCatalogBlockWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseIssueCatalogBlockResponse(rsp)
+}
+
+// IssueCatalogBlockWithResponse Block a server, a tool or models
+//
+// Blocks, for the whole organization and at once, with a reason, an MCP
+// server and its tools, a tool, a model, every model of a provider or
+// every model of an endpoint (CAT-04; `catalog.block.issue`). The block
+// names what it covers by reference, so it also covers what the
+// catalog has not seen yet; enforcement points receive the SHA-256 of
+// the reference in the watch stream, without a new bundle. It takes a
+// governance state version. At most 500 blocks are active, and one
+// more is refused (`conflict`), as is a second active block of the same
+// kind and reference. A block never changes an entry's status. The
+// design of blocks is reserved for the halt path's review (plan P1-16,
+// step 7), which may change this operation.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/blocks (the `IssueCatalogBlock` operationId).
+func (c *ClientWithResponses) IssueCatalogBlockWithResponse(ctx context.Context, body IssueCatalogBlockJSONRequestBody, reqEditors ...RequestEditorFn) (*IssueCatalogBlockResponse, error) {
+	rsp, err := c.IssueCatalogBlock(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseIssueCatalogBlockResponse(rsp)
+}
+
+// GetCatalogBlockWithResponse Get a block
+//
+// Returns a block, with its spread to enforcement points and its
+// pending unblock request. The design of blocks is reserved for the
+// halt path's review (plan P1-16, step 7), which may change this
+// operation.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /catalog/blocks/{id} (the `GetCatalogBlock` operationId).
+func (c *ClientWithResponses) GetCatalogBlockWithResponse(ctx context.Context, id CatalogBlockId, reqEditors ...RequestEditorFn) (*GetCatalogBlockResponse, error) {
+	rsp, err := c.GetCatalogBlock(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCatalogBlockResponse(rsp)
+}
+
+// RequestCatalogUnblockWithBodyWithResponse Request that a block be lifted
+//
+// Asks, with a reason, that an active block be lifted
+// (`catalog.unblock.request`). Someone else on the steering or the
+// advisory committee approves it (HUM-04). A block has one pending
+// request at most (`conflict`). The design of blocks is reserved for
+// the halt path's review (plan P1-16, step 7), which may change this
+// operation.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests (the `RequestCatalogUnblock` operationId).
+func (c *ClientWithResponses) RequestCatalogUnblockWithBodyWithResponse(ctx context.Context, id CatalogBlockId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestCatalogUnblockResponse, error) {
+	rsp, err := c.RequestCatalogUnblockWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestCatalogUnblockResponse(rsp)
+}
+
+// RequestCatalogUnblockWithResponse Request that a block be lifted
+//
+// Asks, with a reason, that an active block be lifted
+// (`catalog.unblock.request`). Someone else on the steering or the
+// advisory committee approves it (HUM-04). A block has one pending
+// request at most (`conflict`). The design of blocks is reserved for
+// the halt path's review (plan P1-16, step 7), which may change this
+// operation.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests (the `RequestCatalogUnblock` operationId).
+func (c *ClientWithResponses) RequestCatalogUnblockWithResponse(ctx context.Context, id CatalogBlockId, body RequestCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestCatalogUnblockResponse, error) {
+	rsp, err := c.RequestCatalogUnblock(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestCatalogUnblockResponse(rsp)
+}
+
+// ApproveCatalogUnblockWithBodyWithResponse Approve lifting a block
+//
+// Approves a pending unblock request, and lifts the block in a
+// governance state version of its own (`catalog.unblock.approve`).
+// Nobody approves their own request (`forbidden`, HUM-04, ST-81), and
+// the database refuses it too. Lifting a block leaves every entry as it
+// was. The design of blocks is reserved for the halt path's review
+// (plan P1-16, step 7), which may change this operation.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve (the `ApproveCatalogUnblock` operationId).
+func (c *ClientWithResponses) ApproveCatalogUnblockWithBodyWithResponse(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveCatalogUnblockResponse, error) {
+	rsp, err := c.ApproveCatalogUnblockWithBody(ctx, id, requestId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveCatalogUnblockResponse(rsp)
+}
+
+// ApproveCatalogUnblockWithResponse Approve lifting a block
+//
+// Approves a pending unblock request, and lifts the block in a
+// governance state version of its own (`catalog.unblock.approve`).
+// Nobody approves their own request (`forbidden`, HUM-04, ST-81), and
+// the database refuses it too. Lifting a block leaves every entry as it
+// was. The design of blocks is reserved for the halt path's review
+// (plan P1-16, step 7), which may change this operation.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve (the `ApproveCatalogUnblock` operationId).
+func (c *ClientWithResponses) ApproveCatalogUnblockWithResponse(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, body ApproveCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveCatalogUnblockResponse, error) {
+	rsp, err := c.ApproveCatalogUnblock(ctx, id, requestId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveCatalogUnblockResponse(rsp)
+}
+
+// DeclineCatalogUnblockWithBodyWithResponse Decline lifting a block
+//
+// Declines a pending unblock request, with a reason
+// (`catalog.unblock.approve`): the block stays active, and can take
+// another request. A decline only denies, so the requester may decline
+// their own request. The design of blocks is reserved for the halt
+// path's review (plan P1-16, step 7), which may change this operation.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline (the `DeclineCatalogUnblock` operationId).
+func (c *ClientWithResponses) DeclineCatalogUnblockWithBodyWithResponse(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineCatalogUnblockResponse, error) {
+	rsp, err := c.DeclineCatalogUnblockWithBody(ctx, id, requestId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineCatalogUnblockResponse(rsp)
+}
+
+// DeclineCatalogUnblockWithResponse Decline lifting a block
+//
+// Declines a pending unblock request, with a reason
+// (`catalog.unblock.approve`): the block stays active, and can take
+// another request. A decline only denies, so the requester may decline
+// their own request. The design of blocks is reserved for the halt
+// path's review (plan P1-16, step 7), which may change this operation.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline (the `DeclineCatalogUnblock` operationId).
+func (c *ClientWithResponses) DeclineCatalogUnblockWithResponse(ctx context.Context, id CatalogBlockId, requestId UnblockRequestId, body DeclineCatalogUnblockJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineCatalogUnblockResponse, error) {
+	rsp, err := c.DeclineCatalogUnblock(ctx, id, requestId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineCatalogUnblockResponse(rsp)
+}
+
+// DeclinePendingFromAgentWithBodyWithResponse Decline everything an agent brought that waits for review
+//
+// Declines at once, with a reason, every entry, definition and digest
+// that the agent's reports brought and that still waits for review
+// (`catalog.entry.approve`): the answer to an agent that floods the
+// queue (threat model, T-74). What is declined stays denied, and frees
+// the agent's room for what waits for review (CORE-13). Approved
+// entries keep what they pinned.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/declines (the `DeclinePendingFromAgent` operationId).
+func (c *ClientWithResponses) DeclinePendingFromAgentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclinePendingFromAgentResponse, error) {
+	rsp, err := c.DeclinePendingFromAgentWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclinePendingFromAgentResponse(rsp)
+}
+
+// DeclinePendingFromAgentWithResponse Decline everything an agent brought that waits for review
+//
+// Declines at once, with a reason, every entry, definition and digest
+// that the agent's reports brought and that still waits for review
+// (`catalog.entry.approve`): the answer to an agent that floods the
+// queue (threat model, T-74). What is declined stays denied, and frees
+// the agent's room for what waits for review (CORE-13). Approved
+// entries keep what they pinned.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/declines (the `DeclinePendingFromAgent` operationId).
+func (c *ClientWithResponses) DeclinePendingFromAgentWithResponse(ctx context.Context, body DeclinePendingFromAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclinePendingFromAgentResponse, error) {
+	rsp, err := c.DeclinePendingFromAgent(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclinePendingFromAgentResponse(rsp)
+}
+
+// GetToolDefinitionWithResponse Get a tool definition
+//
+// Returns a tool definition that the core stores, for review and diffs:
+// the members that its hash covers (contracts, section 4.10), as the
+// bytes of their canonical JSON, exactly as stored, so that the
+// SHA-256 of the body is the hash in the path. The definition was
+// reported by an agent: it is untrusted text, which the console shows
+// as plain text. It is served only as `application/json`, with
+// `X-Content-Type-Options: nosniff` and the API's
+// `Content-Security-Policy: default-src 'none'`, never as HTML. The
+// core stores no member over the limits of a report (a name and a
+// title of 256 bytes, a description of 16 KiB, each schema of 64 KiB,
+// annotations of 4 KiB), so a body is never larger than 1 MiB, JSON
+// escapes included.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /catalog/definitions/{sha256} (the `GetToolDefinition` operationId).
+func (c *ClientWithResponses) GetToolDefinitionWithResponse(ctx context.Context, sha256 DefinitionSha256, reqEditors ...RequestEditorFn) (*GetToolDefinitionResponse, error) {
+	rsp, err := c.GetToolDefinition(ctx, sha256, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolDefinitionResponse(rsp)
+}
+
+// ListCatalogModelsWithResponse List models
+//
+// Lists the models of the catalog that match every filter given,
+// ordered by key, one page at a time (CAT-02). Their endpoints and
+// names were reported by agents, and are untrusted text.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /catalog/models (the `ListCatalogModels` operationId).
+func (c *ClientWithResponses) ListCatalogModelsWithResponse(ctx context.Context, params *ListCatalogModelsParams, reqEditors ...RequestEditorFn) (*ListCatalogModelsResponse, error) {
+	rsp, err := c.ListCatalogModels(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCatalogModelsResponse(rsp)
+}
+
+// GetCatalogModelWithResponse Get a model
+//
+// Returns a model of the catalog, with the ETag that its approval or decline must send back.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /catalog/models/{id} (the `GetCatalogModel` operationId).
+func (c *ClientWithResponses) GetCatalogModelWithResponse(ctx context.Context, id CatalogModelId, reqEditors ...RequestEditorFn) (*GetCatalogModelResponse, error) {
+	rsp, err := c.GetCatalogModel(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCatalogModelResponse(rsp)
+}
+
+// ApproveCatalogModelWithBodyWithResponse Approve a model or a new digest
+//
+// Approves a discovered model, or one of the digests of an approved
+// model that wait for review, for the whole organization
+// (`catalog.entry.approve`, the advisory committee). It pins the
+// digest of the weights that the request names, which must be one that
+// the model's runtime reported; a model whose runtime reports no digest
+// is approved without one. Approving never enables anything for an
+// agent (CAT-03). It needs If-Match with the model's ETag.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/models/{id}/approve (the `ApproveCatalogModel` operationId).
+func (c *ClientWithResponses) ApproveCatalogModelWithBodyWithResponse(ctx context.Context, id CatalogModelId, params *ApproveCatalogModelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveCatalogModelResponse, error) {
+	rsp, err := c.ApproveCatalogModelWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveCatalogModelResponse(rsp)
+}
+
+// ApproveCatalogModelWithResponse Approve a model or a new digest
+//
+// Approves a discovered model, or one of the digests of an approved
+// model that wait for review, for the whole organization
+// (`catalog.entry.approve`, the advisory committee). It pins the
+// digest of the weights that the request names, which must be one that
+// the model's runtime reported; a model whose runtime reports no digest
+// is approved without one. Approving never enables anything for an
+// agent (CAT-03). It needs If-Match with the model's ETag.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/models/{id}/approve (the `ApproveCatalogModel` operationId).
+func (c *ClientWithResponses) ApproveCatalogModelWithResponse(ctx context.Context, id CatalogModelId, params *ApproveCatalogModelParams, body ApproveCatalogModelJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveCatalogModelResponse, error) {
+	rsp, err := c.ApproveCatalogModel(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveCatalogModelResponse(rsp)
+}
+
+// DeclineCatalogModelWithBodyWithResponse Decline a model or a new digest
+//
+// Declines, with a reason (`catalog.entry.approve`), the digest that
+// the request names, which waits for review, or, without one, a
+// discovered model and every digest of it that waits. What is declined
+// leaves the queue of what waits for review and stays denied; it can
+// still be approved later. An approved model keeps its pinned digest.
+// It needs If-Match with the model's ETag.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/models/{id}/decline (the `DeclineCatalogModel` operationId).
+func (c *ClientWithResponses) DeclineCatalogModelWithBodyWithResponse(ctx context.Context, id CatalogModelId, params *DeclineCatalogModelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineCatalogModelResponse, error) {
+	rsp, err := c.DeclineCatalogModelWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineCatalogModelResponse(rsp)
+}
+
+// DeclineCatalogModelWithResponse Decline a model or a new digest
+//
+// Declines, with a reason (`catalog.entry.approve`), the digest that
+// the request names, which waits for review, or, without one, a
+// discovered model and every digest of it that waits. What is declined
+// leaves the queue of what waits for review and stays denied; it can
+// still be approved later. An approved model keeps its pinned digest.
+// It needs If-Match with the model's ETag.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/models/{id}/decline (the `DeclineCatalogModel` operationId).
+func (c *ClientWithResponses) DeclineCatalogModelWithResponse(ctx context.Context, id CatalogModelId, params *DeclineCatalogModelParams, body DeclineCatalogModelJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineCatalogModelResponse, error) {
+	rsp, err := c.DeclineCatalogModel(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineCatalogModelResponse(rsp)
+}
+
+// ListCatalogServersWithResponse List MCP servers
+//
+// Lists the MCP servers of the catalog that match every filter given,
+// ordered by key, one page at a time (CAT-02). Their references,
+// announced names, versions and display forms were reported by agents:
+// they are untrusted text, shown as plain text, and only to the callers
+// who may view the catalog (`catalog.view`).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /catalog/servers (the `ListCatalogServers` operationId).
+func (c *ClientWithResponses) ListCatalogServersWithResponse(ctx context.Context, params *ListCatalogServersParams, reqEditors ...RequestEditorFn) (*ListCatalogServersResponse, error) {
+	rsp, err := c.ListCatalogServers(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCatalogServersResponse(rsp)
+}
+
+// GetCatalogServerWithResponse Get an MCP server
+//
+// Returns an MCP server of the catalog, with the ETag that its approval or decline must send back.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /catalog/servers/{id} (the `GetCatalogServer` operationId).
+func (c *ClientWithResponses) GetCatalogServerWithResponse(ctx context.Context, id CatalogServerId, reqEditors ...RequestEditorFn) (*GetCatalogServerResponse, error) {
+	rsp, err := c.GetCatalogServer(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCatalogServerResponse(rsp)
+}
+
+// ApproveCatalogServerWithBodyWithResponse Approve an MCP server
+//
+// Approves a discovered MCP server for the whole organization
+// (`catalog.entry.approve`, the advisory committee). Its key never
+// changes afterwards. The request can approve some of the server's
+// tools at once: each names the definition hash the reviewer saw in
+// full, its classification and the arguments policies may see, as
+// approveCatalogTool does, and the whole request is refused if one of
+// them is. Approving never enables anything for an agent (CAT-03). It
+// needs If-Match with the server's ETag.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/servers/{id}/approve (the `ApproveCatalogServer` operationId).
+func (c *ClientWithResponses) ApproveCatalogServerWithBodyWithResponse(ctx context.Context, id CatalogServerId, params *ApproveCatalogServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveCatalogServerResponse, error) {
+	rsp, err := c.ApproveCatalogServerWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveCatalogServerResponse(rsp)
+}
+
+// ApproveCatalogServerWithResponse Approve an MCP server
+//
+// Approves a discovered MCP server for the whole organization
+// (`catalog.entry.approve`, the advisory committee). Its key never
+// changes afterwards. The request can approve some of the server's
+// tools at once: each names the definition hash the reviewer saw in
+// full, its classification and the arguments policies may see, as
+// approveCatalogTool does, and the whole request is refused if one of
+// them is. Approving never enables anything for an agent (CAT-03). It
+// needs If-Match with the server's ETag.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/servers/{id}/approve (the `ApproveCatalogServer` operationId).
+func (c *ClientWithResponses) ApproveCatalogServerWithResponse(ctx context.Context, id CatalogServerId, params *ApproveCatalogServerParams, body ApproveCatalogServerJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveCatalogServerResponse, error) {
+	rsp, err := c.ApproveCatalogServer(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveCatalogServerResponse(rsp)
+}
+
+// DeclineCatalogServerWithBodyWithResponse Decline an MCP server
+//
+// Declines a discovered MCP server, with a reason
+// (`catalog.entry.approve`). It leaves the queue of what waits for
+// review and stays discovered, so its tools stay denied; it can still
+// be approved later. An approved server cannot be declined
+// (`conflict`): a block or disables restrict it at once. It needs
+// If-Match with the server's ETag.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/servers/{id}/decline (the `DeclineCatalogServer` operationId).
+func (c *ClientWithResponses) DeclineCatalogServerWithBodyWithResponse(ctx context.Context, id CatalogServerId, params *DeclineCatalogServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineCatalogServerResponse, error) {
+	rsp, err := c.DeclineCatalogServerWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineCatalogServerResponse(rsp)
+}
+
+// DeclineCatalogServerWithResponse Decline an MCP server
+//
+// Declines a discovered MCP server, with a reason
+// (`catalog.entry.approve`). It leaves the queue of what waits for
+// review and stays discovered, so its tools stay denied; it can still
+// be approved later. An approved server cannot be declined
+// (`conflict`): a block or disables restrict it at once. It needs
+// If-Match with the server's ETag.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/servers/{id}/decline (the `DeclineCatalogServer` operationId).
+func (c *ClientWithResponses) DeclineCatalogServerWithResponse(ctx context.Context, id CatalogServerId, params *DeclineCatalogServerParams, body DeclineCatalogServerJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineCatalogServerResponse, error) {
+	rsp, err := c.DeclineCatalogServer(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineCatalogServerResponse(rsp)
+}
+
+// ListCatalogToolsWithResponse List tools
+//
+// Lists the tools of the catalog that match every filter given, ordered
+// by key, one page at a time (CAT-02). The agent's own tools
+// (`agent/<name>`) are entries of their agent, so two of them can share
+// a key: filter them by agent. Names were reported by agents, and are
+// untrusted text.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /catalog/tools (the `ListCatalogTools` operationId).
+func (c *ClientWithResponses) ListCatalogToolsWithResponse(ctx context.Context, params *ListCatalogToolsParams, reqEditors ...RequestEditorFn) (*ListCatalogToolsResponse, error) {
+	rsp, err := c.ListCatalogTools(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCatalogToolsResponse(rsp)
+}
+
+// GetCatalogToolWithResponse Get a tool
+//
+// Returns a tool of the catalog: its pinned definition hash, the
+// definitions that wait for review, its classification and the
+// arguments policies may see, with the ETag that its approval or
+// decline must send back. getToolDefinition returns each definition in
+// full.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /catalog/tools/{id} (the `GetCatalogTool` operationId).
+func (c *ClientWithResponses) GetCatalogToolWithResponse(ctx context.Context, id CatalogToolId, reqEditors ...RequestEditorFn) (*GetCatalogToolResponse, error) {
+	rsp, err := c.GetCatalogTool(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCatalogToolResponse(rsp)
+}
+
+// ApproveCatalogToolWithBodyWithResponse Approve a tool or a new definition
+//
+// Approves a discovered tool, or one of the definitions of an approved
+// tool that wait for review, for the whole organization
+// (`catalog.entry.approve`, the advisory committee). It pins the
+// definition hash the request names, which must be one of the tool's
+// reported definitions that the core stores; a built-in tool has none,
+// and a tool of any other kind without a definition hash is never
+// approved (`conflict`, contracts section 7.7). A tool of an MCP server
+// is approved only once its server is (`conflict`). The reviewer
+// classifies the tool, starting from its MCP annotations or, without
+// them, from the protocol's conservative defaults (not read-only,
+// destructive, open world), and declares the arguments policies may
+// see, with their types from the tool's input schema (RFC-0002, section
+// 7.5). For an approved tool, a request that names its pinned
+// definition changes only its classification and declared arguments;
+// a declaration that an active policy version reads cannot be
+// withdrawn, and a declared argument's type cannot change while an
+// active usage rule uses it (`conflict`). Approving never
+// enables anything for an agent (CAT-03). It needs If-Match with the
+// tool's ETag.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/tools/{id}/approve (the `ApproveCatalogTool` operationId).
+func (c *ClientWithResponses) ApproveCatalogToolWithBodyWithResponse(ctx context.Context, id CatalogToolId, params *ApproveCatalogToolParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveCatalogToolResponse, error) {
+	rsp, err := c.ApproveCatalogToolWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveCatalogToolResponse(rsp)
+}
+
+// ApproveCatalogToolWithResponse Approve a tool or a new definition
+//
+// Approves a discovered tool, or one of the definitions of an approved
+// tool that wait for review, for the whole organization
+// (`catalog.entry.approve`, the advisory committee). It pins the
+// definition hash the request names, which must be one of the tool's
+// reported definitions that the core stores; a built-in tool has none,
+// and a tool of any other kind without a definition hash is never
+// approved (`conflict`, contracts section 7.7). A tool of an MCP server
+// is approved only once its server is (`conflict`). The reviewer
+// classifies the tool, starting from its MCP annotations or, without
+// them, from the protocol's conservative defaults (not read-only,
+// destructive, open world), and declares the arguments policies may
+// see, with their types from the tool's input schema (RFC-0002, section
+// 7.5). For an approved tool, a request that names its pinned
+// definition changes only its classification and declared arguments;
+// a declaration that an active policy version reads cannot be
+// withdrawn, and a declared argument's type cannot change while an
+// active usage rule uses it (`conflict`). Approving never
+// enables anything for an agent (CAT-03). It needs If-Match with the
+// tool's ETag.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/tools/{id}/approve (the `ApproveCatalogTool` operationId).
+func (c *ClientWithResponses) ApproveCatalogToolWithResponse(ctx context.Context, id CatalogToolId, params *ApproveCatalogToolParams, body ApproveCatalogToolJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveCatalogToolResponse, error) {
+	rsp, err := c.ApproveCatalogTool(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveCatalogToolResponse(rsp)
+}
+
+// DeclineCatalogToolWithBodyWithResponse Decline a tool or a new definition
+//
+// Declines, with a reason (`catalog.entry.approve`), the definition
+// that the request names, which waits for review, or, without one, a
+// discovered tool and every definition of it that waits. What is
+// declined leaves the queue of what waits for review and stays not
+// approved, so it stays denied; it can still be approved later. A
+// declined definition reported again does not return to the queue. An
+// approved tool keeps its pinned definition. It needs If-Match with the
+// tool's ETag.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/tools/{id}/decline (the `DeclineCatalogTool` operationId).
+func (c *ClientWithResponses) DeclineCatalogToolWithBodyWithResponse(ctx context.Context, id CatalogToolId, params *DeclineCatalogToolParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclineCatalogToolResponse, error) {
+	rsp, err := c.DeclineCatalogToolWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineCatalogToolResponse(rsp)
+}
+
+// DeclineCatalogToolWithResponse Decline a tool or a new definition
+//
+// Declines, with a reason (`catalog.entry.approve`), the definition
+// that the request names, which waits for review, or, without one, a
+// discovered tool and every definition of it that waits. What is
+// declined leaves the queue of what waits for review and stays not
+// approved, so it stays denied; it can still be approved later. A
+// declined definition reported again does not return to the queue. An
+// approved tool keeps its pinned definition. It needs If-Match with the
+// tool's ETag.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/tools/{id}/decline (the `DeclineCatalogTool` operationId).
+func (c *ClientWithResponses) DeclineCatalogToolWithResponse(ctx context.Context, id CatalogToolId, params *DeclineCatalogToolParams, body DeclineCatalogToolJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclineCatalogToolResponse, error) {
+	rsp, err := c.DeclineCatalogTool(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclineCatalogToolResponse(rsp)
+}
+
+// CompileUsageRulesWithBodyWithResponse Compile usage rules into Cedar
+//
+// Writes the Cedar statements of a policy's usage rules, as the core's
+// check at submission regenerates them, for the console's forms and for
+// policy-as-code repositories (RFC-0002, section 8; contracts, section
+// 6.11). It writes exactly what the reference generator of the
+// conformance kit writes (`test/conformance/profile`, `GenerateRules`),
+// and refuses what it refuses (`bad_request`, with the reason): for
+// each rule, and for each of its tools in their order, its
+// `tool.invoke` statement, then its `tool.expose` statement. A global
+// policy's rules take the arguments that the catalog declares, and
+// cannot name an agent's own tool (`agent/<name>`); an agent-specific
+// policy's take those of the agent's catalog. The rules are given as
+// JSON text, as their annotations carry them, so that the generator
+// reads exactly what a policy would hold: a repeated member name, a
+// lone surrogate or an integer beyond 64 bits is refused rather than
+// read another way. The text is at most 256 KiB, and statements that
+// would exceed 2 MiB, the limit of a whole bundle (contracts, step V1),
+// are refused before they are written. Compiling changes nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/usage-rules/compile (the `CompileUsageRules` operationId).
+func (c *ClientWithResponses) CompileUsageRulesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompileUsageRulesResponse, error) {
+	rsp, err := c.CompileUsageRulesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompileUsageRulesResponse(rsp)
+}
+
+// CompileUsageRulesWithResponse Compile usage rules into Cedar
+//
+// Writes the Cedar statements of a policy's usage rules, as the core's
+// check at submission regenerates them, for the console's forms and for
+// policy-as-code repositories (RFC-0002, section 8; contracts, section
+// 6.11). It writes exactly what the reference generator of the
+// conformance kit writes (`test/conformance/profile`, `GenerateRules`),
+// and refuses what it refuses (`bad_request`, with the reason): for
+// each rule, and for each of its tools in their order, its
+// `tool.invoke` statement, then its `tool.expose` statement. A global
+// policy's rules take the arguments that the catalog declares, and
+// cannot name an agent's own tool (`agent/<name>`); an agent-specific
+// policy's take those of the agent's catalog. The rules are given as
+// JSON text, as their annotations carry them, so that the generator
+// reads exactly what a policy would hold: a repeated member name, a
+// lone surrogate or an integer beyond 64 bits is refused rather than
+// read another way. The text is at most 256 KiB, and statements that
+// would exceed 2 MiB, the limit of a whole bundle (contracts, step V1),
+// are refused before they are written. Compiling changes nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /catalog/usage-rules/compile (the `CompileUsageRules` operationId).
+func (c *ClientWithResponses) CompileUsageRulesWithResponse(ctx context.Context, body CompileUsageRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*CompileUsageRulesResponse, error) {
+	rsp, err := c.CompileUsageRules(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompileUsageRulesResponse(rsp)
 }
 
 // ListDataCategoriesWithResponse List the data categories
@@ -10918,6 +18853,98 @@ func ParseGetAgentActionsResponse(rsp *http.Response) (*GetAgentActionsResponse,
 	return response, nil
 }
 
+// ParseGetAgentDeclaredToolingResponse parses an HTTP response from a GetAgentDeclaredToolingWithResponse call
+func ParseGetAgentDeclaredToolingResponse(rsp *http.Response) (*GetAgentDeclaredToolingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAgentDeclaredToolingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeclaredTooling
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetAgentDeclaredToolingResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeclareAgentToolingResponse parses an HTTP response from a DeclareAgentToolingWithResponse call
+func ParseDeclareAgentToolingResponse(rsp *http.Response) (*DeclareAgentToolingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeclareAgentToolingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeclaredTooling
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers DeclareAgentToolingResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseAddAgentDelegateResponse parses an HTTP response from a AddAgentDelegateWithResponse call
 func ParseAddAgentDelegateResponse(rsp *http.Response) (*AddAgentDelegateResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -11253,6 +19280,204 @@ func ParseListAgentReviewsResponse(rsp *http.Response) (*ListAgentReviewsRespons
 	return response, nil
 }
 
+// ParseListAgentToolingResponse parses an HTTP response from a ListAgentToolingWithResponse call
+func ParseListAgentToolingResponse(rsp *http.Response) (*ListAgentToolingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAgentToolingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AgentToolingList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAgentToolingRequestsResponse parses an HTTP response from a ListAgentToolingRequestsWithResponse call
+func ParseListAgentToolingRequestsResponse(rsp *http.Response) (*ListAgentToolingRequestsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAgentToolingRequestsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ToolingRequestList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRequestAgentToolingResponse parses an HTTP response from a RequestAgentToolingWithResponse call
+func ParseRequestAgentToolingResponse(rsp *http.Response) (*RequestAgentToolingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RequestAgentToolingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ToolingRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseApproveAgentToolingRequestResponse parses an HTTP response from a ApproveAgentToolingRequestWithResponse call
+func ParseApproveAgentToolingRequestResponse(rsp *http.Response) (*ApproveAgentToolingRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveAgentToolingRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ToolingRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeclineAgentToolingRequestResponse parses an HTTP response from a DeclineAgentToolingRequestWithResponse call
+func ParseDeclineAgentToolingRequestResponse(rsp *http.Response) (*DeclineAgentToolingRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeclineAgentToolingRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ToolingRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDisableAgentToolingResponse parses an HTTP response from a DisableAgentToolingWithResponse call
+func ParseDisableAgentToolingResponse(rsp *http.Response) (*DisableAgentToolingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DisableAgentToolingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ToolingEntryRefList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListAgentTransitionsResponse parses an HTTP response from a ListAgentTransitionsWithResponse call
 func ParseListAgentTransitionsResponse(rsp *http.Response) (*ListAgentTransitionsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -11454,6 +19679,829 @@ func ParseGetAuditKeysResponse(rsp *http.Response) (*GetAuditKeysResponse, error
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest []map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListCatalogBlocksResponse parses an HTTP response from a ListCatalogBlocksWithResponse call
+func ParseListCatalogBlocksResponse(rsp *http.Response) (*ListCatalogBlocksResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCatalogBlocksResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogBlockList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseIssueCatalogBlockResponse parses an HTTP response from a IssueCatalogBlockWithResponse call
+func ParseIssueCatalogBlockResponse(rsp *http.Response) (*IssueCatalogBlockResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &IssueCatalogBlockResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CatalogBlock
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetCatalogBlockResponse parses an HTTP response from a GetCatalogBlockWithResponse call
+func ParseGetCatalogBlockResponse(rsp *http.Response) (*GetCatalogBlockResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCatalogBlockResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogBlock
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRequestCatalogUnblockResponse parses an HTTP response from a RequestCatalogUnblockWithResponse call
+func ParseRequestCatalogUnblockResponse(rsp *http.Response) (*RequestCatalogUnblockResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RequestCatalogUnblockResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CatalogUnblockRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseApproveCatalogUnblockResponse parses an HTTP response from a ApproveCatalogUnblockWithResponse call
+func ParseApproveCatalogUnblockResponse(rsp *http.Response) (*ApproveCatalogUnblockResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveCatalogUnblockResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogBlock
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeclineCatalogUnblockResponse parses an HTTP response from a DeclineCatalogUnblockWithResponse call
+func ParseDeclineCatalogUnblockResponse(rsp *http.Response) (*DeclineCatalogUnblockResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeclineCatalogUnblockResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogUnblockRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeclinePendingFromAgentResponse parses an HTTP response from a DeclinePendingFromAgentWithResponse call
+func ParseDeclinePendingFromAgentResponse(rsp *http.Response) (*DeclinePendingFromAgentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeclinePendingFromAgentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogDeclineSummary
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetToolDefinitionResponse parses an HTTP response from a GetToolDefinitionWithResponse call
+func ParseGetToolDefinitionResponse(rsp *http.Response) (*GetToolDefinitionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetToolDefinitionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ToolDefinition
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetToolDefinitionResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListCatalogModelsResponse parses an HTTP response from a ListCatalogModelsWithResponse call
+func ParseListCatalogModelsResponse(rsp *http.Response) (*ListCatalogModelsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCatalogModelsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogModelList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetCatalogModelResponse parses an HTTP response from a GetCatalogModelWithResponse call
+func ParseGetCatalogModelResponse(rsp *http.Response) (*GetCatalogModelResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCatalogModelResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetCatalogModelResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseApproveCatalogModelResponse parses an HTTP response from a ApproveCatalogModelWithResponse call
+func ParseApproveCatalogModelResponse(rsp *http.Response) (*ApproveCatalogModelResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveCatalogModelResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ApproveCatalogModelResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeclineCatalogModelResponse parses an HTTP response from a DeclineCatalogModelWithResponse call
+func ParseDeclineCatalogModelResponse(rsp *http.Response) (*DeclineCatalogModelResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeclineCatalogModelResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers DeclineCatalogModelResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListCatalogServersResponse parses an HTTP response from a ListCatalogServersWithResponse call
+func ParseListCatalogServersResponse(rsp *http.Response) (*ListCatalogServersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCatalogServersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogServerList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetCatalogServerResponse parses an HTTP response from a GetCatalogServerWithResponse call
+func ParseGetCatalogServerResponse(rsp *http.Response) (*GetCatalogServerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCatalogServerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogServer
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetCatalogServerResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseApproveCatalogServerResponse parses an HTTP response from a ApproveCatalogServerWithResponse call
+func ParseApproveCatalogServerResponse(rsp *http.Response) (*ApproveCatalogServerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveCatalogServerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogServer
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ApproveCatalogServerResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeclineCatalogServerResponse parses an HTTP response from a DeclineCatalogServerWithResponse call
+func ParseDeclineCatalogServerResponse(rsp *http.Response) (*DeclineCatalogServerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeclineCatalogServerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogServer
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers DeclineCatalogServerResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListCatalogToolsResponse parses an HTTP response from a ListCatalogToolsWithResponse call
+func ParseListCatalogToolsResponse(rsp *http.Response) (*ListCatalogToolsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCatalogToolsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogToolList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetCatalogToolResponse parses an HTTP response from a GetCatalogToolWithResponse call
+func ParseGetCatalogToolResponse(rsp *http.Response) (*GetCatalogToolResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCatalogToolResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogTool
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetCatalogToolResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseApproveCatalogToolResponse parses an HTTP response from a ApproveCatalogToolWithResponse call
+func ParseApproveCatalogToolResponse(rsp *http.Response) (*ApproveCatalogToolResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveCatalogToolResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogTool
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ApproveCatalogToolResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeclineCatalogToolResponse parses an HTTP response from a DeclineCatalogToolWithResponse call
+func ParseDeclineCatalogToolResponse(rsp *http.Response) (*DeclineCatalogToolResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeclineCatalogToolResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogTool
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers DeclineCatalogToolResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCompileUsageRulesResponse parses an HTTP response from a CompileUsageRulesWithResponse call
+func ParseCompileUsageRulesResponse(rsp *http.Response) (*CompileUsageRulesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CompileUsageRulesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CompiledUsageRules
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

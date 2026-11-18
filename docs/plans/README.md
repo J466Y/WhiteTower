@@ -45,7 +45,7 @@ Read first: [requirements](../requirements/mvp-requirements.md), [architecture](
 | [P1-13](phase-1/P1-13-security-hardening-and-release.md) | Security hardening and release v0.1.0 | M | all feature plans | NFR-11, NFR-12, NFR-13 | Draft |
 | [P1-14](phase-1/P1-14-pilot-and-gate.md) | Pilot and Phase 1 gate | M, plus pilot calendar | P1-13 | Charter success criteria | Draft |
 | [P1-15](phase-1/P1-15-network-quarantine.md) | Kubernetes network quarantine module | M | P0-03, P1-05, P1-07; P1-08 for the end-to-end tests | KIL-10, NFR-23 | Draft |
-| [P1-16](phase-1/P1-16-mcp-servers-tools-and-models.md) | MCP servers, tools and models | L | P1-04; P0-03 step 12 and P1-06 for its bundles and usage rules; P0-03 step 12, P1-07, P1-08 and the accepted halt-path design for its blocks | CAT-01 to CAT-10, NFR-24; backend of UI-10; the catalog part of API-04 | Draft |
+| [P1-16](phase-1/P1-16-mcp-servers-tools-and-models.md) | MCP servers, tools and models | L | P1-04; P0-03 step 12 and P1-06 for its bundles and usage rules; P0-03 step 12, P1-07, P1-08 and the accepted halt-path design for its blocks | CAT-01 to CAT-10, NFR-24; backend of UI-10; the catalog part of API-04 | In progress (1 of 8 pull requests) |
 | [P1-17](phase-1/P1-17-settings.md) | Settings | M | P1-01, P1-02 (writer), P1-03; P1-04's inbox (its pull request 7) for its notifications | API-01 and API-03 for settings; the settings row of the permission matrix | Draft |
 
 ## Dependencies

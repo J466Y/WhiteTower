@@ -69,6 +69,43 @@ const (
 	// PermissionModuleManage allows registering, updating, and managing enforcement modules.
 	PermissionModuleManage Permission = "module.manage"
 
+	// PermissionCatalogView allows viewing the catalog of MCP servers, tools
+	// and models, and agents' tooling (RFC-0002). References and reported
+	// text are shown only with it.
+	PermissionCatalogView Permission = "catalog.view"
+
+	// PermissionCatalogEntryApprove allows approving or declining a catalog
+	// entry, a new tool definition or a new model digest, classifying a tool
+	// and declaring the arguments policies see.
+	PermissionCatalogEntryApprove Permission = "catalog.entry.approve"
+
+	// PermissionCatalogBlockIssue allows blocking a catalog entry for the
+	// whole organization, at once, with a reason.
+	PermissionCatalogBlockIssue Permission = "catalog.block.issue"
+
+	// PermissionCatalogUnblockRequest allows requesting that a block be lifted.
+	PermissionCatalogUnblockRequest Permission = "catalog.unblock.request"
+
+	// PermissionCatalogUnblockApprove allows approving or declining a request
+	// to lift a block; nobody approves their own (HUM-04).
+	PermissionCatalogUnblockApprove Permission = "catalog.unblock.approve"
+
+	// PermissionToolingEnableRequest allows requesting that tools and models
+	// be enabled for an agent.
+	PermissionToolingEnableRequest Permission = "tooling.enable.request"
+
+	// PermissionToolingEnableApprove allows approving or declining a request
+	// to enable tooling for an agent; nobody approves their own (HUM-04).
+	PermissionToolingEnableApprove Permission = "tooling.enable.approve"
+
+	// PermissionToolingDisable allows disabling an agent's tooling, at once,
+	// with a reason.
+	PermissionToolingDisable Permission = "tooling.disable"
+
+	// PermissionToolingDeclare allows declaring the tooling of an agent
+	// without an enforcement point (CAT-08).
+	PermissionToolingDeclare Permission = "tooling.declare"
+
 	// PermissionAuditEventsRead allows querying and viewing entries from the audit log.
 	PermissionAuditEventsRead Permission = "audit.events.read"
 
@@ -119,6 +156,15 @@ var allPermissions = []Permission{
 	PermissionHaltReleaseRequest,
 	PermissionHaltReleaseApprove,
 	PermissionModuleManage,
+	PermissionCatalogView,
+	PermissionCatalogEntryApprove,
+	PermissionCatalogBlockIssue,
+	PermissionCatalogUnblockRequest,
+	PermissionCatalogUnblockApprove,
+	PermissionToolingEnableRequest,
+	PermissionToolingEnableApprove,
+	PermissionToolingDisable,
+	PermissionToolingDeclare,
 	PermissionAuditEventsRead,
 	PermissionAuditVerify,
 	PermissionAuditExport,

@@ -14,17 +14,21 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 	// expected maps each role to its exact expected permission grants.
 	expected := map[Role]map[Permission]Scope{
 		RoleSteering: {
-			PermissionInventoryView:       ScopeAll,
-			PermissionPolicyGlobalAuthor:  ScopeAll,
-			PermissionPolicyGlobalApprove: ScopeAll,
-			PermissionHaltAgentIssue:      ScopeAll,
-			PermissionHaltFleetIssue:      ScopeAll,
-			PermissionHaltReleaseRequest:  ScopeAll,
-			PermissionHaltReleaseApprove:  ScopeAll,
-			PermissionAuditEventsRead:     ScopeAll,
-			PermissionAuditVerify:         ScopeAll,
-			PermissionAuditExport:         ScopeAll,
-			PermissionIdentityMeRead:      ScopeAll,
+			PermissionInventoryView:         ScopeAll,
+			PermissionPolicyGlobalAuthor:    ScopeAll,
+			PermissionPolicyGlobalApprove:   ScopeAll,
+			PermissionHaltAgentIssue:        ScopeAll,
+			PermissionHaltFleetIssue:        ScopeAll,
+			PermissionHaltReleaseRequest:    ScopeAll,
+			PermissionHaltReleaseApprove:    ScopeAll,
+			PermissionCatalogView:           ScopeAll,
+			PermissionCatalogBlockIssue:     ScopeAll,
+			PermissionCatalogUnblockRequest: ScopeAll,
+			PermissionCatalogUnblockApprove: ScopeAll,
+			PermissionAuditEventsRead:       ScopeAll,
+			PermissionAuditVerify:           ScopeAll,
+			PermissionAuditExport:           ScopeAll,
+			PermissionIdentityMeRead:        ScopeAll,
 		},
 		RoleAdvisory: {
 			PermissionInventoryView:          ScopeAll,
@@ -40,6 +44,14 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 			PermissionHaltAgentIssue:         ScopeAll,
 			PermissionHaltReleaseRequest:     ScopeAll,
 			PermissionHaltReleaseApprove:     ScopeAll,
+			PermissionCatalogView:            ScopeAll,
+			PermissionCatalogEntryApprove:    ScopeAll,
+			PermissionCatalogBlockIssue:      ScopeAll,
+			PermissionCatalogUnblockRequest:  ScopeAll,
+			PermissionCatalogUnblockApprove:  ScopeAll,
+			PermissionToolingEnableRequest:   ScopeAll,
+			PermissionToolingEnableApprove:   ScopeAll,
+			PermissionToolingDisable:         ScopeAll,
 			PermissionAuditEventsRead:        ScopeAll,
 			PermissionAuditVerify:            ScopeAll,
 			PermissionAuditExport:            ScopeAll,
@@ -57,6 +69,10 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 			PermissionAgentCredentialsManage: ScopeOwn,
 			PermissionHaltAgentIssue:         ScopeOwn,
 			PermissionHaltReleaseRequest:     ScopeOwn,
+			PermissionCatalogView:            ScopeAll,
+			PermissionToolingEnableRequest:   ScopeOwn,
+			PermissionToolingDisable:         ScopeOwn,
+			PermissionToolingDeclare:         ScopeOwn,
 			PermissionAuditEventsRead:        ScopeOwn,
 			PermissionIdentityMeRead:         ScopeAll,
 		},
@@ -78,6 +94,11 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 			PermissionHaltReleaseRequest:     ScopeAll,
 			PermissionHaltReleaseApprove:     ScopeAll,
 			PermissionModuleManage:           ScopeAll,
+			PermissionCatalogView:            ScopeAll,
+			PermissionCatalogBlockIssue:      ScopeAll,
+			PermissionCatalogUnblockRequest:  ScopeAll,
+			PermissionToolingDisable:         ScopeAll,
+			PermissionToolingDeclare:         ScopeAll,
 			PermissionAuditEventsRead:        ScopeAll,
 			PermissionAuditVerify:            ScopeAll,
 			PermissionAuditExport:            ScopeAll,
@@ -85,6 +106,7 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 		},
 		RoleAuditor: {
 			PermissionInventoryView:   ScopeAll,
+			PermissionCatalogView:     ScopeAll,
 			PermissionAuditEventsRead: ScopeAll,
 			PermissionAuditVerify:     ScopeAll,
 			PermissionAuditExport:     ScopeAll,
@@ -92,6 +114,7 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 		},
 		RoleAdmin: {
 			PermissionInventoryView:           ScopeAll,
+			PermissionCatalogView:             ScopeAll,
 			PermissionSettingsManage:          ScopeAll,
 			PermissionIdentityMeRead:          ScopeAll,
 			PermissionIdentityTokensManage:    ScopeAll,
@@ -105,8 +128,8 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 	if len(roles) != 7 {
 		t.Fatalf("expected 7 roles, got %d", len(roles))
 	}
-	if len(permissions) != 27 {
-		t.Fatalf("expected 27 permissions, got %d", len(permissions))
+	if len(permissions) != 36 {
+		t.Fatalf("expected 36 permissions, got %d", len(permissions))
 	}
 
 	totalChecked := 0
@@ -128,8 +151,8 @@ func TestPermissionMatrixEveryRoleAndPermissionPair(t *testing.T) {
 		}
 	}
 
-	if totalChecked != 7*27 {
-		t.Fatalf("expected 189 checks, got %d", totalChecked)
+	if totalChecked != 7*36 {
+		t.Fatalf("expected 252 checks, got %d", totalChecked)
 	}
 }
 
@@ -351,6 +374,147 @@ func TestBreakglassReadsTheInventoryAndChangesNothing(t *testing.T) {
 		}
 		if err := az.Authorize(context.Background(), custodian, op); !errors.Is(err, auth.ErrDenied) {
 			t.Errorf("%s: got %v, want refused", op, err)
+		}
+	}
+}
+
+// catalogOperations maps each operation of the catalog and of agents' tooling
+// (plan P1-16) to the roles that the matrix lets call it, before a handler
+// checks the scope of the grant on the agent.
+func catalogOperations() map[string][]Role {
+	viewers := []Role{RoleSteering, RoleAdvisory, RoleOwner, RoleOperator, RoleAuditor, RoleAdmin}
+	approvers := []Role{RoleAdvisory}
+	blockers := []Role{RoleSteering, RoleAdvisory, RoleOperator}
+	return map[string][]Role{
+		"listCatalogServers":         viewers,
+		"getCatalogServer":           viewers,
+		"approveCatalogServer":       approvers,
+		"declineCatalogServer":       approvers,
+		"listCatalogTools":           viewers,
+		"getCatalogTool":             viewers,
+		"approveCatalogTool":         approvers,
+		"declineCatalogTool":         approvers,
+		"getToolDefinition":          viewers,
+		"listCatalogModels":          viewers,
+		"getCatalogModel":            viewers,
+		"approveCatalogModel":        approvers,
+		"declineCatalogModel":        approvers,
+		"declinePendingFromAgent":    approvers,
+		"listCatalogBlocks":          viewers,
+		"issueCatalogBlock":          blockers,
+		"getCatalogBlock":            viewers,
+		"requestCatalogUnblock":      blockers,
+		"approveCatalogUnblock":      {RoleSteering, RoleAdvisory},
+		"declineCatalogUnblock":      {RoleSteering, RoleAdvisory},
+		"compileUsageRules":          viewers,
+		"listAgentTooling":           viewers,
+		"listAgentToolingRequests":   viewers,
+		"requestAgentTooling":        {RoleAdvisory, RoleOwner},
+		"approveAgentToolingRequest": approvers,
+		"declineAgentToolingRequest": approvers,
+		"disableAgentTooling":        {RoleAdvisory, RoleOwner, RoleOperator},
+		"getAgentDeclaredTooling":    viewers,
+		"declareAgentTooling":        {RoleOwner, RoleOperator},
+	}
+}
+
+// The operations of the catalog reach the roles that the matrix grants their
+// permission to, and no other: the user role sees nothing of the catalog.
+func TestCatalogOperationsFollowTheMatrix(t *testing.T) {
+	az := NewAuthorizer()
+	for op, allowed := range catalogOperations() {
+		for _, role := range AllRoles() {
+			p := &auth.Principal{ID: "p1", Roles: []string{string(role)}}
+			err := az.Authorize(context.Background(), p, op)
+			if want := slices.Contains(allowed, role); want != (err == nil) {
+				t.Errorf("%s as %s: got %v, want allowed=%v", op, role, err, want)
+			}
+		}
+	}
+}
+
+// Every operation of the catalog also needs catalog.view, since its answer
+// carries references and reported text: a token that holds the operation's
+// own scope but not catalog.view is refused, and passes once it holds both.
+func TestEveryCatalogOperationAlsoNeedsCatalogView(t *testing.T) {
+	az := NewAuthorizer()
+	owned := ContextWithRelationship(context.Background(), Relationship{IsOwner: true})
+	roles := []string{string(RoleSteering), string(RoleAdvisory), string(RoleOwner), string(RoleOperator)}
+	for op := range catalogOperations() {
+		perm, ok := az.ResolveOperation(op)
+		if !ok {
+			t.Errorf("%s maps to no permission", op)
+			continue
+		}
+		own := perm
+		if perm == PermissionCatalogView {
+			own = PermissionInventoryView
+		}
+		token := &auth.Principal{ID: "p1", Roles: roles, Scopes: []string{string(own)}}
+		if err := az.Authorize(owned, token, op); !errors.Is(err, auth.ErrDenied) {
+			t.Errorf("%s with the scope %s alone: got %v, want refused", op, own, err)
+		}
+		token.Scopes = append(token.Scopes, string(PermissionCatalogView))
+		if err := az.Authorize(owned, token, op); err != nil {
+			t.Errorf("%s with the scopes %v: got %v, want allowed", op, token.Scopes, err)
+		}
+	}
+}
+
+// An owner requests, disables and declares tooling only for the agents they
+// own: each grant of these is `own`, and the authorizer refuses it on an
+// agent the owner does not own, while the advisory committee and operators
+// hold theirs on every agent.
+func TestAnOwnerActsOnTheToolingOfOnlyTheAgentsTheyOwn(t *testing.T) {
+	az := NewAuthorizer()
+	owned := ContextWithRelationship(context.Background(), Relationship{IsOwner: true})
+	notOwned := ContextWithRelationship(context.Background(), Relationship{IsOwner: false})
+	owner := &auth.Principal{ID: "p1", Roles: []string{string(RoleOwner)}}
+	everyAgent := map[string]Role{
+		"requestAgentTooling": RoleAdvisory,
+		"disableAgentTooling": RoleOperator,
+		"declareAgentTooling": RoleOperator,
+	}
+	for op, other := range everyAgent {
+		if err := az.Authorize(owned, owner, op); err != nil {
+			t.Errorf("%s on an agent the owner owns: got %v, want allowed", op, err)
+		}
+		if err := az.Authorize(notOwned, owner, op); !errors.Is(err, auth.ErrDenied) {
+			t.Errorf("%s on an agent the owner does not own: got %v, want refused", op, err)
+		}
+		p := &auth.Principal{ID: "p2", Roles: []string{string(other)}}
+		if err := az.Authorize(notOwned, p, op); err != nil {
+			t.Errorf("%s as %s on an agent they do not own: got %v, want allowed", op, other, err)
+		}
+	}
+}
+
+// Security test ST-20: A break-glass session reaches no operation of the
+// catalog, not even one that only reads: it halts, and reads only what P1-03
+// lets it read (HUM-06).
+func TestBreakglassReachesNoCatalogOperation(t *testing.T) {
+	az := NewAuthorizer()
+	custodian := &auth.Principal{
+		ID:    "custodian",
+		Roles: []string{string(RoleOperator), string(RoleAdvisory)},
+		Scopes: []string{
+			string(PermissionHaltAgentIssue), string(PermissionHaltFleetIssue), string(PermissionInventoryView),
+			string(PermissionAuditEventsRead), string(PermissionAuditVerify), string(PermissionAuditExport),
+			string(PermissionIdentityMeRead), string(PermissionCatalogView), string(PermissionToolingDisable),
+		},
+		IsBreakglass: true,
+	}
+	for op := range catalogOperations() {
+		perm, ok := az.ResolveOperation(op)
+		if !ok {
+			t.Errorf("%s maps to no permission", op)
+			continue
+		}
+		if err := az.Authorize(context.Background(), custodian, op); !errors.Is(err, auth.ErrDenied) {
+			t.Errorf("%s: got %v, want refused", op, err)
+		}
+		if err := az.AuthorizeResource(custodian, perm, Relationship{IsOwner: true}); !errors.Is(err, auth.ErrDenied) {
+			t.Errorf("%s through AuthorizeResource: got %v, want refused", op, err)
 		}
 	}
 }
