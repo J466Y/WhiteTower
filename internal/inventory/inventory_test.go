@@ -30,7 +30,8 @@ var epoch = time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)
 // fixture is an inventory on a database of its own, with people who hold the
 // roles that the tests need.
 type fixture struct {
-	pool *db.DB
+	database *dbtest.Database
+	pool     *db.DB
 	// opts are the options of inv, from which a test makes another inventory
 	// with one of them changed.
 	opts     inventory.Options
@@ -46,7 +47,8 @@ type fixture struct {
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	pool := dbtest.New(t).Open(t)
+	database := dbtest.New(t)
+	pool := database.Open(t)
 	catalog, err := audit.LoadCatalog(events.Files)
 	if err != nil {
 		t.Fatal(err)
@@ -56,6 +58,7 @@ func setup(t *testing.T) *fixture {
 	halts := &selectorHalts{labels: map[string]uuid.UUID{}}
 	unused := &tooling{unused: map[uuid.UUID][]inventory.UnusedTool{}}
 	f := &fixture{
+		database: database,
 		pool:     pool,
 		clk:      clk,
 		policies: active,

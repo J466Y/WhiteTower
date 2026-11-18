@@ -556,6 +556,73 @@ func TestTheDatabaseRefusesASignOffByAParty(t *testing.T) {
 	}
 }
 
+// impatient returns the inventory on connections that wait at most 200 ms
+// for a lock.
+func (f *fixture) impatient(t *testing.T) *inventory.Inventory {
+	t.Helper()
+	cfg := f.database.Config
+	cfg.URL += "&lock_timeout=200ms"
+	pool, err := db.Open(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	opts := f.opts
+	opts.DB = pool
+	return inventory.New(opts)
+}
+
+// A completion or a sign-off refuses whoever may not make it before it takes
+// any lock: while another session holds the agent's row, each refused caller
+// gets their refusal at once, never a lock timeout. Otherwise a stream of
+// refused requests would hold the agent's row, which an agent halt locks
+// before it takes the version counter (the design of the halt path, section
+// 2). An allowed caller does wait for the row.
+func TestARefusedCompletionOrSignOffTakesNoLock(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	inv := f.impatient(t)
+	a := f.inState(t, "invoice-triage", "active")
+	scheduled := f.openReview(t, a.ID)
+	b, waiting := f.completed(t, "awaiting-signoff")
+	adam := f.member(t, "Adam Advisory", "owner", "advisory")
+	if _, err := f.inv.AddDelegate(ctx, f.olivia, b.ID, uuid.MustParse(adam.ID)); err != nil {
+		t.Fatal(err)
+	}
+	f.held(t,
+		func(ctx context.Context, tx *db.Tx) error {
+			_, err := tx.Exec(ctx, `SELECT 1 FROM whitetower.agents WHERE id = ANY($1) FOR NO KEY UPDATE`, []uuid.UUID{a.ID, b.ID})
+			return err
+		},
+		func(context.Context, *db.Tx) error { return nil })
+	complete := func(by auth.Principal) error {
+		_, err := inv.CompleteReview(ctx, by, scheduled.ID, scheduled.Version, attested())
+		return err
+	}
+	signOff := func(by auth.Principal) error {
+		_, err := inv.SignOffReview(ctx, by, waiting.ID, waiting.Version)
+		return err
+	}
+	for _, c := range []struct {
+		name string
+		err  error
+	}{
+		{"a completion by another owner", complete(f.otto)},
+		{"a completion by a service account", complete(f.serviceAccount(t, "owner"))},
+		{"a completion by a user", complete(f.uma)},
+		{"a sign-off by another owner", signOff(f.otto)},
+		{"a sign-off by a service account", signOff(f.serviceAccount(t, "advisory"))},
+		{"a sign-off by a user", signOff(f.uma)},
+		{"a sign-off by a delegate", signOff(adam)},
+	} {
+		t.Run(c.name, func(t *testing.T) { refused(t, c.err, inventory.Forbidden) })
+	}
+	var pgErr *pgconn.PgError
+	if err := complete(f.olivia); !errors.As(err, &pgErr) || pgErr.Code != "55P03" {
+		t.Errorf("the agent's owner: got %v, want a lock timeout", err)
+	}
+}
+
 // Retiring an agent cancels its open review, which leaves every inbox; it is
 // then neither completed nor signed off.
 func TestRetirementCancelsTheOpenReview(t *testing.T) {

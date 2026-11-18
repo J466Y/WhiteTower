@@ -252,22 +252,20 @@ func (inv *Inventory) CompleteReview(ctx context.Context, caller auth.Principal,
 	}
 	err = inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := inventorydb.New(tx)
-		r, a, err := inv.lockReview(ctx, q, caller, id)
+		_, a, err := inv.readReview(ctx, q, caller, id)
 		if err != nil {
 			return err
 		}
-		own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: a.ID, PrincipalID: actor})
-		if err != nil {
-			return fmt.Errorf("reading the agent's owners: %w", err)
-		}
-		if caller.Kind != auth.Human {
-			return refuse(Forbidden, "only a person attests for an agent and completes its review")
-		}
-		if err := inv.authorize(ctx, caller, authz.PermissionAgentReview, authz.Relationship{IsOwner: own}); err != nil {
+		if err := inv.mayComplete(ctx, q, caller, actor, a.ID); err != nil {
 			return err
 		}
-		if !own {
-			return refuse(Forbidden, "only the agent's primary owner and its delegates complete its review")
+		r, a, err := inv.lockReview(ctx, q, id)
+		if err != nil {
+			return err
+		}
+		// The agent's owners may have changed before the lock.
+		if err := inv.mayComplete(ctx, q, caller, actor, a.ID); err != nil {
+			return err
 		}
 		if err := reviewable(r, a, version, "scheduled"); err != nil {
 			return err
@@ -350,30 +348,20 @@ func (inv *Inventory) SignOffReview(ctx context.Context, caller auth.Principal, 
 	}
 	err = inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := inventorydb.New(tx)
-		r, a, err := inv.lockReview(ctx, q, caller, id)
+		r, a, err := inv.readReview(ctx, q, caller, id)
 		if err != nil {
 			return err
 		}
-		if caller.Kind != auth.Human {
-			return refuse(Forbidden, "only a person signs off a review (HUM-04)")
-		}
-		// The scope sign_off of the advisory committee's grant covers the
-		// reviews that need a sign-off: the setting holds high and critical
-		// always, and the tiers that administrators add. The owner role's
-		// grant of scope own never applies, since IsOwner stays false.
-		if err := inv.authorize(ctx, caller, authz.PermissionAgentReview, authz.Relationship{IsHighOrCriticalRisk: r.SignoffRequired}); err != nil {
+		if err := inv.maySignOff(ctx, q, caller, actor, r, a); err != nil {
 			return err
 		}
-		ever, err := q.EverAssigned(ctx, inventorydb.EverAssignedParams{AgentID: a.ID, PrincipalID: actor})
-		if err != nil {
-			return fmt.Errorf("reading the agent's owners: %w", err)
+		if r, a, err = inv.lockReview(ctx, q, id); err != nil {
+			return err
 		}
-		uc, err := q.GetUseCase(ctx, a.UseCaseID)
-		if err != nil {
-			return fmt.Errorf("reading the agent's use case: %w", err)
-		}
-		if ever || a.CreatedBy.ID == actor || uc.CreatedBy == actor || (r.CompletedBy != nil && *r.CompletedBy == actor) {
-			return refuse(Forbidden, "separation of duties: nobody signs off the review of an agent they own, delegate for, ever did, or created, nor of one whose use case they created, nor a review they completed (HUM-04)")
+		// The agent's owners, and whoever completed the review, may have
+		// changed before the lock.
+		if err := inv.maySignOff(ctx, q, caller, actor, r, a); err != nil {
+			return err
 		}
 		if err := reviewable(r, a, version, "awaiting_signoff"); err != nil {
 			return err
@@ -402,24 +390,13 @@ func (inv *Inventory) SignOffReview(ctx context.Context, caller auth.Principal, 
 	return inv.GetReview(ctx, caller, id)
 }
 
-// lockReview locks a review's agent, then the review, and reads both. A
-// completion and a sign-off of the agent's review therefore happen one after
-// the other, and before or after the agent's automatic suspension, which
-// locks the agent's row too. They take no governance state version, since
-// enforcement points see nothing of a review, and wait for nothing outside
-// the database: an agent halt, which locks the agent's row before it takes
-// the version counter, waits at most for one such short transaction, as it
-// does for an edit. Whoever may not see the agent finds no review.
-func (inv *Inventory) lockReview(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, id uuid.UUID) (inventorydb.WhitetowerReview, *Agent, error) {
+// readReview reads a review and its agent without a lock, so that a caller
+// whom a completion or a sign-off refuses takes no lock at all. Whoever may
+// not see the agent finds no review.
+func (inv *Inventory) readReview(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, id uuid.UUID) (inventorydb.WhitetowerReview, *Agent, error) {
 	r, err := q.GetReview(ctx, id)
 	if err != nil {
 		return r, nil, notFound(err, "review")
-	}
-	if _, err := q.LockAgent(ctx, r.AgentID); err != nil {
-		return r, nil, fmt.Errorf("locking the review's agent: %w", err)
-	}
-	if r, err = q.LockReview(ctx, id); err != nil {
-		return r, nil, fmt.Errorf("locking the review: %w", err)
 	}
 	a, err := inv.load(ctx, q, r.AgentID)
 	if err != nil {
@@ -429,6 +406,77 @@ func (inv *Inventory) lockReview(ctx context.Context, q *inventorydb.Queries, ca
 		return r, nil, refuse(NotFound, "no review has this ID")
 	}
 	return r, a, nil
+}
+
+// lockReview locks a review's agent, then the review, and reads both again,
+// once the caller is known to be allowed. A completion and a sign-off of the
+// agent's review therefore happen one after the other, and before or after
+// the agent's automatic suspension, which locks the agent's row too. They
+// take no governance state version, since enforcement points see nothing of
+// a review, and wait for nothing outside the database: an agent halt, which
+// locks the agent's row before it takes the version counter, waits at most
+// for one such short transaction of an allowed caller, as it does for an
+// edit, and never for a refused one.
+func (inv *Inventory) lockReview(ctx context.Context, q *inventorydb.Queries, id uuid.UUID) (inventorydb.WhitetowerReview, *Agent, error) {
+	r, err := q.GetReview(ctx, id)
+	if err != nil {
+		return r, nil, fmt.Errorf("reading the review: %w", err)
+	}
+	if _, err := q.LockAgent(ctx, r.AgentID); err != nil {
+		return r, nil, fmt.Errorf("locking the review's agent: %w", err)
+	}
+	if r, err = q.LockReview(ctx, id); err != nil {
+		return r, nil, fmt.Errorf("locking the review: %w", err)
+	}
+	a, err := inv.load(ctx, q, r.AgentID)
+	return r, a, err
+}
+
+// mayComplete refuses a completion to anyone but a person who is the agent's
+// primary owner or one of its delegates, with agent.review within their
+// token's scopes.
+func (inv *Inventory) mayComplete(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, actor, agentID uuid.UUID) error {
+	if caller.Kind != auth.Human {
+		return refuse(Forbidden, "only a person attests for an agent and completes its review")
+	}
+	own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: agentID, PrincipalID: actor})
+	if err != nil {
+		return fmt.Errorf("reading the agent's owners: %w", err)
+	}
+	if err := inv.authorize(ctx, caller, authz.PermissionAgentReview, authz.Relationship{IsOwner: own}); err != nil {
+		return err
+	}
+	if !own {
+		return refuse(Forbidden, "only the agent's primary owner and its delegates complete its review")
+	}
+	return nil
+}
+
+// maySignOff refuses a sign-off to anyone but a person whose grant reaches
+// the review, and to whoever separation of duties refuses (HUM-04).
+func (inv *Inventory) maySignOff(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, actor uuid.UUID, r inventorydb.WhitetowerReview, a *Agent) error {
+	if caller.Kind != auth.Human {
+		return refuse(Forbidden, "only a person signs off a review (HUM-04)")
+	}
+	// The scope sign_off of the advisory committee's grant covers the
+	// reviews that need a sign-off: the setting holds high and critical
+	// always, and the tiers that administrators add. The owner role's grant
+	// of scope own never applies, since IsOwner stays false.
+	if err := inv.authorize(ctx, caller, authz.PermissionAgentReview, authz.Relationship{IsHighOrCriticalRisk: r.SignoffRequired}); err != nil {
+		return err
+	}
+	ever, err := q.EverAssigned(ctx, inventorydb.EverAssignedParams{AgentID: a.ID, PrincipalID: actor})
+	if err != nil {
+		return fmt.Errorf("reading the agent's owners: %w", err)
+	}
+	uc, err := q.GetUseCase(ctx, a.UseCaseID)
+	if err != nil {
+		return fmt.Errorf("reading the agent's use case: %w", err)
+	}
+	if ever || a.CreatedBy.ID == actor || uc.CreatedBy == actor || (r.CompletedBy != nil && *r.CompletedBy == actor) {
+		return refuse(Forbidden, "separation of duties: nobody signs off the review of an agent they own, delegate for, ever did, or created, nor of one whose use case they created, nor a review they completed (HUM-04)")
+	}
+	return nil
 }
 
 // reviewable refuses a change of a review that is no longer at the version
