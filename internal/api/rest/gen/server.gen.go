@@ -45,19 +45,19 @@ func (e ActorType) Valid() bool {
 
 // Defines values for AgentSource.
 const (
-	Discovered AgentSource = "discovered"
-	Imported   AgentSource = "imported"
-	Registered AgentSource = "registered"
+	AgentSourceDiscovered AgentSource = "discovered"
+	AgentSourceImported   AgentSource = "imported"
+	AgentSourceRegistered AgentSource = "registered"
 )
 
 // Valid indicates whether the value is a known member of the AgentSource enum.
 func (e AgentSource) Valid() bool {
 	switch e {
-	case Discovered:
+	case AgentSourceDiscovered:
 		return true
-	case Imported:
+	case AgentSourceImported:
 		return true
-	case Registered:
+	case AgentSourceRegistered:
 		return true
 	default:
 		return false
@@ -109,6 +109,180 @@ func (e AiActClassification) Valid() bool {
 	}
 }
 
+// Defines values for ArgumentTransform.
+const (
+	EmailDomain ArgumentTransform = "email_domain"
+	Lowercase   ArgumentTransform = "lowercase"
+	Path        ArgumentTransform = "path"
+	UrlHost     ArgumentTransform = "url_host"
+)
+
+// Valid indicates whether the value is a known member of the ArgumentTransform enum.
+func (e ArgumentTransform) Valid() bool {
+	switch e {
+	case EmailDomain:
+		return true
+	case Lowercase:
+		return true
+	case Path:
+		return true
+	case UrlHost:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArgumentType.
+const (
+	Bool      ArgumentType = "Bool"
+	Long      ArgumentType = "Long"
+	SetLong   ArgumentType = "Set<Long>"
+	SetString ArgumentType = "Set<String>"
+	String    ArgumentType = "String"
+)
+
+// Valid indicates whether the value is a known member of the ArgumentType enum.
+func (e ArgumentType) Valid() bool {
+	switch e {
+	case Bool:
+		return true
+	case Long:
+		return true
+	case SetLong:
+		return true
+	case SetString:
+		return true
+	case String:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogBlockStatus.
+const (
+	CatalogBlockStatusActive CatalogBlockStatus = "active"
+	CatalogBlockStatusLifted CatalogBlockStatus = "lifted"
+)
+
+// Valid indicates whether the value is a known member of the CatalogBlockStatus enum.
+func (e CatalogBlockStatus) Valid() bool {
+	switch e {
+	case CatalogBlockStatusActive:
+		return true
+	case CatalogBlockStatusLifted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogBlockKind.
+const (
+	CatalogBlockKindEndpoint CatalogBlockKind = "endpoint"
+	CatalogBlockKindModel    CatalogBlockKind = "model"
+	CatalogBlockKindProvider CatalogBlockKind = "provider"
+	CatalogBlockKindServer   CatalogBlockKind = "server"
+	CatalogBlockKindTool     CatalogBlockKind = "tool"
+)
+
+// Valid indicates whether the value is a known member of the CatalogBlockKind enum.
+func (e CatalogBlockKind) Valid() bool {
+	switch e {
+	case CatalogBlockKindEndpoint:
+		return true
+	case CatalogBlockKindModel:
+		return true
+	case CatalogBlockKindProvider:
+		return true
+	case CatalogBlockKindServer:
+		return true
+	case CatalogBlockKindTool:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogEntryType.
+const (
+	CatalogEntryTypeModel  CatalogEntryType = "model"
+	CatalogEntryTypeServer CatalogEntryType = "server"
+	CatalogEntryTypeTool   CatalogEntryType = "tool"
+)
+
+// Valid indicates whether the value is a known member of the CatalogEntryType enum.
+func (e CatalogEntryType) Valid() bool {
+	switch e {
+	case CatalogEntryTypeModel:
+		return true
+	case CatalogEntryTypeServer:
+		return true
+	case CatalogEntryTypeTool:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogRequestStatus.
+const (
+	CatalogRequestStatusApproved CatalogRequestStatus = "approved"
+	CatalogRequestStatusDeclined CatalogRequestStatus = "declined"
+	CatalogRequestStatusPending  CatalogRequestStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the CatalogRequestStatus enum.
+func (e CatalogRequestStatus) Valid() bool {
+	switch e {
+	case CatalogRequestStatusApproved:
+		return true
+	case CatalogRequestStatusDeclined:
+		return true
+	case CatalogRequestStatusPending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogServerTransport.
+const (
+	CatalogServerTransportHttp  CatalogServerTransport = "http"
+	CatalogServerTransportStdio CatalogServerTransport = "stdio"
+)
+
+// Valid indicates whether the value is a known member of the CatalogServerTransport enum.
+func (e CatalogServerTransport) Valid() bool {
+	switch e {
+	case CatalogServerTransportHttp:
+		return true
+	case CatalogServerTransportStdio:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CatalogStatus.
+const (
+	CatalogStatusApproved   CatalogStatus = "approved"
+	CatalogStatusDiscovered CatalogStatus = "discovered"
+)
+
+// Valid indicates whether the value is a known member of the CatalogStatus enum.
+func (e CatalogStatus) Valid() bool {
+	switch e {
+	case CatalogStatusApproved:
+		return true
+	case CatalogStatusDiscovered:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CoverageLevel.
 const (
 	C0 CoverageLevel = "C0"
@@ -127,6 +301,24 @@ func (e CoverageLevel) Valid() bool {
 	case C2:
 		return true
 	case C3:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeclaredServerTransport.
+const (
+	DeclaredServerTransportHttp  DeclaredServerTransport = "http"
+	DeclaredServerTransportStdio DeclaredServerTransport = "stdio"
+)
+
+// Valid indicates whether the value is a known member of the DeclaredServerTransport enum.
+func (e DeclaredServerTransport) Valid() bool {
+	switch e {
+	case DeclaredServerTransportHttp:
+		return true
+	case DeclaredServerTransportStdio:
 		return true
 	default:
 		return false
@@ -547,18 +739,81 @@ func (e SuspensionReason) Valid() bool {
 	}
 }
 
+// Defines values for ToolKind.
+const (
+	ToolKindBuiltin  ToolKind = "builtin"
+	ToolKindFunction ToolKind = "function"
+	ToolKindHttp     ToolKind = "http"
+	ToolKindMcp      ToolKind = "mcp"
+	ToolKindOther    ToolKind = "other"
+)
+
+// Valid indicates whether the value is a known member of the ToolKind enum.
+func (e ToolKind) Valid() bool {
+	switch e {
+	case ToolKindBuiltin:
+		return true
+	case ToolKindFunction:
+		return true
+	case ToolKindHttp:
+		return true
+	case ToolKindMcp:
+		return true
+	case ToolKindOther:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ToolOrigin.
+const (
+	ToolOriginAgent    ToolOrigin = "agent"
+	ToolOriginProvider ToolOrigin = "provider"
+)
+
+// Valid indicates whether the value is a known member of the ToolOrigin enum.
+func (e ToolOrigin) Valid() bool {
+	switch e {
+	case ToolOriginAgent:
+		return true
+	case ToolOriginProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ToolingObservationSource.
+const (
+	Declaration ToolingObservationSource = "declaration"
+	Report      ToolingObservationSource = "report"
+)
+
+// Valid indicates whether the value is a known member of the ToolingObservationSource enum.
+func (e ToolingObservationSource) Valid() bool {
+	switch e {
+	case Declaration:
+		return true
+	case Report:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UnusedToolingKind.
 const (
-	Model UnusedToolingKind = "model"
-	Tool  UnusedToolingKind = "tool"
+	UnusedToolingKindModel UnusedToolingKind = "model"
+	UnusedToolingKindTool  UnusedToolingKind = "tool"
 )
 
 // Valid indicates whether the value is a known member of the UnusedToolingKind enum.
 func (e UnusedToolingKind) Valid() bool {
 	switch e {
-	case Model:
+	case UnusedToolingKindModel:
 		return true
-	case Tool:
+	case UnusedToolingKindTool:
 		return true
 	default:
 		return false
@@ -640,6 +895,24 @@ func (e ExportAgentsParamsFormat) Valid() bool {
 	case Csv:
 		return true
 	case Json:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListCatalogBlocksParamsStatus.
+const (
+	ListCatalogBlocksParamsStatusActive ListCatalogBlocksParamsStatus = "active"
+	ListCatalogBlocksParamsStatusLifted ListCatalogBlocksParamsStatus = "lifted"
+)
+
+// Valid indicates whether the value is a known member of the ListCatalogBlocksParamsStatus enum.
+func (e ListCatalogBlocksParamsStatus) Valid() bool {
+	switch e {
+	case ListCatalogBlocksParamsStatusActive:
+		return true
+	case ListCatalogBlocksParamsStatusLifted:
 		return true
 	default:
 		return false
@@ -800,6 +1073,36 @@ type AgentList struct {
 	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
+// AgentToolingEntry An entry of the catalog as it stands for the agent. A server is
+// enabled when one of its tools is, since an agent is enabled to use
+// tools and models.
+type AgentToolingEntry struct {
+	Blocked   bool               `json:"blocked"`
+	Declared  bool               `json:"declared"`
+	Enabled   bool               `json:"enabled"`
+	EnabledAt *time.Time         `json:"enabledAt,omitempty"`
+	EntryId   openapi_types.UUID `json:"entryId"`
+	EntryType CatalogEntryType   `json:"entryType"`
+	Key       string             `json:"key"`
+
+	// LastUsedAt When the agent last used the enabled entry, as allowed decisions record it (CAT-09).
+	LastUsedAt   *time.Time           `json:"lastUsedAt,omitempty"`
+	Observations []ToolingObservation `json:"observations"`
+
+	// RequestId The approved request that enabled the entry.
+	RequestId *openapi_types.UUID `json:"requestId,omitempty"`
+
+	// Status An entry is discovered until the advisory committee approves it
+	// (CAT-02). A declined entry stays discovered, so it stays denied.
+	Status CatalogStatus `json:"status"`
+}
+
+// AgentToolingList defines model for AgentToolingList.
+type AgentToolingList struct {
+	Entries    []AgentToolingEntry `json:"entries"`
+	NextCursor *string             `json:"nextCursor,omitempty"`
+}
+
 // AiActClassification The classification under the EU AI Act. A use case classified `prohibited` is never validated.
 type AiActClassification string
 
@@ -815,6 +1118,29 @@ type ApiTokenMetadata struct {
 	Scopes      []string           `json:"scopes"`
 	TokenPrefix string             `json:"tokenPrefix"`
 }
+
+// ApprovalRequest defines model for ApprovalRequest.
+type ApprovalRequest struct {
+	Comment *string `json:"comment,omitempty"`
+}
+
+// ApproveCatalogModelRequest defines model for ApproveCatalogModelRequest.
+type ApproveCatalogModelRequest struct {
+	// Digest The digest of the weights the reviewer approves, which approval pins. Required when the model's runtime reported one.
+	Digest *string `json:"digest,omitempty"`
+}
+
+// ApproveCatalogServerRequest defines model for ApproveCatalogServerRequest.
+type ApproveCatalogServerRequest struct {
+	// Tools The server's tools to approve with it, each once; none when absent.
+	Tools *[]ServerToolApproval `json:"tools,omitempty"`
+}
+
+// ArgumentTransform The transform that applies to a string, or to each string of a set, before policies see it (contracts, section 6.11).
+type ArgumentTransform string
+
+// ArgumentType An argument's type, as Cedar names it (contracts, section 7.7).
+type ArgumentType string
 
 // AuditCheckpoint defines model for AuditCheckpoint.
 type AuditCheckpoint struct {
@@ -874,6 +1200,361 @@ type AuditInclusionProof struct {
 	// RootHash Base64-encoded 32-byte Merkle root hash.
 	RootHash string `json:"rootHash"`
 	TreeSize int64  `json:"treeSize"`
+}
+
+// CatalogBlock An organization-wide block (CAT-04). Enforcement points receive its
+// ID, kind and the SHA-256 of its target; the target in clear and the
+// reason stay in the core.
+type CatalogBlock struct {
+	// EntryKey The key of the catalog entry the block covers, when the catalog has one.
+	EntryKey *string            `json:"entryKey,omitempty"`
+	Id       openapi_types.UUID `json:"id"`
+	IssuedAt time.Time          `json:"issuedAt"`
+
+	// IssuedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	IssuedBy PrincipalRef `json:"issuedBy"`
+
+	// IssuedStateVersion The governance state version that carries the block.
+	IssuedStateVersion int64 `json:"issuedStateVersion"`
+
+	// Kind What a block covers, which its target names (RFC-0002, section 6).
+	Kind     CatalogBlockKind `json:"kind"`
+	LiftedAt *time.Time       `json:"liftedAt,omitempty"`
+
+	// LiftedStateVersion The governance state version that lifted the block.
+	LiftedStateVersion *int64 `json:"liftedStateVersion,omitempty"`
+	Reason             string `json:"reason"`
+
+	// Spread How many connected enforcement points acknowledged a state version that carries the block (EP-15).
+	Spread *CatalogBlockSpread `json:"spread,omitempty"`
+	Status CatalogBlockStatus  `json:"status"`
+	Target string              `json:"target"`
+
+	// TargetSha256 The SHA-256 of the target's UTF-8 bytes.
+	TargetSha256 string `json:"targetSha256"`
+
+	// UnblockRequest A request to lift a block, which someone else on the steering or the advisory committee decides (HUM-04).
+	UnblockRequest *CatalogUnblockRequest `json:"unblockRequest,omitempty"`
+}
+
+// CatalogBlockStatus defines model for CatalogBlock.Status.
+type CatalogBlockStatus string
+
+// CatalogBlockKind What a block covers, which its target names (RFC-0002, section 6).
+type CatalogBlockKind string
+
+// CatalogBlockList defines model for CatalogBlockList.
+type CatalogBlockList struct {
+	Blocks     []CatalogBlock `json:"blocks"`
+	NextCursor *string        `json:"nextCursor,omitempty"`
+}
+
+// CatalogBlockSpread How many connected enforcement points acknowledged a state version that carries the block (EP-15).
+type CatalogBlockSpread struct {
+	Acknowledged      int `json:"acknowledged"`
+	EnforcementPoints int `json:"enforcementPoints"`
+}
+
+// CatalogDecline A reviewer's decline of an entry, or of one of its definitions or
+// digests, which then no longer waits for review.
+type CatalogDecline struct {
+	DeclinedAt time.Time `json:"declinedAt"`
+
+	// DeclinedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DeclinedBy PrincipalRef `json:"declinedBy"`
+
+	// DefinitionSha256 The declined definition, when a definition was declined rather than the tool.
+	DefinitionSha256 *string `json:"definitionSha256,omitempty"`
+
+	// Digest The declined digest, when a digest was declined rather than the model.
+	Digest *string `json:"digest,omitempty"`
+	Reason string  `json:"reason"`
+}
+
+// CatalogDeclineSummary How many entries, definitions and digests were declined.
+type CatalogDeclineSummary struct {
+	Definitions int `json:"definitions"`
+	Digests     int `json:"digests"`
+	Models      int `json:"models"`
+	Servers     int `json:"servers"`
+	Tools       int `json:"tools"`
+}
+
+// CatalogEntryType defines model for CatalogEntryType.
+type CatalogEntryType string
+
+// CatalogFlag What the core flags for reviewers: `unpinned_package`, a local server
+// launched through `npx`, `uvx`, `pipx run` or `bunx` without an exact
+// version (threat model, T-77); `secret_in_path`, a reference whose URL
+// path has a segment that looks like a secret, for which the
+// administrator may add a redaction rule (CAT-10, T-76). Later plans
+// may add flags: a client shows a flag it does not know as it is, and a
+// filter on a flag the server does not know is refused
+// (`bad_request`).
+type CatalogFlag = string
+
+// CatalogModel A model of the catalog (RFC-0002, section 3). Its endpoint and name
+// were reported: untrusted text.
+type CatalogModel struct {
+	ApprovedAt *time.Time `json:"approvedAt,omitempty"`
+
+	// ApprovedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	ApprovedBy *PrincipalRef `json:"approvedBy,omitempty"`
+
+	// Blocked Whether an active block covers the model, its provider or its endpoint.
+	Blocked bool `json:"blocked"`
+
+	// Digest The pinned digest of the model's weights, when its runtime reported one at approval.
+	Digest *string `json:"digest,omitempty"`
+
+	// Endpoint The normalized base URL of the endpoint the agent calls.
+	Endpoint string `json:"endpoint"`
+
+	// FirstAgentId The agent whose report or declaration first brought the model.
+	FirstAgentId openapi_types.UUID `json:"firstAgentId"`
+	FirstSeenAt  time.Time          `json:"firstSeenAt"`
+	Flags        []CatalogFlag      `json:"flags"`
+	Id           openapi_types.UUID `json:"id"`
+
+	// Key The key that the core assigned, a slug of the provider or the
+	// endpoint, a slash and a slug of the name. It never changes once
+	// the model is approved.
+	Key string `json:"key"`
+
+	// LastDecline A reviewer's decline of an entry, or of one of its definitions or
+	// digests, which then no longer waits for review.
+	LastDecline *CatalogDecline `json:"lastDecline,omitempty"`
+	LastSeenAt  time.Time       `json:"lastSeenAt"`
+
+	// Name The model's name, as requested.
+	Name string `json:"name"`
+
+	// PendingDigests The reported digests that differ from the pinned one and wait for
+	// review. Enforcement points deny the model for a runtime whose
+	// digest differs from the pinned one (RFC-0002, section 7.1).
+	PendingDigests []string `json:"pendingDigests"`
+
+	// PendingReview Whether the model, or one of its digests, waits for review.
+	PendingReview bool `json:"pendingReview"`
+
+	// Provider The provider, from the contracts' table of model providers (section 6.3) or a lowercase name of its own.
+	Provider string `json:"provider"`
+
+	// Status An entry is discovered until the advisory committee approves it
+	// (CAT-02). A declined entry stays discovered, so it stays denied.
+	Status CatalogStatus `json:"status"`
+}
+
+// CatalogModelList defines model for CatalogModelList.
+type CatalogModelList struct {
+	Models     []CatalogModel `json:"models"`
+	NextCursor *string        `json:"nextCursor,omitempty"`
+}
+
+// CatalogRequestStatus defines model for CatalogRequestStatus.
+type CatalogRequestStatus string
+
+// CatalogServer An MCP server of the catalog (RFC-0002, section 3). Its reference,
+// announced name and version and display form were reported, redacted
+// by the enforcement point and again by the core (CAT-10): untrusted
+// text, shown as plain text.
+type CatalogServer struct {
+	// AnnouncedName The name the server announces.
+	AnnouncedName *string `json:"announcedName,omitempty"`
+
+	// AnnouncedVersion The version the server announces.
+	AnnouncedVersion *string    `json:"announcedVersion,omitempty"`
+	ApprovedAt       *time.Time `json:"approvedAt,omitempty"`
+
+	// ApprovedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	ApprovedBy *PrincipalRef `json:"approvedBy,omitempty"`
+
+	// Blocked Whether an active block covers the server; a block never changes its status.
+	Blocked bool `json:"blocked"`
+
+	// DisplayForm The server's URL or command line, redacted.
+	DisplayForm *string `json:"displayForm,omitempty"`
+
+	// FirstAgentId The agent whose report or declaration first brought the server.
+	FirstAgentId openapi_types.UUID `json:"firstAgentId"`
+	FirstSeenAt  time.Time          `json:"firstSeenAt"`
+	Flags        []CatalogFlag      `json:"flags"`
+	Id           openapi_types.UUID `json:"id"`
+
+	// Key The key that the core assigned, which never changes once the server is approved.
+	Key string `json:"key"`
+
+	// LastDecline A reviewer's decline of an entry, or of one of its definitions or
+	// digests, which then no longer waits for review.
+	LastDecline *CatalogDecline `json:"lastDecline,omitempty"`
+	LastSeenAt  time.Time       `json:"lastSeenAt"`
+
+	// PendingReview Whether the server waits for review.
+	PendingReview bool `json:"pendingReview"`
+
+	// Reference The server's reference, a normalized URL, a `connector:` name or a `stdio:` command line (contracts, section 4.10).
+	Reference string `json:"reference"`
+
+	// Status An entry is discovered until the advisory committee approves it
+	// (CAT-02). A declined entry stays discovered, so it stays denied.
+	Status    CatalogStatus          `json:"status"`
+	Transport CatalogServerTransport `json:"transport"`
+}
+
+// CatalogServerTransport defines model for CatalogServer.Transport.
+type CatalogServerTransport string
+
+// CatalogServerList defines model for CatalogServerList.
+type CatalogServerList struct {
+	NextCursor *string         `json:"nextCursor,omitempty"`
+	Servers    []CatalogServer `json:"servers"`
+}
+
+// CatalogStatus An entry is discovered until the advisory committee approves it
+// (CAT-02). A declined entry stays discovered, so it stays denied.
+type CatalogStatus string
+
+// CatalogTool A tool of the catalog (RFC-0002, section 3). An MCP tool names its
+// server, an agent's own tool its agent, and a built-in tool its
+// provider and type. Its name was reported: untrusted text. The tool
+// has no origin: each observation has its own (listAgentTooling).
+type CatalogTool struct {
+	// AgentId The agent whose own tool this is.
+	AgentId    *openapi_types.UUID `json:"agentId,omitempty"`
+	ApprovedAt *time.Time          `json:"approvedAt,omitempty"`
+
+	// ApprovedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	ApprovedBy *PrincipalRef `json:"approvedBy,omitempty"`
+
+	// Arguments The arguments policies may see, empty until a reviewer declares them.
+	Arguments []ToolArgument `json:"arguments"`
+
+	// Blocked Whether an active block covers the tool or its server.
+	Blocked bool `json:"blocked"`
+
+	// Classification The reviewer's classification of a tool, which policies read
+	// (`read_only`, `destructive` and `open_world`). The MCP annotations
+	// are hints from the server; these values have been reviewed.
+	Classification *ToolClassification `json:"classification,omitempty"`
+
+	// DefinitionSha256 The pinned definition hash, once approved; a built-in tool has none.
+	DefinitionSha256 *string `json:"definitionSha256,omitempty"`
+
+	// FirstAgentId The agent whose report or declaration first brought the tool.
+	FirstAgentId openapi_types.UUID `json:"firstAgentId"`
+	FirstSeenAt  time.Time          `json:"firstSeenAt"`
+	Id           openapi_types.UUID `json:"id"`
+
+	// Key The key that the core assigned: `<server key>/<name>`,
+	// `agent/<name>` for an agent's own tool, unique within its agent,
+	// or `provider.<provider>/<type>` for a built-in tool. It never
+	// changes once the tool is approved.
+	Key string `json:"key"`
+
+	// Kind `function` is the agent's own code, `mcp` a tool of an MCP server,
+	// `builtin` a tool that the model provider defines and runs, and
+	// `http` and `other` the agent's own tools of those kinds (contracts,
+	// section 4.10).
+	Kind ToolKind `json:"kind"`
+
+	// LastDecline A reviewer's decline of an entry, or of one of its definitions or
+	// digests, which then no longer waits for review.
+	LastDecline *CatalogDecline `json:"lastDecline,omitempty"`
+	LastSeenAt  time.Time       `json:"lastSeenAt"`
+	Name        string          `json:"name"`
+
+	// PendingDefinitions The reported definitions that differ from the pinned one and wait
+	// for review, by hash. Enforcement points deny and hide the tool
+	// for an agent whose definition differs from the pinned one
+	// (RFC-0002, section 7.1).
+	PendingDefinitions []string `json:"pendingDefinitions"`
+
+	// PendingReview Whether the tool, or one of its definitions, waits for review.
+	PendingReview bool `json:"pendingReview"`
+
+	// Provider A built-in tool's provider.
+	Provider *string `json:"provider,omitempty"`
+
+	// ServerId An MCP tool's server.
+	ServerId *openapi_types.UUID `json:"serverId,omitempty"`
+
+	// Status An entry is discovered until the advisory committee approves it
+	// (CAT-02). A declined entry stays discovered, so it stays denied.
+	Status CatalogStatus `json:"status"`
+
+	// Type A built-in tool's type, as its provider names it.
+	Type *string `json:"type,omitempty"`
+}
+
+// CatalogToolApproval defines model for CatalogToolApproval.
+type CatalogToolApproval struct {
+	// Arguments The arguments policies may see; none when absent.
+	Arguments *[]ToolArgumentDeclaration `json:"arguments,omitempty"`
+
+	// Classification The reviewer's classification of a tool, which policies read
+	// (`read_only`, `destructive` and `open_world`). The MCP annotations
+	// are hints from the server; these values have been reviewed.
+	Classification ToolClassification `json:"classification"`
+
+	// DefinitionSha256 The definition the reviewer saw in full, which approval pins. Required for every tool but a built-in one, which must not have it.
+	DefinitionSha256 *string `json:"definitionSha256,omitempty"`
+}
+
+// CatalogToolList defines model for CatalogToolList.
+type CatalogToolList struct {
+	NextCursor *string       `json:"nextCursor,omitempty"`
+	Tools      []CatalogTool `json:"tools"`
+}
+
+// CatalogUnblockRequest A request to lift a block, which someone else on the steering or the advisory committee decides (HUM-04).
+type CatalogUnblockRequest struct {
+	BlockId openapi_types.UUID `json:"blockId"`
+
+	// Comment The approver's comment, or the reason of a decline.
+	Comment   *string    `json:"comment,omitempty"`
+	DecidedAt *time.Time `json:"decidedAt,omitempty"`
+
+	// DecidedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DecidedBy   *PrincipalRef      `json:"decidedBy,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	Reason      string             `json:"reason"`
+	RequestedAt time.Time          `json:"requestedAt"`
+
+	// RequestedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	RequestedBy PrincipalRef         `json:"requestedBy"`
+	Status      CatalogRequestStatus `json:"status"`
+}
+
+// CompileUsageRulesRequest defines model for CompileUsageRulesRequest.
+type CompileUsageRulesRequest struct {
+	// AgentId The agent of an agent-specific policy; absent for a global policy.
+	AgentId *openapi_types.UUID `json:"agentId,omitempty"`
+
+	// Rules The JSON text of the policy's usage rules, an array of objects
+	// with `id`, `description`, `tools` and `when`, whose conditions
+	// have `arg`, `op`, `values` and optionally `transform` and
+	// `if_absent` (contracts, section 6.11): at most 256 KiB of UTF-8.
+	Rules string `json:"rules"`
+}
+
+// CompiledUsageRules defines model for CompiledUsageRules.
+type CompiledUsageRules struct {
+	// Statements The Cedar statements, separated by an empty line.
+	Statements string `json:"statements"`
 }
 
 // CoverageLevel How deeply White Tower governs the agent (INV-08): C0, declared in the
@@ -938,6 +1619,92 @@ type CreatedToken struct {
 // DataCategoryList defines model for DataCategoryList.
 type DataCategoryList struct {
 	DataCategories []string `json:"dataCategories"`
+}
+
+// DeclareToolingRequest The complete tooling declared for an agent, in the shape and within
+// the limits of a tooling report (contracts, section 4.10). A tool's
+// name, provider and type and a model's provider and name, which become
+// keys, hold no control character (U+0000 to U+001F, U+007F), since the
+// generator of usage rules refuses one in a tool's key (contracts,
+// section 6.11); the server also refuses a lone surrogate or a
+// noncharacter in any string, as it does in a report.
+type DeclareToolingRequest struct {
+	Models  []DeclaredModel  `json:"models"`
+	Servers []DeclaredServer `json:"servers"`
+	Tools   []DeclaredTool   `json:"tools"`
+}
+
+// DeclaredModel defines model for DeclaredModel.
+type DeclaredModel struct {
+	Endpoint string `json:"endpoint"`
+	Name     string `json:"name"`
+	Provider string `json:"provider"`
+}
+
+// DeclaredServer A declared MCP server, as a report carries one; the server checks the limits in UTF-8 bytes.
+type DeclaredServer struct {
+	DisplayForm *string                 `json:"displayForm,omitempty"`
+	Name        *string                 `json:"name,omitempty"`
+	Reference   string                  `json:"reference"`
+	Transport   DeclaredServerTransport `json:"transport"`
+	Version     *string                 `json:"version,omitempty"`
+}
+
+// DeclaredServerTransport defines model for DeclaredServer.Transport.
+type DeclaredServerTransport string
+
+// DeclaredTool A declared tool, as a report carries one: an MCP tool names its
+// server by its position in `servers`, and a built-in tool its provider
+// and type.
+type DeclaredTool struct {
+	// Kind `function` is the agent's own code, `mcp` a tool of an MCP server,
+	// `builtin` a tool that the model provider defines and runs, and
+	// `http` and `other` the agent's own tools of those kinds (contracts,
+	// section 4.10).
+	Kind     ToolKind `json:"kind"`
+	Name     string   `json:"name"`
+	Provider *string  `json:"provider,omitempty"`
+	Server   *int     `json:"server,omitempty"`
+	Type     *string  `json:"type,omitempty"`
+}
+
+// DeclaredTooling defines model for DeclaredTooling.
+type DeclaredTooling struct {
+	DeclaredAt *time.Time `json:"declaredAt,omitempty"`
+
+	// DeclaredBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DeclaredBy *PrincipalRef    `json:"declaredBy,omitempty"`
+	Models     []DeclaredModel  `json:"models"`
+	Servers    []DeclaredServer `json:"servers"`
+	Tools      []DeclaredTool   `json:"tools"`
+}
+
+// DeclineCatalogModelRequest defines model for DeclineCatalogModelRequest.
+type DeclineCatalogModelRequest struct {
+	// Digest A digest that waits for review, to decline it rather than the model.
+	Digest *string `json:"digest,omitempty"`
+	Reason string  `json:"reason"`
+}
+
+// DeclineCatalogToolRequest defines model for DeclineCatalogToolRequest.
+type DeclineCatalogToolRequest struct {
+	// DefinitionSha256 A definition that waits for review, to decline it rather than the tool.
+	DefinitionSha256 *string `json:"definitionSha256,omitempty"`
+	Reason           string  `json:"reason"`
+}
+
+// DeclinePendingFromAgentRequest defines model for DeclinePendingFromAgentRequest.
+type DeclinePendingFromAgentRequest struct {
+	AgentId openapi_types.UUID `json:"agentId"`
+	Reason  string             `json:"reason"`
+}
+
+// DisableAgentToolingRequest defines model for DisableAgentToolingRequest.
+type DisableAgentToolingRequest struct {
+	Entries []ToolingEntrySelector `json:"entries"`
+	Reason  string                 `json:"reason"`
 }
 
 // EditAgentRequest The members to change; the others keep their values (editAgent).
@@ -1032,8 +1799,12 @@ type InboxItem struct {
 
 	// Kind What waits: `use_case_validation`, `policy_approval`,
 	// `review_due`, `review_signoff`, `halt_release`,
-	// `ownership_transfer` or `module_approval`. Later plans add kinds,
-	// and a client shows a kind it does not know generically.
+	// `ownership_transfer`, `module_approval`, `catalog_review` (an
+	// entry, a definition or a digest of the catalog that waits for
+	// review), `tooling_request` (a request to enable tooling for an
+	// agent) or `unblock_request` (a request to lift a block). Later
+	// plans add kinds, and a client shows a kind it does not know
+	// generically.
 	Kind string `json:"kind"`
 
 	// Role The caller's role that the item is addressed to; absent when it is addressed to the caller.
@@ -1084,6 +1855,18 @@ type InstanceStatus string
 type InstanceList struct {
 	Instances  []Instance `json:"instances"`
 	NextCursor *string    `json:"nextCursor,omitempty"`
+}
+
+// IssueCatalogBlockRequest defines model for IssueCatalogBlockRequest.
+type IssueCatalogBlockRequest struct {
+	// Kind What a block covers, which its target names (RFC-0002, section 6).
+	Kind   CatalogBlockKind `json:"kind"`
+	Reason string           `json:"reason"`
+
+	// Target What the block covers: the string form of the reference of a
+	// server, a tool or a model (contracts, section 4.10), a provider,
+	// or the normalized base URL of an endpoint.
+	Target string `json:"target"`
 }
 
 // Labels Labels, which filters, selector halts and policies use; policies see
@@ -1270,11 +2053,22 @@ type ProposeAgentRequest struct {
 	Vendor    *string            `json:"vendor,omitempty"`
 }
 
+// ReasonRequest defines model for ReasonRequest.
+type ReasonRequest struct {
+	Reason string `json:"reason"`
+}
+
 // ReassignOwnerRequest defines model for ReassignOwnerRequest.
 type ReassignOwnerRequest struct {
 	// PrincipalId The new primary owner.
 	PrincipalId openapi_types.UUID `json:"principalId"`
 	Reason      string             `json:"reason"`
+}
+
+// RequestAgentToolingRequest defines model for RequestAgentToolingRequest.
+type RequestAgentToolingRequest struct {
+	Entry  ToolingEntrySelector `json:"entry"`
+	Reason string               `json:"reason"`
 }
 
 // RequestOwnershipTransferRequest defines model for RequestOwnershipTransferRequest.
@@ -1366,6 +2160,14 @@ type RiskTier string
 // stops it, whatever its lifecycle state (lifecycle, section 2).
 type RunState string
 
+// ServerToolApproval defines model for ServerToolApproval.
+type ServerToolApproval struct {
+	Approval CatalogToolApproval `json:"approval"`
+
+	// ToolId A tool of the server being approved.
+	ToolId openapi_types.UUID `json:"toolId"`
+}
+
 // ServiceAccount defines model for ServiceAccount.
 type ServiceAccount struct {
 	CreatedAt              time.Time            `json:"createdAt"`
@@ -1394,6 +2196,161 @@ type SuspensionFrom string
 
 // SuspensionReason Why the agent was suspended (lifecycle, transitions T10 to T12).
 type SuspensionReason string
+
+// ToolArgument A declared argument, under the name that is its key in the tool's record of `context.args`.
+type ToolArgument struct {
+	Name string   `json:"name"`
+	Path []string `json:"path"`
+
+	// Transform The transform that applies to a string, or to each string of a set, before policies see it (contracts, section 6.11).
+	Transform *ArgumentTransform `json:"transform,omitempty"`
+
+	// Type An argument's type, as Cedar names it (contracts, section 7.7).
+	Type ArgumentType `json:"type"`
+}
+
+// ToolArgumentDeclaration An argument that policies may see (RFC-0002, section 7.5): its path
+// in the call's arguments, through objects only, its transform and its
+// type. A property whose name holds `.` or `:` cannot be declared, and
+// a transform applies to `String` and `Set<String>` only. The
+// argument's name is its path joined with `.`, followed by `:` and the
+// transform when it has one, and a tool declares each name once. A
+// property name is never empty and holds no control character (U+0000
+// to U+001F, U+007F), since the generator of usage rules refuses one in
+// an argument's name (contracts, section 6.11); the server also refuses
+// a lone surrogate or a noncharacter, as it does in a report.
+type ToolArgumentDeclaration struct {
+	Path []string `json:"path"`
+
+	// Transform The transform that applies to a string, or to each string of a set, before policies see it (contracts, section 6.11).
+	Transform *ArgumentTransform `json:"transform,omitempty"`
+
+	// Type An argument's type, as Cedar names it (contracts, section 7.7).
+	Type ArgumentType `json:"type"`
+}
+
+// ToolClassification The reviewer's classification of a tool, which policies read
+// (`read_only`, `destructive` and `open_world`). The MCP annotations
+// are hints from the server; these values have been reviewed.
+type ToolClassification struct {
+	Destructive bool `json:"destructive"`
+	OpenWorld   bool `json:"openWorld"`
+	ReadOnly    bool `json:"readOnly"`
+}
+
+// ToolDefinition A tool definition, the members that its hash covers, as reported
+// (contracts, section 4.10): an MCP tool's `name`, `title`,
+// `description`, `inputSchema`, `outputSchema` and `annotations`, and
+// another tool's `name` and `inputSchema`. Integers keep their exact
+// value, whatever their size.
+type ToolDefinition struct {
+	// Annotations The tool's MCP annotations, as reported.
+	Annotations interface{} `json:"annotations,omitempty"`
+	Description *string     `json:"description,omitempty"`
+
+	// InputSchema The tool's input schema, as reported.
+	InputSchema interface{} `json:"inputSchema,omitempty"`
+	Name        string      `json:"name"`
+
+	// OutputSchema The tool's output schema, as reported.
+	OutputSchema interface{} `json:"outputSchema,omitempty"`
+	Title        *string     `json:"title,omitempty"`
+}
+
+// ToolKind `function` is the agent's own code, `mcp` a tool of an MCP server,
+// `builtin` a tool that the model provider defines and runs, and
+// `http` and `other` the agent's own tools of those kinds (contracts,
+// section 4.10).
+type ToolKind string
+
+// ToolOrigin Who runs the tool, as a source reported it: `agent` (the agent's
+// process, or an MCP server the agent connects to) or `provider` (the
+// model provider, during a model call). One remote MCP server can be
+// run by one agent and by another agent's provider, so the origin is
+// an observation's, never the catalog entry's.
+type ToolOrigin string
+
+// ToolingEntryRef defines model for ToolingEntryRef.
+type ToolingEntryRef struct {
+	EntryId   openapi_types.UUID `json:"entryId"`
+	EntryType CatalogEntryType   `json:"entryType"`
+	Key       string             `json:"key"`
+}
+
+// ToolingEntryRefList defines model for ToolingEntryRefList.
+type ToolingEntryRefList struct {
+	Entries []ToolingEntryRef `json:"entries"`
+}
+
+// ToolingEntrySelector defines model for ToolingEntrySelector.
+type ToolingEntrySelector struct {
+	EntryId   openapi_types.UUID `json:"entryId"`
+	EntryType CatalogEntryType   `json:"entryType"`
+}
+
+// ToolingObservation What one source holds of an entry for the agent: an instance's
+// reports, or a person's declaration. A report's tool has the origin
+// and the definition hash it reported, and a report's model the digest.
+type ToolingObservation struct {
+	// Current Whether the source's latest report or declaration still holds the entry.
+	Current bool `json:"current"`
+
+	// DeclaredBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DeclaredBy       *PrincipalRef `json:"declaredBy,omitempty"`
+	DefinitionSha256 *string       `json:"definitionSha256,omitempty"`
+	Digest           *string       `json:"digest,omitempty"`
+	FirstSeenAt      time.Time     `json:"firstSeenAt"`
+
+	// InstanceId The reporting instance.
+	InstanceId *openapi_types.UUID `json:"instanceId,omitempty"`
+	LastSeenAt time.Time           `json:"lastSeenAt"`
+
+	// Origin Who runs the tool, as a source reported it: `agent` (the agent's
+	// process, or an MCP server the agent connects to) or `provider` (the
+	// model provider, during a model call). One remote MCP server can be
+	// run by one agent and by another agent's provider, so the origin is
+	// an observation's, never the catalog entry's.
+	Origin *ToolOrigin              `json:"origin,omitempty"`
+	Source ToolingObservationSource `json:"source"`
+}
+
+// ToolingObservationSource defines model for ToolingObservation.Source.
+type ToolingObservationSource string
+
+// ToolingRequest A request to enable a tool, a model or an MCP server's approved tools for an agent, decided once.
+type ToolingRequest struct {
+	AgentId openapi_types.UUID `json:"agentId"`
+
+	// Comment The approver's comment, or the reason of a decline.
+	Comment   *string    `json:"comment,omitempty"`
+	DecidedAt *time.Time `json:"decidedAt,omitempty"`
+
+	// DecidedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	DecidedBy *PrincipalRef `json:"decidedBy,omitempty"`
+
+	// Enabled What the approval enabled, an MCP server's approved tools for a request that names a server.
+	Enabled     *[]ToolingEntryRef `json:"enabled,omitempty"`
+	Entry       ToolingEntryRef    `json:"entry"`
+	Id          openapi_types.UUID `json:"id"`
+	Reason      string             `json:"reason"`
+	RequestedAt time.Time          `json:"requestedAt"`
+
+	// RequestedBy A principal, as the resources that name one show it. The display name
+	// is absent only where a caller asked to leave names out, as a
+	// pseudonymized export does.
+	RequestedBy PrincipalRef         `json:"requestedBy"`
+	Status      CatalogRequestStatus `json:"status"`
+}
+
+// ToolingRequestList defines model for ToolingRequestList.
+type ToolingRequestList struct {
+	NextCursor *string          `json:"nextCursor,omitempty"`
+	Requests   []ToolingRequest `json:"requests"`
+}
 
 // Transition One transition of an agent's lifecycle. `fromState` is absent for the
 // agent's creation, T1, and `reason` is present for a suspension.
@@ -1554,8 +2511,35 @@ type AgentStateFilter = []LifecycleState
 // AgentUseCaseFilter defines model for AgentUseCaseFilter.
 type AgentUseCaseFilter = openapi_types.UUID
 
+// CatalogBlockId defines model for CatalogBlockId.
+type CatalogBlockId = openapi_types.UUID
+
+// CatalogFlagFilter defines model for CatalogFlagFilter.
+type CatalogFlagFilter = []CatalogFlag
+
+// CatalogKeyFilter defines model for CatalogKeyFilter.
+type CatalogKeyFilter = string
+
+// CatalogModelId defines model for CatalogModelId.
+type CatalogModelId = openapi_types.UUID
+
+// CatalogPendingReviewFilter defines model for CatalogPendingReviewFilter.
+type CatalogPendingReviewFilter = bool
+
+// CatalogServerId defines model for CatalogServerId.
+type CatalogServerId = openapi_types.UUID
+
+// CatalogStatusFilter defines model for CatalogStatusFilter.
+type CatalogStatusFilter = []CatalogStatus
+
+// CatalogToolId defines model for CatalogToolId.
+type CatalogToolId = openapi_types.UUID
+
 // Cursor defines model for Cursor.
 type Cursor = string
+
+// DefinitionSha256 defines model for DefinitionSha256.
+type DefinitionSha256 = string
 
 // DelegateId defines model for DelegateId.
 type DelegateId = openapi_types.UUID
@@ -1569,8 +2553,14 @@ type Limit = int
 // ReviewId defines model for ReviewId.
 type ReviewId = openapi_types.UUID
 
+// ToolingRequestId defines model for ToolingRequestId.
+type ToolingRequestId = openapi_types.UUID
+
 // TransferId defines model for TransferId.
 type TransferId = openapi_types.UUID
+
+// UnblockRequestId defines model for UnblockRequestId.
+type UnblockRequestId = openapi_types.UUID
 
 // UseCaseId defines model for UseCaseId.
 type UseCaseId = openapi_types.UUID
@@ -1655,6 +2645,15 @@ type EditAgentParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// DeclareAgentToolingParams defines parameters for DeclareAgentTooling.
+type DeclareAgentToolingParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // RemoveAgentDelegateParams defines parameters for RemoveAgentDelegate.
 type RemoveAgentDelegateParams struct {
 	// Reason Why the assignment ends. A request without a reason is refused (`bad_request`).
@@ -1690,6 +2689,33 @@ type ReassignAgentOwnerParams struct {
 
 // ListAgentReviewsParams defines parameters for ListAgentReviews.
 type ListAgentReviewsParams struct {
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListAgentToolingParams defines parameters for ListAgentTooling.
+type ListAgentToolingParams struct {
+	// EntryType Entries of this kind.
+	EntryType *CatalogEntryType `form:"entryType,omitempty" json:"entryType,omitempty"`
+
+	// Enabled Only the enabled entries, or only the others.
+	Enabled *bool `form:"enabled,omitempty" json:"enabled,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListAgentToolingRequestsParams defines parameters for ListAgentToolingRequests.
+type ListAgentToolingRequestsParams struct {
+	// Status Requests in any of these statuses.
+	Status *[]CatalogRequestStatus `form:"status,omitempty" json:"status,omitempty"`
+
 	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
@@ -1749,6 +2775,147 @@ type GetAuditEventsParams struct {
 
 	// Limit Maximum number of events to return.
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListCatalogBlocksParams defines parameters for ListCatalogBlocks.
+type ListCatalogBlocksParams struct {
+	// Status The blocks in this status.
+	Status *ListCatalogBlocksParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListCatalogBlocksParamsStatus defines parameters for ListCatalogBlocks.
+type ListCatalogBlocksParamsStatus string
+
+// ListCatalogModelsParams defines parameters for ListCatalogModels.
+type ListCatalogModelsParams struct {
+	// Status Entries in any of these statuses.
+	Status *CatalogStatusFilter `form:"status,omitempty" json:"status,omitempty"`
+
+	// PendingReview Only the entries that wait for review, themselves or by a new definition or digest, or only the others.
+	PendingReview *CatalogPendingReviewFilter `form:"pendingReview,omitempty" json:"pendingReview,omitempty"`
+
+	// Flag Entries that carry every one of these flags.
+	Flag *CatalogFlagFilter `form:"flag,omitempty" json:"flag,omitempty"`
+
+	// Key The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths.
+	Key *CatalogKeyFilter `form:"key,omitempty" json:"key,omitempty"`
+
+	// Provider The models of this provider (contracts, section 6.3).
+	Provider *string `form:"provider,omitempty" json:"provider,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ApproveCatalogModelParams defines parameters for ApproveCatalogModel.
+type ApproveCatalogModelParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// DeclineCatalogModelParams defines parameters for DeclineCatalogModel.
+type DeclineCatalogModelParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListCatalogServersParams defines parameters for ListCatalogServers.
+type ListCatalogServersParams struct {
+	// Status Entries in any of these statuses.
+	Status *CatalogStatusFilter `form:"status,omitempty" json:"status,omitempty"`
+
+	// PendingReview Only the entries that wait for review, themselves or by a new definition or digest, or only the others.
+	PendingReview *CatalogPendingReviewFilter `form:"pendingReview,omitempty" json:"pendingReview,omitempty"`
+
+	// Flag Entries that carry every one of these flags.
+	Flag *CatalogFlagFilter `form:"flag,omitempty" json:"flag,omitempty"`
+
+	// Key The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths.
+	Key *CatalogKeyFilter `form:"key,omitempty" json:"key,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ApproveCatalogServerParams defines parameters for ApproveCatalogServer.
+type ApproveCatalogServerParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// DeclineCatalogServerParams defines parameters for DeclineCatalogServer.
+type DeclineCatalogServerParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListCatalogToolsParams defines parameters for ListCatalogTools.
+type ListCatalogToolsParams struct {
+	// Status Entries in any of these statuses.
+	Status *CatalogStatusFilter `form:"status,omitempty" json:"status,omitempty"`
+
+	// PendingReview Only the entries that wait for review, themselves or by a new definition or digest, or only the others.
+	PendingReview *CatalogPendingReviewFilter `form:"pendingReview,omitempty" json:"pendingReview,omitempty"`
+
+	// Key The entry with this key, matched exactly. Keys hold slashes, so they are filters rather than paths.
+	Key *CatalogKeyFilter `form:"key,omitempty" json:"key,omitempty"`
+
+	// ServerId The tools of this MCP server.
+	ServerId *openapi_types.UUID `form:"serverId,omitempty" json:"serverId,omitempty"`
+
+	// AgentId The own tools of this agent.
+	AgentId *openapi_types.UUID `form:"agentId,omitempty" json:"agentId,omitempty"`
+
+	// Kind Tools of any of these kinds.
+	Kind *[]ToolKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// Cursor Where the page starts, as the previous page returned it in `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit The page size.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ApproveCatalogToolParams defines parameters for ApproveCatalogTool.
+type ApproveCatalogToolParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// DeclineCatalogToolParams defines parameters for DeclineCatalogTool.
+type DeclineCatalogToolParams struct {
+	// IfMatch The ETag of the version the change applies to (API-03). A change
+	// without it is refused with `precondition_required`, and one with an
+	// ETag that is no longer current with `precondition_failed` (threat
+	// model, T-08).
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // ListInboxItemsParams defines parameters for ListInboxItems.
@@ -1844,6 +3011,9 @@ type ProposeAgentJSONRequestBody = ProposeAgentRequest
 // EditAgentJSONRequestBody defines body for EditAgent for application/json ContentType.
 type EditAgentJSONRequestBody = EditAgentRequest
 
+// DeclareAgentToolingJSONRequestBody defines body for DeclareAgentTooling for application/json ContentType.
+type DeclareAgentToolingJSONRequestBody = DeclareToolingRequest
+
 // AddAgentDelegateJSONRequestBody defines body for AddAgentDelegate for application/json ContentType.
 type AddAgentDelegateJSONRequestBody = AddDelegateRequest
 
@@ -1853,8 +3023,56 @@ type RequestOwnershipTransferJSONRequestBody = RequestOwnershipTransferRequest
 // ReassignAgentOwnerJSONRequestBody defines body for ReassignAgentOwner for application/json ContentType.
 type ReassignAgentOwnerJSONRequestBody = ReassignOwnerRequest
 
+// RequestAgentToolingJSONRequestBody defines body for RequestAgentTooling for application/json ContentType.
+type RequestAgentToolingJSONRequestBody = RequestAgentToolingRequest
+
+// ApproveAgentToolingRequestJSONRequestBody defines body for ApproveAgentToolingRequest for application/json ContentType.
+type ApproveAgentToolingRequestJSONRequestBody = ApprovalRequest
+
+// DeclineAgentToolingRequestJSONRequestBody defines body for DeclineAgentToolingRequest for application/json ContentType.
+type DeclineAgentToolingRequestJSONRequestBody = ReasonRequest
+
+// DisableAgentToolingJSONRequestBody defines body for DisableAgentTooling for application/json ContentType.
+type DisableAgentToolingJSONRequestBody = DisableAgentToolingRequest
+
 // TransitionAgentJSONRequestBody defines body for TransitionAgent for application/json ContentType.
 type TransitionAgentJSONRequestBody = TransitionRequest
+
+// IssueCatalogBlockJSONRequestBody defines body for IssueCatalogBlock for application/json ContentType.
+type IssueCatalogBlockJSONRequestBody = IssueCatalogBlockRequest
+
+// RequestCatalogUnblockJSONRequestBody defines body for RequestCatalogUnblock for application/json ContentType.
+type RequestCatalogUnblockJSONRequestBody = ReasonRequest
+
+// ApproveCatalogUnblockJSONRequestBody defines body for ApproveCatalogUnblock for application/json ContentType.
+type ApproveCatalogUnblockJSONRequestBody = ApprovalRequest
+
+// DeclineCatalogUnblockJSONRequestBody defines body for DeclineCatalogUnblock for application/json ContentType.
+type DeclineCatalogUnblockJSONRequestBody = ReasonRequest
+
+// DeclinePendingFromAgentJSONRequestBody defines body for DeclinePendingFromAgent for application/json ContentType.
+type DeclinePendingFromAgentJSONRequestBody = DeclinePendingFromAgentRequest
+
+// ApproveCatalogModelJSONRequestBody defines body for ApproveCatalogModel for application/json ContentType.
+type ApproveCatalogModelJSONRequestBody = ApproveCatalogModelRequest
+
+// DeclineCatalogModelJSONRequestBody defines body for DeclineCatalogModel for application/json ContentType.
+type DeclineCatalogModelJSONRequestBody = DeclineCatalogModelRequest
+
+// ApproveCatalogServerJSONRequestBody defines body for ApproveCatalogServer for application/json ContentType.
+type ApproveCatalogServerJSONRequestBody = ApproveCatalogServerRequest
+
+// DeclineCatalogServerJSONRequestBody defines body for DeclineCatalogServer for application/json ContentType.
+type DeclineCatalogServerJSONRequestBody = ReasonRequest
+
+// ApproveCatalogToolJSONRequestBody defines body for ApproveCatalogTool for application/json ContentType.
+type ApproveCatalogToolJSONRequestBody = CatalogToolApproval
+
+// DeclineCatalogToolJSONRequestBody defines body for DeclineCatalogTool for application/json ContentType.
+type DeclineCatalogToolJSONRequestBody = DeclineCatalogToolRequest
+
+// CompileUsageRulesJSONRequestBody defines body for CompileUsageRules for application/json ContentType.
+type CompileUsageRulesJSONRequestBody = CompileUsageRulesRequest
 
 // RevokeAllSessionsAndTokensJSONRequestBody defines body for RevokeAllSessionsAndTokens for application/json ContentType.
 type RevokeAllSessionsAndTokensJSONRequestBody = EmergencyRevocationRequest
@@ -1897,6 +3115,12 @@ type ServerInterface interface {
 	// GetAgentActions Get the lifecycle actions open to the caller
 	// (GET /agents/{id}/actions)
 	GetAgentActions(w http.ResponseWriter, r *http.Request, id AgentId)
+	// GetAgentDeclaredTooling Get an agent's declared tooling
+	// (GET /agents/{id}/declared-tooling)
+	GetAgentDeclaredTooling(w http.ResponseWriter, r *http.Request, id AgentId)
+	// DeclareAgentTooling Declare an agent's tooling
+	// (PUT /agents/{id}/declared-tooling)
+	DeclareAgentTooling(w http.ResponseWriter, r *http.Request, id AgentId, params DeclareAgentToolingParams)
 	// AddAgentDelegate Add a delegate
 	// (POST /agents/{id}/delegates)
 	AddAgentDelegate(w http.ResponseWriter, r *http.Request, id AgentId)
@@ -1927,6 +3151,24 @@ type ServerInterface interface {
 	// ListAgentReviews List an agent's periodic reviews
 	// (GET /agents/{id}/reviews)
 	ListAgentReviews(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentReviewsParams)
+	// ListAgentTooling List an agent's tooling
+	// (GET /agents/{id}/tooling)
+	ListAgentTooling(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentToolingParams)
+	// ListAgentToolingRequests List an agent's requests to enable tooling
+	// (GET /agents/{id}/tooling-requests)
+	ListAgentToolingRequests(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentToolingRequestsParams)
+	// RequestAgentTooling Request enabling tooling for an agent
+	// (POST /agents/{id}/tooling-requests)
+	RequestAgentTooling(w http.ResponseWriter, r *http.Request, id AgentId)
+	// ApproveAgentToolingRequest Approve a request to enable tooling
+	// (POST /agents/{id}/tooling-requests/{requestId}/approve)
+	ApproveAgentToolingRequest(w http.ResponseWriter, r *http.Request, id AgentId, requestId ToolingRequestId)
+	// DeclineAgentToolingRequest Decline a request to enable tooling
+	// (POST /agents/{id}/tooling-requests/{requestId}/decline)
+	DeclineAgentToolingRequest(w http.ResponseWriter, r *http.Request, id AgentId, requestId ToolingRequestId)
+	// DisableAgentTooling Disable an agent's tooling
+	// (POST /agents/{id}/tooling/disable)
+	DisableAgentTooling(w http.ResponseWriter, r *http.Request, id AgentId)
 	// ListAgentTransitions List an agent's lifecycle history
 	// (GET /agents/{id}/transitions)
 	ListAgentTransitions(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentTransitionsParams)
@@ -1945,6 +3187,69 @@ type ServerInterface interface {
 	// GetAuditKeys List checkpoint signing keys
 	// (GET /audit/keys)
 	GetAuditKeys(w http.ResponseWriter, r *http.Request)
+	// ListCatalogBlocks List blocks
+	// (GET /catalog/blocks)
+	ListCatalogBlocks(w http.ResponseWriter, r *http.Request, params ListCatalogBlocksParams)
+	// IssueCatalogBlock Block a server, a tool or models
+	// (POST /catalog/blocks)
+	IssueCatalogBlock(w http.ResponseWriter, r *http.Request)
+	// GetCatalogBlock Get a block
+	// (GET /catalog/blocks/{id})
+	GetCatalogBlock(w http.ResponseWriter, r *http.Request, id CatalogBlockId)
+	// RequestCatalogUnblock Request that a block be lifted
+	// (POST /catalog/blocks/{id}/unblock-requests)
+	RequestCatalogUnblock(w http.ResponseWriter, r *http.Request, id CatalogBlockId)
+	// ApproveCatalogUnblock Approve lifting a block
+	// (POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve)
+	ApproveCatalogUnblock(w http.ResponseWriter, r *http.Request, id CatalogBlockId, requestId UnblockRequestId)
+	// DeclineCatalogUnblock Decline lifting a block
+	// (POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline)
+	DeclineCatalogUnblock(w http.ResponseWriter, r *http.Request, id CatalogBlockId, requestId UnblockRequestId)
+	// DeclinePendingFromAgent Decline everything an agent brought that waits for review
+	// (POST /catalog/declines)
+	DeclinePendingFromAgent(w http.ResponseWriter, r *http.Request)
+	// GetToolDefinition Get a tool definition
+	// (GET /catalog/definitions/{sha256})
+	GetToolDefinition(w http.ResponseWriter, r *http.Request, sha256 DefinitionSha256)
+	// ListCatalogModels List models
+	// (GET /catalog/models)
+	ListCatalogModels(w http.ResponseWriter, r *http.Request, params ListCatalogModelsParams)
+	// GetCatalogModel Get a model
+	// (GET /catalog/models/{id})
+	GetCatalogModel(w http.ResponseWriter, r *http.Request, id CatalogModelId)
+	// ApproveCatalogModel Approve a model or a new digest
+	// (POST /catalog/models/{id}/approve)
+	ApproveCatalogModel(w http.ResponseWriter, r *http.Request, id CatalogModelId, params ApproveCatalogModelParams)
+	// DeclineCatalogModel Decline a model or a new digest
+	// (POST /catalog/models/{id}/decline)
+	DeclineCatalogModel(w http.ResponseWriter, r *http.Request, id CatalogModelId, params DeclineCatalogModelParams)
+	// ListCatalogServers List MCP servers
+	// (GET /catalog/servers)
+	ListCatalogServers(w http.ResponseWriter, r *http.Request, params ListCatalogServersParams)
+	// GetCatalogServer Get an MCP server
+	// (GET /catalog/servers/{id})
+	GetCatalogServer(w http.ResponseWriter, r *http.Request, id CatalogServerId)
+	// ApproveCatalogServer Approve an MCP server
+	// (POST /catalog/servers/{id}/approve)
+	ApproveCatalogServer(w http.ResponseWriter, r *http.Request, id CatalogServerId, params ApproveCatalogServerParams)
+	// DeclineCatalogServer Decline an MCP server
+	// (POST /catalog/servers/{id}/decline)
+	DeclineCatalogServer(w http.ResponseWriter, r *http.Request, id CatalogServerId, params DeclineCatalogServerParams)
+	// ListCatalogTools List tools
+	// (GET /catalog/tools)
+	ListCatalogTools(w http.ResponseWriter, r *http.Request, params ListCatalogToolsParams)
+	// GetCatalogTool Get a tool
+	// (GET /catalog/tools/{id})
+	GetCatalogTool(w http.ResponseWriter, r *http.Request, id CatalogToolId)
+	// ApproveCatalogTool Approve a tool or a new definition
+	// (POST /catalog/tools/{id}/approve)
+	ApproveCatalogTool(w http.ResponseWriter, r *http.Request, id CatalogToolId, params ApproveCatalogToolParams)
+	// DeclineCatalogTool Decline a tool or a new definition
+	// (POST /catalog/tools/{id}/decline)
+	DeclineCatalogTool(w http.ResponseWriter, r *http.Request, id CatalogToolId, params DeclineCatalogToolParams)
+	// CompileUsageRules Compile usage rules into Cedar
+	// (POST /catalog/usage-rules/compile)
+	CompileUsageRules(w http.ResponseWriter, r *http.Request)
 	// ListDataCategories List the data categories
 	// (GET /data-categories)
 	ListDataCategories(w http.ResponseWriter, r *http.Request)
@@ -2432,6 +3737,82 @@ func (siw *ServerInterfaceWrapper) GetAgentActions(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// GetAgentDeclaredTooling operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentDeclaredTooling(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentDeclaredTooling(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeclareAgentTooling operation middleware
+func (siw *ServerInterfaceWrapper) DeclareAgentTooling(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeclareAgentToolingParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeclareAgentTooling(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // AddAgentDelegate operation middleware
 func (siw *ServerInterfaceWrapper) AddAgentDelegate(w http.ResponseWriter, r *http.Request) {
 
@@ -2855,6 +4236,277 @@ func (siw *ServerInterfaceWrapper) ListAgentReviews(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListAgentTooling operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentTooling(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAgentToolingParams
+
+	// ------------- Optional query parameter "entryType" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "entryType", r.URL.Query(), &params.EntryType, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "entryType"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entryType", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "enabled" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "enabled", r.URL.Query(), &params.Enabled, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "enabled"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "enabled", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentTooling(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAgentToolingRequests operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentToolingRequests(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAgentToolingRequestsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentToolingRequests(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestAgentTooling operation middleware
+func (siw *ServerInterfaceWrapper) RequestAgentTooling(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestAgentTooling(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveAgentToolingRequest operation middleware
+func (siw *ServerInterfaceWrapper) ApproveAgentToolingRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId ToolingRequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", r.PathValue("requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveAgentToolingRequest(w, r, id, requestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeclineAgentToolingRequest operation middleware
+func (siw *ServerInterfaceWrapper) DeclineAgentToolingRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId ToolingRequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", r.PathValue("requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeclineAgentToolingRequest(w, r, id, requestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableAgentTooling operation middleware
+func (siw *ServerInterfaceWrapper) DisableAgentTooling(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AgentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableAgentTooling(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAgentTransitions operation middleware
 func (siw *ServerInterfaceWrapper) ListAgentTransitions(w http.ResponseWriter, r *http.Request) {
 
@@ -3168,6 +4820,966 @@ func (siw *ServerInterfaceWrapper) GetAuditKeys(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAuditKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCatalogBlocks operation middleware
+func (siw *ServerInterfaceWrapper) ListCatalogBlocks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCatalogBlocksParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCatalogBlocks(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// IssueCatalogBlock operation middleware
+func (siw *ServerInterfaceWrapper) IssueCatalogBlock(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.IssueCatalogBlock(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCatalogBlock operation middleware
+func (siw *ServerInterfaceWrapper) GetCatalogBlock(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogBlockId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCatalogBlock(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestCatalogUnblock operation middleware
+func (siw *ServerInterfaceWrapper) RequestCatalogUnblock(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogBlockId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestCatalogUnblock(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveCatalogUnblock operation middleware
+func (siw *ServerInterfaceWrapper) ApproveCatalogUnblock(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogBlockId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId UnblockRequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", r.PathValue("requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveCatalogUnblock(w, r, id, requestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeclineCatalogUnblock operation middleware
+func (siw *ServerInterfaceWrapper) DeclineCatalogUnblock(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogBlockId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId UnblockRequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", r.PathValue("requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeclineCatalogUnblock(w, r, id, requestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeclinePendingFromAgent operation middleware
+func (siw *ServerInterfaceWrapper) DeclinePendingFromAgent(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeclinePendingFromAgent(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetToolDefinition operation middleware
+func (siw *ServerInterfaceWrapper) GetToolDefinition(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sha256" -------------
+	var sha256 DefinitionSha256
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sha256", r.PathValue("sha256"), &sha256, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sha256", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetToolDefinition(w, r, sha256)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCatalogModels operation middleware
+func (siw *ServerInterfaceWrapper) ListCatalogModels(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCatalogModelsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "pendingReview" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "pendingReview", r.URL.Query(), &params.PendingReview, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "pendingReview"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pendingReview", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "flag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "flag", r.URL.Query(), &params.Flag, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "flag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "key" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "key", r.URL.Query(), &params.Key, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "key"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "key", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "provider" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "provider", r.URL.Query(), &params.Provider, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "provider"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCatalogModels(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCatalogModel operation middleware
+func (siw *ServerInterfaceWrapper) GetCatalogModel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogModelId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCatalogModel(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveCatalogModel operation middleware
+func (siw *ServerInterfaceWrapper) ApproveCatalogModel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogModelId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ApproveCatalogModelParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveCatalogModel(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeclineCatalogModel operation middleware
+func (siw *ServerInterfaceWrapper) DeclineCatalogModel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogModelId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeclineCatalogModelParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeclineCatalogModel(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCatalogServers operation middleware
+func (siw *ServerInterfaceWrapper) ListCatalogServers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCatalogServersParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "pendingReview" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "pendingReview", r.URL.Query(), &params.PendingReview, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "pendingReview"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pendingReview", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "flag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "flag", r.URL.Query(), &params.Flag, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "flag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "key" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "key", r.URL.Query(), &params.Key, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "key"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "key", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCatalogServers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCatalogServer operation middleware
+func (siw *ServerInterfaceWrapper) GetCatalogServer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogServerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCatalogServer(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveCatalogServer operation middleware
+func (siw *ServerInterfaceWrapper) ApproveCatalogServer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogServerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ApproveCatalogServerParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveCatalogServer(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeclineCatalogServer operation middleware
+func (siw *ServerInterfaceWrapper) DeclineCatalogServer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogServerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeclineCatalogServerParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeclineCatalogServer(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCatalogTools operation middleware
+func (siw *ServerInterfaceWrapper) ListCatalogTools(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCatalogToolsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "pendingReview" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "pendingReview", r.URL.Query(), &params.PendingReview, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "pendingReview"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pendingReview", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "key" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "key", r.URL.Query(), &params.Key, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "key"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "key", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "serverId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "serverId", r.URL.Query(), &params.ServerId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "serverId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "serverId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "agentId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "agentId", r.URL.Query(), &params.AgentId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCatalogTools(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCatalogTool operation middleware
+func (siw *ServerInterfaceWrapper) GetCatalogTool(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogToolId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCatalogTool(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveCatalogTool operation middleware
+func (siw *ServerInterfaceWrapper) ApproveCatalogTool(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogToolId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ApproveCatalogToolParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveCatalogTool(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeclineCatalogTool operation middleware
+func (siw *ServerInterfaceWrapper) DeclineCatalogTool(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id CatalogToolId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeclineCatalogToolParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeclineCatalogTool(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompileUsageRules operation middleware
+func (siw *ServerInterfaceWrapper) CompileUsageRules(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompileUsageRules(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3987,6 +6599,35 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/reviews/{id}/sign-off", wrapper.SignOffReview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/data-categories", wrapper.ListDataCategories)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/inbox", wrapper.ListInboxItems)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/catalog/servers", wrapper.ListCatalogServers)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/catalog/servers/{id}", wrapper.GetCatalogServer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/servers/{id}/approve", wrapper.ApproveCatalogServer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/servers/{id}/decline", wrapper.DeclineCatalogServer)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/catalog/tools", wrapper.ListCatalogTools)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/catalog/tools/{id}", wrapper.GetCatalogTool)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/tools/{id}/approve", wrapper.ApproveCatalogTool)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/tools/{id}/decline", wrapper.DeclineCatalogTool)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/catalog/definitions/{sha256}", wrapper.GetToolDefinition)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/catalog/models", wrapper.ListCatalogModels)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/catalog/models/{id}", wrapper.GetCatalogModel)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/models/{id}/approve", wrapper.ApproveCatalogModel)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/models/{id}/decline", wrapper.DeclineCatalogModel)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/declines", wrapper.DeclinePendingFromAgent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/catalog/blocks", wrapper.ListCatalogBlocks)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/blocks", wrapper.IssueCatalogBlock)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/catalog/blocks/{id}", wrapper.GetCatalogBlock)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/blocks/{id}/unblock-requests", wrapper.RequestCatalogUnblock)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/blocks/{id}/unblock-requests/{requestId}/approve", wrapper.ApproveCatalogUnblock)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/blocks/{id}/unblock-requests/{requestId}/decline", wrapper.DeclineCatalogUnblock)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/catalog/usage-rules/compile", wrapper.CompileUsageRules)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{id}/tooling", wrapper.ListAgentTooling)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{id}/tooling/disable", wrapper.DisableAgentTooling)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{id}/tooling-requests", wrapper.ListAgentToolingRequests)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{id}/tooling-requests", wrapper.RequestAgentTooling)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{id}/tooling-requests/{requestId}/approve", wrapper.ApproveAgentToolingRequest)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{id}/tooling-requests/{requestId}/decline", wrapper.DeclineAgentToolingRequest)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{id}/declared-tooling", wrapper.GetAgentDeclaredTooling)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{id}/declared-tooling", wrapper.DeclareAgentTooling)
 
 	return m
 }
@@ -4276,6 +6917,102 @@ type GetAgentActionsdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetAgentActionsdefaultApplicationProblemPlusJSONResponse) VisitGetAgentActionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgentDeclaredToolingRequestObject struct {
+	Id AgentId `json:"id"`
+}
+
+type GetAgentDeclaredToolingResponseObject interface {
+	VisitGetAgentDeclaredToolingResponse(w http.ResponseWriter) error
+}
+
+type GetAgentDeclaredTooling200ResponseHeaders struct {
+	ETag string
+}
+
+type GetAgentDeclaredTooling200JSONResponse struct {
+	Body    DeclaredTooling
+	Headers GetAgentDeclaredTooling200ResponseHeaders
+}
+
+func (response GetAgentDeclaredTooling200JSONResponse) VisitGetAgentDeclaredToolingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgentDeclaredToolingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetAgentDeclaredToolingdefaultApplicationProblemPlusJSONResponse) VisitGetAgentDeclaredToolingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclareAgentToolingRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params DeclareAgentToolingParams
+	Body   *DeclareAgentToolingJSONRequestBody
+}
+
+type DeclareAgentToolingResponseObject interface {
+	VisitDeclareAgentToolingResponse(w http.ResponseWriter) error
+}
+
+type DeclareAgentTooling200ResponseHeaders struct {
+	ETag string
+}
+
+type DeclareAgentTooling200JSONResponse struct {
+	Body    DeclaredTooling
+	Headers DeclareAgentTooling200ResponseHeaders
+}
+
+func (response DeclareAgentTooling200JSONResponse) VisitDeclareAgentToolingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclareAgentToolingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeclareAgentToolingdefaultApplicationProblemPlusJSONResponse) VisitDeclareAgentToolingResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -4685,6 +7422,248 @@ func (response ListAgentReviewsdefaultApplicationProblemPlusJSONResponse) VisitL
 	return err
 }
 
+type ListAgentToolingRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params ListAgentToolingParams
+}
+
+type ListAgentToolingResponseObject interface {
+	VisitListAgentToolingResponse(w http.ResponseWriter) error
+}
+
+type ListAgentTooling200JSONResponse AgentToolingList
+
+func (response ListAgentTooling200JSONResponse) VisitListAgentToolingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentToolingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListAgentToolingdefaultApplicationProblemPlusJSONResponse) VisitListAgentToolingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentToolingRequestsRequestObject struct {
+	Id     AgentId `json:"id"`
+	Params ListAgentToolingRequestsParams
+}
+
+type ListAgentToolingRequestsResponseObject interface {
+	VisitListAgentToolingRequestsResponse(w http.ResponseWriter) error
+}
+
+type ListAgentToolingRequests200JSONResponse ToolingRequestList
+
+func (response ListAgentToolingRequests200JSONResponse) VisitListAgentToolingRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentToolingRequestsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListAgentToolingRequestsdefaultApplicationProblemPlusJSONResponse) VisitListAgentToolingRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestAgentToolingRequestObject struct {
+	Id   AgentId `json:"id"`
+	Body *RequestAgentToolingJSONRequestBody
+}
+
+type RequestAgentToolingResponseObject interface {
+	VisitRequestAgentToolingResponse(w http.ResponseWriter) error
+}
+
+type RequestAgentTooling201JSONResponse ToolingRequest
+
+func (response RequestAgentTooling201JSONResponse) VisitRequestAgentToolingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestAgentToolingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RequestAgentToolingdefaultApplicationProblemPlusJSONResponse) VisitRequestAgentToolingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveAgentToolingRequestRequestObject struct {
+	Id        AgentId          `json:"id"`
+	RequestId ToolingRequestId `json:"requestId"`
+	Body      *ApproveAgentToolingRequestJSONRequestBody
+}
+
+type ApproveAgentToolingRequestResponseObject interface {
+	VisitApproveAgentToolingRequestResponse(w http.ResponseWriter) error
+}
+
+type ApproveAgentToolingRequest200JSONResponse ToolingRequest
+
+func (response ApproveAgentToolingRequest200JSONResponse) VisitApproveAgentToolingRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveAgentToolingRequestdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ApproveAgentToolingRequestdefaultApplicationProblemPlusJSONResponse) VisitApproveAgentToolingRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineAgentToolingRequestRequestObject struct {
+	Id        AgentId          `json:"id"`
+	RequestId ToolingRequestId `json:"requestId"`
+	Body      *DeclineAgentToolingRequestJSONRequestBody
+}
+
+type DeclineAgentToolingRequestResponseObject interface {
+	VisitDeclineAgentToolingRequestResponse(w http.ResponseWriter) error
+}
+
+type DeclineAgentToolingRequest200JSONResponse ToolingRequest
+
+func (response DeclineAgentToolingRequest200JSONResponse) VisitDeclineAgentToolingRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineAgentToolingRequestdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeclineAgentToolingRequestdefaultApplicationProblemPlusJSONResponse) VisitDeclineAgentToolingRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAgentToolingRequestObject struct {
+	Id   AgentId `json:"id"`
+	Body *DisableAgentToolingJSONRequestBody
+}
+
+type DisableAgentToolingResponseObject interface {
+	VisitDisableAgentToolingResponse(w http.ResponseWriter) error
+}
+
+type DisableAgentTooling200JSONResponse ToolingEntryRefList
+
+func (response DisableAgentTooling200JSONResponse) VisitDisableAgentToolingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableAgentToolingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DisableAgentToolingdefaultApplicationProblemPlusJSONResponse) VisitDisableAgentToolingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListAgentTransitionsRequestObject struct {
 	Id     AgentId `json:"id"`
 	Params ListAgentTransitionsParams
@@ -4933,6 +7912,922 @@ type GetAuditKeysdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetAuditKeysdefaultApplicationProblemPlusJSONResponse) VisitGetAuditKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCatalogBlocksRequestObject struct {
+	Params ListCatalogBlocksParams
+}
+
+type ListCatalogBlocksResponseObject interface {
+	VisitListCatalogBlocksResponse(w http.ResponseWriter) error
+}
+
+type ListCatalogBlocks200JSONResponse CatalogBlockList
+
+func (response ListCatalogBlocks200JSONResponse) VisitListCatalogBlocksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCatalogBlocksdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListCatalogBlocksdefaultApplicationProblemPlusJSONResponse) VisitListCatalogBlocksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type IssueCatalogBlockRequestObject struct {
+	Body *IssueCatalogBlockJSONRequestBody
+}
+
+type IssueCatalogBlockResponseObject interface {
+	VisitIssueCatalogBlockResponse(w http.ResponseWriter) error
+}
+
+type IssueCatalogBlock201JSONResponse CatalogBlock
+
+func (response IssueCatalogBlock201JSONResponse) VisitIssueCatalogBlockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type IssueCatalogBlockdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response IssueCatalogBlockdefaultApplicationProblemPlusJSONResponse) VisitIssueCatalogBlockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCatalogBlockRequestObject struct {
+	Id CatalogBlockId `json:"id"`
+}
+
+type GetCatalogBlockResponseObject interface {
+	VisitGetCatalogBlockResponse(w http.ResponseWriter) error
+}
+
+type GetCatalogBlock200JSONResponse CatalogBlock
+
+func (response GetCatalogBlock200JSONResponse) VisitGetCatalogBlockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCatalogBlockdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetCatalogBlockdefaultApplicationProblemPlusJSONResponse) VisitGetCatalogBlockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestCatalogUnblockRequestObject struct {
+	Id   CatalogBlockId `json:"id"`
+	Body *RequestCatalogUnblockJSONRequestBody
+}
+
+type RequestCatalogUnblockResponseObject interface {
+	VisitRequestCatalogUnblockResponse(w http.ResponseWriter) error
+}
+
+type RequestCatalogUnblock201JSONResponse CatalogUnblockRequest
+
+func (response RequestCatalogUnblock201JSONResponse) VisitRequestCatalogUnblockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestCatalogUnblockdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RequestCatalogUnblockdefaultApplicationProblemPlusJSONResponse) VisitRequestCatalogUnblockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveCatalogUnblockRequestObject struct {
+	Id        CatalogBlockId   `json:"id"`
+	RequestId UnblockRequestId `json:"requestId"`
+	Body      *ApproveCatalogUnblockJSONRequestBody
+}
+
+type ApproveCatalogUnblockResponseObject interface {
+	VisitApproveCatalogUnblockResponse(w http.ResponseWriter) error
+}
+
+type ApproveCatalogUnblock200JSONResponse CatalogBlock
+
+func (response ApproveCatalogUnblock200JSONResponse) VisitApproveCatalogUnblockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveCatalogUnblockdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ApproveCatalogUnblockdefaultApplicationProblemPlusJSONResponse) VisitApproveCatalogUnblockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineCatalogUnblockRequestObject struct {
+	Id        CatalogBlockId   `json:"id"`
+	RequestId UnblockRequestId `json:"requestId"`
+	Body      *DeclineCatalogUnblockJSONRequestBody
+}
+
+type DeclineCatalogUnblockResponseObject interface {
+	VisitDeclineCatalogUnblockResponse(w http.ResponseWriter) error
+}
+
+type DeclineCatalogUnblock200JSONResponse CatalogUnblockRequest
+
+func (response DeclineCatalogUnblock200JSONResponse) VisitDeclineCatalogUnblockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineCatalogUnblockdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeclineCatalogUnblockdefaultApplicationProblemPlusJSONResponse) VisitDeclineCatalogUnblockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclinePendingFromAgentRequestObject struct {
+	Body *DeclinePendingFromAgentJSONRequestBody
+}
+
+type DeclinePendingFromAgentResponseObject interface {
+	VisitDeclinePendingFromAgentResponse(w http.ResponseWriter) error
+}
+
+type DeclinePendingFromAgent200JSONResponse CatalogDeclineSummary
+
+func (response DeclinePendingFromAgent200JSONResponse) VisitDeclinePendingFromAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclinePendingFromAgentdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeclinePendingFromAgentdefaultApplicationProblemPlusJSONResponse) VisitDeclinePendingFromAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetToolDefinitionRequestObject struct {
+	Sha256 DefinitionSha256 `json:"sha256"`
+}
+
+type GetToolDefinitionResponseObject interface {
+	VisitGetToolDefinitionResponse(w http.ResponseWriter) error
+}
+
+type GetToolDefinition200ResponseHeaders struct {
+	ETag string
+}
+
+type GetToolDefinition200JSONResponse struct {
+	Body    ToolDefinition
+	Headers GetToolDefinition200ResponseHeaders
+}
+
+func (response GetToolDefinition200JSONResponse) VisitGetToolDefinitionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetToolDefinitiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetToolDefinitiondefaultApplicationProblemPlusJSONResponse) VisitGetToolDefinitionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCatalogModelsRequestObject struct {
+	Params ListCatalogModelsParams
+}
+
+type ListCatalogModelsResponseObject interface {
+	VisitListCatalogModelsResponse(w http.ResponseWriter) error
+}
+
+type ListCatalogModels200JSONResponse CatalogModelList
+
+func (response ListCatalogModels200JSONResponse) VisitListCatalogModelsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCatalogModelsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListCatalogModelsdefaultApplicationProblemPlusJSONResponse) VisitListCatalogModelsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCatalogModelRequestObject struct {
+	Id CatalogModelId `json:"id"`
+}
+
+type GetCatalogModelResponseObject interface {
+	VisitGetCatalogModelResponse(w http.ResponseWriter) error
+}
+
+type GetCatalogModel200ResponseHeaders struct {
+	ETag string
+}
+
+type GetCatalogModel200JSONResponse struct {
+	Body    CatalogModel
+	Headers GetCatalogModel200ResponseHeaders
+}
+
+func (response GetCatalogModel200JSONResponse) VisitGetCatalogModelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCatalogModeldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetCatalogModeldefaultApplicationProblemPlusJSONResponse) VisitGetCatalogModelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveCatalogModelRequestObject struct {
+	Id     CatalogModelId `json:"id"`
+	Params ApproveCatalogModelParams
+	Body   *ApproveCatalogModelJSONRequestBody
+}
+
+type ApproveCatalogModelResponseObject interface {
+	VisitApproveCatalogModelResponse(w http.ResponseWriter) error
+}
+
+type ApproveCatalogModel200ResponseHeaders struct {
+	ETag string
+}
+
+type ApproveCatalogModel200JSONResponse struct {
+	Body    CatalogModel
+	Headers ApproveCatalogModel200ResponseHeaders
+}
+
+func (response ApproveCatalogModel200JSONResponse) VisitApproveCatalogModelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveCatalogModeldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ApproveCatalogModeldefaultApplicationProblemPlusJSONResponse) VisitApproveCatalogModelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineCatalogModelRequestObject struct {
+	Id     CatalogModelId `json:"id"`
+	Params DeclineCatalogModelParams
+	Body   *DeclineCatalogModelJSONRequestBody
+}
+
+type DeclineCatalogModelResponseObject interface {
+	VisitDeclineCatalogModelResponse(w http.ResponseWriter) error
+}
+
+type DeclineCatalogModel200ResponseHeaders struct {
+	ETag string
+}
+
+type DeclineCatalogModel200JSONResponse struct {
+	Body    CatalogModel
+	Headers DeclineCatalogModel200ResponseHeaders
+}
+
+func (response DeclineCatalogModel200JSONResponse) VisitDeclineCatalogModelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineCatalogModeldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeclineCatalogModeldefaultApplicationProblemPlusJSONResponse) VisitDeclineCatalogModelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCatalogServersRequestObject struct {
+	Params ListCatalogServersParams
+}
+
+type ListCatalogServersResponseObject interface {
+	VisitListCatalogServersResponse(w http.ResponseWriter) error
+}
+
+type ListCatalogServers200JSONResponse CatalogServerList
+
+func (response ListCatalogServers200JSONResponse) VisitListCatalogServersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCatalogServersdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListCatalogServersdefaultApplicationProblemPlusJSONResponse) VisitListCatalogServersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCatalogServerRequestObject struct {
+	Id CatalogServerId `json:"id"`
+}
+
+type GetCatalogServerResponseObject interface {
+	VisitGetCatalogServerResponse(w http.ResponseWriter) error
+}
+
+type GetCatalogServer200ResponseHeaders struct {
+	ETag string
+}
+
+type GetCatalogServer200JSONResponse struct {
+	Body    CatalogServer
+	Headers GetCatalogServer200ResponseHeaders
+}
+
+func (response GetCatalogServer200JSONResponse) VisitGetCatalogServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCatalogServerdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetCatalogServerdefaultApplicationProblemPlusJSONResponse) VisitGetCatalogServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveCatalogServerRequestObject struct {
+	Id     CatalogServerId `json:"id"`
+	Params ApproveCatalogServerParams
+	Body   *ApproveCatalogServerJSONRequestBody
+}
+
+type ApproveCatalogServerResponseObject interface {
+	VisitApproveCatalogServerResponse(w http.ResponseWriter) error
+}
+
+type ApproveCatalogServer200ResponseHeaders struct {
+	ETag string
+}
+
+type ApproveCatalogServer200JSONResponse struct {
+	Body    CatalogServer
+	Headers ApproveCatalogServer200ResponseHeaders
+}
+
+func (response ApproveCatalogServer200JSONResponse) VisitApproveCatalogServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveCatalogServerdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ApproveCatalogServerdefaultApplicationProblemPlusJSONResponse) VisitApproveCatalogServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineCatalogServerRequestObject struct {
+	Id     CatalogServerId `json:"id"`
+	Params DeclineCatalogServerParams
+	Body   *DeclineCatalogServerJSONRequestBody
+}
+
+type DeclineCatalogServerResponseObject interface {
+	VisitDeclineCatalogServerResponse(w http.ResponseWriter) error
+}
+
+type DeclineCatalogServer200ResponseHeaders struct {
+	ETag string
+}
+
+type DeclineCatalogServer200JSONResponse struct {
+	Body    CatalogServer
+	Headers DeclineCatalogServer200ResponseHeaders
+}
+
+func (response DeclineCatalogServer200JSONResponse) VisitDeclineCatalogServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineCatalogServerdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeclineCatalogServerdefaultApplicationProblemPlusJSONResponse) VisitDeclineCatalogServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCatalogToolsRequestObject struct {
+	Params ListCatalogToolsParams
+}
+
+type ListCatalogToolsResponseObject interface {
+	VisitListCatalogToolsResponse(w http.ResponseWriter) error
+}
+
+type ListCatalogTools200JSONResponse CatalogToolList
+
+func (response ListCatalogTools200JSONResponse) VisitListCatalogToolsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCatalogToolsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListCatalogToolsdefaultApplicationProblemPlusJSONResponse) VisitListCatalogToolsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCatalogToolRequestObject struct {
+	Id CatalogToolId `json:"id"`
+}
+
+type GetCatalogToolResponseObject interface {
+	VisitGetCatalogToolResponse(w http.ResponseWriter) error
+}
+
+type GetCatalogTool200ResponseHeaders struct {
+	ETag string
+}
+
+type GetCatalogTool200JSONResponse struct {
+	Body    CatalogTool
+	Headers GetCatalogTool200ResponseHeaders
+}
+
+func (response GetCatalogTool200JSONResponse) VisitGetCatalogToolResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCatalogTooldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetCatalogTooldefaultApplicationProblemPlusJSONResponse) VisitGetCatalogToolResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveCatalogToolRequestObject struct {
+	Id     CatalogToolId `json:"id"`
+	Params ApproveCatalogToolParams
+	Body   *ApproveCatalogToolJSONRequestBody
+}
+
+type ApproveCatalogToolResponseObject interface {
+	VisitApproveCatalogToolResponse(w http.ResponseWriter) error
+}
+
+type ApproveCatalogTool200ResponseHeaders struct {
+	ETag string
+}
+
+type ApproveCatalogTool200JSONResponse struct {
+	Body    CatalogTool
+	Headers ApproveCatalogTool200ResponseHeaders
+}
+
+func (response ApproveCatalogTool200JSONResponse) VisitApproveCatalogToolResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveCatalogTooldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ApproveCatalogTooldefaultApplicationProblemPlusJSONResponse) VisitApproveCatalogToolResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineCatalogToolRequestObject struct {
+	Id     CatalogToolId `json:"id"`
+	Params DeclineCatalogToolParams
+	Body   *DeclineCatalogToolJSONRequestBody
+}
+
+type DeclineCatalogToolResponseObject interface {
+	VisitDeclineCatalogToolResponse(w http.ResponseWriter) error
+}
+
+type DeclineCatalogTool200ResponseHeaders struct {
+	ETag string
+}
+
+type DeclineCatalogTool200JSONResponse struct {
+	Body    CatalogTool
+	Headers DeclineCatalogTool200ResponseHeaders
+}
+
+func (response DeclineCatalogTool200JSONResponse) VisitDeclineCatalogToolResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclineCatalogTooldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeclineCatalogTooldefaultApplicationProblemPlusJSONResponse) VisitDeclineCatalogToolResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompileUsageRulesRequestObject struct {
+	Body *CompileUsageRulesJSONRequestBody
+}
+
+type CompileUsageRulesResponseObject interface {
+	VisitCompileUsageRulesResponse(w http.ResponseWriter) error
+}
+
+type CompileUsageRules200JSONResponse CompiledUsageRules
+
+func (response CompileUsageRules200JSONResponse) VisitCompileUsageRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompileUsageRulesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CompileUsageRulesdefaultApplicationProblemPlusJSONResponse) VisitCompileUsageRulesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -5799,6 +9694,12 @@ type StrictServerInterface interface {
 	// GetAgentActions Get the lifecycle actions open to the caller
 	// (GET /agents/{id}/actions)
 	GetAgentActions(ctx context.Context, request GetAgentActionsRequestObject) (GetAgentActionsResponseObject, error)
+	// GetAgentDeclaredTooling Get an agent's declared tooling
+	// (GET /agents/{id}/declared-tooling)
+	GetAgentDeclaredTooling(ctx context.Context, request GetAgentDeclaredToolingRequestObject) (GetAgentDeclaredToolingResponseObject, error)
+	// DeclareAgentTooling Declare an agent's tooling
+	// (PUT /agents/{id}/declared-tooling)
+	DeclareAgentTooling(ctx context.Context, request DeclareAgentToolingRequestObject) (DeclareAgentToolingResponseObject, error)
 	// AddAgentDelegate Add a delegate
 	// (POST /agents/{id}/delegates)
 	AddAgentDelegate(ctx context.Context, request AddAgentDelegateRequestObject) (AddAgentDelegateResponseObject, error)
@@ -5829,6 +9730,24 @@ type StrictServerInterface interface {
 	// ListAgentReviews List an agent's periodic reviews
 	// (GET /agents/{id}/reviews)
 	ListAgentReviews(ctx context.Context, request ListAgentReviewsRequestObject) (ListAgentReviewsResponseObject, error)
+	// ListAgentTooling List an agent's tooling
+	// (GET /agents/{id}/tooling)
+	ListAgentTooling(ctx context.Context, request ListAgentToolingRequestObject) (ListAgentToolingResponseObject, error)
+	// ListAgentToolingRequests List an agent's requests to enable tooling
+	// (GET /agents/{id}/tooling-requests)
+	ListAgentToolingRequests(ctx context.Context, request ListAgentToolingRequestsRequestObject) (ListAgentToolingRequestsResponseObject, error)
+	// RequestAgentTooling Request enabling tooling for an agent
+	// (POST /agents/{id}/tooling-requests)
+	RequestAgentTooling(ctx context.Context, request RequestAgentToolingRequestObject) (RequestAgentToolingResponseObject, error)
+	// ApproveAgentToolingRequest Approve a request to enable tooling
+	// (POST /agents/{id}/tooling-requests/{requestId}/approve)
+	ApproveAgentToolingRequest(ctx context.Context, request ApproveAgentToolingRequestRequestObject) (ApproveAgentToolingRequestResponseObject, error)
+	// DeclineAgentToolingRequest Decline a request to enable tooling
+	// (POST /agents/{id}/tooling-requests/{requestId}/decline)
+	DeclineAgentToolingRequest(ctx context.Context, request DeclineAgentToolingRequestRequestObject) (DeclineAgentToolingRequestResponseObject, error)
+	// DisableAgentTooling Disable an agent's tooling
+	// (POST /agents/{id}/tooling/disable)
+	DisableAgentTooling(ctx context.Context, request DisableAgentToolingRequestObject) (DisableAgentToolingResponseObject, error)
 	// ListAgentTransitions List an agent's lifecycle history
 	// (GET /agents/{id}/transitions)
 	ListAgentTransitions(ctx context.Context, request ListAgentTransitionsRequestObject) (ListAgentTransitionsResponseObject, error)
@@ -5847,6 +9766,69 @@ type StrictServerInterface interface {
 	// GetAuditKeys List checkpoint signing keys
 	// (GET /audit/keys)
 	GetAuditKeys(ctx context.Context, request GetAuditKeysRequestObject) (GetAuditKeysResponseObject, error)
+	// ListCatalogBlocks List blocks
+	// (GET /catalog/blocks)
+	ListCatalogBlocks(ctx context.Context, request ListCatalogBlocksRequestObject) (ListCatalogBlocksResponseObject, error)
+	// IssueCatalogBlock Block a server, a tool or models
+	// (POST /catalog/blocks)
+	IssueCatalogBlock(ctx context.Context, request IssueCatalogBlockRequestObject) (IssueCatalogBlockResponseObject, error)
+	// GetCatalogBlock Get a block
+	// (GET /catalog/blocks/{id})
+	GetCatalogBlock(ctx context.Context, request GetCatalogBlockRequestObject) (GetCatalogBlockResponseObject, error)
+	// RequestCatalogUnblock Request that a block be lifted
+	// (POST /catalog/blocks/{id}/unblock-requests)
+	RequestCatalogUnblock(ctx context.Context, request RequestCatalogUnblockRequestObject) (RequestCatalogUnblockResponseObject, error)
+	// ApproveCatalogUnblock Approve lifting a block
+	// (POST /catalog/blocks/{id}/unblock-requests/{requestId}/approve)
+	ApproveCatalogUnblock(ctx context.Context, request ApproveCatalogUnblockRequestObject) (ApproveCatalogUnblockResponseObject, error)
+	// DeclineCatalogUnblock Decline lifting a block
+	// (POST /catalog/blocks/{id}/unblock-requests/{requestId}/decline)
+	DeclineCatalogUnblock(ctx context.Context, request DeclineCatalogUnblockRequestObject) (DeclineCatalogUnblockResponseObject, error)
+	// DeclinePendingFromAgent Decline everything an agent brought that waits for review
+	// (POST /catalog/declines)
+	DeclinePendingFromAgent(ctx context.Context, request DeclinePendingFromAgentRequestObject) (DeclinePendingFromAgentResponseObject, error)
+	// GetToolDefinition Get a tool definition
+	// (GET /catalog/definitions/{sha256})
+	GetToolDefinition(ctx context.Context, request GetToolDefinitionRequestObject) (GetToolDefinitionResponseObject, error)
+	// ListCatalogModels List models
+	// (GET /catalog/models)
+	ListCatalogModels(ctx context.Context, request ListCatalogModelsRequestObject) (ListCatalogModelsResponseObject, error)
+	// GetCatalogModel Get a model
+	// (GET /catalog/models/{id})
+	GetCatalogModel(ctx context.Context, request GetCatalogModelRequestObject) (GetCatalogModelResponseObject, error)
+	// ApproveCatalogModel Approve a model or a new digest
+	// (POST /catalog/models/{id}/approve)
+	ApproveCatalogModel(ctx context.Context, request ApproveCatalogModelRequestObject) (ApproveCatalogModelResponseObject, error)
+	// DeclineCatalogModel Decline a model or a new digest
+	// (POST /catalog/models/{id}/decline)
+	DeclineCatalogModel(ctx context.Context, request DeclineCatalogModelRequestObject) (DeclineCatalogModelResponseObject, error)
+	// ListCatalogServers List MCP servers
+	// (GET /catalog/servers)
+	ListCatalogServers(ctx context.Context, request ListCatalogServersRequestObject) (ListCatalogServersResponseObject, error)
+	// GetCatalogServer Get an MCP server
+	// (GET /catalog/servers/{id})
+	GetCatalogServer(ctx context.Context, request GetCatalogServerRequestObject) (GetCatalogServerResponseObject, error)
+	// ApproveCatalogServer Approve an MCP server
+	// (POST /catalog/servers/{id}/approve)
+	ApproveCatalogServer(ctx context.Context, request ApproveCatalogServerRequestObject) (ApproveCatalogServerResponseObject, error)
+	// DeclineCatalogServer Decline an MCP server
+	// (POST /catalog/servers/{id}/decline)
+	DeclineCatalogServer(ctx context.Context, request DeclineCatalogServerRequestObject) (DeclineCatalogServerResponseObject, error)
+	// ListCatalogTools List tools
+	// (GET /catalog/tools)
+	ListCatalogTools(ctx context.Context, request ListCatalogToolsRequestObject) (ListCatalogToolsResponseObject, error)
+	// GetCatalogTool Get a tool
+	// (GET /catalog/tools/{id})
+	GetCatalogTool(ctx context.Context, request GetCatalogToolRequestObject) (GetCatalogToolResponseObject, error)
+	// ApproveCatalogTool Approve a tool or a new definition
+	// (POST /catalog/tools/{id}/approve)
+	ApproveCatalogTool(ctx context.Context, request ApproveCatalogToolRequestObject) (ApproveCatalogToolResponseObject, error)
+	// DeclineCatalogTool Decline a tool or a new definition
+	// (POST /catalog/tools/{id}/decline)
+	DeclineCatalogTool(ctx context.Context, request DeclineCatalogToolRequestObject) (DeclineCatalogToolResponseObject, error)
+	// CompileUsageRules Compile usage rules into Cedar
+	// (POST /catalog/usage-rules/compile)
+	CompileUsageRules(ctx context.Context, request CompileUsageRulesRequestObject) (CompileUsageRulesResponseObject, error)
 	// ListDataCategories List the data categories
 	// (GET /data-categories)
 	ListDataCategories(ctx context.Context, request ListDataCategoriesRequestObject) (ListDataCategoriesResponseObject, error)
@@ -6110,6 +10092,66 @@ func (sh *strictHandler) GetAgentActions(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetAgentActionsResponseObject); ok {
 		if err := validResponse.VisitGetAgentActionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgentDeclaredTooling operation middleware
+func (sh *strictHandler) GetAgentDeclaredTooling(w http.ResponseWriter, r *http.Request, id AgentId) {
+	var request GetAgentDeclaredToolingRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentDeclaredTooling(ctx, request.(GetAgentDeclaredToolingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentDeclaredTooling")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentDeclaredToolingResponseObject); ok {
+		if err := validResponse.VisitGetAgentDeclaredToolingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeclareAgentTooling operation middleware
+func (sh *strictHandler) DeclareAgentTooling(w http.ResponseWriter, r *http.Request, id AgentId, params DeclareAgentToolingParams) {
+	var request DeclareAgentToolingRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body DeclareAgentToolingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeclareAgentTooling(ctx, request.(DeclareAgentToolingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeclareAgentTooling")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeclareAgentToolingResponseObject); ok {
+		if err := validResponse.VisitDeclareAgentToolingResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -6407,6 +10449,197 @@ func (sh *strictHandler) ListAgentReviews(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// ListAgentTooling operation middleware
+func (sh *strictHandler) ListAgentTooling(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentToolingParams) {
+	var request ListAgentToolingRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentTooling(ctx, request.(ListAgentToolingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentTooling")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentToolingResponseObject); ok {
+		if err := validResponse.VisitListAgentToolingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentToolingRequests operation middleware
+func (sh *strictHandler) ListAgentToolingRequests(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentToolingRequestsParams) {
+	var request ListAgentToolingRequestsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentToolingRequests(ctx, request.(ListAgentToolingRequestsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentToolingRequests")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentToolingRequestsResponseObject); ok {
+		if err := validResponse.VisitListAgentToolingRequestsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RequestAgentTooling operation middleware
+func (sh *strictHandler) RequestAgentTooling(w http.ResponseWriter, r *http.Request, id AgentId) {
+	var request RequestAgentToolingRequestObject
+
+	request.Id = id
+
+	var body RequestAgentToolingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RequestAgentTooling(ctx, request.(RequestAgentToolingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RequestAgentTooling")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RequestAgentToolingResponseObject); ok {
+		if err := validResponse.VisitRequestAgentToolingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApproveAgentToolingRequest operation middleware
+func (sh *strictHandler) ApproveAgentToolingRequest(w http.ResponseWriter, r *http.Request, id AgentId, requestId ToolingRequestId) {
+	var request ApproveAgentToolingRequestRequestObject
+
+	request.Id = id
+	request.RequestId = requestId
+
+	var body ApproveAgentToolingRequestJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveAgentToolingRequest(ctx, request.(ApproveAgentToolingRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveAgentToolingRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveAgentToolingRequestResponseObject); ok {
+		if err := validResponse.VisitApproveAgentToolingRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeclineAgentToolingRequest operation middleware
+func (sh *strictHandler) DeclineAgentToolingRequest(w http.ResponseWriter, r *http.Request, id AgentId, requestId ToolingRequestId) {
+	var request DeclineAgentToolingRequestRequestObject
+
+	request.Id = id
+	request.RequestId = requestId
+
+	var body DeclineAgentToolingRequestJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeclineAgentToolingRequest(ctx, request.(DeclineAgentToolingRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeclineAgentToolingRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeclineAgentToolingRequestResponseObject); ok {
+		if err := validResponse.VisitDeclineAgentToolingRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisableAgentTooling operation middleware
+func (sh *strictHandler) DisableAgentTooling(w http.ResponseWriter, r *http.Request, id AgentId) {
+	var request DisableAgentToolingRequestObject
+
+	request.Id = id
+
+	var body DisableAgentToolingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisableAgentTooling(ctx, request.(DisableAgentToolingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisableAgentTooling")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisableAgentToolingResponseObject); ok {
+		if err := validResponse.VisitDisableAgentToolingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListAgentTransitions operation middleware
 func (sh *strictHandler) ListAgentTransitions(w http.ResponseWriter, r *http.Request, id AgentId, params ListAgentTransitionsParams) {
 	var request ListAgentTransitionsRequestObject
@@ -6561,6 +10794,641 @@ func (sh *strictHandler) GetAuditKeys(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetAuditKeysResponseObject); ok {
 		if err := validResponse.VisitGetAuditKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCatalogBlocks operation middleware
+func (sh *strictHandler) ListCatalogBlocks(w http.ResponseWriter, r *http.Request, params ListCatalogBlocksParams) {
+	var request ListCatalogBlocksRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCatalogBlocks(ctx, request.(ListCatalogBlocksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCatalogBlocks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCatalogBlocksResponseObject); ok {
+		if err := validResponse.VisitListCatalogBlocksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// IssueCatalogBlock operation middleware
+func (sh *strictHandler) IssueCatalogBlock(w http.ResponseWriter, r *http.Request) {
+	var request IssueCatalogBlockRequestObject
+
+	var body IssueCatalogBlockJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.IssueCatalogBlock(ctx, request.(IssueCatalogBlockRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "IssueCatalogBlock")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(IssueCatalogBlockResponseObject); ok {
+		if err := validResponse.VisitIssueCatalogBlockResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCatalogBlock operation middleware
+func (sh *strictHandler) GetCatalogBlock(w http.ResponseWriter, r *http.Request, id CatalogBlockId) {
+	var request GetCatalogBlockRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCatalogBlock(ctx, request.(GetCatalogBlockRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCatalogBlock")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCatalogBlockResponseObject); ok {
+		if err := validResponse.VisitGetCatalogBlockResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RequestCatalogUnblock operation middleware
+func (sh *strictHandler) RequestCatalogUnblock(w http.ResponseWriter, r *http.Request, id CatalogBlockId) {
+	var request RequestCatalogUnblockRequestObject
+
+	request.Id = id
+
+	var body RequestCatalogUnblockJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RequestCatalogUnblock(ctx, request.(RequestCatalogUnblockRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RequestCatalogUnblock")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RequestCatalogUnblockResponseObject); ok {
+		if err := validResponse.VisitRequestCatalogUnblockResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApproveCatalogUnblock operation middleware
+func (sh *strictHandler) ApproveCatalogUnblock(w http.ResponseWriter, r *http.Request, id CatalogBlockId, requestId UnblockRequestId) {
+	var request ApproveCatalogUnblockRequestObject
+
+	request.Id = id
+	request.RequestId = requestId
+
+	var body ApproveCatalogUnblockJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveCatalogUnblock(ctx, request.(ApproveCatalogUnblockRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveCatalogUnblock")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveCatalogUnblockResponseObject); ok {
+		if err := validResponse.VisitApproveCatalogUnblockResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeclineCatalogUnblock operation middleware
+func (sh *strictHandler) DeclineCatalogUnblock(w http.ResponseWriter, r *http.Request, id CatalogBlockId, requestId UnblockRequestId) {
+	var request DeclineCatalogUnblockRequestObject
+
+	request.Id = id
+	request.RequestId = requestId
+
+	var body DeclineCatalogUnblockJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeclineCatalogUnblock(ctx, request.(DeclineCatalogUnblockRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeclineCatalogUnblock")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeclineCatalogUnblockResponseObject); ok {
+		if err := validResponse.VisitDeclineCatalogUnblockResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeclinePendingFromAgent operation middleware
+func (sh *strictHandler) DeclinePendingFromAgent(w http.ResponseWriter, r *http.Request) {
+	var request DeclinePendingFromAgentRequestObject
+
+	var body DeclinePendingFromAgentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeclinePendingFromAgent(ctx, request.(DeclinePendingFromAgentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeclinePendingFromAgent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeclinePendingFromAgentResponseObject); ok {
+		if err := validResponse.VisitDeclinePendingFromAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetToolDefinition operation middleware
+func (sh *strictHandler) GetToolDefinition(w http.ResponseWriter, r *http.Request, sha256 DefinitionSha256) {
+	var request GetToolDefinitionRequestObject
+
+	request.Sha256 = sha256
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetToolDefinition(ctx, request.(GetToolDefinitionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetToolDefinition")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetToolDefinitionResponseObject); ok {
+		if err := validResponse.VisitGetToolDefinitionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCatalogModels operation middleware
+func (sh *strictHandler) ListCatalogModels(w http.ResponseWriter, r *http.Request, params ListCatalogModelsParams) {
+	var request ListCatalogModelsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCatalogModels(ctx, request.(ListCatalogModelsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCatalogModels")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCatalogModelsResponseObject); ok {
+		if err := validResponse.VisitListCatalogModelsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCatalogModel operation middleware
+func (sh *strictHandler) GetCatalogModel(w http.ResponseWriter, r *http.Request, id CatalogModelId) {
+	var request GetCatalogModelRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCatalogModel(ctx, request.(GetCatalogModelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCatalogModel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCatalogModelResponseObject); ok {
+		if err := validResponse.VisitGetCatalogModelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApproveCatalogModel operation middleware
+func (sh *strictHandler) ApproveCatalogModel(w http.ResponseWriter, r *http.Request, id CatalogModelId, params ApproveCatalogModelParams) {
+	var request ApproveCatalogModelRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ApproveCatalogModelJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveCatalogModel(ctx, request.(ApproveCatalogModelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveCatalogModel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveCatalogModelResponseObject); ok {
+		if err := validResponse.VisitApproveCatalogModelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeclineCatalogModel operation middleware
+func (sh *strictHandler) DeclineCatalogModel(w http.ResponseWriter, r *http.Request, id CatalogModelId, params DeclineCatalogModelParams) {
+	var request DeclineCatalogModelRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body DeclineCatalogModelJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeclineCatalogModel(ctx, request.(DeclineCatalogModelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeclineCatalogModel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeclineCatalogModelResponseObject); ok {
+		if err := validResponse.VisitDeclineCatalogModelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCatalogServers operation middleware
+func (sh *strictHandler) ListCatalogServers(w http.ResponseWriter, r *http.Request, params ListCatalogServersParams) {
+	var request ListCatalogServersRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCatalogServers(ctx, request.(ListCatalogServersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCatalogServers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCatalogServersResponseObject); ok {
+		if err := validResponse.VisitListCatalogServersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCatalogServer operation middleware
+func (sh *strictHandler) GetCatalogServer(w http.ResponseWriter, r *http.Request, id CatalogServerId) {
+	var request GetCatalogServerRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCatalogServer(ctx, request.(GetCatalogServerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCatalogServer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCatalogServerResponseObject); ok {
+		if err := validResponse.VisitGetCatalogServerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApproveCatalogServer operation middleware
+func (sh *strictHandler) ApproveCatalogServer(w http.ResponseWriter, r *http.Request, id CatalogServerId, params ApproveCatalogServerParams) {
+	var request ApproveCatalogServerRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ApproveCatalogServerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveCatalogServer(ctx, request.(ApproveCatalogServerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveCatalogServer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveCatalogServerResponseObject); ok {
+		if err := validResponse.VisitApproveCatalogServerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeclineCatalogServer operation middleware
+func (sh *strictHandler) DeclineCatalogServer(w http.ResponseWriter, r *http.Request, id CatalogServerId, params DeclineCatalogServerParams) {
+	var request DeclineCatalogServerRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body DeclineCatalogServerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeclineCatalogServer(ctx, request.(DeclineCatalogServerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeclineCatalogServer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeclineCatalogServerResponseObject); ok {
+		if err := validResponse.VisitDeclineCatalogServerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCatalogTools operation middleware
+func (sh *strictHandler) ListCatalogTools(w http.ResponseWriter, r *http.Request, params ListCatalogToolsParams) {
+	var request ListCatalogToolsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCatalogTools(ctx, request.(ListCatalogToolsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCatalogTools")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCatalogToolsResponseObject); ok {
+		if err := validResponse.VisitListCatalogToolsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCatalogTool operation middleware
+func (sh *strictHandler) GetCatalogTool(w http.ResponseWriter, r *http.Request, id CatalogToolId) {
+	var request GetCatalogToolRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCatalogTool(ctx, request.(GetCatalogToolRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCatalogTool")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCatalogToolResponseObject); ok {
+		if err := validResponse.VisitGetCatalogToolResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApproveCatalogTool operation middleware
+func (sh *strictHandler) ApproveCatalogTool(w http.ResponseWriter, r *http.Request, id CatalogToolId, params ApproveCatalogToolParams) {
+	var request ApproveCatalogToolRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ApproveCatalogToolJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveCatalogTool(ctx, request.(ApproveCatalogToolRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveCatalogTool")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveCatalogToolResponseObject); ok {
+		if err := validResponse.VisitApproveCatalogToolResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeclineCatalogTool operation middleware
+func (sh *strictHandler) DeclineCatalogTool(w http.ResponseWriter, r *http.Request, id CatalogToolId, params DeclineCatalogToolParams) {
+	var request DeclineCatalogToolRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body DeclineCatalogToolJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeclineCatalogTool(ctx, request.(DeclineCatalogToolRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeclineCatalogTool")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeclineCatalogToolResponseObject); ok {
+		if err := validResponse.VisitDeclineCatalogToolResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompileUsageRules operation middleware
+func (sh *strictHandler) CompileUsageRules(w http.ResponseWriter, r *http.Request) {
+	var request CompileUsageRulesRequestObject
+
+	var body CompileUsageRulesJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompileUsageRules(ctx, request.(CompileUsageRulesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompileUsageRules")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompileUsageRulesResponseObject); ok {
+		if err := validResponse.VisitCompileUsageRulesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

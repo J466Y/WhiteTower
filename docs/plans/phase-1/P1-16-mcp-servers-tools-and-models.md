@@ -3,8 +3,8 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | Draft |
-| **Size** | L, in six pull requests, about five weeks (see [progress notes](#progress-notes)) |
+| **Status** | In progress (1 of 8 pull requests) |
+| **Size** | L, in eight pull requests, about five weeks (see [progress notes](#progress-notes)) |
 | **Depends on** | P1-04 for steps 1 to 4; RFC-0002 in the contracts ([P0-03](../phase-0/P0-03-module-contracts.md), step 12) and P1-06 for steps 5 and 6; P0-03 step 12, the blocks record and the mock module of P1-07 (steps 5 and 8), the harness of P1-08 (step 10) and the accepted design of the halt path for step 7 |
 | **Unblocks** | The wiring of tooling reports in P1-07 (its step 7), the catalog steps of P1-09, P1-10.6 and P1-10.7, the catalog commands of P1-11, the catalog flows of P1-12.2, P1-13, P1-14 |
 | **Requirements** | CAT-01 to CAT-10, NFR-24; backend of UI-10; the catalog part of API-04 |
@@ -209,13 +209,15 @@ Blocks travel on the halt path, which must never become a bottleneck (NFR-03). O
 
 ## Progress notes
 
-The plan lands in six pull requests.
+The plan lands in eight pull requests: the first is in three parts (the maintainer's decision of 2026-11-17), each from `main` once the one before is merged.
 
 | Pull request | Steps | Status |
 | --- | --- | --- |
-| 1. Permissions, API and catalog | 1, 2 | Not started |
+| 1a. Permissions and API | 1: the nine permissions, and every operation of the plan, answering `not_implemented` until built | Done |
+| 1b. Catalog entries | 2: the catalog's tables, the key grammar, entries and changed definitions and digests, the flags for unpinned packages and secrets in URL paths, `catalog.discovered` and `catalog.definition_changed`, and the reads | Not started |
+| 1c. Catalog review | 2: approving and declining, classification and declared arguments, `catalog.approved` and `catalog.declined` | Not started |
 | 2. Enablement and declared tooling | 3; ST-81 for enabling | Not started |
-| 3. Observations and definitions | 4; ST-75 | Not started |
+| 3. Observations and definitions | 4; ST-75; from step 2, the redaction rules applied again to what the catalog holds, the merge of entries that become one, and the core's redaction of reports | Not started |
 | 4. Bundles | 5, with P1-06; needs P0-03 step 12 | Not started |
 | 5. Usage rules | 6, with P1-06 | Not started |
 | 6. Blocks and metrics | 7, 8; ST-80, ST-81 for unblocking; needs P1-07's blocks record and the accepted design | Not started |
@@ -230,3 +232,39 @@ The reviews of P0-03 step 12's parts left these to P1-16. Each keeps what the co
 | Part 3c | Refuses to approve a tool that is not built-in without its definition hash, which the catalog file's schema requires of an approved tool |
 | Part 3d-2 (2026-11-16) | Decides how a catalog entry's `origin` is set, since who runs a remote MCP server's tool can differ from one agent to another. Policies on whether calls are decided read `calls_decided`, never `origin` (contracts, section 6.10) |
 | Part 3d-3 (2026-11-16) | Refuses a control character (U+0000 to U+001F, U+007F) where a report brings a tool's name or an argument's path, since the generator of usage rules refuses one in a tool key or an argument name (contracts, section 6.11) |
+
+### 2026-11-17: permissions and the agreed API (pull request 1a)
+
+- **The split** (the maintainer's decision of 2026-11-17). Pull request 1 is in three parts, about 2,200, 2,100 and 1,800 changed lines without generated code: 1a, the permissions and the whole API; 1b, the catalog's tables, the key grammar, entries and changed definitions and digests with their flags, the events `catalog.discovered` and `catalog.definition_changed`, and the reads; 1c, approving and declining, with the events `catalog.approved` and `catalog.declined`. The entry point of 1b that records reported entries has its production caller in pull request 3, as P1-02's ingestion logic came before P1-07's transport.
+- **Permissions** (`internal/authz`). The nine permissions of step 1, with the rows of the permission matrix. ST-17 checks 36 permissions, 252 pairs. Each operation maps to its permission in `registerDefaults`, and `TestCatalogOperationsFollowTheMatrix` checks which roles reach each one.
+  - The three `own` grants (`tooling.enable.request`, `tooling.disable` and `tooling.declare`) are all on operations of step 3, which answer `not_implemented` here. `TestAnOwnerActsOnTheToolingOfOnlyTheAgentsTheyOwn` checks at the authorizer that an owner is refused on an agent they do not own; the handler tests, through `Inventory.IsOwner`, come with pull request 2, which builds those handlers.
+  - Break-glass reaches none of the operations, reads included (`TestBreakglassReachesNoCatalogOperation`, ST-20).
+- **The API**, under the tag `catalog`: 29 operations, each answering `not_implemented` until the pull request of its step builds it (`internal/api/rest/catalog.go`). P1-10.7 has no owner yet, so the maintainer's review of this pull request stands for the console side, as it did for P1-04's API.
+
+  | Resource | Operations | Built in |
+  | --- | --- | --- |
+  | Servers | `listCatalogServers`, `getCatalogServer`, `approveCatalogServer`, `declineCatalogServer` | 1b, 1c |
+  | Tools | `listCatalogTools`, `getCatalogTool`, `getToolDefinition`, `approveCatalogTool`, `declineCatalogTool` | 1b, 1c |
+  | Models | `listCatalogModels`, `getCatalogModel`, `approveCatalogModel`, `declineCatalogModel` | 1b, 1c |
+  | The review queue | `declinePendingFromAgent` | 1c |
+  | Agents' tooling | `listAgentTooling`, `listAgentToolingRequests`, `requestAgentTooling`, `approveAgentToolingRequest`, `declineAgentToolingRequest`, `disableAgentTooling`, `getAgentDeclaredTooling`, `declareAgentTooling` | 2, 3 |
+  | Usage rules | `compileUsageRules` | 5 |
+  | Blocks | `listCatalogBlocks`, `issueCatalogBlock`, `getCatalogBlock`, `requestCatalogUnblock`, `approveCatalogUnblock`, `declineCatalogUnblock` | 6 |
+
+- **Decisions the API states:**
+  - **`catalog.view` for every operation of the tag** (the reviewer's note of 2026-11-17). Their answers carry references and reported text. `Authorizer.Authorize` requires `catalog.view` besides the operation's own permission for every operation that `registerDefaults` maps through `catalogOperation`: from a role and, for an API token, in its scopes. Every role that holds a permission of the catalog also holds `catalog.view`, so only API tokens are concerned. The check is central, so handlers need not repeat it, and no answer shows a reference to anyone without `catalog.view`. `TestEveryOperationOfTheCatalogNeedsCatalogView` reads the tag from the OpenAPI document, so a new operation of the tag that is not mapped this way fails it.
+  - **Conventions.** Entries, requests and blocks have UUIDs in their paths, and keys are exact query filters; lists take `limit` and `cursor`. Changes to an entry and to an agent's declared tooling need `If-Match`. Requests are decided once and take none, and a disable takes none, so that it never waits on a version.
+  - **Declines** (the reviewer's decision 5 of 2026-11-17). `declineAgentToolingRequest` (`tooling.enable.approve`) and `declineCatalogUnblock` (`catalog.unblock.approve`) decide a request without approving it. A decline only denies, so the requester may decline their own request; an approval keeps `authz.CheckApproval` and the database's check.
+  - **Inbox kinds.** `catalog_review`, `tooling_request` and `unblock_request` join the `x-extensible-enum` of inbox items; the database's check widens in pull request 2. The catalog's flags are an `x-extensible-enum` too, since later plans may add some.
+  - **Several definitions and digests can wait for one entry**, reported by different agents: `pendingDefinitions` and `pendingDigests` list them, and an approval or a decline names the one it decides.
+  - **`getToolDefinition`** serves reported, untrusted bytes exactly as stored, so that the SHA-256 of the body is the hash in the path: only as `application/json`, with `X-Content-Type-Options: nosniff`, which the console listener sets on every response, and the API's `Content-Security-Policy: default-src 'none'`. A body is at most 1 MiB. Its handler writes the stored bytes through a response type of its own, since encoding them again would round large integers.
+  - **`compileUsageRules`** takes the JSON text of the rules, in the form their annotations carry (contracts, section 6.11, with `if_absent`), not a typed object: decoding into a structure would accept a repeated member name and round integers beyond 2^53, which the generator refuses. When built, it writes exactly what `test/conformance/profile`'s `GenerateRules` writes, and refuses what it refuses. Its input is at most 256 KiB, and statements over 2 MiB, the limit of a whole bundle, are refused before they are written.
+  - **Blocks are agreed as API only.** Their schemas keep to what RFC-0002 says; their design is reserved for the reviewer, on the halt path, and pull request 6 may change these operations.
+  - **Declared tooling** takes the shape and the limits of a tooling report.
+  - **Strings that become keys or argument names** (the note of 2026-11-16, item 4). The patterns of a declared tool's name, provider and type, a declared model's provider and name, and each property name of a declared argument's path refuse a control character (U+0000 to U+001F, U+007F), which the generator of usage rules refuses in a tool's key or an argument's name; a property name is never empty either. The server also refuses a lone surrogate or a noncharacter there, as it does in a report. Refusing them only later would narrow the API.
+- **A tool's origin** (the maintainer's decision 2 of 2026-11-17, the answer to the item of part 3d-2 in the note of 2026-11-16). Catalog entries carry no origin. Each observation records the origin that its source reports (pull request 3). An agent's catalog file says `provider` when any of that agent's current observations says so (pull request 4). Built-in tools are always `provider`, and the agent's own tools and the tools of a `stdio` server always `agent`. A tool that is enabled or declared but not observed takes `provider` if built-in, and `agent` otherwise. In the API, the catalog's tool shows no origin, and the agent's tooling shows each observation's.
+- **Built-in tools' keys** are `provider.<provider>/<type>` (the reviewer's decision 3 of 2026-11-17), as the API's description of a tool's key says; pull request 1b records it with the key grammar.
+- **Differences from the plan:**
+  - ST-17 grows from 27 to 36 permissions (252 pairs), not from 25 to 34 (238): the plan predates `identity.tokens.manage` and `identity.emergency.revoke`.
+  - Applying the redaction rules again to what the catalog holds, merging the entries that become one, and the core's own redaction of reports (CORE-11) move from step 2 to pull request 3 (the reviewer's decision 4 of 2026-11-17): the setting `catalog.redaction_rules` comes with that pull request, and the merge of enablement needs `agent_tooling`, which pull request 2 adds. Pull request 1b only flags secrets in URL paths and unpinned packages.
+  - Operations that step 1 does not list: the two declines above, `declinePendingFromAgent` for step 2's decline of everything one agent brought, `getToolDefinition` for reviewing definitions in full, and `getAgentDeclaredTooling`, whose ETag a new declaration sends back.
