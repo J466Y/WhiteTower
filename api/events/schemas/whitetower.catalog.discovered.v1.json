@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Catalog entries discovered",
+  "description": "A tooling report brought MCP servers, tools or models that the catalog did not have (RFC-0002, section 9; plan P1-16, step 2). Each is discovered, so it stays denied until the advisory committee approves it (CORE-10). Entries are named by their keys and the SHA-256 of their references, never by a reference in clear, a description or a schema (NFR-20, CORE-11). The agent's own tools (agent/<name>) are entries of the agent the event names. An event lists at most 100 entries: a report that brings more records several.",
+  "type": "object",
+  "required": [
+    "instance_id",
+    "agent_id",
+    "entries",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "instance_id": {
+      "description": "The reporting instance.",
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "agent_id": {
+      "description": "The agent whose report brought the entries.",
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": [
+        "type",
+        "key",
+        "reference_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "server",
+            "tool",
+            "model"
+          ]
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "reference_sha256": {
+          "description": "The SHA-256 of the UTF-8 bytes of the string form of the entry's reference (contracts, section 4.10).",
+          "$ref": "common.schema.json#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000032",
+  "source": "/core",
+  "type": "whitetower.catalog.definition_changed.v1",
+  "time": "2026-11-18T09:40:51.877Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "instance_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000c1",
+    "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "changes": [
+      {
+        "type": "tool",
+        "key": "githubcopilot/create_issue",
+        "reference_sha256": "6598e1ecfcf6c42b8a35d3d8ea93bff1b44cd1c1d109b8e9464c1079165d4d54",
+        "approved_definition": "f64633d2b1505e3498ea24dfe5be3533a047c391f51989b719dc7a2f013e6a85",
+        "reported_definition": "e71fde374b25e346cb098590061c14f3dfb00894540652db541c1ca162165413"
+      },
+      {
+        "type": "model",
+        "key": "gpu-01/llama3.1-8b",
+        "reference_sha256": "21e3dade3b94e44fc4387d76150524e620a6613820fa7266863c9188a95275c1",
+        "approved_digest": "46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e",
+        "reported_digest": "365c0bd3c000a25d28ddbf732fe1c6add414de7275464c4e4d1c3b5fcb5d8ad1"
+      }
+    ],
+    "actor": {
+      "type": "system"
+    }
+  }
+}

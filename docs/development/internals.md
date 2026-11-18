@@ -18,7 +18,7 @@ flowchart LR
 | `internal/api/rest` | The public REST API: the code generated from the OpenAPI document, its middleware, the problem details | Domain packages, the platform |
 | `internal/api/moduleapi` | The module API of the module contracts, on ConnectRPC | Domain packages, the platform |
 | `internal/webui` | The embedded console | The platform |
-| `internal/<domain>` | The domain, from plan P1-02 on: the audit log, identities, the inventory, policies, the module registry, the kill switch | The platform, the embedded contract files of `api/` |
+| `internal/<domain>` | The domain, from plan P1-02 on: the audit log, identities, the inventory, the catalog of MCP servers, tools and models, policies, the module registry, the kill switch | The platform, the embedded contract files of `api/` |
 | `internal/platform/...` | What every part shares: configuration, logging, metrics, tracing, the database, background jobs, notifications across replicas, the clock, the authentication hooks, rate limits, health, the TLS of the listeners (`servertls`) and of the core's clients (`tlsclient`) | Other platform packages, `internal/version` |
 | `internal/cli` | `wtctl` | The generated API client, the platform |
 | `pkg/apiclient`, `pkg/moduleapi` | Generated code, public: the API client and the module API's types | |

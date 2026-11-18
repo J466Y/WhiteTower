@@ -354,6 +354,26 @@
       "subject": "optional",
       "schema": "schemas/whitetower.audit.read.v1.json",
       "example": "examples/whitetower.audit.read.v1.json"
+    },
+    {
+      "type": "whitetower.catalog.discovered.v1",
+      "summary": "A tooling report brought MCP servers, tools or models that the catalog did not have, which stay discovered until approved (RFC-0002, section 9). They are named by key and by the SHA-256 of their references.",
+      "emitters": [
+        "core"
+      ],
+      "subject": "none",
+      "schema": "schemas/whitetower.catalog.discovered.v1.json",
+      "example": "examples/whitetower.catalog.discovered.v1.json"
+    },
+    {
+      "type": "whitetower.catalog.definition_changed.v1",
+      "summary": "A tooling report brought a definition of an approved tool, or a digest of a model, that differs from the pinned one, which stays until the new one is approved (RFC-0002, sections 7.1 and 9).",
+      "emitters": [
+        "core"
+      ],
+      "subject": "none",
+      "schema": "schemas/whitetower.catalog.definition_changed.v1.json",
+      "example": "examples/whitetower.catalog.definition_changed.v1.json"
     }
   ]
 }

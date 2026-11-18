@@ -72,6 +72,10 @@ var rules = map[string]rule{
 	"whitetower.session.revoked.v1":          {actor: "actor", fixed: "success", reason: "reason"},
 	"whitetower.service_account.created.v1":  {actor: "actor", fixed: "success"},
 	"whitetower.access.revoked_all.v1":       {actor: "actor", fixed: "success", reason: "reason"},
+	// The catalog of MCP servers, tools and models (plan P1-16): what a
+	// report brings has the system as its actor.
+	"whitetower.catalog.discovered.v1":         {actor: "actor"},
+	"whitetower.catalog.definition_changed.v1": {actor: "actor"},
 }
 
 // outcomes maps the outcomes that events tell to those the audit log

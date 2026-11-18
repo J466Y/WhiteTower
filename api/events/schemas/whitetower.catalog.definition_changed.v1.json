@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Catalog definitions changed",
+  "description": "A tooling report brought, for approved tools, definitions that differ from their pinned ones, or, for models with a pinned digest, digests that differ from it (RFC-0002, sections 7.1 and 9; plan P1-16, step 2). The pinned definition or digest stays, and the reported one waits for review: enforcement points deny the tool or the model, and hide the tool, until it is approved (CORE-10). Each change carries both hashes, or both digests, and names its entry by key and by the SHA-256 of its reference, never by a reference in clear, a description or a schema (NFR-20, CORE-11). An event lists at most 100 changes: a report that brings more records several.",
+  "type": "object",
+  "required": [
+    "instance_id",
+    "agent_id",
+    "changes",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "instance_id": {
+      "description": "The reporting instance.",
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "agent_id": {
+      "description": "The agent whose report brought the changes.",
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "changes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/actor"
+    }
+  },
+  "$defs": {
+    "change": {
+      "type": "object",
+      "required": [
+        "type",
+        "key",
+        "reference_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "tool",
+            "model"
+          ]
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "reference_sha256": {
+          "description": "The SHA-256 of the UTF-8 bytes of the string form of the entry's reference (contracts, section 4.10).",
+          "$ref": "common.schema.json#/$defs/sha256"
+        },
+        "approved_definition": {
+          "description": "A tool's pinned definition hash.",
+          "$ref": "common.schema.json#/$defs/sha256"
+        },
+        "reported_definition": {
+          "description": "The definition hash that the report brought.",
+          "$ref": "common.schema.json#/$defs/sha256"
+        },
+        "approved_digest": {
+          "description": "A model's pinned digest.",
+          "$ref": "#/$defs/digest"
+        },
+        "reported_digest": {
+          "description": "The digest that the report brought.",
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "tool"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "approved_definition",
+          "reported_definition"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "approved_digest"
+              ]
+            },
+            {
+              "required": [
+                "reported_digest"
+              ]
+            }
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "approved_digest",
+          "reported_digest"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "approved_definition"
+              ]
+            },
+            {
+              "required": [
+                "reported_definition"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "digest": {
+      "description": "A digest of a model's weights, as its runtime reports it: at most 128 bytes, without a control character.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+    }
+  }
+}

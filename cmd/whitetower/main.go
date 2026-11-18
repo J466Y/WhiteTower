@@ -25,6 +25,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/authz"
+	"github.com/J466Y/WhiteTower/internal/catalog"
 	"github.com/J466Y/WhiteTower/internal/govstate"
 	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/clock"
@@ -183,11 +184,11 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		return err
 	}
 
-	catalog, err := audit.LoadCatalog(events.Files)
+	eventCatalog, err := audit.LoadCatalog(events.Files)
 	if err != nil {
 		return err
 	}
-	writer := audit.NewWriter(catalog, clock.System)
+	writer := audit.NewWriter(eventCatalog, clock.System)
 
 	// The sessions, and the tokens of the CLI's exchange, record the sign-in
 	// configuration that the OIDC service creates them with, below, and the
@@ -335,6 +336,9 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 			// write of an agent's governance state to add.
 			SelectorHalts: inventory.NoSelectorHalts{},
 		}),
+		// The tooling reports that fill the catalog arrive through the
+		// module API once plan P1-07 wires them (P1-16, pull request 3).
+		Catalog: catalog.New(catalog.Options{DB: database, Clock: clock.System, Writer: writer}),
 	})
 	drain := server.NewDrain()
 	ready := health.NewReadiness(logger)
