@@ -3,11 +3,16 @@
 # own directory, so the root osv-scanner.toml does not apply here.
 #
 # OSV-Scanner cannot scope an ignore to one advisory and one version at once.
-# The entry below takes the version, so every other minimatch still fails the
-# scan, but it also hides any other advisory of 5.1.9 until it expires. Remove
-# it once GitHub's advisory database starts GHSA-g3hv-75wg-m249 at 7.0.0, or
-# once openapi-typescript moves to @redocly/openapi-core 2.x, which uses
-# picomatch instead.
+# Each entry below takes one version, so every other version of its package
+# still fails the scan, but it also hides any other advisory of that version
+# until it expires.
+#
+# minimatch: remove the entry once GitHub's advisory database starts
+# GHSA-g3hv-75wg-m249 at 7.0.0, or once openapi-typescript moves to
+# @redocly/openapi-core 2.x, which uses picomatch instead.
+#
+# picomatch: remove the entry once a release fixes GHSA-fc5q-39xc-vjpf, and
+# update the lockfile to it.
 
 [[PackageOverrides]]
 name = "minimatch"
@@ -16,3 +21,11 @@ ecosystem = "npm"
 effectiveUntil = 2027-02-02
 vulnerability.ignore = true
 reason = "GHSA-g3hv-75wg-m249 matches every version before 11.0.1, but the code it describes (firstPhasePreProcess) first appears in minimatch 7.0.0, and 5.1.9 has neither it nor optimizationLevel. minimatch reaches the console only through openapi-typescript and @redocly/openapi-core, a build-time tool that generates src/api/schema.gen.ts."
+
+[[PackageOverrides]]
+name = "picomatch"
+version = "4.0.7"
+ecosystem = "npm"
+effectiveUntil = 2027-02-18
+vulnerability.ignore = true
+reason = "GHSA-fc5q-39xc-vjpf (ReDoS through single-branch repeated extglobs) affects every version up to 4.0.7, the latest, and no fixed release exists yet. It needs an attacker who controls the glob pattern. picomatch reaches the console only through Vite, Vitest, tinyglobby and fdir, development and build tools whose patterns come from the repository's own configuration, and no code of the built console imports it. The maintainer's decision of 2026-11-18."
