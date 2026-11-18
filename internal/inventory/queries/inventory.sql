@@ -224,6 +224,55 @@ UPDATE whitetower.reviews SET status = 'cancelled', version = version + 1
 WHERE agent_id = $1 AND status IN ('scheduled', 'awaiting_signoff')
 RETURNING id;
 
+-- name: AgentsToSuspend :many
+-- The agents in one of the states given whose primary owner is not an active
+-- principal, or whose open review's grace period ended before the time given,
+-- which comes from the application's clock, with which of the two holds, by
+-- ID. A read without a lock: the automatic suspension of each agent checks
+-- its reason again under the agent's lock.
+SELECT c.id, c.owner_inactive, c.review_overdue FROM (
+  SELECT a.id,
+    NOT EXISTS (
+      SELECT 1 FROM whitetower.agent_owners o
+      JOIN whitetower.principals p ON p.id = o.principal_id
+      WHERE o.agent_id = a.id AND o.role = 'primary' AND o.ended_at IS NULL AND p.status = 'active'
+    ) AS owner_inactive,
+    EXISTS (
+      SELECT 1 FROM whitetower.reviews r
+      WHERE r.agent_id = a.id AND r.status IN ('scheduled', 'awaiting_signoff') AND r.grace_ends_at < sqlc.arg(now)
+    ) AS review_overdue
+  FROM whitetower.agents a
+  WHERE a.lifecycle_state = ANY(sqlc.arg(states)::text[])
+) c
+WHERE c.owner_inactive OR c.review_overdue
+ORDER BY c.id;
+
+-- name: ReviewsToRemind :many
+-- The scheduled reviews whose latest reminder point has passed at the time
+-- given, which comes from the application's clock, and that were not reminded
+-- since that point, with the point: one of the numbers of days before the due
+-- date given, or 0 for the due date itself. A day is 24 hours, as when the
+-- review was scheduled. A read without a lock: each reminder checks again, as
+-- it records itself, that it is still due.
+SELECT r.id, r.agent_id, r.due_at, p.days::integer AS days_before_due
+FROM whitetower.reviews r
+CROSS JOIN LATERAL (
+  SELECT min(d) AS days FROM unnest(sqlc.arg(days)::integer[] || 0) AS d
+  WHERE r.due_at - make_interval(hours => 24 * d) <= sqlc.arg(now)
+) p
+WHERE r.status = 'scheduled' AND p.days IS NOT NULL
+  AND (r.last_reminder_at IS NULL OR r.last_reminder_at < r.due_at - make_interval(hours => 24 * p.days))
+ORDER BY r.due_at, r.id;
+
+-- name: RecordReminder :execrows
+-- Records that a scheduled review was reminded at the time given, unless it
+-- was reminded at or after the reminder point given, or is no longer
+-- scheduled. The review's version stays: a reminder changes nothing that the
+-- review shows, so that a completion read before it still applies.
+UPDATE whitetower.reviews SET last_reminder_at = sqlc.arg(reminded_at)::timestamptz
+WHERE id = sqlc.arg(id) AND status = 'scheduled'
+  AND (last_reminder_at IS NULL OR last_reminder_at < sqlc.arg(point)::timestamptz);
+
 -- name: ListAgentReviews :many
 -- A page of the agent's reviews, the latest due first.
 SELECT * FROM whitetower.reviews

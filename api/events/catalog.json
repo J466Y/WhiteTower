@@ -157,7 +157,7 @@
     },
     {
       "type": "whitetower.review.changed.v1",
-      "summary": "An agent's periodic review was scheduled, completed, signed off or cancelled (INV-06).",
+      "summary": "An agent's periodic review was scheduled, reminded, completed, signed off or cancelled (INV-06).",
       "emitters": [
         "core"
       ],

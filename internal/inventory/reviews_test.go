@@ -556,9 +556,9 @@ func TestTheDatabaseRefusesASignOffByAParty(t *testing.T) {
 	}
 }
 
-// impatient returns the inventory on connections that wait at most 200 ms
-// for a lock.
-func (f *fixture) impatient(t *testing.T) *inventory.Inventory {
+// impatientPool returns connections to the test's database that wait at most
+// 200 ms for a lock.
+func (f *fixture) impatientPool(t *testing.T) *db.DB {
 	t.Helper()
 	cfg := f.database.Config
 	cfg.URL += "&lock_timeout=200ms"
@@ -567,8 +567,15 @@ func (f *fixture) impatient(t *testing.T) *inventory.Inventory {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
+	return pool
+}
+
+// impatient returns the inventory on connections that wait at most 200 ms
+// for a lock.
+func (f *fixture) impatient(t *testing.T) *inventory.Inventory {
+	t.Helper()
 	opts := f.opts
-	opts.DB = pool
+	opts.DB = f.impatientPool(t)
 	return inventory.New(opts)
 }
 

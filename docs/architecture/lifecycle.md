@@ -119,10 +119,10 @@ The transitions White Tower makes itself (T7, T8, T11 and T12) cannot be asked f
 | Step | Rule |
 | --- | --- |
 | Scheduling | At activation (T9) and after each completed review, counted from its completion, or from its sign-off when it needs one. A review keeps the due date, the grace period and the need for a sign-off that the settings gave when it was scheduled. The interval depends on the risk tier (setting `lifecycle.review_interval_days`: 365, 365, 180 and 90 days for low, medium, high and critical) |
-| Reminders | 30, 7 and 1 days before the due date (setting `lifecycle.review_reminder_days`), in the owner's inbox |
+| Reminders | 30, 7 and 1 days before the due date (setting `lifecycle.review_reminder_days`), in the inbox of whoever is the agent's primary owner then; each reminder takes the one before it out of the inbox. Only a review that waits for its owner is reminded: one that waits for its sign-off is in the advisory committee's inbox already. When several reminders fell due at once, only the latest goes out |
 | Completion | The owner attests that the agent is still needed, the owner is still right, the data categories are current, the policy is still adequate and the enabled tooling is still needed. The review lists, as candidates to disable, the enabled tooling the agent has not used within the period (setting `lifecycle.review_unused_tooling_days`, 90 days; CAT-09) |
 | Sign-off | For high and critical risk (setting `lifecycle.review_signoff_risk_tiers`), a member of the advisory committee signs off before the review counts as completed: a person, and neither whoever completed the review nor anyone whom `not_owner_or_creator` refuses (section 4), that is the agent's primary owner or a delegate, now or ever, or the creator of the agent or of its use case. The database refuses the same |
-| Overdue | Past the due date, the review is overdue and reminders escalate to the advisory committee. Past the grace period (setting `lifecycle.review_grace_days`, 14 days), the agent is suspended (T11) |
+| Overdue | Past the due date, the review is overdue, and one reminder goes to the advisory committee; the owner's last reminder stays. Past the grace period (setting `lifecycle.review_grace_days`, 14 days), the lifecycle guard suspends the agent (T11) within a minute |
 
 ## 9. Effects on credentials, bundles and governance state
 
