@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Periodic review changed",
-  "description": "An agent's periodic review was scheduled, reminded by the lifecycle guard, completed by its owner, signed off by the advisory committee, or cancelled when the agent was retired (INV-06; plan P1-04, steps 6 and 7). A scheduled review carries the terms that the settings gave it. A reminder carries whom it went to, and why then. A completion carries the owner's attestation: its five statements, which are all true, and the keys of the candidates to disable that the owner keeps. The comment that the owner writes stays in the inventory.",
+  "description": "An agent's periodic review was scheduled, completed by its owner, signed off by the advisory committee, or cancelled when the agent was retired (INV-06; plan P1-04, step 6). A scheduled review carries the terms that the settings gave it. A completion carries the owner's attestation: its five statements, which are all true, and the keys of the candidates to disable that the owner keeps. The comment that the owner writes stays in the inventory.",
   "type": "object",
   "required": [
     "change",
@@ -77,34 +77,12 @@
           ]
         }
       }
-    },
-    {
-      "if": {
-        "properties": {
-          "change": {
-            "const": "reminded"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "reminder"
-        ]
-      },
-      "else": {
-        "not": {
-          "required": [
-            "reminder"
-          ]
-        }
-      }
     }
   ],
   "properties": {
     "change": {
       "enum": [
         "scheduled",
-        "reminded",
         "completed",
         "signed_off",
         "cancelled"
@@ -122,41 +100,6 @@
     },
     "signoff_required": {
       "type": "boolean"
-    },
-    "reminder": {
-      "description": "Whom a reminder went to, and why then: the agent's primary owner, at one of the numbers of days before the due date that the setting lifecycle.review_reminder_days gives, or, once the review is past its due date, the advisory committee.",
-      "oneOf": [
-        {
-          "type": "object",
-          "required": [
-            "days_before_due",
-            "principal_id"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "days_before_due": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 365
-            },
-            "principal_id": {
-              "$ref": "common.schema.json#/$defs/uuid"
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "role"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "role": {
-              "const": "advisory"
-            }
-          }
-        }
-      ]
     },
     "status": {
       "description": "Where the completion left the review: completed, or waiting for the advisory committee's sign-off.",

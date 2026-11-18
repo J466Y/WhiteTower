@@ -101,16 +101,10 @@ func (f *fixture) reminders(t *testing.T, review uuid.UUID) []string {
 	return found
 }
 
-// remindedEvents returns the review events of the reminders, oldest first.
+// remindedEvents returns the events of the reminders, oldest first.
 func (f *fixture) remindedEvents(t *testing.T) []event {
 	t.Helper()
-	var reminded []event
-	for _, e := range f.events(t, "whitetower.review.changed.v1") {
-		if e.data["change"] == "reminded" {
-			reminded = append(reminded, e)
-		}
-	}
-	return reminded
+	return f.events(t, "whitetower.review.reminded.v1")
 }
 
 // Deactivating an agent's owner, as SCIM does, suspends the agent within one

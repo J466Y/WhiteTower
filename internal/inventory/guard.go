@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authz"
 	"github.com/J466Y/WhiteTower/internal/inventory/inventorydb"
 	"github.com/J466Y/WhiteTower/internal/platform/db"
@@ -160,7 +161,8 @@ func (inv *Inventory) remind(ctx context.Context, logger *slog.Logger) (int, err
 // checks again that the reminder is due; it locks neither the agent's row
 // nor its governance state, and takes no governance state version, since
 // enforcement points see nothing of a review, so that no halt ever waits for
-// a reminder.
+// a reminder. It records whitetower.review.reminded.v1, as the system: a
+// reminder changes nothing that the review shows.
 func (inv *Inventory) remindReview(ctx context.Context, r inventorydb.ReviewsToRemindRow, now time.Time) error {
 	return inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := inventorydb.New(tx)
@@ -198,9 +200,13 @@ func (inv *Inventory) remindReview(ctx context.Context, r inventorydb.ReviewsToR
 		if err := q.AddInboxItem(ctx, item); err != nil {
 			return fmt.Errorf("adding the reminder to the inbox: %w", err)
 		}
-		return inv.recordReview(ctx, tx, r.AgentID, map[string]any{
-			"change": "reminded", "review_id": r.ID.String(), "actor": map[string]any{"type": "system"}, "reminder": reminder,
-		})
+		if err := inv.writer.Record(ctx, tx, audit.Event{
+			Type: "whitetower.review.reminded.v1", Subject: r.AgentID.String(),
+			Data: map[string]any{"review_id": r.ID.String(), "reminder": reminder, "actor": map[string]any{"type": "system"}},
+		}); err != nil {
+			return fmt.Errorf("recording the reminder of the agent's review: %w", err)
+		}
+		return nil
 	})
 }
 
