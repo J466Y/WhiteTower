@@ -767,6 +767,9 @@ const accept connect.Code = 0
 type registrationAnswer struct {
 	code        connect.Code
 	environment modulev1alpha1.Environment
+	// handled is closed once the core has answered the registration, and
+	// has recorded it if it accepted it.
+	handled chan struct{}
 }
 
 // refusingCore is the kit's fake core with the refusals it cannot script
@@ -817,6 +820,7 @@ func (c *refusingCore) RegisterInstance(ctx context.Context, req *connect.Reques
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case a := <-c.answers:
+		defer close(a.handled)
 		if a.code != accept {
 			return nil, connect.NewError(a.code, errors.New("refused by the test"))
 		}
@@ -858,13 +862,21 @@ func (c *refusingCore) acceptWith(ctx context.Context, t *testing.T, env modulev
 }
 
 // reply gives the stub's next registration the answer given. It returns once
-// the registration has it, so the stub has handled every earlier answer.
+// the core has answered the registration, so the stub has handled every
+// earlier answer, and the core has recorded the registration if it accepted
+// it: a test that counts registrations right after an acceptance counts it.
 func (c *refusingCore) reply(ctx context.Context, t *testing.T, a registrationAnswer) {
 	t.Helper()
+	a.handled = make(chan struct{})
 	select {
 	case c.answers <- a:
 	case <-ctx.Done():
 		t.Fatalf("the stub did not register again: %v", ctx.Err())
+	}
+	select {
+	case <-a.handled:
+	case <-ctx.Done():
+		t.Fatalf("the core did not answer the registration: %v", ctx.Err())
 	}
 }
 
