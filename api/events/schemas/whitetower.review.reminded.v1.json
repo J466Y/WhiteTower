@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Periodic review reminded",
+  "description": "The lifecycle guard reminded someone of an agent's periodic review (INV-06; plan P1-04, step 7): the agent's primary owner, at one of the numbers of days before the due date that the setting lifecycle.review_reminder_days gives, or, once the review is past its due date, the advisory committee. A reminder changes nothing that the review shows.",
+  "type": "object",
+  "required": [
+    "review_id",
+    "reminder",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "review_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "reminder": {
+      "description": "Whom the reminder went to, and why then.",
+      "oneOf": [
+        {
+          "description": "The agent's primary owner, by pseudonymous principal ID, at a number of days before the due date.",
+          "type": "object",
+          "required": [
+            "days_before_due",
+            "principal_id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "days_before_due": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365
+            },
+            "principal_id": {
+              "$ref": "common.schema.json#/$defs/uuid"
+            }
+          }
+        },
+        {
+          "description": "The advisory committee, once the review is past its due date.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "const": "advisory"
+            }
+          }
+        }
+      ]
+    },
+    "actor": {
+      "description": "Always the system: only the lifecycle guard reminds.",
+      "$ref": "common.schema.json#/$defs/actor",
+      "properties": {
+        "type": {
+          "const": "system"
+        }
+      }
+    }
+  }
+}

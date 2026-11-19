@@ -1,0 +1,28 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000031",
+  "source": "/core",
+  "type": "whitetower.review.changed.v1",
+  "time": "2027-04-12T09:14:05.112Z",
+  "subject": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+  "datacontenttype": "application/json",
+  "data": {
+    "change": "completed",
+    "review_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000e1",
+    "status": "awaiting_signoff",
+    "attestation": {
+      "still_needed": true,
+      "owner_still_right": true,
+      "data_categories_current": true,
+      "policy_adequate": true,
+      "tooling_still_needed": true,
+      "kept_tooling": [
+        "invoices/archive_invoice"
+      ]
+    },
+    "actor": {
+      "type": "human",
+      "id": "0192f1c2-7a3b-7c4d-8e5f-0000000000a1"
+    }
+  }
+}

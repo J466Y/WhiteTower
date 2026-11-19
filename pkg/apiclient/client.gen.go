@@ -4364,12 +4364,14 @@ type ClientInterface interface {
 	// Records the owner's attestation (INV-06): the agent is still needed,
 	// its owner is still right, its data categories are current, its policy
 	// is still adequate and its enabled tooling is still needed. The
-	// attestation names the candidates to disable that the owner keeps; the
-	// owner disables the others in the agent's tooling (plan P1-16). The
-	// agent's primary owner or a delegate completes it (`agent.review`).
-	// When the review needs a sign-off (`signoffRequired`), it then waits
-	// for one; otherwise it is completed and the next review is scheduled.
-	// It needs If-Match with the review's ETag.
+	// attestation names the candidates to disable that the owner keeps,
+	// among those the review lists now; the owner disables the others in
+	// the agent's tooling (plan P1-16). A person who is the agent's primary
+	// owner or a delegate completes it (`agent.review`), while the agent is
+	// active or suspended. When the review needs a sign-off
+	// (`signoffRequired`), it then waits for one; otherwise it is completed
+	// and the next review is scheduled. It needs If-Match with the review's
+	// ETag.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4381,12 +4383,14 @@ type ClientInterface interface {
 	// Records the owner's attestation (INV-06): the agent is still needed,
 	// its owner is still right, its data categories are current, its policy
 	// is still adequate and its enabled tooling is still needed. The
-	// attestation names the candidates to disable that the owner keeps; the
-	// owner disables the others in the agent's tooling (plan P1-16). The
-	// agent's primary owner or a delegate completes it (`agent.review`).
-	// When the review needs a sign-off (`signoffRequired`), it then waits
-	// for one; otherwise it is completed and the next review is scheduled.
-	// It needs If-Match with the review's ETag.
+	// attestation names the candidates to disable that the owner keeps,
+	// among those the review lists now; the owner disables the others in
+	// the agent's tooling (plan P1-16). A person who is the agent's primary
+	// owner or a delegate completes it (`agent.review`), while the agent is
+	// active or suspended. When the review needs a sign-off
+	// (`signoffRequired`), it then waits for one; otherwise it is completed
+	// and the next review is scheduled. It needs If-Match with the review's
+	// ETag.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4398,10 +4402,11 @@ type ClientInterface interface {
 	// A member of the advisory committee signs off a review that waits for
 	// it, whatever the agent's risk tier: the review's `signoffRequired`,
 	// set from the setting `lifecycle.review_signoff_risk_tiers`, decides
-	// (`agent.review`). The signer is a person, neither the one who
-	// completed the review nor one of the agent's owners (HUM-04). The
-	// review is then completed, and the next one scheduled. It needs
-	// If-Match with the review's ETag.
+	// (`agent.review`). The signer is a person, and neither the one who
+	// completed the review, nor anyone who is or ever was the agent's
+	// primary owner or one of its delegates, nor the creator of the agent
+	// or of its use case (HUM-04). The review is then completed, and the
+	// next one scheduled. It needs If-Match with the review's ETag.
 	//
 	// Corresponds with POST /reviews/{id}/sign-off (the `SignOffReview` operationId).
 	SignOffReview(ctx context.Context, id ReviewId, params *SignOffReviewParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6631,12 +6636,14 @@ func (c *Client) GetReview(ctx context.Context, id ReviewId, reqEditors ...Reque
 // Records the owner's attestation (INV-06): the agent is still needed,
 // its owner is still right, its data categories are current, its policy
 // is still adequate and its enabled tooling is still needed. The
-// attestation names the candidates to disable that the owner keeps; the
-// owner disables the others in the agent's tooling (plan P1-16). The
-// agent's primary owner or a delegate completes it (`agent.review`).
-// When the review needs a sign-off (`signoffRequired`), it then waits
-// for one; otherwise it is completed and the next review is scheduled.
-// It needs If-Match with the review's ETag.
+// attestation names the candidates to disable that the owner keeps,
+// among those the review lists now; the owner disables the others in
+// the agent's tooling (plan P1-16). A person who is the agent's primary
+// owner or a delegate completes it (`agent.review`), while the agent is
+// active or suspended. When the review needs a sign-off
+// (`signoffRequired`), it then waits for one; otherwise it is completed
+// and the next review is scheduled. It needs If-Match with the review's
+// ETag.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6658,12 +6665,14 @@ func (c *Client) CompleteReviewWithBody(ctx context.Context, id ReviewId, params
 // Records the owner's attestation (INV-06): the agent is still needed,
 // its owner is still right, its data categories are current, its policy
 // is still adequate and its enabled tooling is still needed. The
-// attestation names the candidates to disable that the owner keeps; the
-// owner disables the others in the agent's tooling (plan P1-16). The
-// agent's primary owner or a delegate completes it (`agent.review`).
-// When the review needs a sign-off (`signoffRequired`), it then waits
-// for one; otherwise it is completed and the next review is scheduled.
-// It needs If-Match with the review's ETag.
+// attestation names the candidates to disable that the owner keeps,
+// among those the review lists now; the owner disables the others in
+// the agent's tooling (plan P1-16). A person who is the agent's primary
+// owner or a delegate completes it (`agent.review`), while the agent is
+// active or suspended. When the review needs a sign-off
+// (`signoffRequired`), it then waits for one; otherwise it is completed
+// and the next review is scheduled. It needs If-Match with the review's
+// ETag.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6685,10 +6694,11 @@ func (c *Client) CompleteReview(ctx context.Context, id ReviewId, params *Comple
 // A member of the advisory committee signs off a review that waits for
 // it, whatever the agent's risk tier: the review's `signoffRequired`,
 // set from the setting `lifecycle.review_signoff_risk_tiers`, decides
-// (`agent.review`). The signer is a person, neither the one who
-// completed the review nor one of the agent's owners (HUM-04). The
-// review is then completed, and the next one scheduled. It needs
-// If-Match with the review's ETag.
+// (`agent.review`). The signer is a person, and neither the one who
+// completed the review, nor anyone who is or ever was the agent's
+// primary owner or one of its delegates, nor the creator of the agent
+// or of its use case (HUM-04). The review is then completed, and the
+// next one scheduled. It needs If-Match with the review's ETag.
 //
 // Corresponds with POST /reviews/{id}/sign-off (the `SignOffReview` operationId).
 func (c *Client) SignOffReview(ctx context.Context, id ReviewId, params *SignOffReviewParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12590,12 +12600,14 @@ type ClientWithResponsesInterface interface {
 	// Records the owner's attestation (INV-06): the agent is still needed,
 	// its owner is still right, its data categories are current, its policy
 	// is still adequate and its enabled tooling is still needed. The
-	// attestation names the candidates to disable that the owner keeps; the
-	// owner disables the others in the agent's tooling (plan P1-16). The
-	// agent's primary owner or a delegate completes it (`agent.review`).
-	// When the review needs a sign-off (`signoffRequired`), it then waits
-	// for one; otherwise it is completed and the next review is scheduled.
-	// It needs If-Match with the review's ETag.
+	// attestation names the candidates to disable that the owner keeps,
+	// among those the review lists now; the owner disables the others in
+	// the agent's tooling (plan P1-16). A person who is the agent's primary
+	// owner or a delegate completes it (`agent.review`), while the agent is
+	// active or suspended. When the review needs a sign-off
+	// (`signoffRequired`), it then waits for one; otherwise it is completed
+	// and the next review is scheduled. It needs If-Match with the review's
+	// ETag.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -12607,12 +12619,14 @@ type ClientWithResponsesInterface interface {
 	// Records the owner's attestation (INV-06): the agent is still needed,
 	// its owner is still right, its data categories are current, its policy
 	// is still adequate and its enabled tooling is still needed. The
-	// attestation names the candidates to disable that the owner keeps; the
-	// owner disables the others in the agent's tooling (plan P1-16). The
-	// agent's primary owner or a delegate completes it (`agent.review`).
-	// When the review needs a sign-off (`signoffRequired`), it then waits
-	// for one; otherwise it is completed and the next review is scheduled.
-	// It needs If-Match with the review's ETag.
+	// attestation names the candidates to disable that the owner keeps,
+	// among those the review lists now; the owner disables the others in
+	// the agent's tooling (plan P1-16). A person who is the agent's primary
+	// owner or a delegate completes it (`agent.review`), while the agent is
+	// active or suspended. When the review needs a sign-off
+	// (`signoffRequired`), it then waits for one; otherwise it is completed
+	// and the next review is scheduled. It needs If-Match with the review's
+	// ETag.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -12624,10 +12638,11 @@ type ClientWithResponsesInterface interface {
 	// A member of the advisory committee signs off a review that waits for
 	// it, whatever the agent's risk tier: the review's `signoffRequired`,
 	// set from the setting `lifecycle.review_signoff_risk_tiers`, decides
-	// (`agent.review`). The signer is a person, neither the one who
-	// completed the review nor one of the agent's owners (HUM-04). The
-	// review is then completed, and the next one scheduled. It needs
-	// If-Match with the review's ETag.
+	// (`agent.review`). The signer is a person, and neither the one who
+	// completed the review, nor anyone who is or ever was the agent's
+	// primary owner or one of its delegates, nor the creator of the agent
+	// or of its use case (HUM-04). The review is then completed, and the
+	// next one scheduled. It needs If-Match with the review's ETag.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -18184,12 +18199,14 @@ func (c *ClientWithResponses) GetReviewWithResponse(ctx context.Context, id Revi
 // Records the owner's attestation (INV-06): the agent is still needed,
 // its owner is still right, its data categories are current, its policy
 // is still adequate and its enabled tooling is still needed. The
-// attestation names the candidates to disable that the owner keeps; the
-// owner disables the others in the agent's tooling (plan P1-16). The
-// agent's primary owner or a delegate completes it (`agent.review`).
-// When the review needs a sign-off (`signoffRequired`), it then waits
-// for one; otherwise it is completed and the next review is scheduled.
-// It needs If-Match with the review's ETag.
+// attestation names the candidates to disable that the owner keeps,
+// among those the review lists now; the owner disables the others in
+// the agent's tooling (plan P1-16). A person who is the agent's primary
+// owner or a delegate completes it (`agent.review`), while the agent is
+// active or suspended. When the review needs a sign-off
+// (`signoffRequired`), it then waits for one; otherwise it is completed
+// and the next review is scheduled. It needs If-Match with the review's
+// ETag.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -18207,12 +18224,14 @@ func (c *ClientWithResponses) CompleteReviewWithBodyWithResponse(ctx context.Con
 // Records the owner's attestation (INV-06): the agent is still needed,
 // its owner is still right, its data categories are current, its policy
 // is still adequate and its enabled tooling is still needed. The
-// attestation names the candidates to disable that the owner keeps; the
-// owner disables the others in the agent's tooling (plan P1-16). The
-// agent's primary owner or a delegate completes it (`agent.review`).
-// When the review needs a sign-off (`signoffRequired`), it then waits
-// for one; otherwise it is completed and the next review is scheduled.
-// It needs If-Match with the review's ETag.
+// attestation names the candidates to disable that the owner keeps,
+// among those the review lists now; the owner disables the others in
+// the agent's tooling (plan P1-16). A person who is the agent's primary
+// owner or a delegate completes it (`agent.review`), while the agent is
+// active or suspended. When the review needs a sign-off
+// (`signoffRequired`), it then waits for one; otherwise it is completed
+// and the next review is scheduled. It needs If-Match with the review's
+// ETag.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -18230,10 +18249,11 @@ func (c *ClientWithResponses) CompleteReviewWithResponse(ctx context.Context, id
 // A member of the advisory committee signs off a review that waits for
 // it, whatever the agent's risk tier: the review's `signoffRequired`,
 // set from the setting `lifecycle.review_signoff_risk_tiers`, decides
-// (`agent.review`). The signer is a person, neither the one who
-// completed the review nor one of the agent's owners (HUM-04). The
-// review is then completed, and the next one scheduled. It needs
-// If-Match with the review's ETag.
+// (`agent.review`). The signer is a person, and neither the one who
+// completed the review, nor anyone who is or ever was the agent's
+// primary owner or one of its delegates, nor the creator of the agent
+// or of its use case (HUM-04). The review is then completed, and the
+// next one scheduled. It needs If-Match with the review's ETag.
 //
 // Returns a wrapper object for the known response body format(s).
 //

@@ -30,11 +30,16 @@ var epoch = time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)
 // fixture is an inventory on a database of its own, with people who hold the
 // roles that the tests need.
 type fixture struct {
+	database *dbtest.Database
 	pool     *db.DB
+	// opts are the options of inv, from which a test makes another inventory
+	// with one of them changed.
+	opts     inventory.Options
 	inv      *inventory.Inventory
 	clk      *clocktest.Fake
 	policies *policies
 	halts    *selectorHalts
+	tooling  *tooling
 	// olivia and otto are owners, alex is on the advisory committee, omar is
 	// an operator and uma a user.
 	olivia, otto, alex, omar, uma auth.Principal
@@ -42,7 +47,8 @@ type fixture struct {
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	pool := dbtest.New(t).Open(t)
+	database := dbtest.New(t)
+	pool := database.Open(t)
 	catalog, err := audit.LoadCatalog(events.Files)
 	if err != nil {
 		t.Fatal(err)
@@ -50,12 +56,15 @@ func setup(t *testing.T) *fixture {
 	clk := clocktest.New(epoch)
 	active := &policies{active: map[uuid.UUID]bool{}}
 	halts := &selectorHalts{labels: map[string]uuid.UUID{}}
+	unused := &tooling{unused: map[uuid.UUID][]inventory.UnusedTool{}}
 	f := &fixture{
+		database: database,
 		pool:     pool,
 		clk:      clk,
 		policies: active,
 		halts:    halts,
-		inv: inventory.New(inventory.Options{
+		tooling:  unused,
+		opts: inventory.Options{
 			DB:            pool,
 			Clock:         clk,
 			Writer:        audit.NewWriter(catalog, clk),
@@ -63,11 +72,13 @@ func setup(t *testing.T) *fixture {
 			Versions:      govstate.NewVersions(notify.NewMemory(), slog.New(slog.DiscardHandler)),
 			Policies:      active,
 			SelectorHalts: halts,
+			Tooling:       unused,
 			RoleMapping: map[string]string{
 				"wt-owner": "owner", "wt-advisory": "advisory", "wt-operator": "operator", "wt-user": "user",
 			},
-		}),
+		},
 	}
+	f.inv = inventory.New(f.opts)
 	f.olivia = f.person(t, "Olivia Owner", "owner")
 	f.otto = f.person(t, "Otto Owner", "owner")
 	f.alex = f.person(t, "Alex Advisory", "advisory")
@@ -123,6 +134,26 @@ func (s *selectorHalts) issue(label string) uuid.UUID {
 	id := uuid.Must(uuid.NewV7())
 	s.labels[label] = id
 	return id
+}
+
+// tooling stands for plan P1-16: the agents it holds have the candidates to
+// disable it gives them, and no other agent has any.
+type tooling struct {
+	mu     sync.Mutex
+	unused map[uuid.UUID][]inventory.UnusedTool
+}
+
+func (u *tooling) Unused(_ context.Context, _ *db.Tx, agentID uuid.UUID) ([]inventory.UnusedTool, error) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.unused[agentID], nil
+}
+
+// set gives the agent the candidates to disable given.
+func (u *tooling) set(agentID uuid.UUID, unused ...inventory.UnusedTool) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.unused[agentID] = unused
 }
 
 // person stores a human principal in the IdP group of the role given, and

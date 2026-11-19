@@ -174,6 +174,130 @@ SELECT EXISTS (
     AND grace_ends_at < sqlc.arg(now)
 );
 
+-- name: HasOpenReview :one
+-- Whether the agent has a review that is scheduled or waits for a sign-off.
+SELECT EXISTS (
+  SELECT 1 FROM whitetower.reviews WHERE agent_id = $1 AND status IN ('scheduled', 'awaiting_signoff')
+);
+
+-- name: ScheduleReview :exec
+-- Schedules a review, with the terms that the settings gave when it was
+-- scheduled: its due date, the end of its grace period and whether it needs a
+-- sign-off.
+INSERT INTO whitetower.reviews (id, agent_id, due_at, grace_ends_at, signoff_required, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(agent_id), sqlc.arg(due_at), sqlc.arg(grace_ends_at), sqlc.arg(signoff_required),
+  sqlc.arg(created_at));
+
+-- name: GetReview :one
+SELECT * FROM whitetower.reviews WHERE id = $1;
+
+-- name: LockReview :one
+-- Locks a review until the transaction ends, then reads it. The caller has
+-- locked the review's agent before.
+SELECT * FROM whitetower.reviews WHERE id = $1 FOR NO KEY UPDATE;
+
+-- name: CompleteReview :execrows
+-- Records the owner's attestation of a scheduled review, if it is still at
+-- the version the caller read: the review is then completed, or waits for a
+-- sign-off.
+UPDATE whitetower.reviews SET
+  status = sqlc.arg(status),
+  attestation = sqlc.arg(attestation),
+  completed_by = sqlc.arg(completed_by),
+  completed_at = sqlc.arg(completed_at),
+  version = version + 1
+WHERE id = sqlc.arg(id) AND version = sqlc.arg(version) AND status = 'scheduled';
+
+-- name: SignOffReview :execrows
+-- Completes a review that waits for a sign-off, if it is still at the version
+-- the caller read.
+UPDATE whitetower.reviews SET
+  status = 'completed',
+  signed_off_by = sqlc.arg(signed_off_by),
+  signed_off_at = sqlc.arg(signed_off_at),
+  version = version + 1
+WHERE id = sqlc.arg(id) AND version = sqlc.arg(version) AND status = 'awaiting_signoff';
+
+-- name: CancelOpenReviews :many
+-- Cancels the agent's open review, if it has one, and returns its ID.
+UPDATE whitetower.reviews SET status = 'cancelled', version = version + 1
+WHERE agent_id = $1 AND status IN ('scheduled', 'awaiting_signoff')
+RETURNING id;
+
+-- name: AgentsToSuspend :many
+-- The agents in one of the states given whose primary owner is not an active
+-- principal, or whose open review's grace period ended before the time given,
+-- which comes from the application's clock, with which of the two holds, by
+-- ID. A read without a lock: the automatic suspension of each agent checks
+-- its reason again under the agent's lock.
+SELECT c.id, c.owner_inactive, c.review_overdue FROM (
+  SELECT a.id,
+    NOT EXISTS (
+      SELECT 1 FROM whitetower.agent_owners o
+      JOIN whitetower.principals p ON p.id = o.principal_id
+      WHERE o.agent_id = a.id AND o.role = 'primary' AND o.ended_at IS NULL AND p.status = 'active'
+    ) AS owner_inactive,
+    EXISTS (
+      SELECT 1 FROM whitetower.reviews r
+      WHERE r.agent_id = a.id AND r.status IN ('scheduled', 'awaiting_signoff') AND r.grace_ends_at < sqlc.arg(now)
+    ) AS review_overdue
+  FROM whitetower.agents a
+  WHERE a.lifecycle_state = ANY(sqlc.arg(states)::text[])
+) c
+WHERE c.owner_inactive OR c.review_overdue
+ORDER BY c.id;
+
+-- name: ReviewsToRemind :many
+-- The scheduled reviews whose latest reminder point has passed at the time
+-- given, which comes from the application's clock, and that were not reminded
+-- since that point, with the point: one of the numbers of days before the due
+-- date given, or 0 for the due date itself. A day is 24 hours, as when the
+-- review was scheduled. A read without a lock: each reminder checks again, as
+-- it records itself, that it is still due.
+SELECT r.id, r.agent_id, r.due_at, p.days::integer AS days_before_due
+FROM whitetower.reviews r
+CROSS JOIN LATERAL (
+  SELECT min(d) AS days FROM unnest(sqlc.arg(days)::integer[] || 0) AS d
+  WHERE r.due_at - make_interval(hours => 24 * d) <= sqlc.arg(now)
+) p
+WHERE r.status = 'scheduled' AND p.days IS NOT NULL
+  AND (r.last_reminder_at IS NULL OR r.last_reminder_at < r.due_at - make_interval(hours => 24 * p.days))
+ORDER BY r.due_at, r.id;
+
+-- name: RecordReminder :execrows
+-- Records that a scheduled review was reminded at the time given, unless it
+-- was reminded at or after the reminder point given, or is no longer
+-- scheduled. The review's version stays: a reminder changes nothing that the
+-- review shows, so that a completion read before it still applies.
+UPDATE whitetower.reviews SET last_reminder_at = sqlc.arg(reminded_at)::timestamptz
+WHERE id = sqlc.arg(id) AND status = 'scheduled'
+  AND (last_reminder_at IS NULL OR last_reminder_at < sqlc.arg(point)::timestamptz);
+
+-- name: ListAgentReviews :many
+-- A page of the agent's reviews, the latest due first.
+SELECT * FROM whitetower.reviews
+WHERE agent_id = sqlc.arg(agent_id)
+  AND (sqlc.narg(before_due)::timestamptz IS NULL
+       OR (due_at, id) < (sqlc.narg(before_due)::timestamptz, sqlc.narg(before_id)::uuid))
+ORDER BY due_at DESC, id DESC
+LIMIT sqlc.arg(page_limit);
+
+-- name: ListReviews :many
+-- A page of the reviews in any of the statuses given (all with none), the
+-- earliest due first. With active_only, only those of active agents. With
+-- overdue, only the open reviews past their due date at the time given, or
+-- only the others.
+SELECT r.* FROM whitetower.reviews r
+JOIN whitetower.agents a ON a.id = r.agent_id
+WHERE (NOT sqlc.arg(active_only)::boolean OR a.lifecycle_state = 'active')
+  AND (cardinality(sqlc.arg(statuses)::text[]) = 0 OR r.status = ANY(sqlc.arg(statuses)::text[]))
+  AND (sqlc.narg(overdue)::boolean IS NULL
+       OR (r.status IN ('scheduled', 'awaiting_signoff') AND r.due_at < sqlc.arg(now)) = sqlc.narg(overdue)::boolean)
+  AND (sqlc.narg(after_due)::timestamptz IS NULL
+       OR (r.due_at, r.id) > (sqlc.narg(after_due)::timestamptz, sqlc.narg(after_id)::uuid))
+ORDER BY r.due_at, r.id
+LIMIT sqlc.arg(page_limit);
+
 -- name: ListTransitions :many
 -- A page of the agent's lifecycle transitions, newest first, with the display
 -- name of whoever took each one; the system has none.

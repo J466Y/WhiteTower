@@ -72,14 +72,17 @@ func (f *fixture) halt(t *testing.T, id uuid.UUID, halted bool) {
 }
 
 // review gives the agent an open review whose grace period ends at the time
-// given, or, without a time, cancels its open review.
+// given: the one that T9 scheduled, moved to that time, or a new one; or,
+// without a time, cancels its open review.
 func (f *fixture) review(t *testing.T, id uuid.UUID, graceEnds *time.Time) {
 	t.Helper()
 	if graceEnds == nil {
 		f.set(t, `UPDATE whitetower.reviews SET status = 'cancelled' WHERE agent_id = $1 AND status = 'scheduled'`, id)
 		return
 	}
-	f.set(t, `INSERT INTO whitetower.reviews (id, agent_id, due_at, grace_ends_at, signoff_required) VALUES ($1, $2, $3, $3, false)`,
+	f.set(t, `UPDATE whitetower.reviews SET due_at = $2, grace_ends_at = $2 WHERE agent_id = $1 AND status = 'scheduled'`, id, *graceEnds)
+	f.set(t, `INSERT INTO whitetower.reviews (id, agent_id, due_at, grace_ends_at, signoff_required)
+		SELECT $1, $2, $3, $3, false WHERE NOT EXISTS (SELECT 1 FROM whitetower.reviews WHERE agent_id = $2 AND status = 'scheduled')`,
 		uuid.Must(uuid.NewV7()), id, *graceEnds)
 }
 

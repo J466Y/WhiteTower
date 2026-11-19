@@ -514,8 +514,8 @@ func (t transition) move(a Agent, reason string, now time.Time) Agent {
 }
 
 // apply moves the agent along t, with its effects on the use case, the
-// decisions, the inbox and the pending ownership transfer, and records the
-// transition at the agent's new governance state version.
+// decisions, the inbox, the pending ownership transfer and the reviews, and
+// records the transition at the agent's new governance state version.
 func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principal, actor uuid.UUID, t transition, a *Agent, uc inventorydb.WhitetowerUseCase, comment string) error {
 	q := inventorydb.New(tx)
 	now := inv.clk.Now().UTC()
@@ -550,6 +550,20 @@ func (inv *Inventory) apply(ctx context.Context, tx *db.Tx, caller auth.Principa
 	// transfer could never be accepted.
 	if t.to == "rejected" || t.to == "retired" {
 		if err := cancelTransfers(ctx, q, a.ID, now); err != nil {
+			return err
+		}
+	}
+	// T9 schedules the agent's first review, and T14 cancels its open one,
+	// before the transition takes its version: the settings and the rows of
+	// reviews are never read or written under the version counter (the
+	// design of the halt path, section 2).
+	switch t.action {
+	case "activate":
+		if err := inv.scheduleReview(ctx, tx, a.ID, a.RiskTier, actorOf(caller), now); err != nil {
+			return err
+		}
+	case "retire":
+		if err := inv.cancelReviews(ctx, tx, a.ID, actorOf(caller), now); err != nil {
 			return err
 		}
 	}

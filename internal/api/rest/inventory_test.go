@@ -78,6 +78,7 @@ func inventoryStore(t *testing.T, people map[string]string) (Options, *db.DB) {
 		Versions:      govstate.NewVersions(notify.NewMemory(), opts.Logger),
 		Policies:      inventory.NoAgentPolicies{},
 		SelectorHalts: inventory.NoSelectorHalts{},
+		Tooling:       inventory.NoTooling{},
 		RoleMapping:   map[string]string{"wt-owner": "owner"},
 	})
 	return opts, pool
@@ -99,8 +100,7 @@ func ifMatch(etag string) http.Header { return http.Header{"If-Match": []string{
 // unbuilt lists the operations of plans P1-04 and P1-16 whose server side is
 // not built yet. The pull request that builds one removes it from here.
 var unbuilt = []string{
-	"exportAgents", "listAgentInstances",
-	"listAgentReviews", "listReviews", "getReview", "completeReview", "signOffReview", "listInboxItems",
+	"exportAgents", "listAgentInstances", "listInboxItems",
 	// P1-16: the catalog, its blocks and usage rules, and agents' tooling.
 	"approveCatalogServer", "declineCatalogServer", "approveCatalogTool", "declineCatalogTool",
 	"approveCatalogModel", "declineCatalogModel", "declinePendingFromAgent",
@@ -575,4 +575,99 @@ func TestIntoAndOutOfServiceThroughTheAPI(t *testing.T) {
 	take(asAlex, "retire", "retired")
 	actions(send, "retired []")
 	problemOf(t, send(http.MethodGet, "/agents/"+uuid.NewString()+"/actions", olivia, "", nil), problem.NotFound)
+}
+
+// Reviews through the API: what each answer carries, with its ETag, and how
+// each refusal of the inventory becomes a problem.
+func TestReviewsThroughTheAPI(t *testing.T) {
+	opts, pool := inventoryStore(t, map[string]string{olivia: "Olivia Owner", alex: "Alex Advisory"})
+	send := sender(Handler(opts))
+	alexOpts := opts
+	alexOpts.Authenticator = fixedAuthenticator{p: auth.Principal{ID: alex, Kind: auth.Human, Name: "Alex Advisory", Roles: []string{"advisory"}}}
+	asAlex := sender(Handler(alexOpts))
+	set := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(context.Background(), sql, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res := send(http.MethodPost, "/use-cases", olivia, useCaseJSON, nil)
+	var uc gen.UseCase
+	if res.status != http.StatusCreated || json.Unmarshal(res.body, &uc) != nil {
+		t.Fatalf("createUseCase: %d %s", res.status, res.body)
+	}
+	res = send(http.MethodPost, "/agents", olivia, proposalJSON(uc.Id), nil)
+	var agent gen.Agent
+	if res.status != http.StatusCreated || json.Unmarshal(res.body, &agent) != nil {
+		t.Fatalf("proposeAgent: %d %s", res.status, res.body)
+	}
+	// The agent comes into service with its first review, as T9 would bring
+	// it: no agent policy is active until plan P1-06 brings policies.
+	id := uuid.New()
+	set(`UPDATE whitetower.agents SET harness = '{"description": "A container."}', lifecycle_state = 'active',
+		activated_at = '2026-10-19T09:00:00Z', version = version + 1 WHERE id = $1`, agent.Id)
+	set(`INSERT INTO whitetower.reviews (id, agent_id, due_at, grace_ends_at, signoff_required, created_at)
+		VALUES ($1, $2, '2027-01-01T00:00:00Z', '2027-01-15T00:00:00Z', true, '2026-10-19T09:00:00Z')`, id, agent.Id)
+	path := "/reviews/" + id.String()
+	review := func(res result, status int, etag string) gen.Review {
+		t.Helper()
+		var r gen.Review
+		if res.status != status || res.header.Get("ETag") != etag || json.Unmarshal(res.body, &r) != nil {
+			t.Fatalf("%d %s %s, want %d with the ETag %s", res.status, res.header.Get("ETag"), res.body, status, etag)
+		}
+		return r
+	}
+
+	r := review(send(http.MethodGet, path, olivia, "", nil), http.StatusOK, `"1"`)
+	if r.Status != gen.ReviewStatusScheduled || r.AgentId != agent.Id || r.Overdue || !r.SignoffRequired || r.UnusedTooling == nil ||
+		len(*r.UnusedTooling) != 0 || r.Attestation != nil || r.CompletedBy != nil {
+		t.Errorf("getReview: %+v", r)
+	}
+	// decoded empties a list before a page is decoded into it, which would
+	// otherwise keep a member that the page leaves out.
+	var list gen.ReviewList
+	decoded := func(l *gen.ReviewList) *gen.ReviewList { *l = gen.ReviewList{}; return l }
+	for _, target := range []string{"/agents/" + agent.Id.String() + "/reviews", "/reviews?status=scheduled&overdue=false"} {
+		if res = send(http.MethodGet, target, olivia, "", nil); res.status != http.StatusOK || json.Unmarshal(res.body, decoded(&list)) != nil ||
+			len(list.Reviews) != 1 || list.Reviews[0].Id != id || list.Reviews[0].UnusedTooling != nil || list.NextCursor != nil {
+			t.Errorf("%s: %d %s", target, res.status, res.body)
+		}
+	}
+	problemOf(t, send(http.MethodGet, "/reviews?status=lost", olivia, "", nil), problem.BadRequest)
+	problemOf(t, send(http.MethodGet, "/reviews/"+uuid.NewString(), olivia, "", nil), problem.NotFound)
+
+	attestation := `{"stillNeeded":true,"ownerStillRight":true,"dataCategoriesCurrent":true,"policyAdequate":true,
+		"toolingStillNeeded":true,"comment":"Still sorting invoices."}`
+	completion := path + "/completion"
+	problemOf(t, send(http.MethodPost, completion, olivia, attestation, nil), problem.PreconditionRequired)
+	problemOf(t, send(http.MethodPost, completion, olivia, attestation, ifMatch(`"2"`)), problem.PreconditionFailed)
+	problemOf(t, send(http.MethodPost, completion, olivia, strings.Replace(attestation, `"policyAdequate":true`, `"policyAdequate":false`, 1),
+		ifMatch(`"1"`)), problem.BadRequest)
+	problemOf(t, asAlex(http.MethodPost, completion, "", attestation, ifMatch(`"1"`)), problem.Forbidden)
+	r = review(send(http.MethodPost, completion, olivia, attestation, ifMatch(`"1"`)), http.StatusOK, `"2"`)
+	if r.Status != gen.ReviewStatusAwaitingSignoff || r.CompletedBy == nil || *r.CompletedBy.DisplayName != "Olivia Owner" ||
+		r.Attestation == nil || *r.Attestation.Comment != "Still sorting invoices." || r.Attestation.KeptTooling == nil || r.CompletedAt == nil {
+		t.Errorf("completeReview: %+v", r)
+	}
+
+	signOff := path + "/sign-off"
+	problemOf(t, send(http.MethodPost, signOff, olivia, "", ifMatch(`"2"`)), problem.Forbidden)
+	problemOf(t, asAlex(http.MethodPost, signOff, "", "", nil), problem.PreconditionRequired)
+	r = review(asAlex(http.MethodPost, signOff, "", "", ifMatch(`"2"`)), http.StatusOK, `"3"`)
+	if r.Status != gen.ReviewStatusCompleted || r.SignedOffBy == nil || r.SignedOffBy.Id.String() != alex || r.SignedOffAt == nil {
+		t.Errorf("signOffReview: %+v", r)
+	}
+	problemOf(t, asAlex(http.MethodPost, signOff, "", "", ifMatch(`"3"`)), problem.Conflict)
+
+	// The sign-off scheduled the next review, which the agent's list shows
+	// first, a page at a time.
+	reviews := "/agents/" + agent.Id.String() + "/reviews"
+	if res = send(http.MethodGet, reviews+"?limit=1", olivia, "", nil); res.status != http.StatusOK || json.Unmarshal(res.body, decoded(&list)) != nil ||
+		len(list.Reviews) != 1 || list.Reviews[0].Status != gen.ReviewStatusScheduled || list.NextCursor == nil {
+		t.Fatalf("listAgentReviews: %d %s", res.status, res.body)
+	}
+	if res = send(http.MethodGet, reviews+"?limit=1&cursor="+*list.NextCursor, olivia, "", nil); res.status != http.StatusOK ||
+		json.Unmarshal(res.body, decoded(&list)) != nil || len(list.Reviews) != 1 || list.Reviews[0].Id != id || list.NextCursor != nil {
+		t.Fatalf("listAgentReviews, last page: %d %s", res.status, res.body)
+	}
 }
