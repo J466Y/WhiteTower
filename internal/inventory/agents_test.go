@@ -9,8 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/J466Y/WhiteTower/internal/govstate"
 	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
+	"github.com/J466Y/WhiteTower/internal/platform/db"
 )
 
 func TestAProposalBecomesADraftOwnedByItsProposer(t *testing.T) {
@@ -331,6 +333,51 @@ func TestOwnersAndOperatorsEditAnAgent(t *testing.T) {
 	if _, err := f.inv.Edit(ctx, f.omar, a.ID, a.Version, inventory.AgentChanges{Name: &name}); err != nil {
 		t.Fatalf("an operator: %v", err)
 	}
+}
+
+// An edit refuses whoever may not make it before it takes any lock, the
+// shared form of the selector halts' advisory lock included: while another
+// session holds that lock exclusively and the agent's row, as a selector halt
+// under way does, each refused caller gets their refusal at once, never a
+// lock timeout (the design of the halt path, section 2). An allowed caller
+// does wait for the lock.
+func TestARefusedEditTakesNoLock(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	inv := f.impatient(t)
+	a := f.propose(t, "invoice-triage")
+	f.held(t,
+		func(ctx context.Context, tx *db.Tx) error {
+			if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, govstate.SelectorHaltsLock); err != nil {
+				return err
+			}
+			_, err := tx.Exec(ctx, `SELECT 1 FROM whitetower.agents WHERE id = $1 FOR NO KEY UPDATE`, a.ID)
+			return err
+		},
+		func(context.Context, *db.Tx) error { return nil })
+	hr, critical := map[string]string{"team": "hr"}, "critical"
+	labels, risk := inventory.AgentChanges{Labels: &hr}, inventory.AgentChanges{RiskTier: &critical}
+	edit := func(by auth.Principal, ch inventory.AgentChanges) error {
+		_, err := inv.Edit(ctx, by, a.ID, a.Version, ch)
+		return err
+	}
+	viewer := f.olivia
+	viewer.Scopes = []string{"inventory.view"}
+	breakglass := auth.Principal{ID: f.omar.ID, Kind: auth.Human, Roles: []string{"operator"}, IsBreakglass: true}
+	for _, c := range []struct {
+		name string
+		err  error
+	}{
+		{"another owner edits the labels", edit(f.otto, labels)},
+		{"another owner edits the risk tier", edit(f.otto, risk)},
+		{"the advisory committee edits the labels", edit(f.alex, labels)},
+		{"a user edits the labels", edit(f.uma, labels)},
+		{"the owner's token without the scope edits the labels", edit(viewer, labels)},
+		{"a break-glass session edits the risk tier", edit(breakglass, risk)},
+	} {
+		t.Run(c.name, func(t *testing.T) { refused(t, c.err, inventory.Forbidden) })
+	}
+	waited(t, edit(f.olivia, labels))
 }
 
 func TestAnEditKeepsTheRulesOfTheAgent(t *testing.T) {

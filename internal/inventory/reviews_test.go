@@ -579,6 +579,28 @@ func (f *fixture) impatient(t *testing.T) *inventory.Inventory {
 	return inventory.New(opts)
 }
 
+// holdAgents locks the rows of the agents in another session until the test
+// ends, as an agent halt does before it takes the version counter.
+func (f *fixture) holdAgents(t *testing.T, ids ...uuid.UUID) {
+	t.Helper()
+	f.held(t,
+		func(ctx context.Context, tx *db.Tx) error {
+			_, err := tx.Exec(ctx, `SELECT 1 FROM whitetower.agents WHERE id = ANY($1) FOR NO KEY UPDATE`, ids)
+			return err
+		},
+		func(context.Context, *db.Tx) error { return nil })
+}
+
+// waited fails the test unless err is a lock timeout: the request waited for
+// a lock that another session holds.
+func waited(t *testing.T, err error) {
+	t.Helper()
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "55P03" {
+		t.Fatalf("got %v, want a lock timeout", err)
+	}
+}
+
 // A completion or a sign-off refuses whoever may not make it before it takes
 // any lock: while another session holds the agent's row, each refused caller
 // gets their refusal at once, never a lock timeout. Otherwise a stream of

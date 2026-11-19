@@ -251,6 +251,28 @@ func (inv *Inventory) Transition(ctx context.Context, caller auth.Principal, age
 	}
 	err = inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := inventorydb.New(tx)
+		// Every check of the caller first, on what is read without a lock, so
+		// that a caller whom the transition refuses holds no lock that an
+		// agent halt would queue behind (the design of the halt path, section
+		// 2).
+		a, err := inv.load(ctx, q, agentID)
+		if err != nil {
+			return err
+		}
+		f, err := inv.mayTake(ctx, q, caller, actor, t, a)
+		if err != nil {
+			return err
+		}
+		uc, err := q.GetUseCase(ctx, a.UseCaseID)
+		if err != nil {
+			return fmt.Errorf("reading the agent's use case: %w", err)
+		}
+		if f.conflicted, err = conflicted(ctx, q, actor, a, uc); err != nil {
+			return err
+		}
+		if err := t.separated(f); err != nil {
+			return err
+		}
 		// The agent's row, then its governance state, as every writer of what
 		// enforcement points see locks them before it takes its version (the
 		// design of the halt path, section 2). The run state that the guards
@@ -263,22 +285,15 @@ func (inv *Inventory) Transition(ctx context.Context, caller auth.Principal, age
 		if err := lockState(ctx, q, agentID); err != nil {
 			return err
 		}
-		a, err := inv.load(ctx, q, agentID)
-		if err != nil {
+		// The agent's state, its owners and its use case may have changed
+		// before the locks.
+		if a, err = inv.load(ctx, q, agentID); err != nil {
 			return err
 		}
-		if !seesAll(caller) && a.LifecycleState != "active" {
-			return refuse(NotFound, "no agent has this ID")
-		}
-		own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: agentID, PrincipalID: actor})
-		if err != nil {
-			return fmt.Errorf("reading the agent's owners: %w", err)
-		}
-		f := facts{person: caller.Kind == auth.Human, own: own, permitted: inv.permits(ctx, caller, t.action, own)}
-		if err := t.allows(f); err != nil {
+		if f, err = inv.mayTake(ctx, q, caller, actor, t, a); err != nil {
 			return err
 		}
-		uc, err := q.LockUseCase(ctx, a.UseCaseID)
+		uc, err = q.LockUseCase(ctx, a.UseCaseID)
 		if err != nil {
 			return fmt.Errorf("reading the agent's use case: %w", err)
 		}
@@ -367,13 +382,38 @@ func (inv *Inventory) permits(ctx context.Context, caller auth.Principal, action
 	return inv.authorize(ctx, caller, permissions[action], authz.Relationship{IsOwner: own}) == nil
 }
 
+// mayTake refuses the caller t on an agent that they may not see, or that
+// their kind, roles, scopes or relationship to the agent do not let them
+// take, and returns what it found of them.
+func (inv *Inventory) mayTake(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, actor uuid.UUID, t transition, a *Agent) (facts, error) {
+	if !seesAll(caller) && a.LifecycleState != "active" {
+		return facts{}, refuse(NotFound, "no agent has this ID")
+	}
+	own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: a.ID, PrincipalID: actor})
+	if err != nil {
+		return facts{}, fmt.Errorf("reading the agent's owners: %w", err)
+	}
+	f := facts{person: caller.Kind == auth.Human, own: own, permitted: inv.permits(ctx, caller, t.action, own)}
+	return f, t.allows(f)
+}
+
+// conflicted reports whether the caller created the agent or its use case,
+// or is or ever was its primary owner or one of its delegates.
+func conflicted(ctx context.Context, q *inventorydb.Queries, actor uuid.UUID, a *Agent, uc inventorydb.WhitetowerUseCase) (bool, error) {
+	ever, err := q.EverAssigned(ctx, inventorydb.EverAssignedParams{AgentID: a.ID, PrincipalID: actor})
+	if err != nil {
+		return false, fmt.Errorf("reading the agent's owners: %w", err)
+	}
+	return ever || a.CreatedBy.ID == actor || uc.CreatedBy == actor, nil
+}
+
 // readFacts adds to f what the guards read of the agent and its use case, in
 // tx, as they concern the caller.
 func (inv *Inventory) readFacts(ctx context.Context, tx *db.Tx, f *facts, actor uuid.UUID, a *Agent, uc inventorydb.WhitetowerUseCase) error {
 	q := inventorydb.New(tx)
-	ever, err := q.EverAssigned(ctx, inventorydb.EverAssignedParams{AgentID: a.ID, PrincipalID: actor})
-	if err != nil {
-		return fmt.Errorf("reading the agent's owners: %w", err)
+	var err error
+	if f.conflicted, err = conflicted(ctx, q, actor, a, uc); err != nil {
+		return err
 	}
 	if f.policyActive, err = inv.policies.Active(ctx, tx, a.ID); err != nil {
 		return fmt.Errorf("reading the agent's policies: %w", err)
@@ -385,7 +425,6 @@ func (inv *Inventory) readFacts(ctx context.Context, tx *db.Tx, f *facts, actor 
 	f.ownerActive = a.PrimaryOwner.Status == "active"
 	f.useCaseStatus = uc.Status
 	f.prohibited = uc.AiActClassification == "prohibited"
-	f.conflicted = ever || a.CreatedBy.ID == actor || uc.CreatedBy == actor
 	f.harnessDeclared = a.Harness != nil
 	f.halted = a.Halted
 	if a.Suspension != nil {
@@ -461,10 +500,11 @@ func (inv *Inventory) Transitions(ctx context.Context, caller auth.Principal, ag
 // t does not start from, a missing comment and the other guards, which the
 // refusal names.
 func (t transition) check(a *Agent, version int64, f facts) error {
+	if err := t.separated(f); err != nil {
+		return err
+	}
 	failed := t.unmet(f)
 	switch {
-	case slices.Contains(failed, "not_owner_or_creator"):
-		return refuse(Forbidden, "separation of duties: nobody may %s an agent they own, delegate for, ever did, or created, nor one whose use case they created (HUM-04)", t.action)
 	case a.Version != version:
 		return refuse(Stale, "the agent changed since you read it: read it again, then retry")
 	case !slices.Contains(t.from, a.LifecycleState):
@@ -473,6 +513,15 @@ func (t transition) check(a *Agent, version int64, f facts) error {
 		return refuse(Invalid, "a comment is required to %s an agent", t.action)
 	case len(failed) > 0:
 		return refuse(Conflict, "the lifecycle refuses to %s the agent, since these guards do not hold: %s", t.action, strings.Join(failed, ", "))
+	}
+	return nil
+}
+
+// separated refuses t to a caller whom its separation of duties refuses
+// (HUM-04).
+func (t transition) separated(f facts) error {
+	if slices.Contains(t.unmet(f), "not_owner_or_creator") {
+		return refuse(Forbidden, "separation of duties: nobody may %s an agent they own, delegate for, ever did, or created, nor one whose use case they created (HUM-04)", t.action)
 	}
 	return nil
 }
