@@ -217,6 +217,40 @@ func TestCheckRefusesInvalidEvents(t *testing.T) {
 			}
 		})
 	}
+	// A reminder goes to the owner, at a number of days before the due date,
+	// or to the advisory committee, each form closed, and only the system
+	// sends one (plan P1-04, step 7).
+	owner := "0192f1c2-7a3b-7c4d-8e5f-0000000000a1"
+	for _, tt := range []struct {
+		name     string
+		reminder map[string]any
+		actor    map[string]any
+		want     string // empty for an event the check accepts
+	}{
+		{"the advisory committee", map[string]any{"role": "advisory"}, nil, ""},
+		{"another role", map[string]any{"role": "operator"}, nil, "invalid data"},
+		{"the owner on the due date", map[string]any{"days_before_due": 0, "principal_id": owner}, nil, "invalid data"},
+		{"the owner without the days", map[string]any{"principal_id": owner}, nil, "invalid data"},
+		{"both forms at once", map[string]any{"days_before_due": 7, "principal_id": owner, "role": "advisory"}, nil, "invalid data"},
+		{"the owner by email", map[string]any{"days_before_due": 7, "principal_id": owner, "email": "olivia@example.org"}, nil, "invalid data"},
+		{"a person's reminder", map[string]any{"role": "advisory"}, map[string]any{"type": "human", "id": owner}, "invalid data"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			e := example("whitetower.review.reminded.v1")
+			data := e["data"].(map[string]any)
+			data["reminder"] = tt.reminder
+			if tt.actor != nil {
+				data["actor"] = tt.actor
+			}
+			_, err := c.check(e)
+			switch {
+			case tt.want == "" && err != nil:
+				t.Fatalf("refused: %v", err)
+			case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+				t.Fatalf("got %v, want %q", err, tt.want)
+			}
+		})
+	}
 }
 
 func TestEmitterAndAction(t *testing.T) {

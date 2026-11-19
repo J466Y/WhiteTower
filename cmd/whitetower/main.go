@@ -308,6 +308,23 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	// the version counter, through the same Versions, which announces each
 	// change on the bus once it commits.
 	versions := govstate.NewVersions(bus, logger)
+	inv := inventory.New(inventory.Options{
+		DB:          database,
+		Clock:       clock.System,
+		Writer:      writer,
+		Authorizer:  authorizer,
+		Versions:    versions,
+		RoleMapping: cfg.Auth.OIDC.RoleMapping,
+		// Until plan P1-06 brings policies, no agent has an active
+		// agent-specific policy, so none becomes active (POL-04).
+		Policies: inventory.NoAgentPolicies{},
+		// Until plan P1-08 brings selector halts, none is active for a
+		// write of an agent's governance state to add.
+		SelectorHalts: inventory.NoSelectorHalts{},
+		// Until plan P1-16 brings the agents' tooling, a review lists no
+		// candidate to disable.
+		Tooling: inventory.NoTooling{},
+	})
 
 	api := rest.Handler(rest.Options{
 		Logger:        logger,
@@ -321,23 +338,7 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		Exchanger:     exchanger,
 		Revocation:    authn.NewEmergencyRevocation(sessionStore, logger),
 		AuditLog:      auditLog,
-		Inventory: inventory.New(inventory.Options{
-			DB:          database,
-			Clock:       clock.System,
-			Writer:      writer,
-			Authorizer:  authorizer,
-			Versions:    versions,
-			RoleMapping: cfg.Auth.OIDC.RoleMapping,
-			// Until plan P1-06 brings policies, no agent has an active
-			// agent-specific policy, so none becomes active (POL-04).
-			Policies: inventory.NoAgentPolicies{},
-			// Until plan P1-08 brings selector halts, none is active for a
-			// write of an agent's governance state to add.
-			SelectorHalts: inventory.NoSelectorHalts{},
-			// Until plan P1-16 brings the agents' tooling, a review lists no
-			// candidate to disable.
-			Tooling: inventory.NoTooling{},
-		}),
+		Inventory:     inv,
 	})
 	drain := server.NewDrain()
 	ready := health.NewReadiness(logger)
@@ -363,8 +364,12 @@ func serve(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	// the database closes.
 	replica, _ := os.Hostname()
 	runner := jobs.New(jobs.Options{DB: database, Replica: replica, Logger: logger, Metrics: metrics.NewJobs(registry)})
-	if err := runner.Add(authn.CleanupSessionsJob(sessionStore)); err != nil {
-		return err
+	// The lifecycle guard suspends the agents whose owner left or whose review
+	// lapsed, and reminds owners of their reviews.
+	for _, job := range []jobs.Job{authn.CleanupSessionsJob(sessionStore), inv.GuardJob(logger)} {
+		if err := runner.Add(job); err != nil {
+			return err
+		}
 	}
 
 	// The audit log: every change records its event through the writer, and

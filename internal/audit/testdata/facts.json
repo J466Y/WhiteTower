@@ -202,6 +202,13 @@
     "outcome": "",
     "reason": ""
   },
+  "whitetower.review.reminded.v1": {
+    "action": "review.reminded",
+    "actor_id": "",
+    "actor_type": "system",
+    "outcome": "",
+    "reason": ""
+  },
   "whitetower.service_account.created.v1": {
     "action": "service_account.created",
     "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000002",

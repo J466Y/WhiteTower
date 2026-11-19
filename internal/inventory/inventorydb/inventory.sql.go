@@ -94,6 +94,61 @@ func (q *Queries) AgentHaltIssued(ctx context.Context, arg AgentHaltIssuedParams
 	return exists, err
 }
 
+const agentsToSuspend = `-- name: AgentsToSuspend :many
+SELECT c.id, c.owner_inactive, c.review_overdue FROM (
+  SELECT a.id,
+    NOT EXISTS (
+      SELECT 1 FROM whitetower.agent_owners o
+      JOIN whitetower.principals p ON p.id = o.principal_id
+      WHERE o.agent_id = a.id AND o.role = 'primary' AND o.ended_at IS NULL AND p.status = 'active'
+    ) AS owner_inactive,
+    EXISTS (
+      SELECT 1 FROM whitetower.reviews r
+      WHERE r.agent_id = a.id AND r.status IN ('scheduled', 'awaiting_signoff') AND r.grace_ends_at < $1
+    ) AS review_overdue
+  FROM whitetower.agents a
+  WHERE a.lifecycle_state = ANY($2::text[])
+) c
+WHERE c.owner_inactive OR c.review_overdue
+ORDER BY c.id
+`
+
+type AgentsToSuspendParams struct {
+	Now    time.Time
+	States []string
+}
+
+type AgentsToSuspendRow struct {
+	ID            uuid.UUID
+	OwnerInactive bool
+	ReviewOverdue bool
+}
+
+// The agents in one of the states given whose primary owner is not an active
+// principal, or whose open review's grace period ended before the time given,
+// which comes from the application's clock, with which of the two holds, by
+// ID. A read without a lock: the automatic suspension of each agent checks
+// its reason again under the agent's lock.
+func (q *Queries) AgentsToSuspend(ctx context.Context, arg AgentsToSuspendParams) ([]AgentsToSuspendRow, error) {
+	rows, err := q.db.Query(ctx, agentsToSuspend, arg.Now, arg.States)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentsToSuspendRow
+	for rows.Next() {
+		var i AgentsToSuspendRow
+		if err := rows.Scan(&i.ID, &i.OwnerInactive, &i.ReviewOverdue); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const cancelOpenReviews = `-- name: CancelOpenReviews :many
 UPDATE whitetower.reviews SET status = 'cancelled', version = version + 1
 WHERE agent_id = $1 AND status IN ('scheduled', 'awaiting_signoff')
@@ -1354,6 +1409,30 @@ func (q *Queries) RecordDecision(ctx context.Context, arg RecordDecisionParams) 
 	return err
 }
 
+const recordReminder = `-- name: RecordReminder :execrows
+UPDATE whitetower.reviews SET last_reminder_at = $1::timestamptz
+WHERE id = $2 AND status = 'scheduled'
+  AND (last_reminder_at IS NULL OR last_reminder_at < $3::timestamptz)
+`
+
+type RecordReminderParams struct {
+	RemindedAt time.Time
+	ID         uuid.UUID
+	Point      time.Time
+}
+
+// Records that a scheduled review was reminded at the time given, unless it
+// was reminded at or after the reminder point given, or is no longer
+// scheduled. The review's version stays: a reminder changes nothing that the
+// review shows, so that a completion read before it still applies.
+func (q *Queries) RecordReminder(ctx context.Context, arg RecordReminderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recordReminder, arg.RemindedAt, arg.ID, arg.Point)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const recordTransition = `-- name: RecordTransition :exec
 INSERT INTO whitetower.lifecycle_transitions (
   id, agent_id, action, from_state, to_state, actor_type, actor_id, reason, comment,
@@ -1440,6 +1519,61 @@ func (q *Queries) ReviewOverdue(ctx context.Context, arg ReviewOverdueParams) (b
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const reviewsToRemind = `-- name: ReviewsToRemind :many
+SELECT r.id, r.agent_id, r.due_at, p.days::integer AS days_before_due
+FROM whitetower.reviews r
+CROSS JOIN LATERAL (
+  SELECT min(d) AS days FROM unnest($1::integer[] || 0) AS d
+  WHERE r.due_at - make_interval(hours => 24 * d) <= $2
+) p
+WHERE r.status = 'scheduled' AND p.days IS NOT NULL
+  AND (r.last_reminder_at IS NULL OR r.last_reminder_at < r.due_at - make_interval(hours => 24 * p.days))
+ORDER BY r.due_at, r.id
+`
+
+type ReviewsToRemindParams struct {
+	Days []int32
+	Now  time.Time
+}
+
+type ReviewsToRemindRow struct {
+	ID            uuid.UUID
+	AgentID       uuid.UUID
+	DueAt         time.Time
+	DaysBeforeDue int32
+}
+
+// The scheduled reviews whose latest reminder point has passed at the time
+// given, which comes from the application's clock, and that were not reminded
+// since that point, with the point: one of the numbers of days before the due
+// date given, or 0 for the due date itself. A day is 24 hours, as when the
+// review was scheduled. A read without a lock: each reminder checks again, as
+// it records itself, that it is still due.
+func (q *Queries) ReviewsToRemind(ctx context.Context, arg ReviewsToRemindParams) ([]ReviewsToRemindRow, error) {
+	rows, err := q.db.Query(ctx, reviewsToRemind, arg.Days, arg.Now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReviewsToRemindRow
+	for rows.Next() {
+		var i ReviewsToRemindRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AgentID,
+			&i.DueAt,
+			&i.DaysBeforeDue,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const scheduleReview = `-- name: ScheduleReview :exec

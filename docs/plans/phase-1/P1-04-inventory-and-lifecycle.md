@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Phase** | 1 Core MVP |
-| **Status** | In progress (7 of 11 pull requests) |
+| **Status** | In progress (8 of 11 pull requests) |
 | **Size** | L |
 | **Depends on** | P1-03 (and the P1-02 writer); the first pull request of P1-07.1 for pull requests 4 to 8 |
 | **Unblocks** | P1-05, P1-06, P1-08, P1-10.2, P1-16 (steps 1 to 4) |
@@ -169,7 +169,7 @@ The plan lands in ten pull requests, the fourth in three parts (the maintainer's
 | 4b. Lifecycle engine: into and out of service | 5 for T9, T10, T13 and T14, through P1-06's interface, stubbed: no agent policy is active; `getAgentActions`; the property tests, 10,000 sequences on the decision core and about 200 on PostgreSQL; ST-23 for activation without the invariant; service accounts take only T10, which the lifecycle says beside "People decide on proposals"; T14 cancels the pending ownership transfer and takes the proposal out of the advisory committee's inbox | Done |
 | 4c. Lifecycle engine: the transitions White Tower makes | 5 for T7, T8, T11 and T12: the entry point for the transitions White Tower makes, where T12 skips drills, and T7 when an edit declares a harness; the active selector halts in every write of the state record, through P1-08's interface, stubbed; the shared form of the selector halts' advisory lock, with the key of `internal/govstate`, taken first in T1 and `editAgent`; `state_version` in `whitetower.agent.updated.v1` when a change concerns what enforcement points see ([design note](P1-08-kill-switch.md#progress-notes), sections 8, 13 and 14) | Done |
 | 5a. Reviews | 6, through P1-16's interface, stubbed; the sign-off's separation of duties in the inventory and in the database; the advisory committee's inbox item of a review that waits for its sign-off | Done |
-| 5b. The lifecycle guard job | 7, one agent per transaction; the reminders and their inbox items, in the owner's inbox and, past the due date, the advisory committee's | Not started |
+| 5b. The lifecycle guard job | 7, one agent per transaction; the reminders and their inbox items, in the owner's inbox and, past the due date, the advisory committee's | Done |
 | 6. Coverage, instances, search and export | 8, 9; ST-24, with cells that start after a `;` or with a tab or a carriage return; C3 through P1-08's interface, stubbed | Not started |
 | 7. Inbox and notifications | 10; the dismissal of items that ask for no action, each member their own copy (P1-17 step 4, DC-4) | Not started |
 | 8. Bulk import | 11, with its operation; at most 100 agents per transaction, one import at a time, each transaction taking the shared form of the selector halts' advisory lock first | Not started |
@@ -492,3 +492,43 @@ A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-0
 - P1-17 registers the four `lifecycle.review_*` settings with the rules that the inventory checks at read.
 - `Inventory.Transition` locks the agent's row before it checks the caller, as completions and sign-offs did before the review of 2026-11-18: a refused caller takes the lock that an agent halt queues behind. It is merged code outside this part, so the review queues a fix of its own.
 - The framework mapping could name `review.changed` among the evidence of ISO/IEC 42001 A.6.2.6, beside INV-06.
+
+### 2026-11-18: the lifecycle guard job (PR 5b)
+
+**What part 5b builds:**
+
+- **The lifecycle guard** (`Inventory.GuardJob`), a background job named `lifecycle-guard` that `internal/platform/jobs` runs on one replica at a time, every minute, as part 5a's notes said. `cmd/whitetower/main.go` registers it. Each run suspends first, then reminds.
+- **Suspensions (INV-05).** A read without a lock (`AgentsToSuspend`) finds the agents in a state that T11 starts from, `validated`, `ready` or `active`, whose primary owner is not an active principal, or whose open review's grace period ended before the application's clock, with which of the two holds. Each agent is then suspended in a short transaction of its own, through `SystemTransition` with `auto_suspend` and the reason that the read found, the owner's first. The entry point locks the agent's row and its governance state, checks again that the agent is in such a state and that the reason holds, and records the transition and its event as the system, with the reason. When the first reason no longer holds, the same transaction tries the second. An agent whose owner came back, or that something else suspended first, stays as it is: the guard never moves an agent out of a suspension, and records only a reason that holds.
+- **Reminders (INV-06; the decisions of 2026-11-17).** A read without a lock (`ReviewsToRemind`) finds the scheduled reviews whose latest reminder point has passed since their last reminder: one of the numbers of days before the due date of `lifecycle.review_reminder_days`, or the due date itself. Each review is reminded in a transaction of its own. `RecordReminder` sets `reviews.last_reminder_at`, unless the review was reminded at or after that point or is no longer scheduled, so each reminder goes out once. Before the due date, a `review_due` item goes to whoever is the agent's primary owner then, and the item before it leaves the inbox; past the due date, one `review_due` item goes to the advisory role, and the owner's last item stays. A completion or a cancellation takes them all out, as part 5a built. Each reminder records `whitetower.review.reminded.v1`, a new event type of the core, with the agent as subject, the system as its actor, and whom it went to: the owner's pseudonymous ID with the number of days, or the advisory role.
+- **One agent, or one review, per transaction** ([design note](P1-08-kill-switch.md#progress-notes), sections 2 and 14). A suspension holds the locks of one agent for a few milliseconds, and the version counter only from `Next` to its commit; it reads no setting. A reminder locks only its review's row: neither the agent's row, nor its governance state, nor the version counter, since enforcement points see nothing of a review, so no halt ever waits for one. The guard takes no advisory lock, since T11 changes no label and no risk tier.
+- **Settings.** The reminders read `lifecycle.review_reminder_days` at use and check it against the rules of 2026-10-21: 1 to 10 distinct numbers of 1 to 365 days. A setting outside them fails the reminders of the run, and the error names it; no default stands in for it. The suspensions read no setting and come first, so a broken setting never keeps an agent in service.
+- **Failures.** An agent or a review that fails is logged through the injected logger, with its ID, and the guard goes on with the others; the run then fails, so that `job_state` and the job's metrics say so.
+- **Idempotent.** A run that stops halfway leaves each agent and each review as it was, or as the guard left it, and the next run goes on from there. Two runs at once, should a replica that lost its lock still be running, suspend and remind each one once.
+- **Time.** Every time that the guard compares comes from the injected clock: the end of a grace period, the reminder points and `last_reminder_at`. A day is 24 hours, as when the review was scheduled.
+- **No migration.** The tables, `reviews.last_reminder_at` and the indexes that the reads use were there.
+
+**Decisions taken in this part:**
+
+| Question | Decision |
+| --- | --- |
+| How the audit log keeps a reminder | A new event type of the core, `whitetower.review.reminded.v1`, with the agent as subject, the system as its only actor, and a `reminder` that names whom it went to (the review's decision of 2026-11-18). A part may add an event type of the core, but not change a merged schema, so `whitetower.review.changed.v1` stays as part 5a merged it; and a reminder changes nothing that the review shows, since its version stays, so it is not a change of the review |
+| Which reviews are reminded | Only a scheduled review, which waits for its owner. A review that waits for its sign-off is in the advisory committee's inbox already (`review_signoff`), and its owner has nothing left to do; past its grace period, it still suspends the agent |
+| Several reminders that fell due while the guard did not run | Only the latest goes out: past the due date, only the advisory committee's |
+| A reminder and the review's ETag | A reminder leaves the review's version as it is: it changes nothing that the review shows, so a completion read before it still applies |
+| A run in which an agent or a review failed | The guard tries every one, then fails the run |
+
+**Tests:** an owner deactivated through P1-03's `PrincipalStore.Deactivate`, as SCIM does, and a review that lapses past its grace period, each suspending its agent within one interval of the guard, which a runner of background jobs leads through PostgreSQL on a fake clock (`WaitTimers`, then `Advance`), and not before; the guard's suspensions for each state and reason, the owner's first when both hold, and the agents it leaves as they are: a review past due within its grace period, an agent suspended by hand, a draft, a proposal and a retired agent, then a second run that changes nothing; an agent that fails, logged by ID, between two that are suspended, and the run that fails; the reminders of a review at 30, 7 and 1 days, each taking the one before it out of the inbox, an owner who changed between two of them, the advisory committee's past the due date with the owner's last staying, runs that send nothing twice, a review waiting for its sign-off that is never reminded, and a completion read before the reminders that takes them all out; only the latest of several reminders that fell due; each reminder setting outside its rules, which fails the run and sends no reminder while the suspensions still happen. Two tests of the halt path, on connections that wait at most 200 ms for a lock, as part 5a's `TestARefusedCompletionOrSignOffTakesNoLock` does: while the guard holds its second agent, before it takes the version counter, the halts of the agent it suspended and of two it has not reached yet go through at once, the halt of the agent it holds times out, and the guard then leaves the halted agents as they are, suspends an agent whose owner came back only because its review lapsed, and leaves one whose owner came back in service; and while a session holds the agents' rows, their governance state and the version counter, as a halt does, every reminder goes out.
+
+**Differences from the plan:**
+
+- Step 7 finds the owners who became inactive "from P1-03 events and a periodic sweep". The guard sweeps every minute; the hook on P1-03's deactivation stays a follow-up, as part 5a's notes said.
+- The notifications of T11 to the advisory committee and operators wait for pull request 7, with the inbox, as part 4c said.
+- Step 7's end-to-end test is the test of one interval (the review's decision of 2026-11-18): it runs the guard under the runner of background jobs, on PostgreSQL, and deactivates the owner through P1-03's code, in process, with a fake clock. `test/e2e` checks a running deployment without signing in, so it cannot yet bring an agent into service or deactivate a person.
+
+**Follow-ups:**
+
+- Pull request 7: the notifications of T11, and the operation that lists the `review_due` items.
+- A hook on P1-03's deactivation, which would suspend the agents of a person who leaves without waiting for the sweep.
+- Pending ownership transfers whose recipient became inactive could expire in the guard (pull request 3's follow-up).
+- P1-17 registers `lifecycle.review_reminder_days` with the rules that the guard checks at read.
+- A test of the guard against a running deployment, once `test/e2e` can sign in.
