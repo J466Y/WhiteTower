@@ -63,7 +63,7 @@ tasks:
     desc: Fail if the generated code is not up to date, or not committed (used by CI)
     vars:
       # Every directory that `task gen` writes.
-      GENERATED: internal/api/rest/gen pkg/apiclient pkg/moduleapi web/src/api internal/platform/db/gen internal/audit/auditdb internal/authn/authndb internal/inventory/inventorydb internal/govstate/govstatedb
+      GENERATED: internal/api/rest/gen pkg/apiclient pkg/moduleapi web/src/api internal/platform/db/gen internal/audit/auditdb internal/authn/authndb internal/inventory/inventorydb internal/govstate/govstatedb internal/catalog/catalogdb
     cmds:
       - task: gen
       # git diff sees tracked files only, so the untracked ones, such as the

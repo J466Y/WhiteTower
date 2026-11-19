@@ -102,9 +102,8 @@ func ifMatch(etag string) http.Header { return http.Header{"If-Match": []string{
 var unbuilt = []string{
 	"exportAgents", "listAgentInstances", "listInboxItems",
 	// P1-16: the catalog, its blocks and usage rules, and agents' tooling.
-	"listCatalogServers", "getCatalogServer", "approveCatalogServer", "declineCatalogServer",
-	"listCatalogTools", "getCatalogTool", "approveCatalogTool", "declineCatalogTool", "getToolDefinition",
-	"listCatalogModels", "getCatalogModel", "approveCatalogModel", "declineCatalogModel", "declinePendingFromAgent",
+	"approveCatalogServer", "declineCatalogServer", "approveCatalogTool", "declineCatalogTool",
+	"approveCatalogModel", "declineCatalogModel", "declinePendingFromAgent",
 	"listCatalogBlocks", "issueCatalogBlock", "getCatalogBlock",
 	"requestCatalogUnblock", "approveCatalogUnblock", "declineCatalogUnblock", "compileUsageRules",
 	"listAgentTooling", "disableAgentTooling", "listAgentToolingRequests", "requestAgentTooling",

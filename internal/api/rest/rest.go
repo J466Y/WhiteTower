@@ -20,6 +20,7 @@ import (
 	"github.com/J466Y/WhiteTower/internal/audit"
 	"github.com/J466Y/WhiteTower/internal/authn"
 	"github.com/J466Y/WhiteTower/internal/authz"
+	"github.com/J466Y/WhiteTower/internal/catalog"
 	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
 	"github.com/J466Y/WhiteTower/internal/platform/logging"
@@ -61,6 +62,9 @@ type Options struct {
 	AuditLog *audit.Log
 	// Inventory keeps the agents and their use cases (plan P1-04).
 	Inventory *inventory.Inventory
+	// Catalog keeps the MCP servers, tools and models of the organization
+	// (plan P1-16).
+	Catalog *catalog.Catalog
 }
 
 // TokenExchanger validates and exchanges an OpenID Connect ID token for an API token.
@@ -76,10 +80,11 @@ type Server struct {
 	revocation *authn.EmergencyRevocation
 	auditLog   *audit.Log
 	inventory  *inventory.Inventory
+	catalog    *catalog.Catalog
 }
 
 // NewServer creates a new Server instance.
-func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, exchanger TokenExchanger, revocation *authn.EmergencyRevocation, auditLog *audit.Log, inv *inventory.Inventory) Server {
+func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, exchanger TokenExchanger, revocation *authn.EmergencyRevocation, auditLog *audit.Log, inv *inventory.Inventory, cat *catalog.Catalog) Server {
 	return Server{
 		tokens:     tokens,
 		principals: principals,
@@ -87,6 +92,7 @@ func NewServer(tokens *authn.TokenStore, principals *authn.PrincipalStore, excha
 		revocation: revocation,
 		auditLog:   auditLog,
 		inventory:  inv,
+		catalog:    cat,
 	}
 }
 
@@ -475,7 +481,7 @@ func (s Server) ExchangeToken(ctx context.Context, request gen.ExchangeTokenRequ
 func Handler(opts Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET "+BasePath+"/openapi.json", documentHandler())
-	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals, opts.Exchanger, opts.Revocation, opts.AuditLog, opts.Inventory), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
+	strict := gen.NewStrictHandlerWithOptions(NewServer(opts.Tokens, opts.Principals, opts.Exchanger, opts.Revocation, opts.AuditLog, opts.Inventory, opts.Catalog), []gen.StrictMiddlewareFunc{authorize(opts.Authorizer)},
 		gen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  requestError,
 			ResponseErrorHandlerFunc: responseError(opts.Logger),

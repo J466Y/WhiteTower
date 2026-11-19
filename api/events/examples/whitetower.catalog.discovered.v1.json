@@ -1,0 +1,37 @@
+{
+  "specversion": "1.0",
+  "id": "0192f1d0-3c5a-7e21-8a4b-000000000031",
+  "source": "/core",
+  "type": "whitetower.catalog.discovered.v1",
+  "time": "2026-11-18T09:30:12.204Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "instance_id": "0192f1c2-7a3b-7c4d-8e5f-0000000000c1",
+    "agent_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
+    "entries": [
+      {
+        "type": "server",
+        "key": "githubcopilot",
+        "reference_sha256": "ca602dd499edea084d35bd6584aea648dec2778e67b48e10ab008ae0c1d06284"
+      },
+      {
+        "type": "tool",
+        "key": "githubcopilot/create_issue",
+        "reference_sha256": "6598e1ecfcf6c42b8a35d3d8ea93bff1b44cd1c1d109b8e9464c1079165d4d54"
+      },
+      {
+        "type": "tool",
+        "key": "agent/send_email",
+        "reference_sha256": "6d0893badcfaba13ed9c219bad4b1dca3542a8513d0f0833259eb8d11b7020d3"
+      },
+      {
+        "type": "model",
+        "key": "openai/gpt-4o",
+        "reference_sha256": "552ee0c1121a25da5906e043255dfd351d0660140642ebf0faf7b5ad579dcac5"
+      }
+    ],
+    "actor": {
+      "type": "system"
+    }
+  }
+}

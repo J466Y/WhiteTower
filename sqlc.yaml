@@ -65,3 +65,11 @@ sql:
         <<: *go
         package: govstatedb
         out: internal/govstate/govstatedb
+  - engine: postgresql
+    schema: *schema
+    queries: internal/catalog/queries
+    gen:
+      go:
+        <<: *go
+        package: catalogdb
+        out: internal/catalog/catalogdb

@@ -97,6 +97,20 @@
     "outcome": "failure",
     "reason": "file_hash"
   },
+  "whitetower.catalog.definition_changed.v1": {
+    "action": "catalog.definition_changed",
+    "actor_id": "",
+    "actor_type": "system",
+    "outcome": "",
+    "reason": ""
+  },
+  "whitetower.catalog.discovered.v1": {
+    "action": "catalog.discovered",
+    "actor_id": "",
+    "actor_type": "system",
+    "outcome": "",
+    "reason": ""
+  },
   "whitetower.decision.made.v1": {
     "action": "tool.invoke",
     "actor_id": "0192f1c2-7a3b-7c4d-8e5f-000000000001",
