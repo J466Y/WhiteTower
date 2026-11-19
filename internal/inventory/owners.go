@@ -123,16 +123,24 @@ func (inv *Inventory) Reassign(ctx context.Context, caller auth.Principal, agent
 	}
 	err = inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := inventorydb.New(tx)
-		// Whoever may not reassign is refused before the lock. The permission
-		// does not depend on the agent, so it still holds under the lock.
-		if _, err := q.GetAgent(ctx, agentID); err != nil {
+		// Whoever may not see the agent, or may not reassign, is refused
+		// before the lock. The permission does not depend on the agent, so it
+		// still holds under the lock; the agent's state may not.
+		row, err := q.GetAgent(ctx, agentID)
+		if err != nil {
 			return notFound(err, "agent")
+		}
+		if err := visible(caller, row.LifecycleState, "agent"); err != nil {
+			return err
 		}
 		if err := inv.authorize(ctx, caller, authz.PermissionAgentOwnershipReassign, authz.Relationship{}); err != nil {
 			return err
 		}
 		a, err := inv.lockAgent(ctx, q, agentID)
 		if err != nil {
+			return err
+		}
+		if err := visible(caller, a.LifecycleState, "agent"); err != nil {
 			return err
 		}
 		if a.Version != version {
@@ -280,7 +288,8 @@ func (inv *Inventory) RequestTransfer(ctx context.Context, caller auth.Principal
 		if a, err = inv.lockAgent(ctx, q, agentID); err != nil {
 			return err
 		}
-		// The agent's primary owner may have changed before the lock.
+		// The agent's state and its primary owner may have changed before the
+		// lock.
 		if err := inv.mayOffer(ctx, caller, actor, a); err != nil {
 			return err
 		}
@@ -334,7 +343,7 @@ func (inv *Inventory) CancelTransfer(ctx context.Context, caller auth.Principal,
 		q := inventorydb.New(tx)
 		// Whoever may not cancel is refused before the lock. The requester
 		// never changes, so the permission still holds under the lock.
-		t, err := getTransfer(ctx, q, agentID, transferID)
+		t, err := getTransfer(ctx, q, caller, agentID, transferID)
 		if err != nil {
 			return err
 		}
@@ -342,7 +351,7 @@ func (inv *Inventory) CancelTransfer(ctx context.Context, caller auth.Principal,
 		if err := inv.authorize(ctx, caller, authz.PermissionAgentMetadataEdit, authz.Relationship{IsOwner: requester}); err != nil {
 			return err
 		}
-		if t, err = lockedTransfer(ctx, q, agentID, transferID); err != nil {
+		if t, err = lockedTransfer(ctx, q, caller, agentID, transferID); err != nil {
 			return err
 		}
 		return inv.closeTransfer(ctx, tx, caller, t, "cancelled", "transfer_cancelled") //nolint:misspell // the schema's spelling
@@ -364,7 +373,7 @@ func (inv *Inventory) AcceptTransfer(ctx context.Context, caller auth.Principal,
 		if err := inv.authorize(ctx, caller, authz.PermissionAgentPropose, authz.Relationship{}); err != nil {
 			return err
 		}
-		if t, err = lockedTransfer(ctx, q, agentID, transferID); err != nil {
+		if t, err = lockedTransfer(ctx, q, caller, agentID, transferID); err != nil {
 			return err
 		}
 		a, err := inv.load(ctx, q, agentID)
@@ -407,14 +416,22 @@ func (inv *Inventory) AcceptTransfer(ctx context.Context, caller auth.Principal,
 }
 
 // DeclineTransfer declines a pending transfer, as the person it names; the
-// agent keeps its primary owner.
+// agent keeps its primary owner. A decline needs no permission of its own,
+// but never comes from a break-glass session.
 func (inv *Inventory) DeclineTransfer(ctx context.Context, caller auth.Principal, agentID, transferID uuid.UUID) (*Transfer, error) {
 	err := inv.db.InTx(ctx, func(ctx context.Context, tx *db.Tx) error {
 		q := inventorydb.New(tx)
 		if _, err := transferFor(ctx, q, caller, agentID, transferID); err != nil {
 			return err
 		}
-		t, err := lockedTransfer(ctx, q, agentID, transferID)
+		// A break-glass session halts agents and reads, and changes nothing
+		// else (ST-20). Every other change is refused to it through the
+		// Authorizer, with this refusal; a decline checks no permission, so
+		// it refuses the session itself.
+		if caller.IsBreakglass {
+			return refuse(Forbidden, "your roles do not permit this")
+		}
+		t, err := lockedTransfer(ctx, q, caller, agentID, transferID)
 		if err != nil {
 			return err
 		}
@@ -430,7 +447,7 @@ func (inv *Inventory) DeclineTransfer(ctx context.Context, caller auth.Principal
 // lock, so that whoever it does not name is refused before any lock. The
 // person that a transfer names never changes.
 func transferFor(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, agentID, transferID uuid.UUID) (inventorydb.WhitetowerOwnershipTransfer, error) {
-	t, err := getTransfer(ctx, q, agentID, transferID)
+	t, err := getTransfer(ctx, q, caller, agentID, transferID)
 	if err != nil {
 		return t, err
 	}
@@ -475,27 +492,31 @@ func (inv *Inventory) closeTransfer(ctx context.Context, tx *db.Tx, caller auth.
 // mayEditOwners checks that the caller may manage the agent's delegates: one
 // of its owners, or an operator, while the agent still changes. It refuses
 // whoever may not before it locks the agent's row, and checks the caller
-// again under the lock, since the agent's owners may have changed.
+// again under the lock, since the agent's state and owners may have changed.
 func (inv *Inventory) mayEditOwners(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, actor, agentID uuid.UUID) error {
-	if _, err := q.GetAgent(ctx, agentID); err != nil {
-		return notFound(err, "agent")
-	}
-	if err := inv.mayEdit(ctx, q, caller, actor, agentID); err != nil {
-		return err
-	}
-	a, err := inv.lockAgent(ctx, q, agentID)
+	a, err := inv.load(ctx, q, agentID)
 	if err != nil {
 		return err
 	}
-	if err := inv.mayEdit(ctx, q, caller, actor, agentID); err != nil {
+	if err := inv.mayEdit(ctx, q, caller, actor, a); err != nil {
+		return err
+	}
+	if a, err = inv.lockAgent(ctx, q, agentID); err != nil {
+		return err
+	}
+	if err := inv.mayEdit(ctx, q, caller, actor, a); err != nil {
 		return err
 	}
 	return stillChanges(a)
 }
 
-// mayOffer refuses an offer of the agent's ownership to anyone but its
-// primary owner, with agent.metadata.edit within their token's scopes.
+// mayOffer refuses an offer of the agent's ownership to a caller who may not
+// see the agent, as if it did not exist, and to anyone but its primary
+// owner, with agent.metadata.edit within their token's scopes.
 func (inv *Inventory) mayOffer(ctx context.Context, caller auth.Principal, actor uuid.UUID, a *Agent) error {
+	if err := visible(caller, a.LifecycleState, "agent"); err != nil {
+		return err
+	}
 	if err := inv.authorize(ctx, caller, authz.PermissionAgentMetadataEdit, authz.Relationship{IsOwner: a.PrimaryOwner.ID == actor}); err != nil {
 		return err
 	}
@@ -519,22 +540,28 @@ func (inv *Inventory) lockAgent(ctx context.Context, q *inventorydb.Queries, age
 }
 
 // lockedTransfer locks the agent, as lockAgent does, then reads its
-// transfer again.
-func lockedTransfer(ctx context.Context, q *inventorydb.Queries, agentID, transferID uuid.UUID) (inventorydb.WhitetowerOwnershipTransfer, error) {
+// transfer again, and checks again that the caller may see the agent, whose
+// state may have changed.
+func lockedTransfer(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, agentID, transferID uuid.UUID) (inventorydb.WhitetowerOwnershipTransfer, error) {
 	if _, err := q.LockAgent(ctx, agentID); err != nil {
 		return inventorydb.WhitetowerOwnershipTransfer{}, notFound(err, "ownership transfer of the agent")
 	}
-	return getTransfer(ctx, q, agentID, transferID)
+	return getTransfer(ctx, q, caller, agentID, transferID)
 }
 
-// getTransfer reads a transfer of the agent. A caller who names an agent that
-// does not exist learns no more than with a transfer that does not.
-func getTransfer(ctx context.Context, q *inventorydb.Queries, agentID, transferID uuid.UUID) (inventorydb.WhitetowerOwnershipTransfer, error) {
+// getTransfer reads a transfer of an agent that the caller may see. A caller
+// who names an agent that does not exist, or that they may not see, learns
+// no more than with a transfer that does not.
+func getTransfer(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, agentID, transferID uuid.UUID) (inventorydb.WhitetowerOwnershipTransfer, error) {
 	t, err := q.GetTransfer(ctx, inventorydb.GetTransferParams{ID: transferID, AgentID: agentID})
 	if err != nil {
 		return t, notFound(err, "ownership transfer of the agent")
 	}
-	return t, nil
+	a, err := q.GetAgent(ctx, agentID)
+	if err != nil {
+		return t, fmt.Errorf("reading the transfer's agent: %w", err)
+	}
+	return t, visible(caller, a.LifecycleState, "ownership transfer of the agent")
 }
 
 // canOwn refuses a principal that may not own agents: someone who is not an

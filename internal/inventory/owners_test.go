@@ -185,12 +185,19 @@ func TestOwnersAndOperatorsManageTheDelegates(t *testing.T) {
 	_, err = f.inv.AddDelegate(ctx, f.olivia, a.ID, uuid.MustParse(f.olivia.ID))
 	refused(t, err, inventory.Conflict)
 	nora := f.person(t, "Nora Owner", "owner")
-	for name, caller := range map[string]auth.Principal{"an owner of other agents": nora, "the advisory committee": f.alex, "a user": f.uma} {
+	for name, c := range map[string]struct {
+		caller auth.Principal
+		kind   inventory.RefusalKind
+	}{
+		"an owner of other agents":            {nora, inventory.Forbidden},
+		"the advisory committee":              {f.alex, inventory.Forbidden},
+		"a user, who sees only active agents": {f.uma, inventory.NotFound},
+	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := f.inv.AddDelegate(ctx, caller, a.ID, uuid.MustParse(nora.ID))
-			refused(t, err, inventory.Forbidden)
-			err = f.inv.RemoveDelegate(ctx, caller, a.ID, otto, "a reason")
-			refused(t, err, inventory.Forbidden)
+			_, err := f.inv.AddDelegate(ctx, c.caller, a.ID, uuid.MustParse(nora.ID))
+			refused(t, err, c.kind)
+			err = f.inv.RemoveDelegate(ctx, c.caller, a.ID, otto, "a reason")
+			refused(t, err, c.kind)
 		})
 	}
 
@@ -319,6 +326,24 @@ func TestATransferWaitsForItsRecipient(t *testing.T) {
 		_, err = f.inv.RequestTransfer(ctx, f.otto, a.ID, otto)
 		refused(t, err, inventory.Invalid)
 	})
+}
+
+// Security test ST-20: A break-glass session declines no ownership transfer, even as the person that the transfer names, although a decline needs no permission of its own
+func TestABreakGlassSessionDeclinesNoTransfer(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	a := f.propose(t, "invoice-triage")
+	tr, err := f.inv.RequestTransfer(ctx, f.olivia, a.ID, uuid.MustParse(f.otto.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	breakglass := f.otto
+	breakglass.IsBreakglass = true
+	_, err = f.inv.DeclineTransfer(ctx, breakglass, a.ID, tr.ID)
+	refused(t, err, inventory.Forbidden)
+	if got, err := f.inv.Get(ctx, f.alex, a.ID); err != nil || got.PendingTransfer == nil || got.PendingTransfer.ID != tr.ID {
+		t.Fatalf("got %+v, %v: want the transfer still pending", got, err)
+	}
 }
 
 func TestTheNewPrimaryOwnerStopsBeingADelegate(t *testing.T) {
@@ -492,7 +517,6 @@ func TestARefusedChangeOfTheOwnersTakesNoLock(t *testing.T) {
 		err  error
 	}{
 		{"a reassignment by an owner", reassign(f.olivia)},
-		{"a reassignment by a user", reassign(f.uma)},
 		{"a reassignment by a token without the scope", reassign(token(f.omar))},
 		{"a reassignment by a break-glass session", reassign(breakglass(f.omar))},
 		{"a new delegate by an owner of other agents", addDelegate(nora)},
@@ -500,7 +524,6 @@ func TestARefusedChangeOfTheOwnersTakesNoLock(t *testing.T) {
 		{"a new delegate by the owner's token without the scope", addDelegate(token(f.olivia))},
 		{"a new delegate by a break-glass session", addDelegate(breakglass(f.omar))},
 		{"a removed delegate by an owner of other agents", removeDelegate(nora)},
-		{"a removed delegate by a user", removeDelegate(f.uma)},
 		{"a removed delegate by the owner's token without the scope", removeDelegate(token(f.olivia))},
 		{"a removed delegate by a break-glass session", removeDelegate(breakglass(f.omar))},
 		{"an offer by a delegate", offer(dana)},
@@ -516,6 +539,7 @@ func TestARefusedChangeOfTheOwnersTakesNoLock(t *testing.T) {
 		{"an acceptance by the recipient in a break-glass session", accept(breakglass(f.otto))},
 		{"a refusal by the owner", decline(f.olivia)},
 		{"a refusal by an operator", decline(f.omar)},
+		{"a refusal by the recipient in a break-glass session", decline(breakglass(f.otto))},
 	} {
 		t.Run(c.name, func(t *testing.T) { refused(t, c.err, inventory.Forbidden) })
 	}

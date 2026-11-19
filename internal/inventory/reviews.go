@@ -132,8 +132,8 @@ func (inv *Inventory) GetReview(ctx context.Context, caller auth.Principal, id u
 		if err != nil {
 			return fmt.Errorf("reading the review's agent: %w", err)
 		}
-		if !seesAll(caller) && agent.LifecycleState != "active" {
-			return refuse(NotFound, "no review has this ID")
+		if err := visible(caller, agent.LifecycleState, "review"); err != nil {
+			return err
 		}
 		reviews, err := inv.reviewsOf(ctx, q, caller, []inventorydb.WhitetowerReview{r})
 		if err != nil {
@@ -406,8 +406,8 @@ func (inv *Inventory) readReview(ctx context.Context, q *inventorydb.Queries, ca
 	if err != nil {
 		return r, nil, err
 	}
-	if !seesAll(caller) && a.LifecycleState != "active" {
-		return r, nil, refuse(NotFound, "no review has this ID")
+	if err := visible(caller, a.LifecycleState, "review"); err != nil {
+		return r, nil, err
 	}
 	return r, a, nil
 }

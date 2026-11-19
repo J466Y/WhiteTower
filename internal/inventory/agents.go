@@ -262,8 +262,8 @@ func (inv *Inventory) Get(ctx context.Context, caller auth.Principal, id uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	if !seesAll(caller) && a.LifecycleState != "active" {
-		return nil, refuse(NotFound, "no agent has this ID")
+	if err := visible(caller, a.LifecycleState, "agent"); err != nil {
+		return nil, err
 	}
 	return a, nil
 }
@@ -312,7 +312,7 @@ func (inv *Inventory) Edit(ctx context.Context, caller auth.Principal, id uuid.U
 		if err != nil {
 			return err
 		}
-		if err := inv.mayEdit(ctx, q, caller, callerID, id); err != nil {
+		if err := inv.mayEdit(ctx, q, caller, callerID, before); err != nil {
 			return err
 		}
 		if ch.Labels != nil || ch.RiskTier != nil {
@@ -322,11 +322,12 @@ func (inv *Inventory) Edit(ctx context.Context, caller auth.Principal, id uuid.U
 			if err := shareSelectorHaltsLock(ctx, q); err != nil {
 				return err
 			}
-			// The agent and its owners may have changed before the lock.
+			// The agent, its state and its owners may have changed before the
+			// lock.
 			if before, err = inv.load(ctx, q, id); err != nil {
 				return err
 			}
-			if err := inv.mayEdit(ctx, q, caller, callerID, id); err != nil {
+			if err := inv.mayEdit(ctx, q, caller, callerID, before); err != nil {
 				return err
 			}
 		}
@@ -416,11 +417,15 @@ func (inv *Inventory) Edit(ctx context.Context, caller auth.Principal, id uuid.U
 	return inv.load(ctx, inventorydb.New(inv.db), id)
 }
 
-// mayEdit refuses a change of the agent's metadata or of its delegates to
-// anyone but its owners and operators, with agent.metadata.edit within their
+// mayEdit refuses a change of the agent's metadata or of its delegates to a
+// caller who may not see the agent, as if it did not exist, and to anyone
+// but its owners and operators, with agent.metadata.edit within their
 // token's scopes.
-func (inv *Inventory) mayEdit(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, actor, agentID uuid.UUID) error {
-	own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: agentID, PrincipalID: actor})
+func (inv *Inventory) mayEdit(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, actor uuid.UUID, a *Agent) error {
+	if err := visible(caller, a.LifecycleState, "agent"); err != nil {
+		return err
+	}
+	own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: a.ID, PrincipalID: actor})
 	if err != nil {
 		return fmt.Errorf("reading the agent's owners: %w", err)
 	}

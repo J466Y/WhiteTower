@@ -145,6 +145,17 @@ func seesAll(caller auth.Principal) bool {
 	return authz.Allows(caller.Roles, authz.PermissionInventoryView, authz.Relationship{})
 }
 
+// visible refuses an agent in the lifecycle state given to a caller who may
+// not see it, as notFound refuses a missing resource that what names: whoever
+// sees only active agents finds no other, and no refusal of a read or a
+// change tells them that it exists.
+func visible(caller auth.Principal, state, what string) error {
+	if !seesAll(caller) && state != "active" {
+		return refuse(NotFound, "no %s has this ID", what)
+	}
+	return nil
+}
+
 // actorType is the kind of actor that the caller is, in the audit log and in
 // the lifecycle's history.
 func actorType(caller auth.Principal) string {

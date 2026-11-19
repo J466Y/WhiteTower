@@ -342,8 +342,8 @@ func (inv *Inventory) Actions(ctx context.Context, caller auth.Principal, agentI
 		if err != nil {
 			return err
 		}
-		if !seesAll(caller) && a.LifecycleState != "active" {
-			return refuse(NotFound, "no agent has this ID")
+		if err := visible(caller, a.LifecycleState, "agent"); err != nil {
+			return err
 		}
 		own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: agentID, PrincipalID: actor})
 		if err != nil {
@@ -386,8 +386,8 @@ func (inv *Inventory) permits(ctx context.Context, caller auth.Principal, action
 // their kind, roles, scopes or relationship to the agent do not let them
 // take, and returns what it found of them.
 func (inv *Inventory) mayTake(ctx context.Context, q *inventorydb.Queries, caller auth.Principal, actor uuid.UUID, t transition, a *Agent) (facts, error) {
-	if !seesAll(caller) && a.LifecycleState != "active" {
-		return facts{}, refuse(NotFound, "no agent has this ID")
+	if err := visible(caller, a.LifecycleState, "agent"); err != nil {
+		return facts{}, err
 	}
 	own, err := q.IsOwner(ctx, inventorydb.IsOwnerParams{AgentID: a.ID, PrincipalID: actor})
 	if err != nil {
