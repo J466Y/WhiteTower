@@ -185,12 +185,19 @@ func TestOwnersAndOperatorsManageTheDelegates(t *testing.T) {
 	_, err = f.inv.AddDelegate(ctx, f.olivia, a.ID, uuid.MustParse(f.olivia.ID))
 	refused(t, err, inventory.Conflict)
 	nora := f.person(t, "Nora Owner", "owner")
-	for name, caller := range map[string]auth.Principal{"an owner of other agents": nora, "the advisory committee": f.alex, "a user": f.uma} {
+	for name, c := range map[string]struct {
+		caller auth.Principal
+		kind   inventory.RefusalKind
+	}{
+		"an owner of other agents":            {nora, inventory.Forbidden},
+		"the advisory committee":              {f.alex, inventory.Forbidden},
+		"a user, who sees only active agents": {f.uma, inventory.NotFound},
+	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := f.inv.AddDelegate(ctx, caller, a.ID, uuid.MustParse(nora.ID))
-			refused(t, err, inventory.Forbidden)
-			err = f.inv.RemoveDelegate(ctx, caller, a.ID, otto, "a reason")
-			refused(t, err, inventory.Forbidden)
+			_, err := f.inv.AddDelegate(ctx, c.caller, a.ID, uuid.MustParse(nora.ID))
+			refused(t, err, c.kind)
+			err = f.inv.RemoveDelegate(ctx, c.caller, a.ID, otto, "a reason")
+			refused(t, err, c.kind)
 		})
 	}
 
@@ -321,6 +328,24 @@ func TestATransferWaitsForItsRecipient(t *testing.T) {
 	})
 }
 
+// Security test ST-20: A break-glass session declines no ownership transfer, even as the person that the transfer names, although a decline needs no permission of its own
+func TestABreakGlassSessionDeclinesNoTransfer(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	a := f.propose(t, "invoice-triage")
+	tr, err := f.inv.RequestTransfer(ctx, f.olivia, a.ID, uuid.MustParse(f.otto.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	breakglass := f.otto
+	breakglass.IsBreakglass = true
+	_, err = f.inv.DeclineTransfer(ctx, breakglass, a.ID, tr.ID)
+	refused(t, err, inventory.Forbidden)
+	if got, err := f.inv.Get(ctx, f.alex, a.ID); err != nil || got.PendingTransfer == nil || got.PendingTransfer.ID != tr.ID {
+		t.Fatalf("got %+v, %v: want the transfer still pending", got, err)
+	}
+}
+
 func TestTheNewPrimaryOwnerStopsBeingADelegate(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
@@ -432,6 +457,105 @@ func TestReassignmentsUnderWayTogetherHappenOneAfterTheOther(t *testing.T) {
 	}
 	if won != 1 || f.primaries(t, a.ID) != 1 {
 		t.Errorf("%d reassignments won, and the agent has %d primary owners: want 1 and 1", won, f.primaries(t, a.ID))
+	}
+}
+
+// A change of an agent's owners or of its transfer refuses whoever may not
+// make it before it takes any lock: while another session holds the agent's
+// row, each refused caller gets their refusal at once, never a lock timeout
+// (the design of the halt path, section 2). Each allowed caller does wait for
+// the row.
+func TestARefusedChangeOfTheOwnersTakesNoLock(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	inv := f.impatient(t)
+	a := f.propose(t, "invoice-triage")
+	dana, nora := f.person(t, "Dana Delegate", "owner"), f.person(t, "Nora Owner", "owner")
+	if _, err := f.inv.AddDelegate(ctx, f.olivia, a.ID, uuid.MustParse(dana.ID)); err != nil {
+		t.Fatal(err)
+	}
+	tr, err := f.inv.RequestTransfer(ctx, f.olivia, a.ID, uuid.MustParse(f.otto.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a = f.get(t, a.ID)
+	f.holdAgents(t, a.ID)
+	reassign := func(by auth.Principal) error {
+		_, err := inv.Reassign(ctx, by, a.ID, a.Version, uuid.MustParse(nora.ID), "reorganization")
+		return err
+	}
+	addDelegate := func(by auth.Principal) error {
+		_, err := inv.AddDelegate(ctx, by, a.ID, uuid.MustParse(nora.ID))
+		return err
+	}
+	removeDelegate := func(by auth.Principal) error {
+		return inv.RemoveDelegate(ctx, by, a.ID, uuid.MustParse(dana.ID), "moved on")
+	}
+	offer := func(by auth.Principal) error {
+		_, err := inv.RequestTransfer(ctx, by, a.ID, uuid.MustParse(nora.ID))
+		return err
+	}
+	cancel := func(by auth.Principal) error { return inv.CancelTransfer(ctx, by, a.ID, tr.ID) }
+	accept := func(by auth.Principal) error {
+		_, err := inv.AcceptTransfer(ctx, by, a.ID, tr.ID)
+		return err
+	}
+	decline := func(by auth.Principal) error {
+		_, err := inv.DeclineTransfer(ctx, by, a.ID, tr.ID)
+		return err
+	}
+	token := func(p auth.Principal) auth.Principal {
+		p.Scopes = []string{"inventory.view"}
+		return p
+	}
+	breakglass := func(p auth.Principal) auth.Principal {
+		p.IsBreakglass = true
+		return p
+	}
+	for _, c := range []struct {
+		name string
+		err  error
+	}{
+		{"a reassignment by an owner", reassign(f.olivia)},
+		{"a reassignment by a token without the scope", reassign(token(f.omar))},
+		{"a reassignment by a break-glass session", reassign(breakglass(f.omar))},
+		{"a new delegate by an owner of other agents", addDelegate(nora)},
+		{"a new delegate by the advisory committee", addDelegate(f.alex)},
+		{"a new delegate by the owner's token without the scope", addDelegate(token(f.olivia))},
+		{"a new delegate by a break-glass session", addDelegate(breakglass(f.omar))},
+		{"a removed delegate by an owner of other agents", removeDelegate(nora)},
+		{"a removed delegate by the owner's token without the scope", removeDelegate(token(f.olivia))},
+		{"a removed delegate by a break-glass session", removeDelegate(breakglass(f.omar))},
+		{"an offer by a delegate", offer(dana)},
+		{"an offer by an operator", offer(f.omar)},
+		{"an offer by the owner's token without the scope", offer(token(f.olivia))},
+		{"an offer by a break-glass session", offer(breakglass(f.omar))},
+		{"a cancellation by the recipient", cancel(f.otto)},
+		{"a cancellation by the advisory committee", cancel(f.alex)},
+		{"a cancellation by the owner's token without the scope", cancel(token(f.olivia))},
+		{"a cancellation by a break-glass session", cancel(breakglass(f.omar))},
+		{"an acceptance by someone else", accept(nora)},
+		{"an acceptance by the recipient's token without the scope", accept(token(f.otto))},
+		{"an acceptance by the recipient in a break-glass session", accept(breakglass(f.otto))},
+		{"a refusal by the owner", decline(f.olivia)},
+		{"a refusal by an operator", decline(f.omar)},
+		{"a refusal by the recipient in a break-glass session", decline(breakglass(f.otto))},
+	} {
+		t.Run(c.name, func(t *testing.T) { refused(t, c.err, inventory.Forbidden) })
+	}
+	for _, c := range []struct {
+		name string
+		err  error
+	}{
+		{"a reassignment by an operator", reassign(f.omar)},
+		{"a new delegate by the owner", addDelegate(f.olivia)},
+		{"a removed delegate by the owner", removeDelegate(f.olivia)},
+		{"an offer by the owner", offer(f.olivia)},
+		{"a cancellation by the owner", cancel(f.olivia)},
+		{"an acceptance by the recipient", accept(f.otto)},
+		{"a refusal by the recipient", decline(f.otto)},
+	} {
+		t.Run(c.name, func(t *testing.T) { waited(t, c.err) })
 	}
 }
 

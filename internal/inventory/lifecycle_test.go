@@ -384,3 +384,48 @@ func TestDecisionsOnOneUseCaseHappenOneAfterTheOther(t *testing.T) {
 		t.Fatalf("got %+v, %v: want the agent still proposed", got, err)
 	}
 }
+
+// A transition refuses whoever may not take it before it takes any lock:
+// while another session holds the agents' rows, each refused caller gets
+// their refusal at once, never a lock timeout. Otherwise a stream of refused
+// requests would hold the agent's row, which an agent halt locks before it
+// takes the version counter (the design of the halt path, section 2). An
+// allowed caller does wait for the row.
+func TestARefusedTransitionTakesNoLock(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	inv := f.impatient(t)
+	draft := f.propose(t, "invoice-triage")
+	proposed := f.submitted(t, "invoice-sorter")
+	ready := f.inState(t, "invoice-reader", "ready")
+	ada := f.member(t, "Ada Advisory", "owner", "advisory")
+	if _, err := f.inv.AddDelegate(ctx, f.olivia, proposed.ID, uuid.MustParse(ada.ID)); err != nil {
+		t.Fatal(err)
+	}
+	proposed = f.get(t, proposed.ID)
+	f.holdAgents(t, draft.ID, proposed.ID, ready.ID)
+	act := func(by auth.Principal, a *inventory.Agent, action string) error {
+		_, err := inv.Transition(ctx, by, a.ID, a.Version, action, "A comment.")
+		return err
+	}
+	viewer := f.alex
+	viewer.Scopes = []string{"inventory.view"}
+	breakglass := auth.Principal{ID: f.omar.ID, Kind: auth.Human, Roles: []string{"operator", "advisory"}, IsBreakglass: true}
+	for _, c := range []struct {
+		name string
+		err  error
+		kind inventory.RefusalKind
+	}{
+		{"another owner submits", act(f.otto, draft, "submit"), inventory.Forbidden},
+		{"another owner activates", act(f.otto, ready, "activate"), inventory.Forbidden},
+		{"an operator validates", act(f.omar, proposed, "validate"), inventory.Forbidden},
+		{"a token without the action's scope validates", act(viewer, proposed, "validate"), inventory.Forbidden},
+		{"a break-glass session validates", act(breakglass, proposed, "validate"), inventory.Forbidden},
+		{"a service account activates", act(f.serviceAccount(t, "operator"), ready, "activate"), inventory.Forbidden},
+		{"a delegate validates, whom separation of duties refuses", act(ada, proposed, "validate"), inventory.Forbidden},
+		{"a user, who sees only active agents, validates", act(f.uma, proposed, "validate"), inventory.NotFound},
+	} {
+		t.Run(c.name, func(t *testing.T) { refused(t, c.err, c.kind) })
+	}
+	waited(t, act(f.olivia, ready, "activate"))
+}

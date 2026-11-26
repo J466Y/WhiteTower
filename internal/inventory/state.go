@@ -51,12 +51,14 @@ func (NoSelectorHalts) Matching(context.Context, *db.Tx, govstate.Attributes) ([
 }
 
 // shareSelectorHaltsLock takes the selector halts' advisory lock in its
-// shared form, first in a transaction that creates an agent or changes its
-// labels or its risk tier: a selector halt takes it exclusively, first in
-// its own, so that the two take turns. At read committed they would
-// otherwise miss each other: the halt would not see the new agent or its new
-// labels, and the writer would not see the halt (the design of the halt
-// path, section 8). Taken first, it is never waited for while a row is held.
+// shared form, in a transaction that creates an agent or changes its labels
+// or its risk tier, once the caller's checks pass and before any other lock:
+// a selector halt takes it exclusively, first in its own, so that the two
+// take turns. At read committed they would otherwise miss each other: the
+// halt would not see the new agent or its new labels, and the writer would
+// not see the halt (the design of the halt path, section 8). Taken before
+// any other lock, it is never waited for while a row is held, and a caller
+// whom the writer refuses never takes it (section 2).
 func shareSelectorHaltsLock(ctx context.Context, q *inventorydb.Queries) error {
 	if err := q.ShareSelectorHaltsLock(ctx, govstate.SelectorHaltsLock); err != nil {
 		return fmt.Errorf("taking the selector halts' lock: %w", err)

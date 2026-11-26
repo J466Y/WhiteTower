@@ -490,7 +490,7 @@ A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-0
 - The guard job finds the owners who became inactive by its periodic sweep, every minute. A hook on P1-03's deactivation, which step 7 mentions, would suspend their agents without waiting for the sweep; it needs code in `internal/authn`, outside this plan's parts, and is left for later.
 - P1-16 implements `inventory.Tooling` from `agent_tooling.last_used_at`.
 - P1-17 registers the four `lifecycle.review_*` settings with the rules that the inventory checks at read.
-- `Inventory.Transition` locks the agent's row before it checks the caller, as completions and sign-offs did before the review of 2026-11-18: a refused caller takes the lock that an agent halt queues behind. It is merged code outside this part, so the review queues a fix of its own.
+- `Inventory.Transition` locks the agent's row before it checks the caller, as completions and sign-offs did before the review of 2026-11-18: a refused caller takes the lock that an agent halt queues behind. It is merged code outside this part, so the review queues a fix of its own. Closed by the fix of 2026-11-19, with the other writers that did the same.
 - The framework mapping could name `review.changed` among the evidence of ISO/IEC 42001 A.6.2.6, beside INV-06.
 
 ### 2026-11-18: the lifecycle guard job (PR 5b)
@@ -532,3 +532,35 @@ A fix outside the eight pull requests, from point 31 of RFC-0001's review ([P0-0
 - Pending ownership transfers whose recipient became inactive could expire in the guard (pull request 3's follow-up).
 - P1-17 registers `lifecycle.review_reminder_days` with the rules that the guard checks at read.
 - A test of the guard against a running deployment, once `test/e2e` can sign in.
+
+### 2026-11-19: checking the caller before any lock (fix)
+
+A fix outside the plan's pull requests, from the review of part 5a (2026-11-18). As section 2 of the [design note](P1-08-kill-switch.md#progress-notes) says, a writer makes every check that can refuse the caller before it takes any lock, the shared form of the selector halts' advisory lock included, and under the locks checks again only what can have changed. So a stream of refused requests holds nothing that an agent halt queues behind.
+
+**Decisions of 2026-11-19.** The review of the fix decided the two points that the fix raised, both to deny more:
+
+| Question | Decision |
+| --- | --- |
+| The writers of owners and transfers, and the edit, checked no visibility: a user, who sees only active agents, learned from `forbidden` rather than `not_found` that an agent in another state exists | Every writer refuses whoever may not see the agent with `not_found`, before any other check of the caller and before any lock, and again under the locks where it reads the agent again, since its state can change. The refusal is word for word that of a missing resource: `no agent has this ID`, or for the writers of a transfer `no ownership transfer of the agent has this ID`, as a missing agent or transfer gives. One function, `visible`, now decides it for the reads (`Get`, `Actions`, `GetReview`, the review that a completion or a sign-off reads) and for the writers |
+| A decline checked no permission in the inventory: only the API layer refused it to a break-glass session (`declineOwnershipTransfer`) | `DeclineTransfer` refuses a break-glass session itself, before any lock, with the `forbidden` that the Authorizer gives the session for every other change: "your roles do not permit this" (ST-20). A decline still needs no other permission: whoever the transfer names declines it |
+
+A person who keeps only the user role after they were offered a transfer of an agent that is not active can no longer decline it, since they no longer see the agent; its giver or an operator cancels it.
+
+- **The writers that locked first.** Each now reads what decides a refusal without a lock, refuses at once, and only then takes the locks it took before, in the same order:
+
+  | Writer | Checked before any lock | Checked under the locks |
+  | --- | --- | --- |
+  | `Transition` | The agent exists and the caller may see it; the caller's kind, the action's permission within their token's scopes, and ownership for the actions that only owners take (`mayTake`); separation of duties (`conflicted`, `separated`) | The same again, on the agent and the use case read under their locks, since the agent's state, its owners and its use case may have changed; then the version, the state, the comment and the other guards, as before |
+  | `Reassign` | The agent exists and the caller may see it; `agent.ownership.reassign` | That the caller may see the agent; the version, the state and the new owner, as before. The permission does not depend on the agent |
+  | `AddDelegate`, `RemoveDelegate` (`mayEditOwners`) | The agent exists and the caller may see it; `agent.metadata.edit`, as one of its owners or not (`mayEdit`) | The caller again, since the agent's state and its owners may have changed; the state, and the delegate, as before |
+  | `RequestTransfer` | The agent exists and the caller may see it; the caller is its primary owner, with `agent.metadata.edit` (`mayOffer`) | The caller again, since the agent's state and its primary owner may have changed; the state and the recipient, as before |
+  | `CancelTransfer` | The transfer exists and the caller may see its agent (`getTransfer`); `agent.metadata.edit`, as its requester or not | That the caller may see the agent; the transfer's status, as before. The requester never changes |
+  | `AcceptTransfer`, `DeclineTransfer` | The transfer exists, the caller may see its agent, and the transfer names the caller (`transferFor`); for an acceptance, `agent.propose`; for a decline, that the caller is not a break-glass session | That the caller may see the agent; the transfer's status, and for an acceptance the agent's state, its primary owner and the recipient, as before. The person that a transfer names never changes |
+  | The agent's edit | The agent exists and the caller may see it; `agent.metadata.edit`, as one of its owners or not (`mayEdit`) | An edit of the labels or the risk tier takes the shared form of the selector halts' advisory lock only then, and reads the agent and checks the caller again; then the version and the rest, as before. Any other edit takes no lock before its update, as before |
+
+- **What stays as it was.** But for the two decisions, each refusal keeps its kind, its message and its precedence, since the checks made before the locks are the first ones made under them, in the same order. An allowed caller takes the same locks in the same order. `SystemTransition`, the halt path and the contracts do not change. A refused caller makes plain reads only, unless what refuses them changed between the read and the locks.
+- **The other writers of the inventory** already refused before they locked: `Propose` and `CreateUseCase` check the caller before their transaction, `EditUseCase` before its update, `CompleteReview` and `SignOffReview` since part 5a. The guard job has no caller.
+- **Tests:**
+  - `TestARefusedTransitionTakesNoLock`, `TestARefusedChangeOfTheOwnersTakesNoLock` and `TestARefusedEditTakesNoLock`, on connections that wait at most 200 ms for a lock, as part 5a's `TestARefusedCompletionOrSignOffTakesNoLock`. While another session holds the agents' rows, and for the edit the selector halts' advisory lock in its exclusive form, every refused caller gets their refusal at once: another owner, an operator or the advisory committee without the permission, a token without the scope, a break-glass session, the recipient of a transfer in a break-glass session declining it, a service account, a delegate whom separation of duties refuses, and someone whom a transfer does not name. Each writer's allowed caller waits for the lock, and times out.
+  - `TestWhoeverSeesOnlyActiveAgentsChangesNoOther`, on the same connections, while another session holds the agents' rows. On an agent that is not active, a user gets from each writer the refusal that an agent that does not exist gives, word for word: the edit, a transition, a reassignment, a new or a removed delegate, an offer, and the cancellation, acceptance and refusal of a transfer. On an active agent, they get the `forbidden` of before. The users whom `TestOwnersAndOperatorsEditAnAgent` and `TestOwnersAndOperatorsManageTheDelegates` refused on a draft now get `not_found`.
+  - `TestABreakGlassSessionDeclinesNoTransfer` (ST-20): the recipient in a break-glass session declines nothing, and the transfer stays pending.

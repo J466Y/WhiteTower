@@ -9,8 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/J466Y/WhiteTower/internal/govstate"
 	"github.com/J466Y/WhiteTower/internal/inventory"
 	"github.com/J466Y/WhiteTower/internal/platform/auth"
+	"github.com/J466Y/WhiteTower/internal/platform/db"
 )
 
 func TestAProposalBecomesADraftOwnedByItsProposer(t *testing.T) {
@@ -232,6 +234,87 @@ func TestWhoeverSeesOnlyActiveAgentsSeesNoOther(t *testing.T) {
 	}
 }
 
+// Whoever sees only active agents finds no other to change: every writer
+// refuses them an agent that is not active, word for word as an agent, or a
+// transfer, that does not exist, before any other check of the caller and
+// before any lock, so that no refusal tells them that the agent exists (the
+// review's decision of 2026-11-19). An active agent refuses them as before.
+func TestWhoeverSeesOnlyActiveAgentsChangesNoOther(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	inv := f.impatient(t)
+	draft := f.propose(t, "invoice-triage")
+	active := f.inState(t, "invoice-reader", "active")
+	dana, nora := uuid.MustParse(f.person(t, "Dana Delegate", "owner").ID), uuid.MustParse(f.person(t, "Nora Owner", "owner").ID)
+	transfers := map[uuid.UUID]uuid.UUID{}
+	for _, a := range []*inventory.Agent{draft, active} {
+		if _, err := f.inv.AddDelegate(ctx, f.olivia, a.ID, dana); err != nil {
+			t.Fatal(err)
+		}
+		tr, err := f.inv.RequestTransfer(ctx, f.olivia, a.ID, uuid.MustParse(f.otto.ID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		transfers[a.ID] = tr.ID
+	}
+	draft, active = f.get(t, draft.ID), f.get(t, active.ID)
+	// An agent that does not exist, named with the draft's transfer.
+	missing := *draft
+	missing.ID = uuid.Must(uuid.NewV7())
+	transfers[missing.ID] = transfers[draft.ID]
+	f.holdAgents(t, draft.ID, active.ID)
+	hr := map[string]string{"team": "hr"}
+	for _, w := range []struct {
+		name  string
+		write func(a *inventory.Agent) error
+	}{
+		{"an edit", func(a *inventory.Agent) error {
+			_, err := inv.Edit(ctx, f.uma, a.ID, a.Version, inventory.AgentChanges{Labels: &hr})
+			return err
+		}},
+		{"a transition", func(a *inventory.Agent) error {
+			_, err := inv.Transition(ctx, f.uma, a.ID, a.Version, "suspend", "Suspected misuse.")
+			return err
+		}},
+		{"a reassignment", func(a *inventory.Agent) error {
+			_, err := inv.Reassign(ctx, f.uma, a.ID, a.Version, nora, "reorganization")
+			return err
+		}},
+		{"a new delegate", func(a *inventory.Agent) error {
+			_, err := inv.AddDelegate(ctx, f.uma, a.ID, nora)
+			return err
+		}},
+		{"a removed delegate", func(a *inventory.Agent) error {
+			return inv.RemoveDelegate(ctx, f.uma, a.ID, dana, "moved on")
+		}},
+		{"an offer", func(a *inventory.Agent) error {
+			_, err := inv.RequestTransfer(ctx, f.uma, a.ID, nora)
+			return err
+		}},
+		{"a cancellation", func(a *inventory.Agent) error {
+			return inv.CancelTransfer(ctx, f.uma, a.ID, transfers[a.ID])
+		}},
+		{"an acceptance", func(a *inventory.Agent) error {
+			_, err := inv.AcceptTransfer(ctx, f.uma, a.ID, transfers[a.ID])
+			return err
+		}},
+		{"a refusal", func(a *inventory.Agent) error {
+			_, err := inv.DeclineTransfer(ctx, f.uma, a.ID, transfers[a.ID])
+			return err
+		}},
+	} {
+		t.Run(w.name, func(t *testing.T) {
+			hidden, absent := w.write(draft), w.write(&missing)
+			refused(t, hidden, inventory.NotFound)
+			refused(t, absent, inventory.NotFound)
+			if hidden.Error() != absent.Error() {
+				t.Errorf("an agent that is not active: %q; one that does not exist: %q", hidden, absent)
+			}
+			refused(t, w.write(active), inventory.Forbidden)
+		})
+	}
+}
+
 func TestAgentsAreListedBySlugOnePageAtATime(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
@@ -322,15 +405,66 @@ func TestOwnersAndOperatorsEditAnAgent(t *testing.T) {
 	ctx := context.Background()
 	a := f.propose(t, "invoice-triage")
 	name := "Invoice sorter"
-	for caller, p := range map[string]auth.Principal{"another owner": f.otto, "the advisory committee": f.alex, "a user": f.uma} {
+	for caller, c := range map[string]struct {
+		p    auth.Principal
+		kind inventory.RefusalKind
+	}{
+		"another owner":                       {f.otto, inventory.Forbidden},
+		"the advisory committee":              {f.alex, inventory.Forbidden},
+		"a user, who sees only active agents": {f.uma, inventory.NotFound},
+	} {
 		t.Run(caller, func(t *testing.T) {
-			_, err := f.inv.Edit(ctx, p, a.ID, a.Version, inventory.AgentChanges{Name: &name})
-			refused(t, err, inventory.Forbidden)
+			_, err := f.inv.Edit(ctx, c.p, a.ID, a.Version, inventory.AgentChanges{Name: &name})
+			refused(t, err, c.kind)
 		})
 	}
 	if _, err := f.inv.Edit(ctx, f.omar, a.ID, a.Version, inventory.AgentChanges{Name: &name}); err != nil {
 		t.Fatalf("an operator: %v", err)
 	}
+}
+
+// An edit refuses whoever may not make it before it takes any lock, the
+// shared form of the selector halts' advisory lock included: while another
+// session holds that lock exclusively and the agent's row, as a selector halt
+// under way does, each refused caller gets their refusal at once, never a
+// lock timeout (the design of the halt path, section 2). An allowed caller
+// does wait for the lock.
+func TestARefusedEditTakesNoLock(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	inv := f.impatient(t)
+	a := f.propose(t, "invoice-triage")
+	f.held(t,
+		func(ctx context.Context, tx *db.Tx) error {
+			if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, govstate.SelectorHaltsLock); err != nil {
+				return err
+			}
+			_, err := tx.Exec(ctx, `SELECT 1 FROM whitetower.agents WHERE id = $1 FOR NO KEY UPDATE`, a.ID)
+			return err
+		},
+		func(context.Context, *db.Tx) error { return nil })
+	hr, critical := map[string]string{"team": "hr"}, "critical"
+	labels, risk := inventory.AgentChanges{Labels: &hr}, inventory.AgentChanges{RiskTier: &critical}
+	edit := func(by auth.Principal, ch inventory.AgentChanges) error {
+		_, err := inv.Edit(ctx, by, a.ID, a.Version, ch)
+		return err
+	}
+	viewer := f.olivia
+	viewer.Scopes = []string{"inventory.view"}
+	breakglass := auth.Principal{ID: f.omar.ID, Kind: auth.Human, Roles: []string{"operator"}, IsBreakglass: true}
+	for _, c := range []struct {
+		name string
+		err  error
+	}{
+		{"another owner edits the labels", edit(f.otto, labels)},
+		{"another owner edits the risk tier", edit(f.otto, risk)},
+		{"the advisory committee edits the labels", edit(f.alex, labels)},
+		{"the owner's token without the scope edits the labels", edit(viewer, labels)},
+		{"a break-glass session edits the risk tier", edit(breakglass, risk)},
+	} {
+		t.Run(c.name, func(t *testing.T) { refused(t, c.err, inventory.Forbidden) })
+	}
+	waited(t, edit(f.olivia, labels))
 }
 
 func TestAnEditKeepsTheRulesOfTheAgent(t *testing.T) {
